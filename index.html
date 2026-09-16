@@ -31,7 +31,7 @@
   .modal-section{background:var(--paper);border-radius:10px;padding:20px 22px;margin:20px 0;border-left:4px solid var(--accent);}
   .modal-section h3{margin:0 0 14px;font-size:17px;font-weight:700;color:var(--text);}
   .modal p, .modal .field label, .modal .ticket-meta{font-size:15px;}
-  .modal{font-size:15.5px;line-height:1.55;}
+  .modal{font-size:16.5px;line-height:1.6;}
   .list-row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--paper);border-radius:8px;padding:11px 14px;margin-bottom:8px;cursor:pointer;border:1px solid transparent;}
   .list-row:hover{border-color:var(--accent);}
   .list-row .lr-main{font-weight:600;font-size:13.5px;}
@@ -81,9 +81,9 @@
   .pill-done{background:#DFF0E4;color:var(--ok);}
   .pill-delivered{background:#E3E7F0;color:#3D4A78;}
   .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,.15);}
-  .riga-dot{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid var(--border);margin-right:4px;vertical-align:middle;font-size:10px;line-height:1;opacity:.45;transition:opacity .15s;}
-  .riga-dot:hover{opacity:.8;}
-  .riga-dot.active{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink);opacity:1;}
+  .riga-status-select{border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px;font-weight:600;cursor:pointer;min-width:130px;}
+  .desc-lavoro{width:100%;min-height:110px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;font-size:16px;font-family:inherit;resize:vertical;}
+  .desc-lavoro:focus{outline:2px solid var(--accent);outline-offset:1px;}
   .pill-open{background:#FBE1DA;color:var(--danger);}
   .pill-accepted{background:#DFF0E4;color:var(--ok);}
   .pill-sent{background:#DDEAF3;color:var(--teal);}
@@ -113,26 +113,29 @@
   .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
   .filters{display:flex;gap:8px;flex-wrap:wrap;}
   .empty{padding:30px 10px;text-align:center;color:var(--muted);font-size:13.5px;}
-  .kanban{display:grid;grid-template-columns:repeat(5,minmax(210px,1fr));gap:12px;overflow-x:auto;}
-  @media(max-width:1100px){.kanban{grid-template-columns:repeat(5,260px);}}
-  .kanban-col{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card);padding:10px;min-width:210px;}
-  .kanban-col h4{margin:2px 6px 10px;font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;}
-  .job-card{background:var(--paper);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;border-top:3px dashed var(--accent);font-size:12.5px;cursor:pointer;}
+  .kanban{display:grid;grid-template-columns:repeat(5,minmax(250px,1fr));gap:14px;overflow-x:auto;}
+  @media(max-width:1100px){.kanban{grid-template-columns:repeat(5,300px);}}
+  .kanban-col{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card);padding:12px;min-width:250px;}
+  .kanban-col h4{margin:2px 8px 12px;font-size:13.5px;color:var(--muted);display:flex;justify-content:space-between;font-weight:600;}
+  .job-card{background:var(--paper);border:1px solid var(--border);border-radius:9px;padding:14px;margin-bottom:12px;border-top:4px dashed var(--accent);font-size:14px;cursor:pointer;}
   .job-card:hover{border-color:var(--accent);}
-  .job-card .jc-client{font-weight:700;font-size:13px;margin-bottom:2px;}
-  .job-card .jc-cat{color:var(--teal);font-size:11.5px;font-weight:600;margin-bottom:6px;}
-  .job-card .jc-lines{margin-bottom:6px;}
-  .job-card .jc-line{color:var(--teal);font-size:11.5px;font-weight:600;line-height:1.5;}
-  .job-card .jc-meta{color:var(--muted);font-size:11.5px;display:flex;justify-content:space-between;margin-top:6px;}
+  .job-card.job-card-importante{border:2px solid #F1C40F;border-top:4px solid #F1C40F;background:#FFFBEB;box-shadow:0 2px 8px rgba(241,196,15,.25);}
+  .job-card .jc-star{color:#B8860B;font-size:11.5px;font-weight:800;letter-spacing:.4px;margin-bottom:6px;}
+  .job-card .jc-client{font-weight:700;font-size:15px;margin-bottom:4px;}
+  .job-card .jc-cat{color:var(--teal);font-size:12.5px;font-weight:600;margin-bottom:6px;}
+  .job-card .jc-lines{margin-bottom:8px;}
+  .job-card .jc-line{color:var(--teal);font-size:12.5px;font-weight:600;line-height:1.6;}
+  .job-card .jc-desc{font-size:13px;color:var(--text);margin-bottom:8px;}
+  .job-card .jc-meta{color:var(--muted);font-size:12.5px;display:flex;justify-content:space-between;margin-top:8px;font-weight:600;}
   .modal-backdrop{position:fixed;inset:0;background:rgba(10,14,22,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 20px;z-index:50;overflow-y:auto;}
   .modal-backdrop.open{display:flex;}
   .modal{background:var(--card);border-radius:12px;max-width:760px;width:100%;padding:30px;position:relative;margin-bottom:40px;}
-  .modal h2{margin:0 0 4px;font-size:24px;font-weight:700;}
-  .modal h3{font-size:17px;font-weight:700;margin:20px 0 10px;}
+  .modal h2{margin:0 0 4px;font-size:26px;font-weight:800;}
+  .modal h3{font-size:18.5px;font-weight:800;margin:22px 0 12px;}
   .modal .close-x{position:absolute;top:16px;right:18px;cursor:pointer;color:var(--muted);font-size:24px;background:none;border:none;}
   .modal .btn{font-size:14.5px;padding:11px 20px;}
   .modal .btn-sm{font-size:13px;padding:7px 13px;}
-  .ticket-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px;margin:16px 0 20px;font-size:15px;font-weight:600;}
+  .ticket-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px;margin:16px 0 20px;font-size:16.5px;font-weight:700;}
   .ticket-meta div span{display:block;font-size:11.5px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px;}
   .steps{display:flex;flex-direction:column;gap:9px;margin-bottom:14px;}
   .step-row{display:flex;align-items:center;gap:12px;font-size:15px;padding:9px 12px;border-radius:7px;background:var(--card);}
@@ -220,6 +223,7 @@ const KANBAN_STATUSES = STATUSES.filter(s=>s!=="Consegnato");
 const STATUS_CLASS = {"Da fare":"pill-todo","In lavorazione":"pill-lavorazione","In produzione":"pill-produzione","Completato":"pill-done","Consegnato":"pill-delivered"};
 const STATUS_DOT = {"Da fare":"#FFFFFF","In lavorazione":"#E74C3C","In produzione":"#F1C40F","Completato":"#2ECC71","Consegnato":"#3D4A78"};
 function statusDot(stato){ return `<span class="status-dot" style="background:${STATUS_DOT[stato]||'#ccc'}"></span>`; }
+function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#4A4A4A" : "#fff"; }
 const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
 const QUOTE_CLASS = {"Bozza":"pill-draft","Inviato":"pill-sent","Accettato":"pill-accepted","Rifiutato":"pill-refused"};
 const STEP_TEMPLATES = {
@@ -249,9 +253,9 @@ function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toIS
 /* ---- Mapping camelCase (app) <-> snake_case (database) ---- */
 function toDbRow(collection, o){
   switch(collection){
-    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null};
+    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null};
     case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito};
-    case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:o.daFatturare!==false, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[]};
+    case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, materiale_ordinato:!!o.materialeOrdinato, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
     case "warehouse": return {id:o.id, nome:o.nome||null, categoria:o.categoria||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
     case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
@@ -261,10 +265,10 @@ function toDbRow(collection, o){
 }
 function fromDbRow(collection, r){
   switch(collection){
-    case "clients": return {id:r.id, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||""};
+    case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||""};
     case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito};
     case "orders": {
-      const o = {id:r.id, clientId:r.client_id, descrizione:r.descrizione||"", worker:r.worker||"", stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:r.da_fatturare!==false, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[]};
+      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:r.worker||"", stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, materialeOrdinato:!!r.materiale_ordinato, fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[]};
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:r.metodo};
@@ -378,7 +382,7 @@ function orderWorkersLabel(o){ return o.worker || "non assegnato"; }
 function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, consegnaTipo){
   const order = {id, clientId, descrizione, worker, stato, dataConsegna,
     righe: (righe && righe.length) ? righe : [emptyRiga(true)],
-    ivaApplicata:false, daFatturare:true, importante:false, sconto:0, costoSpedizione:0, clienteAvvisato:false,
+    ivaApplicata:false, daFatturare:false, importante:false, sconto:0, costoSpedizione:0, clienteAvvisato:false, materialeOrdinato:false, fatturato:false,
     consegnaTipo: consegnaTipo || "Ritiro in sede", spedito:false,
     fasi: [], note:""};
   recalcFasi(order);
@@ -461,9 +465,9 @@ function renderDashboard(){
   const scorteBasse = state.warehouse.filter(w=>Number(w.quantita)<=Number(w.scortaMinima));
   const completatiDaConsegnare = state.orders.filter(o=>o.stato==="Completato");
   const daSpedire = state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato");
-  const daFatturare = state.orders.filter(o=>o.daFatturare);
+  const daFatturare = state.orders.filter(o=>o.daFatturare && !o.fatturato);
   const ordiniImportanti = state.orders.filter(o=>o.importante && o.stato!=="Consegnato");
-  const materialeDaOrdinare = state.orders.filter(o=>o.stato!=="Consegnato" && o.fasi.some(f=>f.nome==="Materiale da ordinare" && !f.completata));
+  const materialeDaOrdinare = state.orders.filter(o=>o.stato!=="Consegnato" && !o.materialeOrdinato && o.fasi.some(f=>f.nome==="Materiale da ordinare" && f.completata));
   const daAvvisare = state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato);
   const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>o.worker===w && o.stato!=="Consegnato").length}));
   const oggi = today();
@@ -567,9 +571,9 @@ function openDashboardList(type){
     attivi: {title:"Ordini attivi", items: state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato")},
     completati: {title:"Completati da consegnare", items: state.orders.filter(o=>o.stato==="Completato")},
     spedire: {title:"Ordini da spedire", items: state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato")},
-    fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare)},
+    fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato)},
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
-    materiale: {title:"Materiale da ordinare", items: state.orders.filter(o=>o.stato!=="Consegnato" && o.fasi.some(f=>f.nome==="Materiale da ordinare" && !f.completata))},
+    materiale: {title:"Materiale da ordinare", items: state.orders.filter(o=>o.stato!=="Consegnato" && !o.materialeOrdinato && o.fasi.some(f=>f.nome==="Materiale da ordinare" && f.completata))},
     avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato)},
     preventivi: {title:"Preventivi in attesa", items: state.quotes.filter(q=>q.stato==="Bozza"||q.stato==="Inviato"), isQuote:true},
     scorte: {title:"Articoli sotto scorta", items: state.warehouse.filter(w=>Number(w.quantita)<=Number(w.scortaMinima)), isStock:true}
@@ -616,6 +620,7 @@ function settoreOptions(sel){ return `<option value="">Seleziona settore…</opt
 /* Campi cliente riutilizzabili (usati sia nel form Clienti sia nei form rapidi di Preventivi/Ordini) */
 function clientFieldsHTML(prefix, existing){
   const e = existing || {};
+  const hasFatturazione = !!(e.indirizzo||e.citta||e.cap||e.provincia||e.partitaIva||e.codiceFiscale||e.pec||e.codiceSDI);
   return `
     <div class="form-grid">
       <div class="field"><label>Tipo cliente</label>
@@ -624,36 +629,46 @@ function clientFieldsHTML(prefix, existing){
     </div>
     <div class="form-grid" id="${prefix}-business" style="margin-top:12px;">
       <div class="field"><label>Ragione sociale / Nome azienda</label><input id="${prefix}-ragsoc" placeholder="Es. Bar Centrale Srl" value="${e.ragioneSociale||''}"></div>
-      <div class="field"><label>Referente (nome)</label><input id="${prefix}-refnome" value="${e.refNome||''}"></div>
-      <div class="field"><label>Referente (cognome)</label><input id="${prefix}-refcognome" value="${e.refCognome||''}"></div>
-      <div class="field"><label>Settore *</label><select id="${prefix}-settore">${settoreOptions(e.settore)}</select></div>
+      <div class="field"><label>Nome</label><input id="${prefix}-refnome" value="${e.refNome||''}"></div>
+      <div class="field"><label>Cognome</label><input id="${prefix}-refcognome" value="${e.refCognome||''}"></div>
     </div>
     <div class="form-grid" id="${prefix}-family" style="margin-top:12px;display:none;">
       <div class="field"><label>Nome</label><input id="${prefix}-nome" value="${e.nome||''}"></div>
       <div class="field"><label>Cognome</label><input id="${prefix}-cognome" value="${e.cognome||''}"></div>
     </div>
     <div class="form-grid" style="margin-top:12px;">
-      <div class="field"><label>Indirizzo</label><input id="${prefix}-indirizzo" value="${e.indirizzo||''}"></div>
-      <div class="field"><label>Città</label><input id="${prefix}-citta" value="${e.citta||''}"></div>
-      <div class="field"><label>CAP</label><input id="${prefix}-cap" value="${e.cap||''}"></div>
-      <div class="field"><label>Provincia</label><input id="${prefix}-provincia" maxlength="2" style="text-transform:uppercase;" value="${e.provincia||''}"></div>
-    </div>
-    <div class="form-grid" style="margin-top:12px;">
-      <div class="field"><label>Partita IVA</label><input id="${prefix}-piva" value="${e.partitaIva||''}"></div>
-      <div class="field"><label>Codice Fiscale</label><input id="${prefix}-cf" value="${e.codiceFiscale||''}"></div>
-      <div class="field"><label>PEC</label><input id="${prefix}-pec" type="email" value="${e.pec||''}"></div>
-    </div>
-    <div class="form-grid" style="margin-top:12px;">
       <div class="field"><label>Telefono</label><input id="${prefix}-telefono" value="${e.telefono||''}"></div>
       <div class="field"><label>Email</label><input id="${prefix}-email" type="email" value="${e.email||''}"></div>
+      <div class="field" id="${prefix}-settore-wrap"><label>Settore merceologico <span id="${prefix}-settore-req">*</span></label><select id="${prefix}-settore">${settoreOptions(e.settore)}</select></div>
     </div>
     <p class="helptext">Compila almeno telefono o email. Per i clienti Business il settore è obbligatorio.</p>
+
+    <button type="button" class="btn btn-outline btn-sm" style="margin-bottom:14px;" onclick="toggleFatturazione('${prefix}')">Compila per fatturare</button>
+    <div id="${prefix}-fatturazione" style="display:${hasFatturazione?'block':'none'};padding-top:4px;">
+      <div class="form-grid">
+        <div class="field"><label>Indirizzo</label><input id="${prefix}-indirizzo" value="${e.indirizzo||''}"></div>
+        <div class="field"><label>Città</label><input id="${prefix}-citta" value="${e.citta||''}"></div>
+        <div class="field"><label>CAP</label><input id="${prefix}-cap" value="${e.cap||''}"></div>
+        <div class="field"><label>Provincia</label><input id="${prefix}-provincia" maxlength="2" style="text-transform:uppercase;" value="${e.provincia||''}"></div>
+      </div>
+      <div class="form-grid" style="margin-top:12px;">
+        <div class="field"><label>Partita IVA</label><input id="${prefix}-piva" value="${e.partitaIva||''}"></div>
+        <div class="field"><label>Codice Fiscale</label><input id="${prefix}-cf" value="${e.codiceFiscale||''}"></div>
+        <div class="field"><label>PEC</label><input id="${prefix}-pec" type="email" value="${e.pec||''}"></div>
+        <div class="field"><label>Codice Univoco SDI</label><input id="${prefix}-sdi" maxlength="7" value="${e.codiceSDI||''}"></div>
+      </div>
+    </div>
   `;
+}
+function toggleFatturazione(prefix){
+  const el = document.getElementById(`${prefix}-fatturazione`);
+  el.style.display = el.style.display==="none" ? "block" : "none";
 }
 function toggleClientTypeFields(prefix){
   const tipo = document.getElementById(`${prefix}-tipo`).value;
   document.getElementById(`${prefix}-business`).style.display = tipo==="Business" ? "grid" : "none";
   document.getElementById(`${prefix}-family`).style.display = tipo==="Family" ? "grid" : "none";
+  document.getElementById(`${prefix}-settore-req`).style.display = tipo==="Business" ? "inline" : "none";
 }
 /* Legge i campi anagrafici comuni (indirizzo, città, piva, ecc.) da un dato prefisso */
 function readCommonClientFields(prefix){
@@ -664,7 +679,8 @@ function readCommonClientFields(prefix){
     provincia: document.getElementById(`${prefix}-provincia`).value.trim().toUpperCase(),
     partitaIva: document.getElementById(`${prefix}-piva`).value.trim(),
     codiceFiscale: document.getElementById(`${prefix}-cf`).value.trim(),
-    pec: document.getElementById(`${prefix}-pec`).value.trim()
+    pec: document.getElementById(`${prefix}-pec`).value.trim(),
+    codiceSDI: document.getElementById(`${prefix}-sdi`).value.trim()
   };
 }
 /* Crea (o aggiorna, se existingId è passato) un cliente leggendo i campi con un dato prefisso. Ritorna l'id o null se non valido. */
@@ -737,10 +753,11 @@ function renderClienti(){
     <p class="helptext">${list.length} clienti su ${state.clients.length} totali.</p>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Tipo</th><th>Nome</th><th>Città</th><th>P.IVA</th><th>Telefono</th><th>Email</th><th>Settore</th><th>Fatturato</th><th></th></tr></thead>
+        <thead><tr><th>N°</th><th>Tipo</th><th>Nome</th><th>Città</th><th>P.IVA</th><th>Telefono</th><th>Email</th><th>Settore</th><th>Fatturato</th><th></th></tr></thead>
         <tbody>
           ${list.length ? list.map(c=>`
             <tr class="clickable-row" onclick="openClientHistory('${c.id}')">
+              <td style="color:var(--muted);font-weight:600;">${c.numero?('#'+c.numero):'—'}</td>
               <td><span class="pill ${c.tipo==='Business'?'pill-business':'pill-family'}">${c.tipo}</span></td>
               <td><span class="status-dot client-dot-${c.tipo==='Business'?'business':'family'}"></span><span style="font-weight:600;color:${c.tipo==='Business'?'#1D5A9E':'#B9660C'}">${clientDisplayName(c)}</span></td>
               <td>${c.citta||"—"}</td>
@@ -750,7 +767,7 @@ function renderClienti(){
               <td>${c.settore||`<span style="color:var(--warn);">da assegnare</span>`}</td>
               <td>${fmtMoney(clientFatturato(c.id))}</td>
               <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteClient('${c.id}')">Elimina</button></td>
-            </tr>`).join("") : `<tr><td colspan="9" class="empty">Nessun cliente con questi filtri.</td></tr>`}
+            </tr>`).join("") : `<tr><td colspan="10" class="empty">Nessun cliente con questi filtri.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -763,7 +780,7 @@ function openClientHistory(clientId){
   const indirizzoCompleto = [c.indirizzo, [c.cap,c.citta].filter(Boolean).join(" "), c.provincia].filter(Boolean).join(", ");
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
-    <h2>${clientDisplayName(c)}</h2>
+    <h2>${c.numero?('#'+c.numero+' — '):''}${clientDisplayName(c)}</h2>
     <p style="color:var(--muted);margin-top:0;">${c.settore||(c.tipo==='Family'?'Cliente privato':'Settore da assegnare')} — Fatturato totale ${fmtMoney(totale)}</p>
     <div class="ticket-meta">
       <div><span>Indirizzo</span>${indirizzoCompleto||"—"}</div>
@@ -930,7 +947,7 @@ function linesEditor(collection, id, righe){
             <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
             <td class="num"><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)"></td>
             <td class="num" style="padding-top:8px;">${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</td>
-            ${showDots ? `<td>${KANBAN_STATUSES.map(s=>`<span class="riga-dot ${r.stato===s?'active':''}" title="${s}" style="background:${STATUS_DOT[s]};color:${s==='Da fare'?'#555':'#fff'}" onclick="updateRigaField('${collection}','${id}','${r.id}','stato','${s}')">${r.stato===s?'✓':''}</span>`).join("")}</td>` : ``}
+            ${showDots ? `<td><select class="riga-status-select" style="background:${STATUS_DOT[r.stato]||'#fff'};color:${statusTextColor(r.stato)}" onchange="updateRigaField('${collection}','${id}','${r.id}','stato',this.value)">${KANBAN_STATUSES.map(s=>`<option value="${s}" ${r.stato===s?'selected':''}>${s}</option>`).join("")}</select></td>` : ``}
             <td><button class="btn btn-ghost btn-sm" onclick="removeRiga('${collection}','${id}','${r.id}')">✕</button></td>
           </tr>`).join("") || `<tr><td colspan="${isOrder?(showDots?7:6):5}" class="empty" style="padding:10px 0;">Nessuna riga. Aggiungine una.</td></tr>`}
       </tbody>
@@ -1073,7 +1090,6 @@ function renderOrdini(){
       <h3>Nuovo ordine</h3>
       <div class="form-grid">
         <div class="field"><label>Cliente</label><select id="of-cliente" onchange="onClientSelectChange(this,'of-newclient')">${clientOptions(null,true)}</select></div>
-        <div class="field"><label>Data consegna</label><input id="of-data" type="date"></div>
       </div>
       <div id="of-newclient" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
         <p class="helptext" style="margin-top:0;">Dati del nuovo cliente</p>
@@ -1083,7 +1099,7 @@ function renderOrdini(){
         <button class="btn btn-primary" onclick="addOrder()">Crea ordine</button>
         <button class="btn btn-outline" onclick="toggleForm('orderForm')">Annulla</button>
       </div>
-      <p class="helptext" style="margin-top:10px;">Verrà creata subito una prima riga di lavorazione: apri la "Scheda" per assegnarle categoria, quantità e prezzo.</p>
+      <p class="helptext" style="margin-top:10px;">Verrà creata subito la scheda di lavorazione: lì potrai impostare data di consegna, operatore, categoria e tutto il resto.</p>
     </div>
     <div class="section-header">
       <div class="filters">
@@ -1095,11 +1111,12 @@ function renderOrdini(){
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>★</th><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Consegna</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
+        <thead><tr><th>N°</th><th>★</th><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Consegna</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
         <tbody>
           ${list.length ? list.map(o=>{
             const saldo = orderSaldo(o);
             return `<tr>
+              <td style="color:var(--muted);font-weight:600;">${o.numero?('#'+o.numero):'—'}</td>
               <td><span class="star ${o.importante?'active':''}" onclick="toggleImportante('${o.id}')">★</span></td>
               <td>${clientName(o.clientId)}</td>
               <td>${orderCategorieLabel(o)}</td>
@@ -1113,7 +1130,7 @@ function renderOrdini(){
                 <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${o.id}')">Elimina</button>
               </td>
             </tr>`;
-          }).join("") : `<tr><td colspan="9" class="empty">Nessun ordine con questi filtri.</td></tr>`}
+          }).join("") : `<tr><td colspan="10" class="empty">Nessun ordine con questi filtri.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -1127,7 +1144,7 @@ function addOrder(){
   const clientId = resolveClientId("of-cliente", "ofnc");
   if(!clientId) return;
   const id = uid();
-  const order = mkOrder(id, clientId, "", "", "Da fare", document.getElementById("of-data").value, undefined, undefined);
+  const order = mkOrder(id, clientId, "", "", "Da fare", "", undefined, undefined);
   state.orders.push(order);
   saveState('orders'); toggleForm('orderForm'); renderOrdini(); showToast("Ordine creato"); openJobCard(id);
 }
@@ -1160,12 +1177,13 @@ function renderFlusso(){
         return `<div class="kanban-col">
           <h4>${statusDot(st)}${st}<span>${items.length}</span></h4>
           ${items.map(o=>`
-            <div class="job-card" onclick="openJobCard('${o.id}')">
-              <div class="jc-client">${clientName(o.clientId)}</div>
+            <div class="job-card ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
+              ${o.importante ? `<div class="jc-star">★ IMPORTANTE</div>` : ``}
+              <div class="jc-client">${o.numero?('#'+o.numero+' — '):''}${clientName(o.clientId)}</div>
               <div class="jc-lines">
                 ${o.righe.filter(r=>r.categoria).map(r=>`<div class="jc-line">${r.categoria}</div>`).join("") || `<div class="jc-line" style="color:var(--muted)">Nessuna categoria assegnata</div>`}
               </div>
-              <div>${o.descrizione ? o.descrizione.slice(0,60) : ""}</div>
+              <div class="jc-desc">${o.descrizione ? o.descrizione.slice(0,80) : ""}</div>
               <div class="jc-meta"><span>${o.worker||"n.a."}</span><span>${fmtDate(o.dataConsegna)}</span></div>
             </div>`).join("") || `<p class="empty" style="padding:14px 4px;">Vuoto</p>`}
         </div>`;
@@ -1179,11 +1197,12 @@ function renderSchede(){
   document.getElementById("view-schede").innerHTML = `
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Avanzamento</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
+        <thead><tr><th>N°</th><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Avanzamento</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
         <tbody>
           ${state.orders.length ? state.orders.map(o=>{
             const done = o.fasi.filter(s=>s.completata).length;
             return `<tr>
+              <td style="color:var(--muted);font-weight:600;">${o.numero?('#'+o.numero):'—'}</td>
               <td>${clientName(o.clientId)}</td>
               <td>${orderCategorieLabel(o)}</td>
               <td>${orderWorkersLabel(o)}</td>
@@ -1193,7 +1212,7 @@ function renderSchede(){
               <td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
               <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Apri scheda</button></td>
             </tr>`;
-          }).join("") : `<tr><td colspan="8" class="empty">Nessun ordine attivo. Crea un ordine per generare la sua scheda di lavorazione.</td></tr>`}
+          }).join("") : `<tr><td colspan="9" class="empty">Nessun ordine attivo. Crea un ordine per generare la sua scheda di lavorazione.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -1210,7 +1229,7 @@ function openJobCard(orderId){
     <button class="close-x" onclick="closeModal()">×</button>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;">
       <div>
-        <h2 style="margin-bottom:2px;">Scheda di lavorazione</h2>
+        <h2 style="margin-bottom:2px;">Scheda di lavorazione ${o.numero?('#'+o.numero):''}</h2>
         <p style="color:var(--muted);margin-top:0;">${c?clientDisplayName(c):"—"}</p>
       </div>
       <label class="checkfield" style="gap:6px;white-space:nowrap;">
@@ -1222,13 +1241,18 @@ function openJobCard(orderId){
       <div><span>Cliente</span>${c?clientDisplayName(c):"—"}</div>
       <div><span>Operatore</span><select class="inline" onchange="updateOrderField('${o.id}','worker',this.value)">${workerOptions(o.worker)}</select></div>
       <div><span>Stato</span><span style="display:flex;align-items:center;gap:6px;">${statusDot(o.stato)}<select class="inline" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option ${s===o.stato?'selected':''}>${s}</option>`).join("")}</select></span></div>
+      <div><span>Data consegna</span><input class="inline" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value)"></div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Descrizione generale del lavoro</h3>
+      <textarea class="desc-lavoro" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
     </div>
 
     <div class="modal-section">
       <h3>Righe di lavorazione</h3>
-      <p class="helptext" style="margin-top:-4px;">Ogni riga ha una propria categoria di lavoro.${o.righe.length>1 ? ' Usa i pallini per segnare lo stato di ciascuna riga.' : ''}</p>
+      <p class="helptext" style="margin-top:-4px;">Ogni riga ha una propria categoria di lavoro.${o.righe.length>1 ? ' Scegli lo stato di ciascuna riga dal menu colorato.' : ''}</p>
       ${linesEditor('orders', o.id, o.righe)}
-      <div class="field" style="margin-top:14px;"><label>Descrizione generale del lavoro</label><textarea onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea></div>
       <div class="checkfield" style="margin:12px 0 6px;"><input type="checkbox" ${o.ivaApplicata?'checked':''} onchange="updateOrderCheck('${o.id}','ivaApplicata',this.checked)"> Applica IVA 22%</div>
       ${o.consegnaTipo==="Spedizione" ? `
       <div class="field" style="max-width:200px;margin-bottom:10px;">
@@ -1249,6 +1273,10 @@ function openJobCard(orderId){
     <div class="modal-section">
       <h3>Fasi di lavorazione</h3>
       ${o.fasi.length ? renderFasiGrouped(o) : `<p class="empty" style="padding:6px 0;">Assegna una categoria a una riga per generare la checklist delle fasi.</p>`}
+      ${o.fasi.some(f=>f.nome==="Materiale da ordinare" && f.completata) ? `
+      <div class="checkfield" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <input type="checkbox" ${o.materialeOrdinato?'checked':''} onchange="updateOrderCheck('${o.id}','materialeOrdinato',this.checked)"> Materiale ordinato
+      </div>` : ``}
     </div>
 
     <div class="modal-section">
@@ -1269,6 +1297,10 @@ function openJobCard(orderId){
         <div class="trow"><span>Incassato</span><span>${fmtMoney(incassato)}</span></div>
         <div class="trow grand"><span>Saldo residuo</span><span style="${saldoResiduo>0.001?'color:var(--danger)':''}">${fmtMoney(saldoResiduo)}</span></div>
       </div>
+      ${o.daFatturare ? `
+      <div class="checkfield" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <input type="checkbox" ${o.fatturato?'checked':''} onchange="updateOrderCheck('${o.id}','fatturato',this.checked)"> Fatturato
+      </div>` : ``}
     </div>
 
 
@@ -1279,9 +1311,10 @@ function openJobCard(orderId){
     ${o.consegnaTipo==="Spedizione" ? `<label class="checkfield" style="margin-bottom:14px;"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Segna come spedito</label>` : ``}
 
     <div class="form-actions">
-      <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica scheda</button>
-      <button class="btn btn-outline" onclick="window.print()">Stampa scheda</button>
+      <button class="btn btn-outline" onclick="window.print()">Stampa</button>
+      <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
       <button class="btn btn-primary" onclick="closeModal(); showToast('Scheda salvata')">SALVA</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
