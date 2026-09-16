@@ -102,6 +102,11 @@
   .field{display:flex;flex-direction:column;gap:5px;}
   .field label{font-size:12px;color:var(--muted);font-weight:600;}
   .field input, .field select, .field textarea{font-family:inherit;font-size:14px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--paper);color:var(--text);}
+  #clientForm{padding:26px;}
+  #clientForm h3{font-size:19px;margin-bottom:20px;}
+  #clientForm .field label{font-size:14px;}
+  #clientForm .field input, #clientForm .field select{font-size:16px;padding:12px 14px;}
+  #clientForm .form-grid{gap:16px;}
   .field textarea{resize:vertical;min-height:56px;}
   input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   input[type=number]{-moz-appearance:textfield;}
@@ -131,6 +136,11 @@
   .modal-backdrop.open{display:flex;}
   .modal{background:var(--card);border-radius:12px;max-width:760px;width:100%;padding:30px;position:relative;margin-bottom:40px;}
   .modal h2{margin:0 0 4px;font-size:26px;font-weight:800;}
+  .jobcard-eyebrow{margin:0;font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+  .ticket-meta-big{grid-template-columns:1fr 1fr 1fr;}
+  .inline-big{font-size:16px !important;padding:10px 12px !important;font-weight:700;}
+  .status-select-big{border:none;border-radius:7px;}
+  @media(max-width:700px){.ticket-meta-big{grid-template-columns:1fr;}}
   .modal h3{font-size:18.5px;font-weight:800;margin:22px 0 12px;}
   .modal .close-x{position:absolute;top:16px;right:18px;cursor:pointer;color:var(--muted);font-size:24px;background:none;border:none;}
   .modal .btn{font-size:14.5px;padding:11px 20px;}
@@ -150,11 +160,12 @@
   a.link{color:var(--teal);text-decoration:none;font-weight:600;}
   .helptext{font-size:12.5px;color:var(--muted);margin-top:-6px;margin-bottom:14px;line-height:1.5;}
   .lines-table{width:100%;border-collapse:collapse;margin-bottom:10px;}
-  .lines-table th{font-size:12px;padding:6px 7px;}
-  .lines-table td{padding:6px 7px;border-bottom:none;}
-  .lines-table input{width:100%;padding:7px 8px;font-size:14px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);}
+  .lines-table th{font-size:12.5px;padding:8px 8px;}
+  .lines-table td{padding:8px 8px;border-bottom:none;}
+  .lines-table input{width:100%;padding:9px 10px;font-size:15px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);}
   .lines-table .num{width:78px;}
-  .lines-table .desc-input{min-width:240px;}
+  .lines-table .desc-input{min-width:260px;font-weight:600;}
+  .riga-categoria-select{width:100%;min-width:170px;padding:9px 10px;font-size:14.5px;font-weight:700;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);}
   .totals-box{background:var(--card);border-radius:8px;padding:14px 18px;margin:12px 0 16px;font-size:15px;}
   .totals-box .trow{display:flex;justify-content:space-between;padding:4px 0;}
   .totals-box .trow.grand{font-weight:700;font-size:19px;border-top:1px solid var(--border);margin-top:8px;padding-top:10px;}
@@ -216,7 +227,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser = null; // {id, email, role}
 
 /* ============ CONFIGURAZIONE ============ */
-const CATEGORIES = ["Preventivo","Grafica e Web","Stampa T-shirt","Ricamo","Stampa Gadget","Allestimento","Lavorazioni Esterne"];
+const CATEGORIES = ["Grafica & Web","Stampa T-shirt","Ricamo","Allestimenti","Gadget","Lavorazioni Esterne"];
 const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone","Misto"];
 const STATUSES = ["Da fare","In lavorazione","In produzione","Completato","Consegnato"];
 const KANBAN_STATUSES = STATUSES.filter(s=>s!=="Consegnato");
@@ -227,12 +238,11 @@ function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzio
 const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
 const QUOTE_CLASS = {"Bozza":"pill-draft","Inviato":"pill-sent","Accettato":"pill-accepted","Rifiutato":"pill-refused"};
 const STEP_TEMPLATES = {
-  "Preventivo": ["Richiesta ricevuta","Materiale disponibile","Richiesta a fornitore esterno","Tempistica lunga","Esito ricevuto"],
-  "Grafica e Web": ["Appuntamento effettuato","Bozza grafica","Revisione cliente","Approvazione finale","Consegna file"],
+  "Grafica & Web": ["Appuntamento effettuato","Bozza grafica","Revisione cliente","Approvazione finale","Consegna file"],
   "Stampa T-shirt": ["Materiale da ordinare","Materiale in arrivo","Pronto per la stampa","Stampa DTF","Stampa taglio","Stampa digitale","Stampa sublimata"],
-  "Ricamo": ["Digitalizzazione ricamo","Ricamo personalizzato con nome","Ricamo standard","Pulizia ricamo"],
-  "Stampa Gadget": ["UV","Laser","Sublimatica","Materiale da ordinare","Nel carrello"],
-  "Allestimento": ["Sopralluogo/misure","Mimaki","Summa","Montaggio","Piccola produzione"],
+  "Ricamo": ["Materiale da ordinare","Digitalizzazione ricamo","Ricamo personalizzato con nome","Ricamo standard","Pulizia ricamo"],
+  "Allestimenti": ["Materiale da ordinare","Sopralluogo/misure","Mimaki","Summa","Montaggio","Piccola produzione"],
+  "Gadget": ["UV","Laser","Sublimatica","Materiale da ordinare","Nel carrello"],
   "Lavorazioni Esterne": ["Presstime","Flyeralarm","Former","Coke","Pressup","AMGS","Hi Print","Ricamarte","Pixart Printing","Officine del Cotone","Altro"]
 };
 const PAY_METHODS = ["Bonifico","Contanti","Carta"];
@@ -942,7 +952,7 @@ function linesEditor(collection, id, righe){
       <tbody>
         ${righe.map(r=>`
           <tr>
-            ${isOrder ? `<td><select class="inline" onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">${categoryOptions(r.categoria, true)}</select></td>` : ``}
+            ${isOrder ? `<td><select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">${categoryOptions(r.categoria, true)}</select></td>` : ``}
             <td><input class="desc-input" value="${r.descrizione||''}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>
             <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
             <td class="num"><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)"></td>
@@ -1229,45 +1239,29 @@ function openJobCard(orderId){
     <button class="close-x" onclick="closeModal()">×</button>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;">
       <div>
-        <h2 style="margin-bottom:2px;">Scheda di lavorazione ${o.numero?('#'+o.numero):''}</h2>
-        <p style="color:var(--muted);margin-top:0;">${c?clientDisplayName(c):"—"}</p>
+        <p class="jobcard-eyebrow">Scheda di lavorazione ${o.numero?('#'+o.numero):''}</p>
+        <h2 style="margin-bottom:2px;">${c?clientDisplayName(c):"—"}</h2>
       </div>
       <label class="checkfield" style="gap:6px;white-space:nowrap;">
         <input type="checkbox" ${o.importante?'checked':''} onchange="updateOrderCheck('${o.id}','importante',this.checked)">
         <span class="star ${o.importante?'active':''}" style="font-size:20px;">★</span> Ordine importante
       </label>
     </div>
-    <div class="ticket-meta">
-      <div><span>Cliente</span>${c?clientDisplayName(c):"—"}</div>
-      <div><span>Operatore</span><select class="inline" onchange="updateOrderField('${o.id}','worker',this.value)">${workerOptions(o.worker)}</select></div>
-      <div><span>Stato</span><span style="display:flex;align-items:center;gap:6px;">${statusDot(o.stato)}<select class="inline" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option ${s===o.stato?'selected':''}>${s}</option>`).join("")}</select></span></div>
-      <div><span>Data consegna</span><input class="inline" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value)"></div>
-    </div>
-
-    <div class="modal-section">
-      <h3>Descrizione generale del lavoro</h3>
-      <textarea class="desc-lavoro" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
+    <div class="ticket-meta ticket-meta-big">
+      <div><span>Operatore</span><select class="inline inline-big" onchange="updateOrderField('${o.id}','worker',this.value)">${workerOptions(o.worker)}</select></div>
+      <div><span>Data consegna</span><input class="inline inline-big" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value)"></div>
+      <div><span>Stato</span><select class="inline inline-big status-select-big" style="background:${STATUS_DOT[o.stato]};color:${statusTextColor(o.stato)}" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${s}</option>`).join("")}</select></div>
     </div>
 
     <div class="modal-section">
       <h3>Righe di lavorazione</h3>
       <p class="helptext" style="margin-top:-4px;">Ogni riga ha una propria categoria di lavoro.${o.righe.length>1 ? ' Scegli lo stato di ciascuna riga dal menu colorato.' : ''}</p>
       ${linesEditor('orders', o.id, o.righe)}
-      <div class="checkfield" style="margin:12px 0 6px;"><input type="checkbox" ${o.ivaApplicata?'checked':''} onchange="updateOrderCheck('${o.id}','ivaApplicata',this.checked)"> Applica IVA 22%</div>
-      ${o.consegnaTipo==="Spedizione" ? `
-      <div class="field" style="max-width:200px;margin-bottom:10px;">
-        <label>Costo di spedizione (€)</label>
-        <input type="number" min="0" step="0.01" value="${o.costoSpedizione||0}" onchange="updateOrderField('${o.id}','costoSpedizione',Number(this.value)||0); openJobCard('${o.id}')">
-      </div>` : ``}
-      <div class="checkfield" style="margin-bottom:6px;"><input type="checkbox" ${o.daFatturare?'checked':''} onchange="updateOrderCheck('${o.id}','daFatturare',this.checked)"> Da fatturare</div>
-      ${o.stato==="Completato" ? `<div class="checkfield" style="margin-bottom:6px;"><input type="checkbox" ${o.clienteAvvisato?'checked':''} onchange="updateOrderCheck('${o.id}','clienteAvvisato',this.checked)"> Cliente avvisato</div>` : ``}
-      <div class="totals-box">
-        <div class="trow"><span>Imponibile</span><span>${fmtMoney(imponibile)}</span></div>
-        ${o.consegnaTipo==="Spedizione" && Number(o.costoSpedizione)>0 ? `<div class="trow"><span>Spedizione</span><span>${fmtMoney(o.costoSpedizione)}</span></div>` : ""}
-        ${o.ivaApplicata ? `<div class="trow"><span>IVA 22%${o.consegnaTipo==="Spedizione" && Number(o.costoSpedizione)>0 ? ' (merce + spedizione)' : ''}</span><span>${fmtMoney(iva)}</span></div>` : ""}
-        ${Number(o.sconto)>0 ? `<div class="trow"><span>Sconto</span><span>− ${fmtMoney(o.sconto)}</span></div>` : ""}
-        <div class="trow grand"><span>Totale lavorazione</span><span>${fmtMoney(totale)}</span></div>
-      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Descrizione generale del lavoro</h3>
+      <textarea class="desc-lavoro" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
     </div>
 
     <div class="modal-section">
@@ -1280,35 +1274,41 @@ function openJobCard(orderId){
     </div>
 
     <div class="modal-section">
-      <h3>Scheda di pagamento</h3>
-      <div class="field" style="max-width:200px;margin-bottom:14px;">
-        <label>Sconto (€)</label>
-        <input type="number" min="0" step="0.01" value="${o.sconto||0}" onchange="updateOrderField('${o.id}','sconto',Number(this.value)||0); openJobCard('${o.id}')">
+      <h3>Fatturazione e pagamento</h3>
+      <div class="checkfield" style="margin-bottom:6px;"><input type="checkbox" ${o.daFatturare?'checked':''} onchange="updateOrderCheck('${o.id}','daFatturare',this.checked)"> Da fatturare</div>
+      <div class="checkfield" style="margin-bottom:14px;"><input type="checkbox" ${o.ivaApplicata?'checked':''} onchange="updateOrderCheck('${o.id}','ivaApplicata',this.checked)"> Applica IVA 22%</div>
+      <div class="form-grid">
+        <div class="field"><label>Sconto (€)</label><input type="number" min="0" step="0.01" value="${o.sconto||0}" onchange="updateOrderField('${o.id}','sconto',Number(this.value)||0); openJobCard('${o.id}')"></div>
+        <div class="field"><label>Modalità di consegna</label><select class="inline" onchange="updateOrderField('${o.id}','consegnaTipo',this.value); openJobCard('${o.id}')">${CONSEGNA_TIPI.map(t=>`<option ${t===o.consegnaTipo?'selected':''}>${t}</option>`).join("")}</select></div>
+        ${o.consegnaTipo==="Spedizione" ? `<div class="field"><label>Costo di spedizione (€)</label><input type="number" min="0" step="0.01" value="${o.costoSpedizione||0}" onchange="updateOrderField('${o.id}','costoSpedizione',Number(this.value)||0); openJobCard('${o.id}')"></div>` : ``}
       </div>
-      <div class="pay-list">
+      ${o.consegnaTipo==="Spedizione" ? `<label class="checkfield" style="margin-top:12px;"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Segna come spedito</label>` : ``}
+      <div class="totals-box" style="margin-top:16px;">
+        <div class="trow"><span>Imponibile</span><span>${fmtMoney(imponibile)}</span></div>
+        ${o.consegnaTipo==="Spedizione" && Number(o.costoSpedizione)>0 ? `<div class="trow"><span>Spedizione</span><span>${fmtMoney(o.costoSpedizione)}</span></div>` : ""}
+        ${o.ivaApplicata ? `<div class="trow"><span>IVA 22%${o.consegnaTipo==="Spedizione" && Number(o.costoSpedizione)>0 ? ' (merce + spedizione)' : ''}</span><span>${fmtMoney(iva)}</span></div>` : ""}
+        ${Number(o.sconto)>0 ? `<div class="trow"><span>Sconto</span><span>− ${fmtMoney(o.sconto)}</span></div>` : ""}
+        <div class="trow grand"><span>Totale lavorazione</span><span>${fmtMoney(totale)}</span></div>
+      </div>
+      <div class="form-actions" style="margin-top:14px;"><button class="btn btn-primary" onclick="openAddPaymentModal('${o.id}')">AGGIUNGI PAGAMENTO</button></div>
+      <div class="pay-list" style="margin-top:14px;">
         ${pagamenti.length ? pagamenti.map(p=>`
           <div class="pay-row">
             <span>${p.tipo} — ${fmtMoney(p.importo)} — ${p.metodo} — ${fmtDate(p.data)}</span>
             <button class="btn btn-ghost btn-sm" onclick="deletePaymentFromCard('${p.id}','${o.id}')">✕</button>
           </div>`).join("") : `<p class="empty" style="padding:6px 0;">Nessun pagamento registrato.</p>`}
       </div>
-      <div class="form-actions"><button class="btn btn-primary" onclick="openAddPaymentModal('${o.id}')">AGGIUNGI PAGAMENTO</button></div>
       <div class="totals-box">
         <div class="trow"><span>Incassato</span><span>${fmtMoney(incassato)}</span></div>
         <div class="trow grand"><span>Saldo residuo</span><span style="${saldoResiduo>0.001?'color:var(--danger)':''}">${fmtMoney(saldoResiduo)}</span></div>
       </div>
       ${o.daFatturare ? `
-      <div class="checkfield" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+      <div class="checkfield" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
         <input type="checkbox" ${o.fatturato?'checked':''} onchange="updateOrderCheck('${o.id}','fatturato',this.checked)"> Fatturato
       </div>` : ``}
+      ${o.stato==="Completato" ? `<div class="checkfield" style="margin-top:10px;"><input type="checkbox" ${o.clienteAvvisato?'checked':''} onchange="updateOrderCheck('${o.id}','clienteAvvisato',this.checked)"> Cliente avvisato</div>` : ``}
     </div>
 
-
-    <div class="field" style="margin-bottom:10px;">
-      <label>Modalità di consegna</label>
-      <select class="inline" onchange="updateOrderField('${o.id}','consegnaTipo',this.value); openJobCard('${o.id}')">${CONSEGNA_TIPI.map(t=>`<option ${t===o.consegnaTipo?'selected':''}>${t}</option>`).join("")}</select>
-    </div>
-    ${o.consegnaTipo==="Spedizione" ? `<label class="checkfield" style="margin-bottom:14px;"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Segna come spedito</label>` : ``}
 
     <div class="form-actions">
       <button class="btn btn-outline" onclick="window.print()">Stampa</button>
