@@ -44,6 +44,8 @@
   .sidebar-footer{margin-top:auto;padding:10px 8px;font-size:11px;color:var(--muted);line-height:1.5;}
   main{flex:1;min-width:0;padding:26px 30px 60px;}
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap;}
+  .global-search{flex:1;max-width:320px;}
+  .global-search input{width:100%;padding:10px 14px;font-size:14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;}
   .topbar h1{font-size:22px;margin:0 0 4px;}
   .topbar p{margin:0;color:var(--muted);font-size:14px;}
   .btn{all:unset;cursor:pointer;padding:9px 16px;border-radius:8px;font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;}
@@ -202,11 +204,15 @@
       <small>Gestionale — Grafica &amp; Stampa</small>
     </div>
     <nav class="tabs" id="nav"></nav>
-    <div class="sidebar-footer">Dati salvati solo in questo browser (locale). Usa "Esporta backup" nella Dashboard per salvare una copia.</div>
+    <div class="sidebar-footer">Dati sincronizzati in tempo reale con tutto lo staff.</div>
   </aside>
   <main>
     <div class="topbar">
       <div><h1 id="viewTitle">Dashboard</h1><p id="viewSubtitle">Panoramica generale dell'attività</p></div>
+      <div class="global-search">
+        <input type="text" id="globalClientSearch" placeholder="🔎 Cerca cliente…" list="globalClientSuggestions" oninput="updateGlobalClientSuggestions(this.value)" onchange="goToSearchedClient(this)" autocomplete="off">
+        <datalist id="globalClientSuggestions"></datalist>
+      </div>
       <div id="topbarActions"></div>
     </div>
     <section class="view" id="view-dashboard"></section>
@@ -661,15 +667,17 @@ function clientFieldsHTML(prefix, existing){
       </div>
     </div>
     <div class="form-grid" id="${prefix}-business" style="margin-top:12px;">
-      <div class="field"><label>Ragione sociale / Nome azienda</label><input id="${prefix}-ragsoc" placeholder="Es. Bar Centrale Srl" value="${e.ragioneSociale||''}" oninput="checkDuplicateClient('${prefix}')"></div>
-      <div class="field"><label>Nome</label><input id="${prefix}-refnome" value="${e.refNome||''}" oninput="checkDuplicateClient('${prefix}')"></div>
-      <div class="field"><label>Cognome</label><input id="${prefix}-refcognome" value="${e.refCognome||''}" oninput="checkDuplicateClient('${prefix}')"></div>
+      <div class="field"><label>Ragione sociale / Nome azienda</label><input id="${prefix}-ragsoc" placeholder="Es. Bar Centrale Srl" value="${e.ragioneSociale||''}" list="${prefix}-ragsoc-list" autocomplete="off"></div>
+      <div class="field"><label>Nome</label><input id="${prefix}-refnome" value="${e.refNome||''}" list="${prefix}-nomi-list" autocomplete="off"></div>
+      <div class="field"><label>Cognome</label><input id="${prefix}-refcognome" value="${e.refCognome||''}" list="${prefix}-cognomi-list" autocomplete="off"></div>
     </div>
     <div class="form-grid" id="${prefix}-family" style="margin-top:12px;display:none;">
-      <div class="field"><label>Nome</label><input id="${prefix}-nome" value="${e.nome||''}" oninput="checkDuplicateClient('${prefix}')"></div>
-      <div class="field"><label>Cognome</label><input id="${prefix}-cognome" value="${e.cognome||''}" oninput="checkDuplicateClient('${prefix}')"></div>
+      <div class="field"><label>Nome</label><input id="${prefix}-nome" value="${e.nome||''}" list="${prefix}-nomi-list" autocomplete="off"></div>
+      <div class="field"><label>Cognome</label><input id="${prefix}-cognome" value="${e.cognome||''}" list="${prefix}-cognomi-list" autocomplete="off"></div>
     </div>
-    <p id="${prefix}-dup-warning" style="display:none;color:var(--warn);font-size:13px;font-weight:600;margin:-6px 0 10px;">⚠ Esiste già un cliente con un nome simile</p>
+    <datalist id="${prefix}-ragsoc-list">${clientRagioneSocialiOptions()}</datalist>
+    <datalist id="${prefix}-nomi-list">${clientNomiOptions()}</datalist>
+    <datalist id="${prefix}-cognomi-list">${clientCognomiOptions()}</datalist>
     <div class="form-grid" style="margin-top:12px;">
       <div class="field"><label>Telefono</label><input id="${prefix}-telefono" value="${e.telefono||''}"></div>
       <div class="field"><label>Email</label><input id="${prefix}-email" type="email" value="${e.email||''}"></div>
@@ -698,26 +706,38 @@ function toggleFatturazione(prefix){
   const el = document.getElementById(`${prefix}-fatturazione`);
   el.style.display = el.style.display==="none" ? "block" : "none";
 }
-function checkDuplicateClient(prefix){
-  const tipoEl = document.getElementById(`${prefix}-tipo`);
-  const tipo = tipoEl ? tipoEl.value : "Business";
-  let candidate = "";
-  if(tipo==="Business"){
-    candidate = (document.getElementById(`${prefix}-ragsoc`)?.value||"").trim();
-  } else {
-    const n = (document.getElementById(`${prefix}-nome`)?.value||"").trim();
-    const c = (document.getElementById(`${prefix}-cognome`)?.value||"").trim();
-    candidate = `${n} ${c}`.trim();
+function clientRagioneSocialiOptions(){
+  return [...new Set(state.clients.filter(c=>c.tipo==='Business' && c.ragioneSociale).map(c=>c.ragioneSociale))].sort((a,b)=>a.localeCompare(b)).map(n=>`<option value="${n}">`).join("");
+}
+function clientNomiOptions(){
+  return [...new Set(state.clients.map(c=>c.tipo==='Business' ? c.refNome : c.nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b)).map(n=>`<option value="${n}">`).join("");
+}
+function clientCognomiOptions(){
+  return [...new Set(state.clients.map(c=>c.tipo==='Business' ? c.refCognome : c.cognome).filter(Boolean))].sort((a,b)=>a.localeCompare(b)).map(n=>`<option value="${n}">`).join("");
+}
+let globalSearchMap = {};
+function updateGlobalClientSuggestions(value){
+  const dl = document.getElementById('globalClientSuggestions');
+  if(value.trim().length < 3){ dl.innerHTML = ""; globalSearchMap = {}; return; }
+  const q = value.trim().toLowerCase();
+  const matches = state.clients.filter(c=>{
+    const name = clientDisplayName(c).toLowerCase();
+    return name.includes(q) || (c.citta||"").toLowerCase().includes(q) || (c.partitaIva||"").toLowerCase().includes(q) || (c.telefono||"").includes(q);
+  }).slice(0,15);
+  globalSearchMap = {};
+  dl.innerHTML = matches.map(c=>{
+    const label = `${clientDisplayName(c)}${c.citta?' — '+c.citta:''}${c.numero?' (#'+c.numero+')':''}`;
+    globalSearchMap[label] = c.id;
+    return `<option value="${label}">`;
+  }).join("");
+}
+function goToSearchedClient(input){
+  const id = globalSearchMap[input.value];
+  if(id){
+    openClientHistory(id);
+    input.value = "";
+    document.getElementById('globalClientSuggestions').innerHTML = "";
   }
-  const warningEl = document.getElementById(`${prefix}-dup-warning`);
-  if(!warningEl) return;
-  if(candidate.length < 3){ warningEl.style.display = "none"; return; }
-  const norm = s => (s||"").toLowerCase().trim();
-  const match = state.clients.some(c => {
-    const name = c.tipo==="Business" ? c.ragioneSociale : `${c.nome} ${c.cognome}`;
-    return norm(name) === norm(candidate);
-  });
-  warningEl.style.display = match ? "block" : "none";
 }
 function toggleClientTypeFields(prefix){
   const tipo = document.getElementById(`${prefix}-tipo`).value;
