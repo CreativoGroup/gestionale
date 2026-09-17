@@ -509,6 +509,7 @@ function renderDashboard(){
   const daFatturare = state.orders.filter(o=>o.daFatturare && !o.fatturato);
   const ordiniImportanti = state.orders.filter(o=>o.importante && o.stato!=="Consegnato");
   const magazzinoDaOrdinare = computeMagazzinoDaOrdinare();
+  const pezziDaOrdinare = magazzinoDaOrdinare.reduce((s,x)=>s + Number(x.entry.daOrdinareQty||0), 0);
   const daAvvisare = state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato);
   const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>o.worker===w && o.stato!=="Consegnato").length}));
   const oggi = today();
@@ -519,13 +520,10 @@ function renderDashboard(){
     <div class="grid grid-auto" style="margin-bottom:18px;">
       <div class="card stat clickable" onclick="openDashboardList('attivi')"><p class="stat-label">Ordini attivi</p><p class="stat-value">${ordiniInLavorazione.length}</p><p class="stat-sub">su ${state.orders.length} totali</p></div>
       <div class="card stat clickable" onclick="openDashboardList('completati')"><p class="stat-label">Completati da consegnare</p><p class="stat-value" style="${completatiDaConsegnare.length?'color:var(--warn)':''}">${completatiDaConsegnare.length}</p><p class="stat-sub">pronti, in attesa di consegna</p></div>
-      <div class="card stat clickable" onclick="openDashboardList('spedire')"><p class="stat-label">Da spedire</p><p class="stat-value" style="${daSpedire.length?'color:var(--teal)':''}">${daSpedire.length}</p><p class="stat-sub">ordini con consegna a spedizione</p></div>
       <div class="card stat clickable" onclick="openDashboardList('fatturare')"><p class="stat-label">Schede da fatturare</p><p class="stat-value" style="${daFatturare.length?'color:var(--accent)':''}">${daFatturare.length}</p><p class="stat-sub">contrassegnate "da fatturare"</p></div>
-      <div class="card stat clickable" onclick="openDashboardList('importanti')"><p class="stat-label">Ordini importanti</p><p class="stat-value" style="${ordiniImportanti.length?'color:var(--accent)':''}">${ordiniImportanti.length}</p><p class="stat-sub">segnalati con la stella ★</p></div>
-      <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${magazzinoDaOrdinare.length?'color:var(--teal)':''}">${magazzinoDaOrdinare.length}</p><p class="stat-sub">articoli mancanti in magazzino</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${pezziDaOrdinare?'color:var(--teal)':''}">${pezziDaOrdinare}</p><p class="stat-sub">pezzi confermati da ordinare</p></div>
       <div class="card stat clickable" onclick="openDashboardList('avvisare')"><p class="stat-label">Cliente da avvisare</p><p class="stat-value" style="${daAvvisare.length?'color:var(--warn)':''}">${daAvvisare.length}</p><p class="stat-sub">lavori completati non ancora comunicati</p></div>
       <div class="card stat clickable" onclick="openDashboardList('preventivi')"><p class="stat-label">Preventivi in attesa</p><p class="stat-value">${preventiviAperti}</p><p class="stat-sub">bozza o inviati</p></div>
-      <div class="card stat clickable" onclick="openDashboardList('scorte')"><p class="stat-label">Articoli sotto scorta</p><p class="stat-value" style="${scorteBasse.length?'color:var(--danger)':''}">${scorteBasse.length}</p><p class="stat-sub">su ${state.warehouse.length} in magazzino</p></div>
     </div>
 
     <div class="card" style="margin-bottom:16px;">
@@ -636,7 +634,7 @@ function openDashboardList(type){
     rows = cfg.items.map(({order,entry})=>`
       <div class="list-row" onclick="openJobCard('${order.id}')">
         <div><div class="lr-main">${clientName(order.clientId)} ${order.numero?('#'+order.numero):''}</div><div class="lr-sub">${entry.codice||''} — ${entry.colore||''} — ${entry.taglia||''}</div></div>
-        <div class="lr-sub" style="color:var(--danger);font-weight:600;">${entry.quantita} pz mancanti</div>
+        <div class="lr-sub" style="color:var(--danger);font-weight:600;">${entry.daOrdinareQty} pz da ordinare</div>
       </div>`).join("");
   } else if(cfg.isQuote){
     rows = cfg.items.map(q=>`
@@ -1030,46 +1028,104 @@ function magazzinoAllowedCategorie(o){
   });
   return set;
 }
+function stockTotalePerCodice(codice){
+  return state.warehouse.filter(w=>w.codice===codice).reduce((s,w)=>s+Math.max(0,Number(w.quantita)||0),0);
+}
+function stockTotalePerColore(codice,colore){
+  return state.warehouse.filter(w=>w.codice===codice && w.colore===colore).reduce((s,w)=>s+Math.max(0,Number(w.quantita)||0),0);
+}
+function stockPerVariante(codice,colore,taglia){
+  const w = state.warehouse.find(x=>x.codice===codice && x.colore===colore && x.taglia===taglia);
+  return w ? Math.max(0,Number(w.quantita)||0) : 0;
+}
 function magazzinoCodiceOptions(allowedSet, selected){
-  const codes = [...new Set(state.warehouse.filter(w=>allowedSet.has(w.categoria)).map(w=>w.codice))].filter(Boolean).sort();
+  const codes = [...new Set(state.warehouse.filter(w=>allowedSet.has(w.categoria)).map(w=>w.codice))].filter(Boolean)
+    .sort((a,b)=>{
+      const sa=stockTotalePerCodice(a), sb=stockTotalePerCodice(b);
+      if((sa>0)!==(sb>0)) return sb>0 ? 1 : -1;
+      if(sa!==sb) return sb-sa;
+      return a.localeCompare(b);
+    });
   return `<option value="">Seleziona codice…</option>` + codes.map(c=>{
     const sample = state.warehouse.find(w=>w.codice===c);
-    return `<option value="${c}" ${c===selected?'selected':''}>${c} — ${sample?sample.nome:''}</option>`;
+    const disponibile = stockTotalePerCodice(c)>0;
+    return `<option value="${c}" ${c===selected?'selected':''} style="${disponibile?'':'color:#C0392B;font-weight:700;'}">${c} — ${sample?sample.nome:''}${disponibile?'':' — NON DISPONIBILE'}</option>`;
   }).join("");
 }
 function magazzinoColoreOptions(codice, selected){
   if(!codice) return `<option value="">—</option>`;
-  const colors = [...new Set(state.warehouse.filter(w=>w.codice===codice).map(w=>w.colore))].filter(Boolean).sort();
-  return `<option value="">Seleziona colore…</option>` + colors.map(c=>`<option value="${c}" ${c===selected?'selected':''}>${c}</option>`).join("");
+  const colors = [...new Set(state.warehouse.filter(w=>w.codice===codice).map(w=>w.colore))].filter(Boolean)
+    .sort((a,b)=>{
+      const sa=stockTotalePerColore(codice,a), sb=stockTotalePerColore(codice,b);
+      if((sa>0)!==(sb>0)) return sb>0 ? 1 : -1;
+      if(sa!==sb) return sb-sa;
+      return a.localeCompare(b);
+    });
+  return `<option value="">Seleziona colore…</option>` + colors.map(c=>{
+    const disponibile = stockTotalePerColore(codice,c)>0;
+    return `<option value="${c}" ${c===selected?'selected':''} style="${disponibile?'':'color:#C0392B;font-weight:700;'}">${c}${disponibile?'':' — NON DISPONIBILE'}</option>`;
+  }).join("");
 }
 function magazzinoTagliaOptions(codice, colore, selected){
   if(!codice || !colore) return `<option value="">—</option>`;
-  const sizes = [...new Set(state.warehouse.filter(w=>w.codice===codice && w.colore===colore).map(w=>w.taglia))].filter(Boolean);
-  return `<option value="">Seleziona taglia…</option>` + sizes.map(s=>`<option value="${s}" ${s===selected?'selected':''}>${s}</option>`).join("");
+  const sizes = [...new Set(state.warehouse.filter(w=>w.codice===codice && w.colore===colore).map(w=>w.taglia))].filter(Boolean)
+    .sort((a,b)=>{
+      const sa=stockPerVariante(codice,colore,a), sb=stockPerVariante(codice,colore,b);
+      if((sa>0)!==(sb>0)) return sb>0 ? 1 : -1;
+      if(sa!==sb) return sb-sa;
+      return a.localeCompare(b,undefined,{numeric:true});
+    });
+  return `<option value="">Seleziona taglia…</option>` + sizes.map(s=>{
+    const qty = stockPerVariante(codice,colore,s);
+    return `<option value="${s}" ${s===selected?'selected':''} style="${qty>0?'':'color:#C0392B;font-weight:700;'}">${s}${qty>0?` — disp. ${qty}`:' — NON DISPONIBILE'}</option>`;
+  }).join("");
+}
+function restoreReservedStock(entry){
+  if(entry && entry.articoloId && Number(entry._reservedQty)>0){
+    adjustWarehouseQty(entry.articoloId, Number(entry._reservedQty));
+  }
 }
 function tryStornoMagazzino(entry){
-  if(entry.stornato && entry.articoloId && entry._reservedQty){ adjustWarehouseQty(entry.articoloId, entry._reservedQty); }
-  entry.stornato = false; entry._reservedQty = 0; entry.articoloId = "";
-  if(!entry.codice || !entry.colore || !entry.taglia || !entry.quantita) return;
+  restoreReservedStock(entry);
+  entry.stornato = false;
+  entry._reservedQty = 0;
+  entry.articoloId = "";
+  entry.daOrdinareQty = 0;
+  entry.ordineConfermato = false;
+
+  const richiesta = Math.max(0,Number(entry.quantita)||0);
+  if(!entry.codice || !entry.colore || !entry.taglia || !richiesta) return;
+
   const w = state.warehouse.find(x=>x.codice===entry.codice && x.colore===entry.colore && x.taglia===entry.taglia);
-  if(w && Number(w.quantita) >= Number(entry.quantita)){
-    w.quantita = Number(w.quantita) - Number(entry.quantita);
-    entry.stornato = true;
-    entry._reservedQty = Number(entry.quantita);
+  if(!w){
+    entry.daOrdinareQty = richiesta;
+    return;
+  }
+
+  const disponibile = Math.max(0,Number(w.quantita)||0);
+  const daStornare = Math.min(disponibile, richiesta);
+
+  if(daStornare>0){
+    w.quantita = disponibile - daStornare;
+    entry._reservedQty = daStornare;
     entry.articoloId = w.id;
   }
+
+  entry.daOrdinareQty = Math.max(0, richiesta - daStornare);
+  entry.stornato = entry.daOrdinareQty===0;
 }
 function addMagazzinoRiga(orderId){
   const o = findItem('orders', orderId);
   if(!o.magazzino) o.magazzino = [];
-  o.magazzino.push({id:uid(), codice:"", colore:"", taglia:"", quantita:1, stornato:false, _reservedQty:0, articoloId:""});
+  o.magazzino.push({id:uid(), codice:"", colore:"", taglia:"", quantita:1, stornato:false, _reservedQty:0, articoloId:"", daOrdinareQty:0, ordineConfermato:false});
   saveState('orders');
   openJobCard(orderId);
 }
 function removeMagazzinoRiga(orderId, rigaId){
   const o = findItem('orders', orderId);
   const entry = o.magazzino.find(m=>m.id===rigaId);
-  if(entry && entry.stornato && entry.articoloId && entry._reservedQty){ adjustWarehouseQty(entry.articoloId, entry._reservedQty); saveState('warehouse'); }
+  restoreReservedStock(entry);
+  if(entry && Number(entry._reservedQty)>0) saveState('warehouse');
   o.magazzino = o.magazzino.filter(m=>m.id!==rigaId);
   saveState('orders');
   openJobCard(orderId);
@@ -1085,11 +1141,20 @@ function updateMagazzinoField(orderId, rigaId, field, value){
   saveState('orders'); saveState('warehouse');
   openJobCard(orderId);
 }
+function confermaOrdineMagazzino(orderId, rigaId){
+  const o = findItem('orders', orderId);
+  const entry = (o.magazzino||[]).find(m=>m.id===rigaId);
+  if(!entry || Number(entry.daOrdinareQty)<=0) return;
+  entry.ordineConfermato = true;
+  saveState('orders');
+  openJobCard(orderId);
+  showToast(`${entry.daOrdinareQty} pz aggiunti a Materiale da ordinare`);
+}
 function computeMagazzinoDaOrdinare(){
   const list = [];
   state.orders.filter(o=>o.stato!=='Consegnato').forEach(order=>{
     (order.magazzino||[]).forEach(entry=>{
-      if(entry.codice && entry.colore && entry.taglia && entry.quantita>0 && !entry.stornato){
+      if(entry.codice && entry.colore && entry.taglia && Number(entry.daOrdinareQty)>0 && entry.ordineConfermato){
         list.push({order, entry});
       }
     });
@@ -1099,7 +1164,13 @@ function computeMagazzinoDaOrdinare(){
 function renderMagazzinoSection(o){
   const allowed = magazzinoAllowedCategorie(o);
   if(!allowed.size) return "";
-  const entries = o.magazzino || [];
+  const entries = [...(o.magazzino || [])].sort((a,b)=>{
+    const ma=Number(a.daOrdinareQty)||0, mb=Number(b.daOrdinareQty)||0;
+    if((ma===0)!==(mb===0)) return ma===0 ? -1 : 1;
+    const ra=Number(a._reservedQty)||0, rb=Number(b._reservedQty)||0;
+    if(ra!==rb) return rb-ra;
+    return 0;
+  });
   return `
     <div class="modal-section">
       <h3>Magazzino</h3>
@@ -1108,15 +1179,28 @@ function renderMagazzinoSection(o){
       <table class="lines-table">
         <thead><tr><th>Codice</th><th>Colore</th><th>Taglia</th><th>Quantità</th><th>Disponibilità</th><th></th></tr></thead>
         <tbody>
-          ${entries.map(m=>`
-            <tr>
+          ${entries.map(m=>{
+            const mancano = Number(m.daOrdinareQty)||0;
+            const usati = Number(m._reservedQty)||0;
+            const status = !m.codice || !m.colore || !m.taglia
+              ? `<span style="color:var(--muted);">—</span>`
+              : mancano===0
+                ? `<span class="pill pill-done">Disponibile</span>${usati?` <span style="font-size:12px;color:var(--muted);">${usati} pz stornati</span>`:''}`
+                : `<div style="color:var(--danger);font-weight:700;">Da ordinare: ${mancano} pz</div>
+                   ${usati?`<div style="font-size:12px;color:var(--muted);margin-top:3px;">${usati} pz presi dal magazzino</div>`:''}
+                   ${m.ordineConfermato
+                     ? `<span class="pill pill-open" style="margin-top:6px;">ORDINE CONFERMATO</span>`
+                     : `<button class="btn btn-outline btn-sm" style="margin-top:6px;border-color:var(--danger);color:var(--danger);" onclick="confermaOrdineMagazzino('${o.id}','${m.id}')">ORDINA ${mancano}</button>`}`;
+            return `
+            <tr style="${mancano>0?'background:#FFF7F5;':''}">
               <td><select class="inline" onchange="updateMagazzinoField('${o.id}','${m.id}','codice',this.value)">${magazzinoCodiceOptions(allowed, m.codice)}</select></td>
               <td><select class="inline" onchange="updateMagazzinoField('${o.id}','${m.id}','colore',this.value)">${magazzinoColoreOptions(m.codice, m.colore)}</select></td>
               <td><select class="inline" onchange="updateMagazzinoField('${o.id}','${m.id}','taglia',this.value)">${magazzinoTagliaOptions(m.codice, m.colore, m.taglia)}</select></td>
               <td><input class="num" type="number" min="1" value="${m.quantita}" onchange="updateMagazzinoField('${o.id}','${m.id}','quantita',this.value)"></td>
-              <td>${m.codice && m.colore && m.taglia ? (m.stornato ? `<span class="pill pill-done">Disponibile</span>` : `<span style="color:var(--danger);font-weight:700;">Non disponibile</span> <button class="btn btn-outline btn-sm" style="margin-left:6px;border-color:var(--danger);color:var(--danger);" onclick="showToast('Già segnalato nel widget Materiale da ordinare della dashboard')">DA ORDINARE</button>`) : `<span style="color:var(--muted);">—</span>`}</td>
+              <td>${status}</td>
               <td><button class="btn btn-ghost btn-sm" onclick="removeMagazzinoRiga('${o.id}','${m.id}')">✕</button></td>
-            </tr>`).join("")}
+            </tr>`;
+          }).join("")}
         </tbody>
       </table>
       </div>` : `<p class="empty" style="padding:6px 0;">Nessun prodotto selezionato dal magazzino.</p>`}
@@ -1599,9 +1683,44 @@ function warehouseCategoryOptions(selected){
   return opts.map(o=>`<option value="${o}" ${o===selected?'selected':''}>${o}</option>`).join("");
 }
 let magazzinoSearch = "";
+function filteredMagazzinoRows(q){
+  q = (q||"").toLowerCase();
+  return state.warehouse
+    .filter(w => !q || (w.codice||"").toLowerCase().includes(q) || (w.nome||"").toLowerCase().includes(q) || (w.colore||"").toLowerCase().includes(q))
+    .sort((a,b)=>{
+      const qa=Number(a.quantita)||0, qb=Number(b.quantita)||0;
+      if((qa>0)!==(qb>0)) return qb>0 ? 1 : -1;
+      if(qa!==qb) return qb-qa;
+      return (a.codice||"").localeCompare(b.codice||"");
+    });
+}
+function magazzinoRowsHtml(list){
+  return list.length ? list.map(w=>{
+    const low = Number(w.quantita) <= Number(w.scortaMinima);
+    return `<tr>
+      <td style="font-weight:700;">${w.codice||"—"}</td>
+      <td><input id="wn-${w.id}" value="${w.nome||''}" style="min-width:160px;"></td>
+      <td>${w.categoria||"—"}</td><td>${w.colore||"—"}</td><td>${w.taglia||"—"}</td>
+      <td class="${low?'low-stock':''}"><input id="wq-${w.id}" type="number" min="0" value="${w.quantita}" style="width:70px;"> ${w.unita}</td>
+      <td><input id="wm-${w.id}" type="number" min="0" value="${w.scortaMinima}" style="width:70px;"> ${w.unita}</td>
+      <td>${low?'<span class="pill pill-open">Sotto scorta</span>':'<span class="pill pill-done">OK</span>'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-primary btn-sm" onclick="saveWarehouseRow('${w.id}')">Aggiorna</button>
+        <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',1)">+1</button>
+        <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',-1)">-1</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteItem('${w.id}')">Elimina</button>
+      </td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="9" class="empty">Nessun articolo con questi filtri.</td></tr>`;
+}
+function filterMagazzino(input){
+  magazzinoSearch = input.value;
+  const tbody = document.getElementById("warehouseTableBody");
+  if(tbody) tbody.innerHTML = magazzinoRowsHtml(filteredMagazzinoRows(magazzinoSearch));
+}
 function renderMagazzino(){
   const q = magazzinoSearch.toLowerCase();
-  const list = state.warehouse.filter(w => !q || (w.codice||"").toLowerCase().includes(q) || (w.nome||"").toLowerCase().includes(q) || (w.colore||"").toLowerCase().includes(q));
+  const list = filteredMagazzinoRows(q);
   document.getElementById("view-magazzino").innerHTML = `
     <div class="form-panel" id="pdfImportForm">
       <h3>Importa DDT Action Wear (PDF)</h3>
@@ -1627,7 +1746,7 @@ function renderMagazzino(){
       </div>
     </div>
     <div class="section-header">
-      <div class="filters"><input class="inline" style="min-width:220px;" placeholder="Cerca per codice, nome o colore…" value="${magazzinoSearch}" oninput="magazzinoSearch=this.value; renderMagazzino();"></div>
+      <div class="filters"><input id="magazzinoSearchInput" class="inline" style="min-width:220px;" placeholder="Cerca per codice, nome o colore…" value="${magazzinoSearch}" oninput="filterMagazzino(this)"></div>
       <div class="filters">
         <button class="btn btn-outline" onclick="toggleForm('pdfImportForm')">📄 Importa da DDT (PDF)</button>
         <button class="btn btn-outline" onclick="toggleForm('itemForm')">+ Nuovo articolo</button>
@@ -1636,24 +1755,8 @@ function renderMagazzino(){
     <div class="table-wrap">
       <table>
         <thead><tr><th>Codice</th><th>Nome</th><th>Categoria</th><th>Colore</th><th>Taglia</th><th>Quantità</th><th>Scorta minima</th><th></th><th></th></tr></thead>
-        <tbody>
-          ${list.length ? list.map(w=>{
-            const low = Number(w.quantita) <= Number(w.scortaMinima);
-            return `<tr>
-              <td style="font-weight:700;">${w.codice||"—"}</td>
-              <td><input id="wn-${w.id}" value="${w.nome||''}" style="min-width:160px;"></td>
-              <td>${w.categoria||"—"}</td><td>${w.colore||"—"}</td><td>${w.taglia||"—"}</td>
-              <td class="${low?'low-stock':''}"><input id="wq-${w.id}" type="number" min="0" value="${w.quantita}" style="width:70px;"> ${w.unita}</td>
-              <td><input id="wm-${w.id}" type="number" min="0" value="${w.scortaMinima}" style="width:70px;"> ${w.unita}</td>
-              <td>${low?'<span class="pill pill-open">Sotto scorta</span>':'<span class="pill pill-done">OK</span>'}</td>
-              <td style="white-space:nowrap;">
-                <button class="btn btn-primary btn-sm" onclick="saveWarehouseRow('${w.id}')">Aggiorna</button>
-                <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',1)">+1</button>
-                <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',-1)">-1</button>
-                <button class="btn btn-ghost btn-sm" onclick="deleteItem('${w.id}')">Elimina</button>
-              </td>
-            </tr>`;
-          }).join("") : `<tr><td colspan="9" class="empty">Nessun articolo con questi filtri.</td></tr>`}
+        <tbody id="warehouseTableBody">
+          ${magazzinoRowsHtml(list)}
         </tbody>
       </table>
     </div>
