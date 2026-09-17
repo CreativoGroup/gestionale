@@ -247,8 +247,8 @@ let currentUser = null; // {id, email, role}
 /* ============ CONFIGURAZIONE ============ */
 const CATEGORIES = ["Stampa","Ricamo","Servizio","Gadget","Allestimenti","Piccolo Formato","Lavorazioni Esterne"];
 const PRODOTTI_PER_CATEGORIA = {
-  "Stampa": ["T-shirt","Polo","Felpa","Shopper","Altro tessuto"],
-  "Ricamo": ["T-shirt","Polo","Felpa","Patch","Altro tessuto"],
+  "Stampa": ["T-shirt","Polo","Felpa","Shopper","Cappello","Altro tessuto"],
+  "Ricamo": ["T-shirt","Polo","Felpa","Patch","Cappello","Altro tessuto"],
   "Servizio": ["Logo","Sito","Grafica pubblicitaria","Altro"],
   "Gadget": ["Penna","USB","Tessera","Tazza","Borraccia","Tela canvas","Altro"],
   "Allestimenti": ["Sticker","Prespaziato","Poster","Banner","Velcro","Altro"],
@@ -295,7 +295,7 @@ function toDbRow(collection, o){
     case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito};
     case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, materiale_ordinato:!!o.materialeOrdinato, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
-    case "warehouse": return {id:o.id, nome:o.nome||null, categoria:o.categoria||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
+    case "warehouse": return {id:o.id, codice:o.codice||null, nome:o.nome||null, categoria:o.categoria||null, colore:o.colore||null, taglia:o.taglia||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
     case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, note:o.note||null};
@@ -310,7 +310,7 @@ function fromDbRow(collection, r){
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:r.metodo};
-    case "warehouse": return {id:r.id, nome:r.nome, categoria:r.categoria, quantita:Number(r.quantita)||0, scortaMinima:Number(r.scorta_minima)||0, unita:r.unita||"pz"};
+    case "warehouse": return {id:r.id, codice:r.codice||"", nome:r.nome, categoria:r.categoria, colore:r.colore||"", taglia:r.taglia||"", quantita:Number(r.quantita)||0, scortaMinima:Number(r.scorta_minima)||0, unita:r.unita||"pz"};
     case "expenses": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
     case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
     case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, note:r.note||""};
@@ -395,7 +395,7 @@ function speseTotaleMese(mese){ return state.expenses.filter(e=>e.data.slice(0,7
 
 /* ============ SEED DEMO ============ */
 function emptyRiga(isOrder){
-  return isOrder ? {id:uid(), descrizione:"", categoria:"", prodotto:"", stato:"Da fare", quantita:1, prezzoUnitario:0}
+  return isOrder ? {id:uid(), descrizione:"", categoria:"", prodotto:"", articoloId:"", stato:"Da fare", quantita:1, prezzoUnitario:0}
                  : {id:uid(), descrizione:"", quantita:1, prezzoUnitario:0};
 }
 /* Ricalcola le fasi di lavorazione in base alle categorie presenti nelle righe, preservando lo stato delle spunte già fatte */
@@ -1014,6 +1014,11 @@ function prodottoOptions(categoria, selected){
   const opts = PRODOTTI_PER_CATEGORIA[categoria] || [];
   return `<option value="">Seleziona…</option>` + opts.map(p=>`<option value="${p}" ${p===selected?'selected':''}>${p}</option>`).join("");
 }
+function warehouseArticoloOptions(prodotto, selected){
+  const items = state.warehouse.filter(w=>w.categoria===prodotto);
+  if(!items.length) return `<option value="">Nessun articolo in magazzino</option>`;
+  return `<option value="">Da magazzino (facoltativo)…</option>` + items.map(w=>`<option value="${w.id}" ${w.id===selected?'selected':''}>${w.codice||''} ${w.colore||''} ${w.taglia||''} (${w.quantita} pz)</option>`).join("");
+}
 function workerOptions(selected){ return `<option value="">Non assegnato</option>` + WORKERS.map(w=>`<option value="${w}" ${w===selected?'selected':''}>${w}</option>`).join(""); }
 
 /* ============ EDITOR RIGHE (usato da preventivi e ordini) ============ */
@@ -1033,7 +1038,7 @@ function linesEditor(collection, id, righe){
         ${righe.map(r=>`
           <tr>
             ${isOrder ? `<td><select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">${categoryOptions(r.categoria, true)}</select></td>
-            <td>${PRODOTTI_PER_CATEGORIA[r.categoria] ? `<select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">${prodottoOptions(r.categoria, r.prodotto)}</select>` : `<span style="color:var(--muted);">—</span>`}</td>` : `<td><input class="desc-input" value="${r.descrizione||''}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>`}
+            <td>${PRODOTTI_PER_CATEGORIA[r.categoria] ? `<select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">${prodottoOptions(r.categoria, r.prodotto)}</select>${(r.categoria==='Stampa'||r.categoria==='Ricamo') && r.prodotto ? `<select class="inline" style="margin-top:6px;font-size:12.5px;" onchange="updateRigaField('${collection}','${id}','${r.id}','articoloId',this.value)">${warehouseArticoloOptions(r.prodotto, r.articoloId)}</select>` : ``}` : `<span style="color:var(--muted);">—</span>`}</td>` : `<td><input class="desc-input" value="${r.descrizione||''}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>`}
             <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
             <td class="num"><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)"></td>
             <td class="num" style="padding-top:8px;">${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</td>
@@ -1056,18 +1061,52 @@ function addRiga(collection, id){
 }
 function removeRiga(collection, id, rigaId){
   const item = findItem(collection, id);
+  const riga = item.righe.find(r=>r.id===rigaId);
+  if(collection==='orders' && riga){ releaseArticoloReservation(riga); saveState('warehouse'); }
   item.righe = item.righe.filter(r=>r.id!==rigaId);
   if(collection==='orders') recalcFasi(item);
   saveState(collection);
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
 }
+function adjustWarehouseQty(articoloId, delta){
+  if(!articoloId) return;
+  const w = findItem('warehouse', articoloId);
+  if(!w) return;
+  w.quantita = Math.max(0, Number(w.quantita) + delta);
+}
+function releaseArticoloReservation(riga){
+  if(riga.articoloId && riga._reservedQty){ adjustWarehouseQty(riga.articoloId, riga._reservedQty); }
+  riga.articoloId = "";
+  riga._reservedQty = 0;
+}
 function updateRigaField(collection, id, rigaId, field, value){
   const item = findItem(collection, id);
   const riga = item.righe.find(r=>r.id===rigaId);
+  const isOrderCollection = collection==='orders';
+
+  if(isOrderCollection && field==='articoloId'){
+    if(riga.articoloId && riga._reservedQty) adjustWarehouseQty(riga.articoloId, riga._reservedQty);
+    riga.articoloId = value;
+    riga._reservedQty = value ? (Number(riga.quantita)||0) : 0;
+    if(value) adjustWarehouseQty(value, -riga._reservedQty);
+    saveState(collection); saveState('warehouse');
+    openJobCard(id);
+    return;
+  }
+  if(isOrderCollection && field==='prodotto'){ releaseArticoloReservation(riga); }
+  if(isOrderCollection && field==='categoria'){ releaseArticoloReservation(riga); riga.prodotto = ""; }
+
   riga[field] = (field==='quantita'||field==='prezzoUnitario') ? Number(value)||0 : value;
-  if(collection==='orders' && field==='categoria'){ recalcFasi(item); riga.prodotto = ""; }
+
+  if(isOrderCollection && field==='quantita' && riga.articoloId){
+    const newQty = Number(riga.quantita)||0;
+    adjustWarehouseQty(riga.articoloId, riga._reservedQty - newQty);
+    riga._reservedQty = newQty;
+    saveState('warehouse');
+  }
+  if(isOrderCollection && field==='categoria') recalcFasi(item);
   saveState(collection);
-  if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
+  if(isOrderCollection) openJobCard(id); else openQuoteDetail(id);
 }
 
 
@@ -1242,6 +1281,8 @@ function addOrder(){
 function deleteOrder(id){
   askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati.", ()=>{
     const paymentIds = state.payments.filter(p=>p.orderId===id).map(p=>p.id);
+    const order = findItem('orders', id);
+    if(order){ order.righe.forEach(r=>{ if(r.articoloId && r._reservedQty) adjustWarehouseQty(r.articoloId, r._reservedQty); }); saveState('warehouse'); }
     state.orders = state.orders.filter(o=>o.id!==id);
     state.payments = state.payments.filter(p=>p.orderId!==id);
     dbDelete('orders', id); dbDeleteMany('payments', paymentIds);
@@ -1312,6 +1353,11 @@ function renderSchede(){
     </div>
   `;
 }
+let fasiSectionOpen = {};
+function toggleFasiSection(orderId){
+  fasiSectionOpen[orderId] = !fasiSectionOpen[orderId];
+  openJobCard(orderId);
+}
 function openJobCard(orderId){
   const o = findItem('orders', orderId);
   const c = state.clients.find(x=>x.id===o.clientId);
@@ -1352,8 +1398,11 @@ function openJobCard(orderId){
     </div>
 
     <div class="modal-section">
-      <h3>Fasi di lavorazione</h3>
-      ${o.fasi.length ? renderFasiGrouped(o) : `<p class="empty" style="padding:6px 0;">Assegna una categoria a una riga per generare la checklist delle fasi.</p>`}
+      <h3 style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="toggleFasiSection('${o.id}')">
+        <span>Fasi di lavorazione ${o.fasi.length ? `<span style="color:var(--muted);font-weight:500;font-size:14px;">(${o.fasi.filter(f=>f.completata).length}/${o.fasi.length} completate)</span>` : ''}</span>
+        <span style="font-size:13px;color:var(--muted);">${fasiSectionOpen[o.id] ? '▾ chiudi' : '▸ apri'}</span>
+      </h3>
+      ${fasiSectionOpen[o.id] ? (o.fasi.length ? renderFasiGrouped(o) : `<p class="empty" style="padding:6px 0;">Assegna una categoria a una riga per generare la checklist delle fasi.</p>`) : ``}
     </div>
 
     <div class="modal-section">
@@ -1467,33 +1516,45 @@ function deletePaymentFromCard(paymentId, orderId){
 }
 
 /* ============ MAGAZZINO ============ */
+function warehouseCategoryOptions(selected){
+  const opts = [...new Set([...(PRODOTTI_PER_CATEGORIA["Stampa"]||[]), ...(PRODOTTI_PER_CATEGORIA["Ricamo"]||[])])];
+  return opts.map(o=>`<option value="${o}" ${o===selected?'selected':''}>${o}</option>`).join("");
+}
+let magazzinoSearch = "";
 function renderMagazzino(){
+  const q = magazzinoSearch.toLowerCase();
+  const list = state.warehouse.filter(w => !q || (w.codice||"").toLowerCase().includes(q) || (w.nome||"").toLowerCase().includes(q) || (w.colore||"").toLowerCase().includes(q));
   document.getElementById("view-magazzino").innerHTML = `
     <div class="form-panel" id="itemForm">
       <h3>Nuovo articolo</h3>
       <div class="form-grid">
-        <div class="field"><label>Nome articolo</label><input id="if-nome"></div>
-        <div class="field"><label>Categoria d'uso</label><select id="if-categoria">${categoryOptions()}</select></div>
-        <div class="field"><label>Unità</label><input id="if-unita" placeholder="pz, rotoli, kg..."></div>
-        <div class="field"><label>Quantità attuale</label><input id="if-quantita" type="number" min="0"></div>
-        <div class="field"><label>Scorta minima</label><input id="if-scorta" type="number" min="0"></div>
+        <div class="field"><label>Codice articolo</label><input id="if-codice" placeholder="Es. BS010"></div>
+        <div class="field"><label>Nome articolo</label><input id="if-nome" placeholder="Es. Evolution T-shirt m/c"></div>
+        <div class="field"><label>Categoria (prodotto)</label><select id="if-categoria">${warehouseCategoryOptions()}</select></div>
+        <div class="field"><label>Colore</label><input id="if-colore" placeholder="Es. Bianco, NY, BK..."></div>
+        <div class="field"><label>Taglia</label><input id="if-taglia" placeholder="Es. S, M, L, XL, UNICA..."></div>
+        <div class="field"><label>Quantità attuale</label><input id="if-quantita" type="number" min="0" value="0"></div>
+        <div class="field"><label>Scorta minima</label><input id="if-scorta" type="number" min="0" value="0"></div>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" onclick="addItem()">Salva articolo</button>
         <button class="btn btn-outline" onclick="toggleForm('itemForm')">Annulla</button>
       </div>
     </div>
-    <p class="helptext">Sezione in costruzione: verrà completata con il catalogo prodotti completo.</p>
+    <div class="section-header">
+      <div class="filters"><input class="inline" style="min-width:220px;" placeholder="Cerca per codice, nome o colore…" value="${magazzinoSearch}" oninput="magazzinoSearch=this.value; renderMagazzino();"></div>
+    </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Articolo</th><th>Categoria</th><th>Quantità</th><th>Scorta minima</th><th></th><th></th></tr></thead>
+        <thead><tr><th>Codice</th><th>Nome</th><th>Categoria</th><th>Colore</th><th>Taglia</th><th>Quantità</th><th>Scorta minima</th><th></th><th></th></tr></thead>
         <tbody>
-          ${state.warehouse.length ? state.warehouse.map(w=>{
+          ${list.length ? list.map(w=>{
             const low = Number(w.quantita) <= Number(w.scortaMinima);
             return `<tr>
-              <td>${w.nome}</td><td>${w.categoria}</td>
-              <td class="${low?'low-stock':''}">${w.quantita} ${w.unita}</td>
-              <td>${w.scortaMinima} ${w.unita}</td>
+              <td style="font-weight:700;">${w.codice||"—"}</td>
+              <td>${w.nome}</td><td>${w.categoria||"—"}</td><td>${w.colore||"—"}</td><td>${w.taglia||"—"}</td>
+              <td class="${low?'low-stock':''}"><input type="number" min="0" value="${w.quantita}" style="width:70px;" onchange="updateWarehouseField('${w.id}','quantita',this.value)"> ${w.unita}</td>
+              <td><input type="number" min="0" value="${w.scortaMinima}" style="width:70px;" onchange="updateWarehouseField('${w.id}','scortaMinima',this.value)"> ${w.unita}</td>
               <td>${low?'<span class="pill pill-open">Sotto scorta</span>':'<span class="pill pill-done">OK</span>'}</td>
               <td style="white-space:nowrap;">
                 <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',1)">+1</button>
@@ -1501,16 +1562,29 @@ function renderMagazzino(){
                 <button class="btn btn-ghost btn-sm" onclick="deleteItem('${w.id}')">Elimina</button>
               </td>
             </tr>`;
-          }).join("") : `<tr><td colspan="6" class="empty">Magazzino vuoto.</td></tr>`}
+          }).join("") : `<tr><td colspan="9" class="empty">Nessun articolo con questi filtri.</td></tr>`}
         </tbody>
       </table>
     </div>
   `;
 }
+function updateWarehouseField(id, field, value){
+  const w = findItem('warehouse', id);
+  w[field] = Number(value)||0;
+  saveState('warehouse');
+}
 function addItem(){
   const nome = document.getElementById("if-nome").value.trim();
   if(!nome){ showToast("Inserisci il nome dell'articolo"); return; }
-  state.warehouse.push({id:uid(), nome, categoria:document.getElementById("if-categoria").value, unita:document.getElementById("if-unita").value.trim()||"pz", quantita:Number(document.getElementById("if-quantita").value)||0, scortaMinima:Number(document.getElementById("if-scorta").value)||0});
+  state.warehouse.push({
+    id:uid(), codice: document.getElementById("if-codice").value.trim(), nome,
+    categoria: document.getElementById("if-categoria").value,
+    colore: document.getElementById("if-colore").value.trim(),
+    taglia: document.getElementById("if-taglia").value.trim(),
+    unita: "pz",
+    quantita:Number(document.getElementById("if-quantita").value)||0,
+    scortaMinima:Number(document.getElementById("if-scorta").value)||0
+  });
   saveState('warehouse'); toggleForm('itemForm'); renderMagazzino(); showToast("Articolo aggiunto");
 }
 function adjustStock(id, delta){ const w = findItem('warehouse',id); w.quantita = Math.max(0, Number(w.quantita)+delta); saveState('warehouse'); renderMagazzino(); }
