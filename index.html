@@ -136,14 +136,14 @@
   .job-card .jc-meta{color:var(--muted);font-size:12.5px;display:flex;justify-content:space-between;margin-top:8px;font-weight:600;}
   .modal-backdrop{position:fixed;inset:0;background:rgba(10,14,22,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 20px;z-index:50;overflow-y:auto;}
   .modal-backdrop.open{display:flex;}
-  .modal{background:var(--card);border-radius:12px;max-width:900px;width:100%;padding:32px;position:relative;margin-bottom:40px;}
+  .modal{background:var(--card);border-radius:12px;max-width:1080px;width:100%;padding:32px;position:relative;margin-bottom:40px;}
   .modal h2{margin:0 0 4px;font-size:26px;font-weight:800;}
   .jobcard-eyebrow{margin:0;font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
   .jobcard-flags{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
   .jobcard-flags .checkfield{font-size:13px;white-space:nowrap;gap:6px;}
   .ticket-meta-big{grid-template-columns:1fr 1fr 1fr;}
   .inline-big{font-size:19px !important;padding:13px 14px !important;font-weight:700;}
-  input[type="date"].inline-big{font-size:19px !important;padding:13px 14px !important;}
+  input[type="date"].inline-big{font-size:22px !important;padding:16px 16px !important;}
   input[type="date"].inline-big::-webkit-calendar-picker-indicator{transform:scale(1.5);margin-left:8px;cursor:pointer;}
   .status-select-big{border:none;border-radius:7px;}
   @media(max-width:700px){.ticket-meta-big{grid-template-columns:1fr;}}
@@ -171,7 +171,7 @@
   .lines-table input{width:100%;padding:9px 10px;font-size:15px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);}
   .lines-table .num{width:78px;}
   .lines-table .desc-input{min-width:260px;font-weight:600;}
-  .riga-categoria-select{width:100%;min-width:190px;padding:12px 12px;font-size:17px;font-weight:700;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--text);}
+  .riga-categoria-select{width:100%;min-width:190px;padding:14px 14px;font-size:19px;font-weight:700;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--text);}
   .totals-box{background:var(--card);border-radius:8px;padding:14px 18px;margin:12px 0 16px;font-size:15px;}
   .totals-box .trow{display:flex;justify-content:space-between;padding:4px 0;}
   .totals-box .trow.grand{font-weight:700;font-size:19px;border-top:1px solid var(--border);margin-top:8px;padding-top:10px;}
@@ -990,9 +990,10 @@ function linesEditor(collection, id, righe){
   const isOrder = collection === 'orders';
   const showDots = isOrder && righe.length > 1;
   return `
+    <div style="overflow-x:auto;">
     <table class="lines-table">
       <thead><tr>
-        ${isOrder ? `<th style="width:210px;">Categoria</th><th style="width:210px;">Prodotto</th>` : `<th>Descrizione</th>`}
+        ${isOrder ? `<th style="width:200px;">Categoria</th><th style="width:200px;">Prodotto</th>` : `<th>Descrizione</th>`}
         <th class="num">Quantità</th><th class="num">Prezzo unit. €</th><th class="num">Totale</th>
         ${showDots ? `<th>Stato riga</th>` : ``}
         <th></th>
@@ -1010,6 +1011,7 @@ function linesEditor(collection, id, righe){
           </tr>`).join("") || `<tr><td colspan="${isOrder?(showDots?7:6):5}" class="empty" style="padding:10px 0;">Nessuna riga. Aggiungine una.</td></tr>`}
       </tbody>
     </table>
+    </div>
     <button class="btn btn-outline btn-sm" onclick="addRiga('${collection}','${id}')">+ Aggiungi riga</button>
   `;
 }
@@ -1290,7 +1292,7 @@ function openJobCard(orderId){
     <button class="close-x" onclick="closeModal()">×</button>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
       <div>
-        <p class="jobcard-eyebrow">Scheda di lavorazione ${o.numero?('#'+o.numero):''}</p>
+        <p class="jobcard-eyebrow">Scheda di lavorazione ${o.numero?('#'+o.numero):''}${o.createdAt?` — creata il ${fmtDate(o.createdAt.slice(0,10))}`:''}</p>
         <h2 style="margin-bottom:2px;">${c?clientDisplayName(c):"—"}</h2>
       </div>
       <div class="jobcard-flags">
