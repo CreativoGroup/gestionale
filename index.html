@@ -44,8 +44,13 @@
   .sidebar-footer{margin-top:auto;padding:10px 8px;font-size:11px;color:var(--muted);line-height:1.5;}
   main{flex:1;min-width:0;padding:26px 30px 60px;}
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap;}
-  .global-search{flex:1;max-width:320px;}
+  .global-search{flex:1;max-width:320px;position:relative;}
   .global-search input{width:100%;padding:10px 14px;font-size:14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;}
+  .global-search-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:280px;overflow-y:auto;z-index:50;}
+  .gsd-item{padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--border);}
+  .gsd-item:last-child{border-bottom:none;}
+  .gsd-item:hover{background:var(--paper);color:var(--accent);}
+  .gsd-empty{padding:12px 14px;font-size:13px;color:var(--muted);}
   .topbar h1{font-size:22px;margin:0 0 4px;}
   .topbar p{margin:0;color:var(--muted);font-size:14px;}
   .btn{all:unset;cursor:pointer;padding:9px 16px;border-radius:8px;font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;}
@@ -210,8 +215,8 @@
     <div class="topbar">
       <div><h1 id="viewTitle">Dashboard</h1><p id="viewSubtitle">Panoramica generale dell'attività</p></div>
       <div class="global-search">
-        <input type="text" id="globalClientSearch" placeholder="🔎 Cerca cliente…" list="globalClientSuggestions" oninput="updateGlobalClientSuggestions(this.value)" onchange="goToSearchedClient(this)" autocomplete="off">
-        <datalist id="globalClientSuggestions"></datalist>
+        <input type="text" id="globalClientSearch" placeholder="🔎 Cerca cliente…" oninput="updateGlobalClientSuggestions(this.value)" onkeydown="globalSearchKeydown(event,this)" onblur="setTimeout(()=>document.getElementById('globalSearchDropdown').style.display='none',150)" autocomplete="off">
+        <div id="globalSearchDropdown" class="global-search-dropdown"></div>
       </div>
       <div id="topbarActions"></div>
     </div>
@@ -717,27 +722,33 @@ function clientCognomiOptions(){
 }
 let globalSearchMap = {};
 function updateGlobalClientSuggestions(value){
-  const dl = document.getElementById('globalClientSuggestions');
-  if(value.trim().length < 3){ dl.innerHTML = ""; globalSearchMap = {}; return; }
-  const q = value.trim().toLowerCase();
+  const dd = document.getElementById('globalSearchDropdown');
+  const v = value.trim();
+  if(v.length < 3){ dd.style.display = "none"; dd.innerHTML = ""; globalSearchMap = {}; return; }
+  const q = v.toLowerCase();
   const matches = state.clients.filter(c=>{
     const name = clientDisplayName(c).toLowerCase();
-    return name.includes(q) || (c.citta||"").toLowerCase().includes(q) || (c.partitaIva||"").toLowerCase().includes(q) || (c.telefono||"").includes(q);
-  }).slice(0,15);
+    return name.includes(q) || (c.partitaIva||"").toLowerCase().includes(q) || (c.telefono||"").includes(q);
+  }).slice(0,10);
   globalSearchMap = {};
-  dl.innerHTML = matches.map(c=>{
-    const label = `${clientDisplayName(c)}${c.citta?' — '+c.citta:''}${c.numero?' (#'+c.numero+')':''}`;
-    globalSearchMap[label] = c.id;
-    return `<option value="${label}">`;
-  }).join("");
+  matches.forEach(c => { globalSearchMap[c.id] = c; });
+  dd.innerHTML = matches.length
+    ? matches.map(c=>`<div class="gsd-item" onmousedown="goToClientById('${c.id}')">${clientDisplayName(c)}</div>`).join("")
+    : `<div class="gsd-empty">Nessun cliente trovato</div>`;
+  dd.style.display = "block";
 }
-function goToSearchedClient(input){
-  const id = globalSearchMap[input.value];
-  if(id){
-    openClientHistory(id);
-    input.value = "";
-    document.getElementById('globalClientSuggestions').innerHTML = "";
-  }
+function globalSearchKeydown(evt, input){
+  if(evt.key !== "Enter") return;
+  const keys = Object.keys(globalSearchMap);
+  if(keys.length){ goToClientById(keys[0]); }
+}
+function goToClientById(id){
+  openClientHistory(id);
+  const input = document.getElementById('globalClientSearch');
+  input.value = "";
+  const dd = document.getElementById('globalSearchDropdown');
+  dd.style.display = "none"; dd.innerHTML = "";
+  globalSearchMap = {};
 }
 function toggleClientTypeFields(prefix){
   const tipo = document.getElementById(`${prefix}-tipo`).value;
