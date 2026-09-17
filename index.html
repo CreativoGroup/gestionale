@@ -7,7 +7,1868 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestionale — Agenzia Grafica &amp; Stampa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><!DOCTYPE html>
+<html lang="it" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestionale — Agenzia Grafica &amp; Stampa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14213D; --ink-2:#1C2A4A; --paper:#F4F6F7; --card:#FFFFFF;
+    --sidebar-bg:#FFFFFF; --sidebar-hover:#F1F3F5;
+    --accent:#E8552F; --accent-dark:#C6431F; --teal:#1F7A8C; --text:#1C2430;
+    --muted:#6B7280; --border:#DDE2E5; --ok:#2E7D4F; --warn:#B8860B; --danger:#C0392B;
+    --radius-card:10px; --radius-pill:999px;
+  }
+  *{box-sizing:border-box;}
+  html,body{width:100%;min-height:100%;}
+  body{margin:0;background:var(--paper);color:var(--text);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+  h1,h2,h3,.brand{font-family:'Space Grotesk',system-ui,sans-serif;}
+  #app{display:flex;min-height:100vh;}
+  aside.sidebar{width:236px;flex-shrink:0;background:var(--sidebar-bg);color:var(--text);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+  .brand{font-size:19px;font-weight:700;color:var(--text);padding:6px 8px 2px;}
+  .brand small{display:block;font-family:'Inter';font-weight:400;font-size:12px;color:var(--muted);margin-top:2px;}
+  .brand-logo{padding:4px 8px 14px;border-bottom:1px solid var(--border);margin-bottom:6px;}
+  .brand-logo img{width:100%;height:auto;display:block;}
+  .brand-logo small{display:block;font-family:'Inter';font-weight:500;font-size:11.5px;color:var(--muted);margin-top:8px;letter-spacing:.2px;}
+  .stat.clickable{cursor:pointer;transition:border-color .15s, transform .1s;}
+  .stat.clickable:hover{border-color:var(--accent);}
+  .stat.clickable:active{transform:scale(.99);}
+  .modal-section{background:var(--paper);border-radius:10px;padding:20px 22px;margin:20px 0;border-left:4px solid var(--accent);}
+  .modal-section h3{margin:0 0 14px;font-size:17px;font-weight:700;color:var(--text);}
+  .modal p, .modal .field label, .modal .ticket-meta{font-size:15px;}
+  .modal{font-size:16.5px;line-height:1.6;}
+  .list-row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--paper);border-radius:8px;padding:11px 14px;margin-bottom:8px;cursor:pointer;border:1px solid transparent;}
+  .list-row:hover{border-color:var(--accent);}
+  .list-row .lr-main{font-weight:600;font-size:13.5px;}
+  .list-row .lr-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  nav.tabs{margin-top:22px;display:flex;flex-direction:column;gap:2px;}
+  nav.tabs button{all:unset;cursor:pointer;padding:10px 12px;border-radius:8px;font-size:14px;color:var(--muted);display:flex;align-items:center;gap:10px;}
+  nav.tabs button:hover{background:var(--sidebar-hover);color:var(--text);}
+  nav.tabs button.active{background:var(--accent);color:#fff;}
+  nav.tabs .icon{width:18px;text-align:center;}
+  .sidebar-footer{margin-top:auto;padding:10px 8px;font-size:11px;color:var(--muted);line-height:1.5;}
+  main{flex:1;min-width:0;padding:26px 30px 60px;}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap;}
+  .topbar h1{font-size:22px;margin:0 0 4px;}
+  .topbar p{margin:0;color:var(--muted);font-size:14px;}
+  .btn{all:unset;cursor:pointer;padding:9px 16px;border-radius:8px;font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--accent);}
+  .btn-outline:hover{border-color:var(--accent);background:#FFF3EE;}
+  .btn-ghost{color:var(--muted);padding:6px 8px;font-weight:500;}
+  .btn-ghost:hover{color:var(--danger);}
+  .btn-sm{padding:5px 10px;font-size:12.5px;}
+  section.view{display:none;}
+  section.view.active{display:block;}
+  .grid{display:grid;gap:16px;}
+  .grid-2{grid-template-columns:1fr 1fr;}
+  .grid-auto{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));}
+  @media(max-width:980px){.grid-2{grid-template-columns:1fr;}}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card);padding:18px;}
+  .stat .stat-label{font-size:12.5px;color:var(--muted);margin:0 0 6px;}
+  .stat .stat-value{font-size:24px;font-weight:700;font-family:'Space Grotesk';}
+  .stat .stat-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr.clickable-row{cursor:pointer;}
+  tr.clickable-row:hover{background:var(--paper);}
+  .star{cursor:pointer;font-size:16px;color:var(--border);user-select:none;}
+  .star.active{color:#F1C40F;text-shadow:0 0 0 #F1C40F;}
+  .star:hover{color:var(--accent);}
+  .table-wrap{overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card);}
+  .pill{display:inline-block;padding:3px 10px;border-radius:var(--radius-pill);font-size:11.5px;font-weight:600;white-space:nowrap;}
+  .pill-todo{background:#F2F2F0;color:#6B6B63;border:1px solid var(--border);}
+  .pill-lavorazione{background:#FBE1DA;color:var(--danger);}
+  .pill-produzione{background:#FCF3CF;color:#8A6D0B;}
+  .pill-done{background:#DFF0E4;color:var(--ok);}
+  .pill-delivered{background:#E3E7F0;color:#3D4A78;}
+  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,.15);}
+  .riga-status-select{border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px;font-weight:600;cursor:pointer;min-width:130px;}
+  .desc-lavoro{width:100%;min-height:110px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;font-size:16px;font-family:inherit;resize:vertical;}
+  .desc-lavoro:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .pill-open{background:#FBE1DA;color:var(--danger);}
+  .pill-accepted{background:#DFF0E4;color:var(--ok);}
+  .pill-sent{background:#DDEAF3;color:var(--teal);}
+  .pill-draft{background:#EDEDED;color:var(--muted);}
+  .pill-refused{background:#FBE1DA;color:var(--danger);}
+  .pill-business{background:#DCE7F5;color:#1D5A9E;}
+  .pill-family{background:#FBE7CC;color:#B9660C;}
+  .client-dot-business{background:#1D5A9E;}
+  .client-dot-family{background:#D9820A;}
+  .form-panel{background:var(--card);border:1px dashed var(--accent);border-radius:var(--radius-card);padding:18px;margin-bottom:18px;display:none;}
+  .form-panel.open{display:block;}
+  .form-panel h3{margin:0 0 14px;font-size:15px;}
+  .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  @media(max-width:800px){.form-grid{grid-template-columns:1fr 1fr;}}
+  @media(max-width:520px){.form-grid{grid-template-columns:1fr;}}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:12px;color:var(--muted);font-weight:600;}
+  .field input, .field select, .field textarea{font-family:inherit;font-size:14px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--paper);color:var(--text);}
+  #clientForm{padding:26px;}
+  #clientForm h3{font-size:19px;margin-bottom:20px;}
+  #clientForm .field label{font-size:14px;}
+  #clientForm .field input, #clientForm .field select{font-size:16px;padding:12px 14px;}
+  #clientForm .form-grid{gap:16px;}
+  .field textarea{resize:vertical;min-height:56px;}
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  input[type=number]{-moz-appearance:textfield;}
+  .checkfield{display:flex;align-items:center;gap:9px;font-size:15px;}
+  .checkfield input{width:16px;height:16px;}
+  .form-actions{margin-top:14px;display:flex;gap:10px;}
+  select.inline{border:1px solid var(--border);background:var(--paper);color:var(--text);font-size:12.5px;padding:5px 8px;border-radius:6px;font-family:inherit;}
+  input.inline{border:1px solid var(--border);background:var(--paper);color:var(--text);font-size:12.5px;padding:5px 8px;border-radius:6px;font-family:inherit;}
+  .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;}
+  .empty{padding:30px 10px;text-align:center;color:var(--muted);font-size:13.5px;}
+  .kanban{display:grid;grid-template-columns:repeat(5,minmax(250px,1fr));gap:14px;overflow-x:auto;}
+  @media(max-width:1100px){.kanban{grid-template-columns:repeat(5,300px);}}
+  .kanban-col{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card);padding:12px;min-width:250px;}
+  .kanban-col h4{margin:2px 8px 12px;font-size:13.5px;color:var(--muted);display:flex;justify-content:space-between;font-weight:600;}
+  .job-card{background:var(--paper);border:1px solid var(--border);border-radius:9px;padding:14px;margin-bottom:12px;border-top:4px dashed var(--accent);font-size:14px;cursor:pointer;}
+  .job-card:hover{border-color:var(--accent);}
+  .job-card.job-card-importante{border:2px solid #F1C40F;border-top:4px solid #F1C40F;background:#FFFBEB;box-shadow:0 2px 8px rgba(241,196,15,.25);}
+  .job-card .jc-star{color:#B8860B;font-size:11.5px;font-weight:800;letter-spacing:.4px;margin-bottom:6px;}
+  .job-card .jc-client{font-weight:700;font-size:15px;margin-bottom:4px;}
+  .job-card .jc-cat{color:var(--teal);font-size:12.5px;font-weight:600;margin-bottom:6px;}
+  .job-card .jc-lines{margin-bottom:8px;}
+  .job-card .jc-line{color:var(--teal);font-size:12.5px;font-weight:600;line-height:1.6;}
+  .job-card .jc-desc{font-size:13px;color:var(--text);margin-bottom:8px;}
+  .job-card .jc-meta{color:var(--muted);font-size:12.5px;display:flex;justify-content:space-between;margin-top:8px;font-weight:600;}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(10,14,22,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 20px;z-index:50;overflow-y:auto;}
+  .modal-backdrop.open{display:flex;}
+  .modal{background:var(--card);border-radius:12px;max-width:900px;width:100%;padding:32px;position:relative;margin-bottom:40px;}
+  .modal h2{margin:0 0 4px;font-size:26px;font-weight:800;}
+  .jobcard-eyebrow{margin:0;font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+  .jobcard-flags{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
+  .jobcard-flags .checkfield{font-size:13px;white-space:nowrap;gap:6px;}
+  .ticket-meta-big{grid-template-columns:1fr 1fr 1fr;}
+  .inline-big{font-size:16px !important;padding:10px 12px !important;font-weight:700;}
+  .status-select-big{border:none;border-radius:7px;}
+  @media(max-width:700px){.ticket-meta-big{grid-template-columns:1fr;}}
+  .modal h3{font-size:18.5px;font-weight:800;margin:22px 0 12px;}
+  .modal .close-x{position:absolute;top:16px;right:18px;cursor:pointer;color:var(--muted);font-size:24px;background:none;border:none;}
+  .modal .btn{font-size:14.5px;padding:11px 20px;}
+  .modal .btn-sm{font-size:13px;padding:7px 13px;}
+  .ticket-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px;margin:16px 0 20px;font-size:16.5px;font-weight:700;}
+  .ticket-meta div span{display:block;font-size:11.5px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px;}
+  .steps{display:flex;flex-direction:column;gap:9px;margin-bottom:14px;}
+  .step-row{display:flex;align-items:center;gap:12px;font-size:15px;padding:9px 12px;border-radius:7px;background:var(--card);}
+  .step-row input{width:16px;height:16px;}
+  .step-row.done label{color:var(--muted);}
+  .fasi-group-title{font-size:13.5px;font-weight:700;color:var(--teal);margin:14px 0 8px;text-transform:uppercase;letter-spacing:.3px;}
+  .fasi-group-title:first-child{margin-top:0;}
+  .low-stock{color:var(--danger);font-weight:700;}
+  .demo-tag{background:var(--accent);color:#fff;font-size:10.5px;padding:1px 7px;border-radius:5px;margin-left:6px;vertical-align:middle;}
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:.25s;pointer-events:none;z-index:80;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  a.link{color:var(--teal);text-decoration:none;font-weight:600;}
+  .helptext{font-size:12.5px;color:var(--muted);margin-top:-6px;margin-bottom:14px;line-height:1.5;}
+  .lines-table{width:100%;border-collapse:collapse;margin-bottom:10px;}
+  .lines-table th{font-size:12.5px;padding:8px 8px;}
+  .lines-table td{padding:8px 8px;border-bottom:none;}
+  .lines-table input{width:100%;padding:9px 10px;font-size:15px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);}
+  .lines-table .num{width:78px;}
+  .lines-table .desc-input{min-width:260px;font-weight:600;}
+  .riga-categoria-select{width:100%;min-width:170px;padding:9px 10px;font-size:14.5px;font-weight:700;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);}
+  .totals-box{background:var(--card);border-radius:8px;padding:14px 18px;margin:12px 0 16px;font-size:15px;}
+  .totals-box .trow{display:flex;justify-content:space-between;padding:4px 0;}
+  .totals-box .trow.grand{font-weight:700;font-size:19px;border-top:1px solid var(--border);margin-top:8px;padding-top:10px;}
+  .pay-list{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;}
+  .pay-row{display:flex;justify-content:space-between;align-items:center;background:var(--card);border-radius:6px;padding:9px 12px;font-size:14.5px;}
+  .login-screen{position:fixed;inset:0;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;background:var(--paper);z-index:9999;padding:20px;}
+  .login-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:32px;width:100%;max-width:360px;}
+</style>
+</head>
+<body>
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <div class="brand-logo" style="border-bottom:none;margin-bottom:18px;padding:0;">
+      <small style="font-size:15px;color:var(--text);font-weight:600;">Gestionale — Grafica &amp; Stampa</small>
+    </div>
+    <h2 style="margin:0 0 16px;font-size:20px;">Accedi</h2>
+    <div class="field" style="margin-bottom:12px;"><label>Email</label><input id="login-email" type="email" autocomplete="username"></div>
+    <div class="field" style="margin-bottom:16px;"><label>Password</label><input id="login-password" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doSignIn()"></div>
+    <p id="login-error" style="color:var(--danger);font-size:13px;display:none;margin:0 0 12px;"></p>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="doSignIn()">Accedi</button>
+  </div>
+</div>
+<div id="app" style="display:none;">
+
+  <aside class="sidebar">
+    <div class="brand-logo">
+      <img src="data:image/png;base64,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" alt="Logo agenzia">
+      <small>Gestionale — Grafica &amp; Stampa</small>
+    </div>
+    <nav class="tabs" id="nav"></nav>
+    <div class="sidebar-footer">Dati salvati solo in questo browser (locale). Usa "Esporta backup" nella Dashboard per salvare una copia.</div>
+  </aside>
+  <main>
+    <div class="topbar">
+      <div><h1 id="viewTitle">Dashboard</h1><p id="viewSubtitle">Panoramica generale dell'attività</p></div>
+      <div id="topbarActions"></div>
+    </div>
+    <section class="view" id="view-dashboard"></section>
+    <section class="view" id="view-clienti"></section>
+    <section class="view" id="view-preventivi"></section>
+    <section class="view" id="view-ordini"></section>
+    <section class="view" id="view-flusso"></section>
+    <section class="view" id="view-schede"></section>
+    <section class="view" id="view-magazzino"></section>
+    <section class="view" id="view-incassi"></section>
+    <section class="view" id="view-spese"></section>
+    <section class="view" id="view-entrate"></section>
+  </main>
+</div>
+<div class="modal-backdrop" id="modalBackdrop"><div class="modal" id="modalBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+/* ============ CONFIGURAZIONE SUPABASE ============ */
+const SUPABASE_URL = "https://isvanzqcifypsejdlmjx.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Ln3Z6A31vG2VRumTfVQycA_FsA0X883";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let currentUser = null; // {id, email, role}
+
+/* ============ CONFIGURAZIONE ============ */
+const CATEGORIES = ["Stampa","Ricamo","Servizio","Gadget","Allestimenti","Piccolo Formato","Lavorazioni Esterne"];
+const PRODOTTI_PER_CATEGORIA = {
+  "Stampa": ["T-shirt","Polo","Felpa","Shopper","Altro tessuto"],
+  "Ricamo": ["T-shirt","Polo","Felpa","Patch","Altro tessuto"],
+  "Servizio": ["Logo","Sito","Grafica pubblicitaria","Altro"],
+  "Gadget": ["Penna","USB","Tessera","Tazza","Borraccia","Tela canvas","Altro"],
+  "Allestimenti": ["Sticker","Prespaziato","Poster","Banner","Velcro","Altro"],
+  "Piccolo Formato": ["Biglietti da visita","A4","A3","Carta adesiva","Altro"],
+  "Lavorazioni Esterne": ["Serigrafia","Grande Formato","Piccolo Formato","Tipografia","Gadget","Altro"]
+};
+const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone","Misto"];
+const STATUSES = ["Da fare","In lavorazione","In produzione","Completato","Consegnato"];
+const KANBAN_STATUSES = STATUSES.filter(s=>s!=="Consegnato");
+const STATUS_CLASS = {"Da fare":"pill-todo","In lavorazione":"pill-lavorazione","In produzione":"pill-produzione","Completato":"pill-done","Consegnato":"pill-delivered"};
+const STATUS_DOT = {"Da fare":"#FFFFFF","In lavorazione":"#E74C3C","In produzione":"#F1C40F","Completato":"#2ECC71","Consegnato":"#3D4A78"};
+function statusDot(stato){ return `<span class="status-dot" style="background:${STATUS_DOT[stato]||'#ccc'}"></span>`; }
+function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#4A4A4A" : "#fff"; }
+const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
+const QUOTE_CLASS = {"Bozza":"pill-draft","Inviato":"pill-sent","Accettato":"pill-accepted","Rifiutato":"pill-refused"};
+const STEP_TEMPLATES = {
+  "Servizio": ["Appuntamento effettuato","Bozza grafica","Revisione cliente","Approvazione finale","Consegna file"],
+  "Stampa": ["Materiale da ordinare","Materiale in arrivo","Pronto per la stampa","Stampa DTF","Stampa taglio","Stampa digitale","Stampa sublimata"],
+  "Ricamo": ["Materiale da ordinare","Digitalizzazione ricamo","Ricamo personalizzato con nome","Ricamo standard","Pulizia ricamo"],
+  "Allestimenti": ["Materiale da ordinare","Sopralluogo/misure","Mimaki","Summa","Montaggio","Piccola produzione"],
+  "Gadget": ["UV","Laser","Sublimatica","Materiale da ordinare","Nel carrello"],
+  "Piccolo Formato": ["Materiale da ordinare","File pronto per la stampa","Stampa","Taglio/rifinitura","Confezionamento"],
+  "Lavorazioni Esterne": ["Presstime","Flyeralarm","Former","Coke","Pressup","AMGS","Hi Print","Ricamarte","Pixart Printing","Officine del Cotone","Altro"]
+};
+const PAY_METHODS = ["Bonifico","Contanti","Carta"];
+const PAY_TIPI = ["Acconto","Saldo"];
+const CLIENT_TYPES = ["Business","Family"];
+const SETTORI = ["Ristorazione","Eventi / Marketing","Associazione Sportiva","Danza","Palestra","Fisioterapia","Medicina Estetica","Medico","Ospedale","Università","Scuola/Parrocchia","Editoria","Cinema/Spettacolo","Piccolo Commerciante","Hotellerie","Legale/Tributario/Assicurativo","Lusso","Tecnologico","Arte","Agenzia","Automotive","Edile","Agenzia Viaggi/Auto/Funebre","Cura Persona"];
+const CONSEGNA_TIPI = ["Ritiro in sede","Spedizione"];
+
+/* ============ STATO ============ */
+let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], entrate:[], appuntamenti:[]};
+let currentView = "dashboard";
+const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", entrate:"entrate", appuntamenti:"appuntamenti"};
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+
+/* ---- Mapping camelCase (app) <-> snake_case (database) ---- */
+function toDbRow(collection, o){
+  switch(collection){
+    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null};
+    case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito};
+    case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, materiale_ordinato:!!o.materialeOrdinato, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[]};
+    case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
+    case "warehouse": return {id:o.id, nome:o.nome||null, categoria:o.categoria||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
+    case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
+    case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
+    case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, note:o.note||null};
+  }
+}
+function fromDbRow(collection, r){
+  switch(collection){
+    case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||""};
+    case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito};
+    case "orders": {
+      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:r.worker||"", stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, materialeOrdinato:!!r.materiale_ordinato, fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], createdAt:r.created_at};
+      return o;
+    }
+    case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:r.metodo};
+    case "warehouse": return {id:r.id, nome:r.nome, categoria:r.categoria, quantita:Number(r.quantita)||0, scortaMinima:Number(r.scorta_minima)||0, unita:r.unita||"pz"};
+    case "expenses": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
+    case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
+    case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, note:r.note||""};
+  }
+}
+
+/* ---- Caricamento iniziale da Supabase (tutte le tabelle in parallelo) ---- */
+async function loadAllFromSupabase(){
+  const collections = Object.keys(TABLES);
+  const results = await Promise.all(collections.map(c => sb.from(TABLES[c]).select("*")));
+  collections.forEach((c, i) => {
+    const { data, error } = results[i];
+    if(error){ console.error("Errore caricamento", c, error); state[c] = []; return; }
+    state[c] = (data||[]).map(r => fromDbRow(c, r));
+  });
+  // Le fasi vanno ricalcolate se qualche categoria non ha più il template previsto, preservando le spunte già fatte
+  state.orders.forEach(o => recalcFasi(o));
+}
+
+/* ---- Scrittura: aggiorna/crea tutte le righe attuali di una collezione (upsert) ---- */
+async function syncCollection(name){
+  const rows = state[name].map(o => toDbRow(name, o));
+  if(!rows.length) return;
+  const { error } = await sb.from(TABLES[name]).upsert(rows);
+  if(error){ console.error("Errore salvataggio", name, error); showToast("Errore nel salvataggio: riprova"); }
+}
+/* ---- Cancellazione mirata ---- */
+async function dbDelete(name, id){
+  const { error } = await sb.from(TABLES[name]).delete().eq("id", id);
+  if(error){ console.error("Errore eliminazione", name, error); showToast("Errore nell'eliminazione: riprova"); }
+}
+async function dbDeleteMany(name, ids){
+  if(!ids.length) return;
+  const { error } = await sb.from(TABLES[name]).delete().in("id", ids);
+  if(error){ console.error("Errore eliminazione multipla", name, error); showToast("Errore nell'eliminazione: riprova"); }
+}
+/* Compatibilità: chiamate rimaste generiche vengono instradate sulla collezione giusta quando possibile */
+function saveState(name){
+  if(name) { syncCollection(name); return; }
+  console.warn("saveState() chiamato senza indicare la collezione: nessuna sincronizzazione effettuata.");
+}
+
+/* ---- Aggiornamenti in tempo reale da altri dispositivi ---- */
+function subscribeRealtime(){
+  Object.keys(TABLES).forEach(name=>{
+    sb.channel(`${name}-changes`)
+      .on("postgres_changes", {event:"*", schema:"public", table:TABLES[name]}, payload => {
+        if(payload.eventType === "DELETE"){
+          state[name] = state[name].filter(x=>x.id !== payload.old.id);
+        } else {
+          const row = fromDbRow(name, payload.new);
+          const idx = state[name].findIndex(x=>x.id===row.id);
+          if(idx>=0) state[name][idx] = row; else state[name].push(row);
+          if(name==="orders") recalcFasi(state[name].find(x=>x.id===row.id));
+        }
+        renderCurrentView();
+      })
+      .subscribe();
+  });
+}
+
+function currentMonth(){ return today().slice(0,7); }
+function fmtDate(iso){ if(!iso) return "—"; const [y,m,d]=iso.split("-"); return `${d}/${m}/${y}`; }
+function fmtMoney(n){ return (Number(n)||0).toLocaleString("it-IT",{style:"currency",currency:"EUR"}); }
+
+/* ============ HELPER CLIENTI ============ */
+function clientDisplayName(c){ if(!c) return "—"; return c.tipo==="Business" ? c.ragioneSociale : `${c.nome||""} ${c.cognome||""}`.trim(); }
+function clientName(id){ const c = state.clients.find(x=>x.id===id); return clientDisplayName(c); }
+
+/* ============ HELPER RIGHE / TOTALI ============ */
+function righeTotale(righe){ return (righe||[]).reduce((s,r)=> s + (Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0), 0); }
+function quoteImponibile(q){ return righeTotale(q.righe); }
+function orderImponibile(o){ return righeTotale(o.righe); }
+function orderSpedizioneCosto(o){ return o.consegnaTipo==="Spedizione" ? (Number(o.costoSpedizione)||0) : 0; }
+function orderIva(o){ return o.ivaApplicata ? (orderImponibile(o) + orderSpedizioneCosto(o)) * 0.22 : 0; }
+function orderTotale(o){ const base = orderImponibile(o) + orderSpedizioneCosto(o) + orderIva(o) - (Number(o.sconto)||0); return Math.max(0, base); }
+function orderIncassato(o){ return state.payments.filter(p=>p.orderId===o.id).reduce((s,p)=>s+Number(p.importo),0); }
+function orderSaldo(o){ return orderTotale(o) - orderIncassato(o); }
+function paymentsTotaleMese(mese){ return state.payments.filter(p=>p.data.slice(0,7)===mese).reduce((s,p)=>s+Number(p.importo),0); }
+function entrateTotaleMese(mese){ return (state.entrate||[]).filter(e=>e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
+function speseTotaleMese(mese){ return state.expenses.filter(e=>e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
+
+/* ============ SEED DEMO ============ */
+function emptyRiga(isOrder){
+  return isOrder ? {id:uid(), descrizione:"", categoria:"", prodotto:"", stato:"Da fare", quantita:1, prezzoUnitario:0}
+                 : {id:uid(), descrizione:"", quantita:1, prezzoUnitario:0};
+}
+/* Ricalcola le fasi di lavorazione in base alle categorie presenti nelle righe, preservando lo stato delle spunte già fatte */
+function recalcFasi(order){
+  const cats = [...new Set((order.righe||[]).map(r=>r.categoria).filter(Boolean))];
+  const existing = order.fasi || [];
+  const fasi = [];
+  cats.forEach(cat=>{
+    (STEP_TEMPLATES[cat]||[]).forEach(nome=>{
+      const key = cat+"__"+nome;
+      const prev = existing.find(f=>f.key===key);
+      fasi.push({key, categoria:cat, nome, completata: prev ? prev.completata : false});
+    });
+  });
+  order.fasi = fasi;
+}
+function orderCategorie(o){ return [...new Set((o.righe||[]).map(r=>r.categoria).filter(Boolean))]; }
+function orderCategorieLabel(o){ const c = orderCategorie(o); return c.length ? c.join(", ") : "—"; }
+function orderWorkersList(o){ return o.worker ? [o.worker] : []; }
+function orderWorkersLabel(o){ return o.worker || "non assegnato"; }
+
+function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, consegnaTipo){
+  const order = {id, clientId, descrizione, worker, stato, dataConsegna,
+    righe: (righe && righe.length) ? righe : [emptyRiga(true)],
+    ivaApplicata:false, daFatturare:false, importante:false, sconto:0, costoSpedizione:0, clienteAvvisato:false, materialeOrdinato:false, fatturato:false,
+    consegnaTipo: consegnaTipo || "Ritiro in sede", spedito:false,
+    fasi: [], note:""};
+  recalcFasi(order);
+  return order;
+}
+/* ============ NAVIGAZIONE ============ */
+const NAV = [
+  {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività"},
+  {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family"},
+  {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi in corso e storico"},
+  {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi"},
+  {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase"},
+  {id:"schede", label:"Schede di lavorazione", icon:"▦", subtitle:"Dettaglio, righe, IVA e pagamenti per ordine"},
+  {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Giacenze e scorte minime"},
+  {id:"incassi", label:"Incassi", icon:"€", subtitle:"Report pagamenti e crediti aperti", adminOnly:true},
+  {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine"},
+  {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti"}
+];
+function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && currentUser.role==="admin")); }
+function renderNav(){
+  document.getElementById("nav").innerHTML = visibleNav().map(n => `<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${n.label}</button>`).join("");
+}
+function goTo(id){
+  currentView = id;
+  document.querySelectorAll("section.view").forEach(s=>s.classList.remove("active"));
+  document.getElementById("view-"+id).classList.add("active");
+  const meta = NAV.find(n=>n.id===id);
+  document.getElementById("viewTitle").textContent = meta.label;
+  document.getElementById("viewSubtitle").textContent = meta.subtitle;
+  renderNav(); renderTopbarActions(); renderCurrentView();
+}
+function renderTopbarActions(){
+  const map = {
+    clienti: `<button class="btn btn-primary" onclick="toggleForm('clientForm')">+ Nuovo cliente</button>`,
+    preventivi: `<button class="btn btn-primary" onclick="toggleForm('quoteForm')">+ Nuovo preventivo</button>`,
+    ordini: `<button class="btn btn-primary" onclick="toggleForm('orderForm')">+ Nuovo ordine</button>`,
+    magazzino: `<button class="btn btn-primary" onclick="toggleForm('itemForm')">+ Nuovo articolo</button>`,
+    incassi: `<button class="btn btn-primary" onclick="toggleForm('paymentForm')">+ Registra incasso</button>`,
+    spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
+    entrate: `<button class="btn btn-primary" onclick="toggleForm('incomeForm')">+ Nuova entrata</button>`,
+    dashboard: `<button class="btn btn-outline" onclick="exportBackup()">Esporta backup</button> <button class="btn btn-outline" onclick="signOut()">Esci (${currentUser?currentUser.email:''})</button>`
+  };
+  document.getElementById("topbarActions").innerHTML = map[currentView] || "";
+}
+function renderCurrentView(){
+  ({dashboard:renderDashboard, clienti:renderClienti, preventivi:renderPreventivi,
+    ordini:renderOrdini, flusso:renderFlusso, schede:renderSchede,
+    magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, entrate:renderEntrate})[currentView]();
+}
+function toggleForm(id){ const el = document.getElementById(id); if(el) el.classList.toggle("open"); }
+
+/* Conferma personalizzata (window.confirm può non funzionare in ambienti sandboxed) */
+let _pendingConfirmAction = null;
+function askConfirm(message, action){
+  _pendingConfirmAction = action;
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Conferma eliminazione</h2>
+    <p style="color:var(--muted);">${message}</p>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="_runPendingConfirm()">Sì, elimina</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+function _runPendingConfirm(){
+  const action = _pendingConfirmAction;
+  _pendingConfirmAction = null;
+  document.getElementById("modalBackdrop").classList.remove("open");
+  if(action) action();
+}
+function showToast(msg){ const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), 2200); }
+
+/* ============ DASHBOARD ============ */
+function renderDashboard(){
+  const activeOrders = state.orders.filter(o=>o.stato!=="Consegnato");
+  const ordiniInLavorazione = state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato");
+  const creditiApertiDash = state.orders.filter(o=>o.stato==="Consegnato").map(o=>({o, saldo:orderSaldo(o)})).filter(x=>x.saldo>0.001);
+  const preventiviAperti = state.quotes.filter(q=>q.stato==="Inviato"||q.stato==="Bozza").length;
+  const scorteBasse = state.warehouse.filter(w=>Number(w.quantita)<=Number(w.scortaMinima));
+  const completatiDaConsegnare = state.orders.filter(o=>o.stato==="Completato");
+  const daSpedire = state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato");
+  const daFatturare = state.orders.filter(o=>o.daFatturare && !o.fatturato);
+  const ordiniImportanti = state.orders.filter(o=>o.importante && o.stato!=="Consegnato");
+  const materialeDaOrdinare = state.orders.filter(o=>o.stato!=="Consegnato" && !o.materialeOrdinato && o.fasi.some(f=>f.nome==="Materiale da ordinare" && f.completata));
+  const daAvvisare = state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato);
+  const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>o.worker===w && o.stato!=="Consegnato").length}));
+  const oggi = today();
+  const consegneGiornaliere = activeOrders.filter(o=>o.dataConsegna===oggi);
+  const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
+
+  document.getElementById("view-dashboard").innerHTML = `
+    <div class="grid grid-auto" style="margin-bottom:18px;">
+      <div class="card stat clickable" onclick="openDashboardList('attivi')"><p class="stat-label">Ordini attivi</p><p class="stat-value">${ordiniInLavorazione.length}</p><p class="stat-sub">su ${state.orders.length} totali</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('completati')"><p class="stat-label">Completati da consegnare</p><p class="stat-value" style="${completatiDaConsegnare.length?'color:var(--warn)':''}">${completatiDaConsegnare.length}</p><p class="stat-sub">pronti, in attesa di consegna</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('spedire')"><p class="stat-label">Da spedire</p><p class="stat-value" style="${daSpedire.length?'color:var(--teal)':''}">${daSpedire.length}</p><p class="stat-sub">ordini con consegna a spedizione</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('fatturare')"><p class="stat-label">Schede da fatturare</p><p class="stat-value" style="${daFatturare.length?'color:var(--accent)':''}">${daFatturare.length}</p><p class="stat-sub">contrassegnate "da fatturare"</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('importanti')"><p class="stat-label">Ordini importanti</p><p class="stat-value" style="${ordiniImportanti.length?'color:var(--accent)':''}">${ordiniImportanti.length}</p><p class="stat-sub">segnalati con la stella ★</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${materialeDaOrdinare.length?'color:var(--teal)':''}">${materialeDaOrdinare.length}</p><p class="stat-sub">schede in attesa di materiale</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('avvisare')"><p class="stat-label">Cliente da avvisare</p><p class="stat-value" style="${daAvvisare.length?'color:var(--warn)':''}">${daAvvisare.length}</p><p class="stat-sub">lavori completati non ancora comunicati</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('preventivi')"><p class="stat-label">Preventivi in attesa</p><p class="stat-value">${preventiviAperti}</p><p class="stat-sub">bozza o inviati</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('scorte')"><p class="stat-label">Articoli sotto scorta</p><p class="stat-value" style="${scorteBasse.length?'color:var(--danger)':''}">${scorteBasse.length}</p><p class="stat-sub">su ${state.warehouse.length} in magazzino</p></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="section-header" style="margin-bottom:10px;">
+        <h3 style="margin:0;">Appuntamenti</h3>
+        <button class="btn btn-outline btn-sm" onclick="toggleForm('apptForm')">+ Nuovo appuntamento</button>
+      </div>
+      <div class="form-panel" id="apptForm" style="margin-bottom:14px;">
+        <div class="form-grid">
+          <div class="field"><label>Titolo</label><input id="af-titolo" placeholder="Es. Consegna, sopralluogo..."></div>
+          <div class="field"><label>Cliente (opzionale)</label><select id="af-cliente"><option value="">Nessuno</option>${clientOptions()}</select></div>
+          <div class="field"><label>Data</label><input id="af-data" type="date" value="${today()}"></div>
+          <div class="field"><label>Ora</label><input id="af-ora" type="time" value="09:00"></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="addAppuntamento()">Salva appuntamento</button>
+          <button class="btn btn-outline" onclick="toggleForm('apptForm')">Annulla</button>
+        </div>
+      </div>
+      ${prossimiAppuntamenti.length ? prossimiAppuntamenti.map(a=>`
+        <div class="list-row" style="cursor:default;">
+          <div><div class="lr-main">${a.titolo}</div><div class="lr-sub">${a.clientId ? clientName(a.clientId) : ""}</div></div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="text-align:right;"><div class="lr-main">${fmtDate(a.data)}</div><div class="lr-sub">${a.ora}</div></div>
+            <button class="btn btn-ghost btn-sm" onclick="deleteAppuntamento('${a.id}')">✕</button>
+          </div>
+        </div>`).join("") : `<p class="empty">Nessun appuntamento in programma.</p>`}
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;">Completati da consegnare</h3>
+        ${completatiDaConsegnare.length ? `<table><tbody>${completatiDaConsegnare.map(o=>`
+          <tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td>${o.consegnaTipo}</td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>
+        `).join("")}</tbody></table>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`}
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Ordini da spedire</h3>
+        ${daSpedire.length ? `<table><tbody>${daSpedire.map(o=>`
+          <tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>
+        `).join("")}</tbody></table>` : `<p class="empty">Nessuna spedizione in sospeso.</p>`}
+      </div>
+    </div>
+    <div class="grid grid-2" style="margin-top:16px;">
+      <div class="card">
+        <h3 style="margin-top:0;">Carico di lavoro per operatore</h3>
+        ${workload.map(x=>`
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="width:80px;font-size:13px;">${x.w}</div>
+            <div style="flex:1;background:var(--paper);border-radius:6px;height:10px;overflow:hidden;"><div style="width:${Math.min(x.n*22,100)}%;background:var(--accent);height:100%;"></div></div>
+            <div style="width:26px;text-align:right;font-size:12.5px;color:var(--muted);">${x.n}</div>
+          </div>`).join("") || `<p class="empty">Nessun ordine assegnato.</p>`}
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Consegne giornaliere</h3>
+        ${consegneGiornaliere.length ? `<table><tbody>${consegneGiornaliere.map(o=>`
+          <tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td></tr>
+        `).join("")}</tbody></table>` : `<p class="empty">Nessuna consegna prevista per oggi.</p>`}
+      </div>
+    </div>
+    ${ordiniImportanti.length ? `<div class="card" style="margin-top:16px;border:1px solid var(--accent);"><h3 style="margin-top:0;">★ Ordini importanti</h3><table><tbody>${ordiniImportanti.map(o=>`<tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>`).join("")}</tbody></table></div>` : ""}
+    ${scorteBasse.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">Avvisi magazzino</h3><table><tbody>${scorteBasse.map(w=>`<tr><td>${w.nome}</td><td class="low-stock">${w.quantita} ${w.unita} (minimo ${w.scortaMinima})</td></tr>`).join("")}</tbody></table></div>` : ""}
+    ${currentUser.role==='admin' ? `
+    <div class="card" style="margin-top:16px;">
+      <h3 style="margin-top:0;">Crediti aperti (ordini consegnati non pagati)</h3>
+      ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Categoria</th><th>Totale ordine</th><th>Saldo da incassare</th></tr></thead><tbody>${creditiApertiDash.map(x=>`<tr><td>${clientName(x.o.clientId)}</td><td>${orderCategorieLabel(x.o)}</td><td>${fmtMoney(orderTotale(x.o))}</td><td style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)}</td></tr>`).join("")}</tbody></table>` : `<p class="empty">Nessun credito aperto.</p>`}
+    </div>` : ``}
+  `;
+}
+function addAppuntamento(){
+  const titolo = document.getElementById("af-titolo").value.trim();
+  if(!titolo){ showToast("Inserisci un titolo per l'appuntamento"); return; }
+  state.appuntamenti.push({
+    id:uid(), titolo,
+    clientId: document.getElementById("af-cliente").value || null,
+    data: document.getElementById("af-data").value || today(),
+    ora: document.getElementById("af-ora").value || "09:00",
+    note:""
+  });
+  saveState('appuntamenti'); toggleForm('apptForm'); renderDashboard(); showToast("Appuntamento salvato");
+}
+function deleteAppuntamento(id){
+  askConfirm("Eliminare questo appuntamento?", ()=>{
+    state.appuntamenti = state.appuntamenti.filter(a=>a.id!==id); dbDelete('appuntamenti', id); renderDashboard();
+  });
+}
+function openDashboardList(type){
+  const configs = {
+    attivi: {title:"Ordini attivi", items: state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato")},
+    completati: {title:"Completati da consegnare", items: state.orders.filter(o=>o.stato==="Completato")},
+    spedire: {title:"Ordini da spedire", items: state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato")},
+    fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato)},
+    importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
+    materiale: {title:"Materiale da ordinare", items: state.orders.filter(o=>o.stato!=="Consegnato" && !o.materialeOrdinato && o.fasi.some(f=>f.nome==="Materiale da ordinare" && f.completata))},
+    avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato)},
+    preventivi: {title:"Preventivi in attesa", items: state.quotes.filter(q=>q.stato==="Bozza"||q.stato==="Inviato"), isQuote:true},
+    scorte: {title:"Articoli sotto scorta", items: state.warehouse.filter(w=>Number(w.quantita)<=Number(w.scortaMinima)), isStock:true}
+  };
+  const cfg = configs[type];
+  let rows;
+  if(cfg.isStock){
+    rows = cfg.items.map(w=>`
+      <div class="list-row" onclick="closeModal(); goTo('magazzino');">
+        <div><div class="lr-main">${w.nome}</div><div class="lr-sub">${w.categoria}</div></div>
+        <div class="lr-sub low-stock">${w.quantita} ${w.unita} (min. ${w.scortaMinima})</div>
+      </div>`).join("");
+  } else if(cfg.isQuote){
+    rows = cfg.items.map(q=>`
+      <div class="list-row" onclick="openQuoteDetail('${q.id}')">
+        <div><div class="lr-main">${clientName(q.clientId)}</div><div class="lr-sub">${q.categoria} — ${fmtMoney(quoteImponibile(q))}</div></div>
+        <span class="pill ${QUOTE_CLASS[q.stato]}">${q.stato}</span>
+      </div>`).join("");
+  } else {
+    rows = cfg.items.map(o=>`
+      <div class="list-row" onclick="openJobCard('${o.id}')">
+        <div><div class="lr-main">${clientName(o.clientId)}</div><div class="lr-sub">${orderCategorieLabel(o)} — ${orderWorkersLabel(o)} — ${fmtDate(o.dataConsegna)}</div></div>
+        <span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span>
+      </div>`).join("");
+  }
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>${cfg.title}</h2>
+    <p style="color:var(--muted);margin-top:0;">${cfg.items.length} elemento/i — clicca per aprire la scheda</p>
+    <div style="margin-top:14px;">${rows || `<p class="empty">Nessun elemento.</p>`}</div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+function exportBackup(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = `gestionale-backup-${today()}.json`; a.click(); URL.revokeObjectURL(url);
+  showToast("Backup esportato");
+}
+
+/* ============ CLIENTI ============ */
+function settoreOptions(sel){ return `<option value="">Seleziona settore…</option>` + SETTORI.map(s=>`<option ${s===sel?'selected':''}>${s}</option>`).join(""); }
+
+/* Campi cliente riutilizzabili (usati sia nel form Clienti sia nei form rapidi di Preventivi/Ordini) */
+function clientFieldsHTML(prefix, existing){
+  const e = existing || {};
+  const hasFatturazione = !!(e.indirizzo||e.citta||e.cap||e.provincia||e.partitaIva||e.codiceFiscale||e.pec||e.codiceSDI);
+  return `
+    <div class="form-grid">
+      <div class="field"><label>Tipo cliente</label>
+        <select id="${prefix}-tipo" onchange="toggleClientTypeFields('${prefix}')">${CLIENT_TYPES.map(t=>`<option value="${t}" ${e.tipo===t?'selected':''}>${t==="Business"?"Business (azienda)":"Family (persona fisica)"}</option>`).join("")}</select>
+      </div>
+    </div>
+    <div class="form-grid" id="${prefix}-business" style="margin-top:12px;">
+      <div class="field"><label>Ragione sociale / Nome azienda</label><input id="${prefix}-ragsoc" placeholder="Es. Bar Centrale Srl" value="${e.ragioneSociale||''}"></div>
+      <div class="field"><label>Nome</label><input id="${prefix}-refnome" value="${e.refNome||''}"></div>
+      <div class="field"><label>Cognome</label><input id="${prefix}-refcognome" value="${e.refCognome||''}"></div>
+    </div>
+    <div class="form-grid" id="${prefix}-family" style="margin-top:12px;display:none;">
+      <div class="field"><label>Nome</label><input id="${prefix}-nome" value="${e.nome||''}"></div>
+      <div class="field"><label>Cognome</label><input id="${prefix}-cognome" value="${e.cognome||''}"></div>
+    </div>
+    <div class="form-grid" style="margin-top:12px;">
+      <div class="field"><label>Telefono</label><input id="${prefix}-telefono" value="${e.telefono||''}"></div>
+      <div class="field"><label>Email</label><input id="${prefix}-email" type="email" value="${e.email||''}"></div>
+      <div class="field" id="${prefix}-settore-wrap"><label>Settore merceologico <span id="${prefix}-settore-req">*</span></label><select id="${prefix}-settore">${settoreOptions(e.settore)}</select></div>
+    </div>
+    <p class="helptext" style="margin-top:10px;margin-bottom:18px;">Compila almeno telefono o email. Per i clienti Business il settore è obbligatorio.</p>
+
+    <button type="button" class="btn btn-outline btn-sm" style="margin-bottom:14px;" onclick="toggleFatturazione('${prefix}')">Compila per fatturare</button>
+    <div id="${prefix}-fatturazione" style="display:${hasFatturazione?'block':'none'};padding-top:4px;">
+      <div class="form-grid">
+        <div class="field"><label>Indirizzo</label><input id="${prefix}-indirizzo" value="${e.indirizzo||''}"></div>
+        <div class="field"><label>Città</label><input id="${prefix}-citta" value="${e.citta||''}"></div>
+        <div class="field"><label>CAP</label><input id="${prefix}-cap" value="${e.cap||''}"></div>
+        <div class="field"><label>Provincia</label><input id="${prefix}-provincia" maxlength="2" style="text-transform:uppercase;" value="${e.provincia||''}"></div>
+      </div>
+      <div class="form-grid" style="margin-top:12px;">
+        <div class="field"><label>Partita IVA</label><input id="${prefix}-piva" value="${e.partitaIva||''}"></div>
+        <div class="field"><label>Codice Fiscale</label><input id="${prefix}-cf" value="${e.codiceFiscale||''}"></div>
+        <div class="field"><label>PEC</label><input id="${prefix}-pec" type="email" value="${e.pec||''}"></div>
+        <div class="field"><label>Codice Univoco SDI</label><input id="${prefix}-sdi" maxlength="7" value="${e.codiceSDI||''}"></div>
+      </div>
+    </div>
+  `;
+}
+function toggleFatturazione(prefix){
+  const el = document.getElementById(`${prefix}-fatturazione`);
+  el.style.display = el.style.display==="none" ? "block" : "none";
+}
+function toggleClientTypeFields(prefix){
+  const tipo = document.getElementById(`${prefix}-tipo`).value;
+  document.getElementById(`${prefix}-business`).style.display = tipo==="Business" ? "grid" : "none";
+  document.getElementById(`${prefix}-family`).style.display = tipo==="Family" ? "grid" : "none";
+  document.getElementById(`${prefix}-settore-req`).style.display = tipo==="Business" ? "inline" : "none";
+}
+/* Legge i campi anagrafici comuni (indirizzo, città, piva, ecc.) da un dato prefisso */
+function readCommonClientFields(prefix){
+  return {
+    indirizzo: document.getElementById(`${prefix}-indirizzo`).value.trim(),
+    citta: document.getElementById(`${prefix}-citta`).value.trim(),
+    cap: document.getElementById(`${prefix}-cap`).value.trim(),
+    provincia: document.getElementById(`${prefix}-provincia`).value.trim().toUpperCase(),
+    partitaIva: document.getElementById(`${prefix}-piva`).value.trim(),
+    codiceFiscale: document.getElementById(`${prefix}-cf`).value.trim(),
+    pec: document.getElementById(`${prefix}-pec`).value.trim(),
+    codiceSDI: document.getElementById(`${prefix}-sdi`).value.trim()
+  };
+}
+/* Crea (o aggiorna, se existingId è passato) un cliente leggendo i campi con un dato prefisso. Ritorna l'id o null se non valido. */
+function createClientFromPrefix(prefix, existingId){
+  const tipo = document.getElementById(`${prefix}-tipo`).value;
+  const telefono = document.getElementById(`${prefix}-telefono`).value.trim();
+  const email = document.getElementById(`${prefix}-email`).value.trim();
+  if(!telefono && !email){ showToast("Inserisci almeno telefono o email"); return null; }
+  const comuni = readCommonClientFields(prefix);
+  let payload;
+  if(tipo==="Business"){
+    const ragioneSociale = document.getElementById(`${prefix}-ragsoc`).value.trim();
+    const settore = document.getElementById(`${prefix}-settore`).value;
+    if(!ragioneSociale){ showToast("Inserisci il nome dell'azienda"); return null; }
+    if(!settore){ showToast("Il settore è obbligatorio per i clienti Business"); return null; }
+    payload = {tipo, ragioneSociale, refNome:document.getElementById(`${prefix}-refnome`).value.trim(), refCognome:document.getElementById(`${prefix}-refcognome`).value.trim(), settore, telefono, email, ...comuni};
+  } else {
+    const nome = document.getElementById(`${prefix}-nome`).value.trim();
+    if(!nome){ showToast("Inserisci il nome della persona"); return null; }
+    payload = {tipo, nome, cognome:document.getElementById(`${prefix}-cognome`).value.trim(), telefono, email, ...comuni};
+  }
+  if(existingId){
+    const c = findItem('clients', existingId);
+    Object.assign(c, payload);
+    saveState('clients'); return existingId;
+  } else {
+    const id = uid();
+    state.clients.push({id, ...payload});
+    saveState('clients'); return id;
+  }
+}
+function clientFatturato(clientId){ return state.orders.filter(o=>o.clientId===clientId).reduce((s,o)=>s+orderTotale(o),0); }
+let clientiFilters = {search:"", settore:"", tipo:"", fatturatoMin:""};
+function renderClienti(){
+  const f = clientiFilters;
+  const list = state.clients.filter(c=>{
+    if(f.tipo && c.tipo!==f.tipo) return false;
+    if(f.settore && c.settore!==f.settore) return false;
+    if(f.fatturatoMin && clientFatturato(c.id) < Number(f.fatturatoMin)) return false;
+    if(f.search){
+      const haystack = (clientDisplayName(c)+" "+(c.citta||"")+" "+(c.partitaIva||"")).toLowerCase();
+      if(!haystack.includes(f.search.toLowerCase())) return false;
+    }
+    return true;
+  });
+  document.getElementById("view-clienti").innerHTML = `
+    <div class="form-panel" id="clientForm">
+      <h3>Nuovo cliente</h3>
+      ${clientFieldsHTML('cf')}
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addClient()">Salva cliente</button>
+        <button class="btn btn-outline" onclick="toggleForm('clientForm')">Annulla</button>
+      </div>
+    </div>
+    <div class="form-panel" id="importForm">
+      <h3>Importa clienti da CSV</h3>
+      <p class="helptext" style="margin-top:0;">Carica un export CSV (es. da Fattura SMART o simili). Riconosce le colonne: Ragione sociale, Nome, Cognome, Tipologia, Indirizzo, Comune, CAP, Provincia, Partita IVA, Codice Fiscale, Cellulare/Telefono, Email, PEC. Il settore non viene importato: lo assegnerai tu in seguito.</p>
+      <input type="file" id="csvFileInput" accept=".csv" onchange="handleClientCsvUpload(event)">
+    </div>
+    <div class="section-header">
+      <div class="filters" style="flex:1;">
+        <input class="inline" style="min-width:220px;" list="clienti-suggerimenti" placeholder="Cerca cliente, città, P.IVA…" value="${f.search}" oninput="clientiFilters.search=this.value; renderClienti();">
+        <datalist id="clienti-suggerimenti">${state.clients.map(c=>`<option value="${clientDisplayName(c)}">`).join("")}</datalist>
+        <select class="inline" onchange="clientiFilters.tipo=this.value; renderClienti();"><option value="">Tutti i tipi</option>${CLIENT_TYPES.map(t=>`<option ${t===f.tipo?'selected':''}>${t}</option>`).join("")}</select>
+        <select class="inline" onchange="clientiFilters.settore=this.value; renderClienti();"><option value="">Tutti i settori</option>${SETTORI.map(s=>`<option ${s===f.settore?'selected':''}>${s}</option>`).join("")}</select>
+        <input class="inline" style="width:150px;" type="number" min="0" placeholder="Fatturato minimo €" value="${f.fatturatoMin}" oninput="clientiFilters.fatturatoMin=this.value; renderClienti();">
+        <button class="btn btn-outline btn-sm" onclick="toggleForm('importForm')">Importa da CSV</button>
+      </div>
+    </div>
+    <p class="helptext">${list.length} clienti su ${state.clients.length} totali.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>N°</th><th>Tipo</th><th>Nome</th><th>Città</th><th>P.IVA</th><th>Telefono</th><th>Email</th><th>Settore</th><th>Fatturato</th><th></th></tr></thead>
+        <tbody>
+          ${list.length ? list.map(c=>`
+            <tr class="clickable-row" onclick="openClientHistory('${c.id}')">
+              <td style="color:var(--muted);font-weight:600;">${c.numero?('#'+c.numero):'—'}</td>
+              <td><span class="pill ${c.tipo==='Business'?'pill-business':'pill-family'}">${c.tipo}</span></td>
+              <td><span class="status-dot client-dot-${c.tipo==='Business'?'business':'family'}"></span><span style="font-weight:600;color:${c.tipo==='Business'?'#1D5A9E':'#B9660C'}">${clientDisplayName(c)}</span></td>
+              <td>${c.citta||"—"}</td>
+              <td>${c.partitaIva||"—"}</td>
+              <td>${c.telefono||"—"}</td>
+              <td>${c.email? `<a class="link" href="mailto:${c.email}" onclick="event.stopPropagation()">${c.email}</a>`:"—"}</td>
+              <td>${c.settore||`<span style="color:var(--warn);">da assegnare</span>`}</td>
+              <td>${fmtMoney(clientFatturato(c.id))}</td>
+              <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteClient('${c.id}')">Elimina</button></td>
+            </tr>`).join("") : `<tr><td colspan="10" class="empty">Nessun cliente con questi filtri.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+function openClientHistory(clientId){
+  const c = state.clients.find(x=>x.id===clientId);
+  const orders = state.orders.filter(o=>o.clientId===clientId).sort((a,b)=>(b.dataConsegna||"").localeCompare(a.dataConsegna||""));
+  const totale = orders.reduce((s,o)=>s+orderTotale(o),0);
+  const indirizzoCompleto = [c.indirizzo, [c.cap,c.citta].filter(Boolean).join(" "), c.provincia].filter(Boolean).join(", ");
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>${c.numero?('#'+c.numero+' — '):''}${clientDisplayName(c)}</h2>
+    <p style="color:var(--muted);margin-top:0;">${c.settore||(c.tipo==='Family'?'Cliente privato':'Settore da assegnare')} — Fatturato totale ${fmtMoney(totale)}</p>
+    <div class="ticket-meta">
+      <div><span>Indirizzo</span>${indirizzoCompleto||"—"}</div>
+      <div><span>Telefono</span>${c.telefono||"—"}</div>
+      <div><span>Email</span>${c.email||"—"}</div>
+      <div><span>Partita IVA</span>${c.partitaIva||"—"}</div>
+      <div><span>Codice Fiscale</span>${c.codiceFiscale||"—"}</div>
+      <div><span>PEC</span>${c.pec||"—"}</div>
+    </div>
+    <div class="form-actions" style="margin-bottom:18px;">
+      <button class="btn btn-outline btn-sm" onclick="openEditClient('${c.id}')">Modifica anagrafica</button>
+    </div>
+    <h3>Storico ordini</h3>
+    ${orders.length ? orders.map(o=>`
+      <div class="list-row" onclick="openJobCard('${o.id}')">
+        <div><div class="lr-main">${o.importante?'★ ':''}${orderCategorieLabel(o)}</div><div class="lr-sub">${fmtDate(o.dataConsegna)} — ${o.worker||"non assegnato"}</div></div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span>${fmtMoney(orderTotale(o))}</span>
+          <span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span>
+        </div>
+      </div>`).join("") : `<p class="empty">Nessun ordine per questo cliente.</p>`}
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Chiudi</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+function openEditClient(clientId){
+  const c = state.clients.find(x=>x.id===clientId);
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="openClientHistory('${clientId}')">×</button>
+    <h2>Modifica cliente</h2>
+    ${clientFieldsHTML('ec', c)}
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveEditClient('${clientId}')">Salva modifiche</button>
+      <button class="btn btn-outline" onclick="openClientHistory('${clientId}')">Annulla</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+  toggleClientTypeFields('ec');
+}
+function saveEditClient(clientId){
+  const id = createClientFromPrefix('ec', clientId);
+  if(!id) return;
+  showToast("Cliente aggiornato");
+  openClientHistory(clientId);
+}
+function addClient(){
+  const id = createClientFromPrefix('cf');
+  if(!id) return;
+  toggleForm('clientForm'); renderClienti(); showToast("Cliente aggiunto");
+}
+function deleteClient(id){
+  askConfirm("Eliminare questo cliente? Gli ordini e preventivi collegati resteranno ma senza cliente associato.", ()=>{
+    state.clients = state.clients.filter(c=>c.id!==id); dbDelete('clients', id); renderClienti();
+  });
+}
+
+/* ============ IMPORT CSV CLIENTI ============ */
+function parseCsvLine(line){
+  const out = []; let cur = ""; let inQuotes = false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(inQuotes){
+      if(ch === '"'){
+        if(line[i+1] === '"'){ cur += '"'; i++; } else { inQuotes = false; }
+      } else cur += ch;
+    } else {
+      if(ch === '"') inQuotes = true;
+      else if(ch === ','){ out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+function parseClientsCsv(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim().length);
+  const rows = lines.map(parseCsvLine);
+  const headerIdx = rows.findIndex(r => r.some(c=>c.trim().toLowerCase()==="ragione sociale"));
+  if(headerIdx === -1){ showToast("Formato CSV non riconosciuto: manca la colonna 'Ragione sociale'"); return []; }
+  const header = rows[headerIdx].map(h=>h.trim().toLowerCase());
+  const idx = name => header.indexOf(name);
+  const cRagSoc=idx("ragione sociale"), cNome=idx("nome"), cCognome=idx("cognome"), cTipologia=idx("tipologia"),
+        cIndirizzo=idx("indirizzo"), cComune=idx("comune"), cCap=idx("cap"), cProvincia=idx("provincia"),
+        cPiva=idx("partita iva"), cCf=idx("codice fiscale"), cCell=idx("cellulare"), cTel=idx("telefono"),
+        cEmail=idx("email"), cPec=idx("pec");
+  const get = (r,i) => (i>=0 && r[i]!==undefined) ? r[i].trim() : "";
+  const clients = [];
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r.some(c=>c.trim())) continue;
+    const ragsoc = get(r,cRagSoc).replace(/^:\s*/,"");
+    const nome = get(r,cNome), cognome = get(r,cCognome);
+    if(!ragsoc && !nome && !cognome) continue;
+    const tipologia = get(r,cTipologia);
+    const tipo = (tipologia==="Privato" || tipologia==="Persona fisica titolare di Partita IVA") ? "Family" : "Business";
+    const common = {
+      telefono: get(r,cCell) || get(r,cTel), email: get(r,cEmail), settore:"",
+      indirizzo: get(r,cIndirizzo), citta: get(r,cComune), cap: get(r,cCap), provincia: get(r,cProvincia),
+      partitaIva: get(r,cPiva), codiceFiscale: get(r,cCf), pec: get(r,cPec),
+      _importBatch: "csv_" + today()
+    };
+    if(tipo==="Business"){
+      clients.push({id:uid(), tipo, ragioneSociale: ragsoc || `${nome} ${cognome}`.trim(), refNome:nome, refCognome:cognome, ...common});
+    } else {
+      clients.push({id:uid(), tipo, nome: nome || ragsoc, cognome, ...common});
+    }
+  }
+  return clients;
+}
+function handleClientCsvUpload(evt){
+  const file = evt.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const parsed = parseClientsCsv(e.target.result);
+    if(!parsed.length){ showToast("Nessun cliente valido trovato nel file"); return; }
+    state.clients.push(...parsed);
+    saveState('clients'); toggleForm('importForm'); renderClienti();
+    showToast(`${parsed.length} clienti importati`);
+  };
+  reader.readAsText(file, "UTF-8");
+}
+
+
+/* ============ OPZIONI CONDIVISE ============ */
+function clientOptions(selected, withNew){
+  const opts = state.clients.map(c=>`<option value="${c.id}" ${c.id===selected?'selected':''}>${clientDisplayName(c)}</option>`).join("");
+  if(!withNew) return opts;
+  const placeholder = `<option value="" ${!selected?'selected':''} disabled>— Seleziona cliente —</option>`;
+  return placeholder + `<option value="__new__">+ Nuovo cliente…</option>` + opts;
+}
+function onClientSelectChange(selectEl, wrapId){
+  document.getElementById(wrapId).style.display = selectEl.value==="__new__" ? "block" : "none";
+}
+/* Ritorna l'id cliente da usare: se è stata scelta "Nuovo cliente" lo crea al volo. Ritorna null se non valido. */
+function resolveClientId(selectId, newClientPrefix){
+  const val = document.getElementById(selectId).value;
+  if(!val){ showToast("Seleziona o crea un cliente"); return null; }
+  if(val === "__new__") return createClientFromPrefix(newClientPrefix);
+  return val;
+}
+function categoryOptions(selected, includeBlank){ return (includeBlank?`<option value="">Seleziona categoria…</option>`:'') + CATEGORIES.map(c=>`<option value="${c}" ${c===selected?'selected':''}>${c}</option>`).join(""); }
+function prodottoOptions(categoria, selected){
+  const opts = PRODOTTI_PER_CATEGORIA[categoria] || [];
+  return `<option value="">Seleziona…</option>` + opts.map(p=>`<option value="${p}" ${p===selected?'selected':''}>${p}</option>`).join("");
+}
+function workerOptions(selected){ return `<option value="">Non assegnato</option>` + WORKERS.map(w=>`<option value="${w}" ${w===selected?'selected':''}>${w}</option>`).join(""); }
+
+/* ============ EDITOR RIGHE (usato da preventivi e ordini) ============ */
+function linesEditor(collection, id, righe){
+  const isOrder = collection === 'orders';
+  const showDots = isOrder && righe.length > 1;
+  return `
+    <table class="lines-table">
+      <thead><tr>
+        ${isOrder ? `<th style="width:170px;">Categoria</th><th style="width:170px;">Prodotto</th>` : `<th>Descrizione</th>`}
+        <th class="num">Quantità</th><th class="num">Prezzo unit. €</th><th class="num">Totale</th>
+        ${showDots ? `<th>Stato riga</th>` : ``}
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${righe.map(r=>`
+          <tr>
+            ${isOrder ? `<td><select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">${categoryOptions(r.categoria, true)}</select></td>
+            <td>${PRODOTTI_PER_CATEGORIA[r.categoria] ? `<select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">${prodottoOptions(r.categoria, r.prodotto)}</select>` : `<span style="color:var(--muted);">—</span>`}</td>` : `<td><input class="desc-input" value="${r.descrizione||''}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>`}
+            <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
+            <td class="num"><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)"></td>
+            <td class="num" style="padding-top:8px;">${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</td>
+            ${showDots ? `<td><select class="riga-status-select" style="background:${STATUS_DOT[r.stato]||'#fff'};color:${statusTextColor(r.stato)}" onchange="updateRigaField('${collection}','${id}','${r.id}','stato',this.value)">${KANBAN_STATUSES.map(s=>`<option value="${s}" ${r.stato===s?'selected':''}>${s}</option>`).join("")}</select></td>` : ``}
+            <td><button class="btn btn-ghost btn-sm" onclick="removeRiga('${collection}','${id}','${r.id}')">✕</button></td>
+          </tr>`).join("") || `<tr><td colspan="${isOrder?(showDots?7:6):5}" class="empty" style="padding:10px 0;">Nessuna riga. Aggiungine una.</td></tr>`}
+      </tbody>
+    </table>
+    <button class="btn btn-outline btn-sm" onclick="addRiga('${collection}','${id}')">+ Aggiungi riga</button>
+  `;
+}
+function findItem(collection, id){ return state[collection].find(x=>x.id===id); }
+function addRiga(collection, id){
+  const item = findItem(collection, id);
+  item.righe.push(emptyRiga(collection==='orders'));
+  if(collection==='orders') recalcFasi(item);
+  saveState(collection);
+  if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
+}
+function removeRiga(collection, id, rigaId){
+  const item = findItem(collection, id);
+  item.righe = item.righe.filter(r=>r.id!==rigaId);
+  if(collection==='orders') recalcFasi(item);
+  saveState(collection);
+  if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
+}
+function updateRigaField(collection, id, rigaId, field, value){
+  const item = findItem(collection, id);
+  const riga = item.righe.find(r=>r.id===rigaId);
+  riga[field] = (field==='quantita'||field==='prezzoUnitario') ? Number(value)||0 : value;
+  if(collection==='orders' && field==='categoria'){ recalcFasi(item); riga.prodotto = ""; }
+  saveState(collection);
+  if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
+}
+
+
+/* ============ PREVENTIVI ============ */
+function renderPreventivi(){
+  document.getElementById("view-preventivi").innerHTML = `
+    <div class="form-panel" id="quoteForm">
+      <h3>Nuovo preventivo</h3>
+      <div class="form-grid">
+        <div class="field"><label>Cliente</label><select id="qf-cliente" onchange="onClientSelectChange(this,'qf-newclient')">${clientOptions(null,true)}</select></div>
+        <div class="field"><label>Categoria lavoro</label><select id="qf-categoria">${categoryOptions()}</select></div>
+      </div>
+      <div id="qf-newclient" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
+        <p class="helptext" style="margin-top:0;">Dati del nuovo cliente</p>
+        ${clientFieldsHTML('qfnc')}
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addQuote()">Crea preventivo</button>
+        <button class="btn btn-outline" onclick="toggleForm('quoteForm')">Annulla</button>
+      </div>
+      <p class="helptext" style="margin-top:10px;">Dopo aver creato il preventivo, apri "Dettagli" per inserire le righe con quantità e prezzo.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Cliente</th><th>Categoria</th><th>Importo</th><th>Data</th><th>Stato</th><th></th></tr></thead>
+        <tbody>
+          ${state.quotes.length ? state.quotes.map(q=>`
+            <tr>
+              <td>${clientName(q.clientId)}</td>
+              <td>${q.categoria}</td>
+              <td>${fmtMoney(quoteImponibile(q))}</td>
+              <td>${fmtDate(q.data)}</td>
+              <td><select class="inline" onchange="setQuoteStatus('${q.id}', this.value)">${QUOTE_STATUSES.map(s=>`<option ${s===q.stato?'selected':''}>${s}</option>`).join("")}</select></td>
+              <td style="white-space:nowrap;">
+                <button class="btn btn-outline btn-sm" onclick="openQuoteDetail('${q.id}')">Dettagli</button>
+                ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-outline btn-sm" onclick="convertToOrder('${q.id}')">→ Ordine</button>` : (q.convertito?`<span class="pill pill-done">Convertito</span>`:"")}
+                <button class="btn btn-ghost btn-sm" onclick="deleteQuote('${q.id}')">Elimina</button>
+              </td>
+            </tr>`).join("") : `<tr><td colspan="6" class="empty">Nessun preventivo registrato.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+function addQuote(){
+  const clientId = resolveClientId("qf-cliente", "qfnc");
+  if(!clientId) return;
+  const id = uid();
+  state.quotes.push({id, clientId, categoria:document.getElementById("qf-categoria").value, descrizione:"", righe:[], stato:"Bozza", data:today()});
+  saveState('quotes'); toggleForm('quoteForm'); renderPreventivi(); showToast("Preventivo creato"); openQuoteDetail(id);
+}
+function setQuoteStatus(id, stato){ findItem('quotes',id).stato = stato; saveState('quotes'); renderPreventivi(); }
+function deleteQuote(id){
+  askConfirm("Eliminare questo preventivo?", ()=>{
+    state.quotes = state.quotes.filter(q=>q.id!==id); dbDelete('quotes', id); renderPreventivi();
+  });
+}
+function convertToOrder(quoteId){
+  const q = findItem('quotes', quoteId);
+  const righe = q.righe.map(r=>({id:uid(), descrizione:r.descrizione, categoria:q.categoria, stato:"Da fare", quantita:r.quantita, prezzoUnitario:r.prezzoUnitario}));
+  const order = mkOrder(uid(), q.clientId, q.descrizione, "", "Da fare", "", righe);
+  state.orders.push(order); q.convertito = true;
+  saveState('orders'); saveState('quotes'); closeModal(); renderPreventivi(); showToast("Ordine creato dal preventivo");
+}
+function openQuoteDetail(quoteId){
+  const q = findItem('quotes', quoteId);
+  const c = state.clients.find(x=>x.id===q.clientId);
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Preventivo</h2>
+    <p style="color:var(--muted);margin-top:0;">${q.categoria}</p>
+    <div class="ticket-meta">
+      <div><span>Cliente</span>${c?clientDisplayName(c):"—"}</div>
+      <div><span>Data</span>${fmtDate(q.data)}</div>
+      <div><span>Categoria</span>
+        <select class="inline" onchange="updateQuoteField('${q.id}','categoria',this.value)">${categoryOptions(q.categoria)}</select>
+      </div>
+      <div><span>Stato</span>
+        <select class="inline" onchange="updateQuoteField('${q.id}','stato',this.value)">${QUOTE_STATUSES.map(s=>`<option ${s===q.stato?'selected':''}>${s}</option>`).join("")}</select>
+      </div>
+    </div>
+    <div class="field"><label>Descrizione generale</label><textarea onchange="updateQuoteField('${q.id}','descrizione',this.value)">${q.descrizione||""}</textarea></div>
+    <div class="modal-section">
+      <h3>Righe di preventivo</h3>
+      ${linesEditor('quotes', q.id, q.righe)}
+      <div class="totals-box">
+        <div class="trow grand"><span>Totale preventivo</span><span>${fmtMoney(quoteImponibile(q))}</span></div>
+      </div>
+    </div>
+    <div class="form-actions">
+      ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
+      <button class="btn btn-outline" onclick="closeModal()">Chiudi</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+function updateQuoteField(id, field, value){ findItem('quotes',id)[field] = value; saveState('quotes'); }
+
+/* ============ ORDINI ============ */
+let orderFilters = {categoria:"", stato:"", worker:"", search:""};
+function renderOrdini(){
+  const f = orderFilters;
+  const list = state.orders.filter(o =>
+    (!f.categoria || orderCategorie(o).includes(f.categoria)) &&
+    (!f.stato || o.stato===f.stato) &&
+    (!f.worker || orderWorkersList(o).includes(f.worker)) &&
+    (!f.search || (clientName(o.clientId)+" "+(o.descrizione||"")+" "+orderCategorieLabel(o)).toLowerCase().includes(f.search.toLowerCase()))
+  ).sort((a,b)=> (a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
+  document.getElementById("view-ordini").innerHTML = `
+    <div class="form-panel" id="orderForm">
+      <h3>Nuovo ordine</h3>
+      <div class="form-grid">
+        <div class="field"><label>Cliente</label><select id="of-cliente" onchange="onClientSelectChange(this,'of-newclient')">${clientOptions(null,true)}</select></div>
+      </div>
+      <div id="of-newclient" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
+        <p class="helptext" style="margin-top:0;">Dati del nuovo cliente</p>
+        ${clientFieldsHTML('ofnc')}
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addOrder()">Crea ordine</button>
+        <button class="btn btn-outline" onclick="toggleForm('orderForm')">Annulla</button>
+      </div>
+      <p class="helptext" style="margin-top:10px;">Verrà creata subito la scheda di lavorazione: lì potrai impostare data di consegna, operatore, categoria e tutto il resto.</p>
+    </div>
+    <div class="section-header">
+      <div class="filters">
+        <input class="inline" style="min-width:200px;" placeholder="Cerca ordine…" value="${f.search}" oninput="orderFilters.search=this.value; renderOrdini();">
+        <select class="inline" onchange="orderFilters.categoria=this.value; renderOrdini();"><option value="">Tutte le categorie</option>${CATEGORIES.map(c=>`<option ${c===f.categoria?'selected':''}>${c}</option>`).join("")}</select>
+        <select class="inline" onchange="orderFilters.stato=this.value; renderOrdini();"><option value="">Tutti gli stati</option>${STATUSES.map(s=>`<option ${s===f.stato?'selected':''}>${s}</option>`).join("")}</select>
+        <select class="inline" onchange="orderFilters.worker=this.value; renderOrdini();"><option value="">Tutti gli operatori</option>${WORKERS.map(w=>`<option ${w===f.worker?'selected':''}>${w}</option>`).join("")}</select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>N°</th><th>★</th><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Consegna</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
+        <tbody>
+          ${list.length ? list.map(o=>{
+            const saldo = orderSaldo(o);
+            return `<tr>
+              <td style="color:var(--muted);font-weight:600;">${o.numero?('#'+o.numero):'—'}</td>
+              <td><span class="star ${o.importante?'active':''}" onclick="toggleImportante('${o.id}')">★</span></td>
+              <td>${clientName(o.clientId)}</td>
+              <td>${orderCategorieLabel(o)}</td>
+              <td>${orderWorkersLabel(o)}</td>
+              <td>${fmtDate(o.dataConsegna)}</td>
+              <td>${fmtMoney(orderTotale(o))}</td>
+              <td style="${saldo>0.001?'color:var(--danger);font-weight:600':''}">${fmtMoney(saldo)}</td>
+              <td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
+              <td style="white-space:nowrap;">
+                <button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button>
+                <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${o.id}')">Elimina</button>
+              </td>
+            </tr>`;
+          }).join("") : `<tr><td colspan="10" class="empty">Nessun ordine con questi filtri.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+function toggleImportante(orderId){
+  const o = findItem('orders', orderId);
+  o.importante = !o.importante; saveState('orders'); renderOrdini();
+}
+function addOrder(){
+  const clientId = resolveClientId("of-cliente", "ofnc");
+  if(!clientId) return;
+  const id = uid();
+  const order = mkOrder(id, clientId, "", "", "Da fare", "", undefined, undefined);
+  state.orders.push(order);
+  saveState('orders'); toggleForm('orderForm'); renderOrdini(); showToast("Ordine creato"); openJobCard(id);
+}
+function deleteOrder(id){
+  askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati.", ()=>{
+    const paymentIds = state.payments.filter(p=>p.orderId===id).map(p=>p.id);
+    state.orders = state.orders.filter(o=>o.id!==id);
+    state.payments = state.payments.filter(p=>p.orderId!==id);
+    dbDelete('orders', id); dbDeleteMany('payments', paymentIds);
+    renderOrdini();
+  });
+}
+
+/* ============ FLUSSO DI LAVORO (Kanban) ============ */
+let flussoFilters = {categoria:"", worker:""};
+function renderFlusso(){
+  const f = flussoFilters;
+  const list = state.orders.filter(o => o.stato!=="Consegnato" && (!f.categoria || orderCategorie(o).includes(f.categoria)) && (!f.worker || orderWorkersList(o).includes(f.worker)));
+  document.getElementById("view-flusso").innerHTML = `
+    <div class="section-header">
+      <div class="filters">
+        <select class="inline" onchange="flussoFilters.categoria=this.value; renderFlusso();"><option value="">Tutte le categorie</option>${CATEGORIES.map(c=>`<option ${c===f.categoria?'selected':''}>${c}</option>`).join("")}</select>
+        <select class="inline" onchange="flussoFilters.worker=this.value; renderFlusso();"><option value="">Tutti gli operatori</option>${WORKERS.map(w=>`<option ${w===f.worker?'selected':''}>${w}</option>`).join("")}</select>
+      </div>
+    </div>
+    <p class="helptext">Gli ordini consegnati non compaiono più qui: restano visibili nell'elenco Ordini.</p>
+    <div class="kanban">
+      ${KANBAN_STATUSES.map(st=>{
+        const items = list.filter(o=>o.stato===st);
+        return `<div class="kanban-col">
+          <h4>${statusDot(st)}${st}<span>${items.length}</span></h4>
+          ${items.map(o=>`
+            <div class="job-card ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
+              ${o.importante ? `<div class="jc-star">★ IMPORTANTE</div>` : ``}
+              <div class="jc-client">${o.numero?('#'+o.numero+' — '):''}${clientName(o.clientId)}</div>
+              <div class="jc-lines">
+                ${o.righe.filter(r=>r.categoria).map(r=>`<div class="jc-line">${r.categoria}</div>`).join("") || `<div class="jc-line" style="color:var(--muted)">Nessuna categoria assegnata</div>`}
+              </div>
+              <div class="jc-desc">${o.descrizione ? o.descrizione.slice(0,80) : ""}</div>
+              <div class="jc-meta"><span>${o.worker||"n.a."}</span><span>${fmtDate(o.dataConsegna)}</span></div>
+            </div>`).join("") || `<p class="empty" style="padding:14px 4px;">Vuoto</p>`}
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+/* ============ SCHEDE DI LAVORAZIONE ============ */
+function renderSchede(){
+  document.getElementById("view-schede").innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>N°</th><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Avanzamento</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
+        <tbody>
+          ${state.orders.length ? state.orders.map(o=>{
+            const done = o.fasi.filter(s=>s.completata).length;
+            return `<tr>
+              <td style="color:var(--muted);font-weight:600;">${o.numero?('#'+o.numero):'—'}</td>
+              <td>${clientName(o.clientId)}</td>
+              <td>${orderCategorieLabel(o)}</td>
+              <td>${orderWorkersLabel(o)}</td>
+              <td>${done}/${o.fasi.length} fasi</td>
+              <td>${fmtMoney(orderTotale(o))}</td>
+              <td style="${orderSaldo(o)>0.001?'color:var(--danger);font-weight:600':''}">${fmtMoney(orderSaldo(o))}</td>
+              <td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
+              <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Apri scheda</button></td>
+            </tr>`;
+          }).join("") : `<tr><td colspan="9" class="empty">Nessun ordine attivo. Crea un ordine per generare la sua scheda di lavorazione.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+function openJobCard(orderId){
+  const o = findItem('orders', orderId);
+  const c = state.clients.find(x=>x.id===o.clientId);
+  const imponibile = orderImponibile(o), iva = orderIva(o), totale = orderTotale(o);
+  const pagamenti = state.payments.filter(p=>p.orderId===o.id);
+  const incassato = pagamenti.reduce((s,p)=>s+Number(p.importo),0);
+  const saldoResiduo = totale - incassato;
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeModal()">×</button>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+      <div>
+        <p class="jobcard-eyebrow">Scheda di lavorazione ${o.numero?('#'+o.numero):''}</p>
+        <h2 style="margin-bottom:2px;">${c?clientDisplayName(c):"—"}</h2>
+      </div>
+      <div class="jobcard-flags">
+        <label class="checkfield"><input type="checkbox" ${o.importante?'checked':''} onchange="updateOrderCheck('${o.id}','importante',this.checked)"> <span class="star ${o.importante?'active':''}" style="font-size:18px;">★</span> Importante</label>
+        ${o.consegnaTipo==="Spedizione" ? `<label class="checkfield"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Spedito</label>` : ``}
+        ${o.fasi.some(f=>f.nome==="Materiale da ordinare" && f.completata) ? `<label class="checkfield"><input type="checkbox" ${o.materialeOrdinato?'checked':''} onchange="updateOrderCheck('${o.id}','materialeOrdinato',this.checked)"> Materiale ordinato</label>` : ``}
+        ${o.daFatturare ? `<label class="checkfield"><input type="checkbox" ${o.fatturato?'checked':''} onchange="updateOrderCheck('${o.id}','fatturato',this.checked)"> Fatturato</label>` : ``}
+        ${o.stato==="Completato" ? `<label class="checkfield"><input type="checkbox" ${o.clienteAvvisato?'checked':''} onchange="updateOrderCheck('${o.id}','clienteAvvisato',this.checked)"> Cliente avvisato</label>` : ``}
+      </div>
+    </div>
+    <div class="ticket-meta ticket-meta-big">
+      <div><span>Operatore</span><select class="inline inline-big" onchange="updateOrderField('${o.id}','worker',this.value)">${workerOptions(o.worker)}</select></div>
+      <div><span>Data consegna</span><input class="inline inline-big" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value)"></div>
+      <div><span>Stato</span><select class="inline inline-big status-select-big" style="background:${STATUS_DOT[o.stato]};color:${statusTextColor(o.stato)}" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${s}</option>`).join("")}</select></div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Righe di lavorazione</h3>
+      <p class="helptext" style="margin-top:-4px;">Ogni riga ha una propria categoria di lavoro.${o.righe.length>1 ? ' Scegli lo stato di ciascuna riga dal menu colorato.' : ''}</p>
+      ${linesEditor('orders', o.id, o.righe)}
+    </div>
+
+    <div class="modal-section">
+      <h3>Descrizione generale del lavoro</h3>
+      <textarea class="desc-lavoro" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
+    </div>
+
+    <div class="modal-section">
+      <h3>Fasi di lavorazione</h3>
+      ${o.fasi.length ? renderFasiGrouped(o) : `<p class="empty" style="padding:6px 0;">Assegna una categoria a una riga per generare la checklist delle fasi.</p>`}
+    </div>
+
+    <div class="modal-section">
+      <h3>Fatturazione e pagamento</h3>
+      <div class="checkfield" style="margin-bottom:6px;"><input type="checkbox" ${o.daFatturare?'checked':''} onchange="updateOrderCheck('${o.id}','daFatturare',this.checked)"> Da fatturare</div>
+      <div class="checkfield" style="margin-bottom:14px;"><input type="checkbox" ${o.ivaApplicata?'checked':''} onchange="updateOrderCheck('${o.id}','ivaApplicata',this.checked)"> Applica IVA 22%</div>
+      <div class="form-grid">
+        <div class="field"><label>Sconto (€)</label><input type="number" min="0" step="0.01" value="${o.sconto||0}" onchange="updateOrderField('${o.id}','sconto',Number(this.value)||0); openJobCard('${o.id}')"></div>
+        <div class="field"><label>Modalità di consegna</label><select class="inline" onchange="updateOrderField('${o.id}','consegnaTipo',this.value); openJobCard('${o.id}')">${CONSEGNA_TIPI.map(t=>`<option ${t===o.consegnaTipo?'selected':''}>${t}</option>`).join("")}</select></div>
+        ${o.consegnaTipo==="Spedizione" ? `<div class="field"><label>Costo di spedizione (€)</label><input type="number" min="0" step="0.01" value="${o.costoSpedizione||0}" onchange="updateOrderField('${o.id}','costoSpedizione',Number(this.value)||0); openJobCard('${o.id}')"></div>` : ``}
+      </div>
+      <div class="totals-box" style="margin-top:16px;">
+        <div class="trow"><span>Imponibile</span><span>${fmtMoney(imponibile)}</span></div>
+        ${o.consegnaTipo==="Spedizione" && Number(o.costoSpedizione)>0 ? `<div class="trow"><span>Spedizione</span><span>${fmtMoney(o.costoSpedizione)}</span></div>` : ""}
+        ${o.ivaApplicata ? `<div class="trow"><span>IVA 22%${o.consegnaTipo==="Spedizione" && Number(o.costoSpedizione)>0 ? ' (merce + spedizione)' : ''}</span><span>${fmtMoney(iva)}</span></div>` : ""}
+        ${Number(o.sconto)>0 ? `<div class="trow"><span>Sconto</span><span>− ${fmtMoney(o.sconto)}</span></div>` : ""}
+        <div class="trow grand"><span>Totale lavorazione</span><span>${fmtMoney(totale)}</span></div>
+      </div>
+      <div class="form-actions" style="margin-top:14px;"><button class="btn btn-primary" onclick="openAddPaymentModal('${o.id}')">AGGIUNGI PAGAMENTO</button></div>
+      <div class="pay-list" style="margin-top:14px;">
+        ${pagamenti.length ? pagamenti.map(p=>`
+          <div class="pay-row">
+            <span>${p.tipo} — ${fmtMoney(p.importo)} — ${p.metodo} — ${fmtDate(p.data)}</span>
+            <button class="btn btn-ghost btn-sm" onclick="deletePaymentFromCard('${p.id}','${o.id}')">✕</button>
+          </div>`).join("") : `<p class="empty" style="padding:6px 0;">Nessun pagamento registrato.</p>`}
+      </div>
+      <div class="totals-box">
+        <div class="trow"><span>Incassato</span><span>${fmtMoney(incassato)}</span></div>
+        <div class="trow grand"><span>Saldo residuo</span><span style="${saldoResiduo>0.001?'color:var(--danger)':''}">${fmtMoney(saldoResiduo)}</span></div>
+      </div>
+    </div>
+
+
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="window.print()">Stampa</button>
+      <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
+      <button class="btn btn-primary" onclick="closeModal(); showToast('Scheda salvata')">SALVA</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+function duplicateOrder(orderId){
+  const o = findItem('orders', orderId);
+  const newRighe = o.righe.map(r=>({...r, id:uid()}));
+  const clone = {
+    ...JSON.parse(JSON.stringify(o)),
+    id: uid(),
+    righe: newRighe,
+    stato: "Da fare",
+    spedito: false,
+    clienteAvvisato: false,
+    note: o.note
+  };
+  clone.righe.forEach(r=>{ r.stato = "Da fare"; });
+  clone.fasi = [];
+  recalcFasi(clone);
+  state.orders.push(clone);
+  saveState('orders');
+  showToast("Scheda duplicata");
+  openJobCard(clone.id);
+}
+function openAddPaymentModal(orderId){
+  const o = findItem('orders', orderId);
+  const saldo = orderSaldo(o);
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="openJobCard('${orderId}')">×</button>
+    <h2>Aggiungi pagamento</h2>
+    <p class="helptext" style="margin-top:0;">Importo suggerito in base al saldo ancora da incassare: ${fmtMoney(saldo)}.</p>
+    <div class="form-grid">
+      <div class="field"><label>Tipo</label><select id="ap-tipo">${PAY_TIPI.map(t=>`<option>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>Importo €</label><input id="ap-importo" type="number" min="0" step="0.01" value="${saldo>0?saldo.toFixed(2):''}"></div>
+      <div class="field"><label>Giorno</label><input id="ap-data" type="date" value="${today()}"></div>
+      <div class="field"><label>Modalità di pagamento</label><select id="ap-metodo">${PAY_METHODS.map(m=>`<option>${m}</option>`).join("")}</select></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="submitAddPayment('${orderId}')">Salva</button>
+      <button class="btn btn-outline" onclick="openJobCard('${orderId}')">Annulla</button>
+    </div>
+  `;
+}
+function submitAddPayment(orderId){
+  const importo = Number(document.getElementById("ap-importo").value)||0;
+  if(importo<=0){ showToast("Inserisci un importo valido"); return; }
+  const o = findItem('orders', orderId);
+  state.payments.push({id:uid(), orderId, clientId:o.clientId,
+    tipo:document.getElementById("ap-tipo").value, importo,
+    data:document.getElementById("ap-data").value||today(),
+    metodo:document.getElementById("ap-metodo").value});
+  saveState('payments'); showToast("Pagamento registrato"); openJobCard(orderId);
+}
+function closeModal(){ document.getElementById("modalBackdrop").classList.remove("open"); renderCurrentView(); }
+function renderFasiGrouped(o){
+  const groups = {};
+  o.fasi.forEach((f,i)=>{ (groups[f.categoria] = groups[f.categoria] || []).push({f,i}); });
+  return Object.keys(groups).map(cat => `
+    <p class="fasi-group-title">${cat}</p>
+    <div class="steps" style="margin-bottom:10px;">
+      ${groups[cat].map(({f,i})=>`<div class="step-row ${f.completata?'done':''}"><input type="checkbox" ${f.completata?'checked':''} onchange="toggleStep('${o.id}',${i})"><label>${f.nome}</label></div>`).join("")}
+    </div>
+  `).join("");
+}
+function toggleStep(orderId, idx){ const o = findItem('orders',orderId); o.fasi[idx].completata = !o.fasi[idx].completata; saveState('orders'); }
+function updateOrderField(orderId, field, value){
+  findItem('orders',orderId)[field] = value; saveState('orders');
+  if(field==='stato') openJobCard(orderId);
+}
+function updateOrderCheck(orderId, field, checked){ findItem('orders',orderId)[field] = checked; saveState('orders'); openJobCard(orderId); }
+function deletePaymentFromCard(paymentId, orderId){
+  state.payments = state.payments.filter(p=>p.id!==paymentId); dbDelete('payments', paymentId); openJobCard(orderId);
+}
+
+/* ============ MAGAZZINO ============ */
+function renderMagazzino(){
+  document.getElementById("view-magazzino").innerHTML = `
+    <div class="form-panel" id="itemForm">
+      <h3>Nuovo articolo</h3>
+      <div class="form-grid">
+        <div class="field"><label>Nome articolo</label><input id="if-nome"></div>
+        <div class="field"><label>Categoria d'uso</label><select id="if-categoria">${categoryOptions()}</select></div>
+        <div class="field"><label>Unità</label><input id="if-unita" placeholder="pz, rotoli, kg..."></div>
+        <div class="field"><label>Quantità attuale</label><input id="if-quantita" type="number" min="0"></div>
+        <div class="field"><label>Scorta minima</label><input id="if-scorta" type="number" min="0"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addItem()">Salva articolo</button>
+        <button class="btn btn-outline" onclick="toggleForm('itemForm')">Annulla</button>
+      </div>
+    </div>
+    <p class="helptext">Sezione in costruzione: verrà completata con il catalogo prodotti completo.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Articolo</th><th>Categoria</th><th>Quantità</th><th>Scorta minima</th><th></th><th></th></tr></thead>
+        <tbody>
+          ${state.warehouse.length ? state.warehouse.map(w=>{
+            const low = Number(w.quantita) <= Number(w.scortaMinima);
+            return `<tr>
+              <td>${w.nome}</td><td>${w.categoria}</td>
+              <td class="${low?'low-stock':''}">${w.quantita} ${w.unita}</td>
+              <td>${w.scortaMinima} ${w.unita}</td>
+              <td>${low?'<span class="pill pill-open">Sotto scorta</span>':'<span class="pill pill-done">OK</span>'}</td>
+              <td style="white-space:nowrap;">
+                <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',1)">+1</button>
+                <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',-1)">-1</button>
+                <button class="btn btn-ghost btn-sm" onclick="deleteItem('${w.id}')">Elimina</button>
+              </td>
+            </tr>`;
+          }).join("") : `<tr><td colspan="6" class="empty">Magazzino vuoto.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+function addItem(){
+  const nome = document.getElementById("if-nome").value.trim();
+  if(!nome){ showToast("Inserisci il nome dell'articolo"); return; }
+  state.warehouse.push({id:uid(), nome, categoria:document.getElementById("if-categoria").value, unita:document.getElementById("if-unita").value.trim()||"pz", quantita:Number(document.getElementById("if-quantita").value)||0, scortaMinima:Number(document.getElementById("if-scorta").value)||0});
+  saveState('warehouse'); toggleForm('itemForm'); renderMagazzino(); showToast("Articolo aggiunto");
+}
+function adjustStock(id, delta){ const w = findItem('warehouse',id); w.quantita = Math.max(0, Number(w.quantita)+delta); saveState('warehouse'); renderMagazzino(); }
+function deleteItem(id){
+  askConfirm("Eliminare questo articolo?", ()=>{
+    state.warehouse = state.warehouse.filter(w=>w.id!==id); dbDelete('warehouse', id); renderMagazzino();
+  });
+}
+
+/* ============ INCASSI / REPORT PAGAMENTI ============ */
+let incassiFilters = {metodo:"", categoria:"", mese: currentMonth(), view:"giorno"};
+function isoWeekKey(dateStr){
+  const d = new Date(dateStr+"T00:00:00");
+  d.setDate(d.getDate() + 4 - (d.getDay()||7));
+  const yearStart = new Date(d.getFullYear(),0,1);
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+  return `${d.getFullYear()}-W${String(weekNo).padStart(2,"0")}`;
+}
+function addDaysTo(dateStr,n){ const d=new Date(dateStr+"T00:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function mondayOf(dateStr){
+  const d = new Date(dateStr+"T00:00:00");
+  const day = d.getDay()||7;
+  d.setDate(d.getDate()-day+1);
+  return d.toISOString().slice(0,10);
+}
+const MESI_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+const GIORNI_IT = ["domenica","lunedì","martedì","mercoledì","giovedì","venerdì","sabato"];
+function dayLabelIt(dateStr){ const d = new Date(dateStr+"T00:00:00"); return `${GIORNI_IT[d.getDay()]} ${fmtDate(dateStr)}`; }
+function statsInRange(startDate, endDate){
+  const incassi = state.payments.filter(p=>p.data>=startDate && p.data<=endDate).reduce((s,p)=>s+Number(p.importo),0);
+  const entrate = (state.entrate||[]).filter(e=>e.data>=startDate && e.data<=endDate).reduce((s,e)=>s+Number(e.importo),0);
+  const spese = state.expenses.filter(e=>e.data>=startDate && e.data<=endDate).reduce((s,e)=>s+Number(e.importo),0);
+  return {incassi, entrate, spese, diff:incassi+entrate-spese};
+}
+function buildDailyRows(numDays){
+  const rows = [];
+  for(let i=0;i<numDays;i++){
+    const d = addDays(-i);
+    rows.push({key:d, start:d, end:d, label:dayLabelIt(d), ...statsInRange(d,d)});
+  }
+  return rows;
+}
+function buildWeeklyRows(numWeeks){
+  const rows = []; const seen = new Set();
+  let cursor = mondayOf(today());
+  for(let i=0;i<numWeeks;i++){
+    if(!seen.has(cursor)){
+      seen.add(cursor);
+      const end = addDaysTo(cursor,6);
+      rows.push({key:cursor, start:cursor, end, label:`Settimana ${fmtDate(cursor)} → ${fmtDate(end)}`, ...statsInRange(cursor,end)});
+    }
+    cursor = addDaysTo(cursor,-7);
+  }
+  return rows;
+}
+function buildMonthlyRows(year){
+  return MESI_IT.map((nome,idx)=>{
+    const mm = String(idx+1).padStart(2,"0");
+    const monthKey = `${year}-${mm}`;
+    const ordersInMonth = state.orders.filter(o=>o.createdAt && o.createdAt.slice(0,7)===monthKey);
+    const paymentsInMonth = state.payments.filter(p=>p.data && p.data.slice(0,7)===monthKey);
+    const contanti = paymentsInMonth.filter(p=>p.metodo==="Contanti").reduce((s,p)=>s+Number(p.importo),0);
+    const carta = paymentsInMonth.filter(p=>p.metodo==="Carta").reduce((s,p)=>s+Number(p.importo),0);
+    const bonifico = paymentsInMonth.filter(p=>p.metodo==="Bonifico").reduce((s,p)=>s+Number(p.importo),0);
+    const soldiIncassati = contanti+carta+bonifico;
+    const entrate = (state.entrate||[]).filter(e=>e.data && e.data.slice(0,7)===monthKey).reduce((s,e)=>s+Number(e.importo),0);
+    const spese = state.expenses.filter(e=>e.data && e.data.slice(0,7)===monthKey).reduce((s,e)=>s+Number(e.importo),0);
+    const totaleOrdini = ordersInMonth.reduce((s,o)=>s+orderTotale(o),0);
+    return {mese:nome, monthKey, nOrdini:ordersInMonth.length, totaleOrdini, nPagamenti:paymentsInMonth.length, contanti, carta, bonifico, soldiIncassati, entrate, spese, differenza:soldiIncassati+entrate-spese};
+  });
+}
+function openReportDetails(start, end, label){
+  const pagamenti = state.payments.filter(p=>p.data>=start && p.data<=end).map(p=>({tipo:"Incasso", data:p.data, descrizione:`${clientName(p.clientId)} — ${p.tipo}`, importo:p.importo, metodo:p.metodo}));
+  const entrate = (state.entrate||[]).filter(e=>e.data>=start && e.data<=end).map(e=>({tipo:"Entrata", data:e.data, descrizione:e.descrizione, importo:e.importo, metodo:e.metodo}));
+  const spese = state.expenses.filter(e=>e.data>=start && e.data<=end).map(e=>({tipo:"Spesa", data:e.data, descrizione:e.descrizione, importo:-e.importo, metodo:e.metodo}));
+  const righe = [...pagamenti, ...entrate, ...spese].sort((a,b)=>a.data.localeCompare(b.data));
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>${label}</h2>
+    <div class="table-wrap" style="margin-top:16px;">
+      <table>
+        <thead><tr><th>Data</th><th>Tipo</th><th>Descrizione</th><th>Metodo</th><th>Importo</th></tr></thead>
+        <tbody>
+          ${righe.length ? righe.map(r=>`<tr><td>${fmtDate(r.data)}</td><td>${r.tipo}</td><td>${r.descrizione||"—"}</td><td>${r.metodo||"—"}</td><td style="${r.importo<0?'color:var(--danger)':''}">${fmtMoney(r.importo)}</td></tr>`).join("") : `<tr><td colspan="5" class="empty">Nessun movimento in questo periodo.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+    <div class="form-actions" style="margin-top:16px;"><button class="btn btn-outline" onclick="closeModal()">Chiudi</button></div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+function drawMonthlyChart(rows){
+  const canvas = document.getElementById("monthlyChart");
+  if(!canvas || typeof Chart==="undefined") return;
+  if(window._monthlyChartInstance) window._monthlyChartInstance.destroy();
+  window._monthlyChartInstance = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: rows.map(r=>r.mese.slice(0,3)),
+      datasets: [
+        {label:"Differenziale", data: rows.map(r=>r.differenza), backgroundColor:"#2ECC71"},
+        {label:"Ordini", data: rows.map(r=>r.totaleOrdini), backgroundColor:"#1F7A8C"}
+      ]
+    },
+    options: { responsive:true, plugins:{legend:{position:"bottom"}}, scales:{y:{beginAtZero:true}} }
+  });
+}
+function orderOptionsForPayments(){ return state.orders.map(o=>`<option value="${o.id}">${clientName(o.clientId)} — ${orderCategorieLabel(o)} — ${fmtMoney(orderTotale(o))}</option>`).join(""); }
+function paymentCategorieLabel(p){ const o = findItem('orders', p.orderId); return o ? orderCategorieLabel(o) : "—"; }
+function paymentMatchesCategoria(p, cat){ if(!cat) return true; const o = findItem('orders', p.orderId); return o ? orderCategorie(o).includes(cat) : false; }
+function renderIncassi(){
+  const f = incassiFilters;
+  const totaleIncassato = state.payments.reduce((s,p)=>s+Number(p.importo),0);
+  const totaleEntrateStorico = (state.entrate||[]).reduce((s,e)=>s+Number(e.importo),0);
+  const totaleSpeseStorico = state.expenses.reduce((s,e)=>s+Number(e.importo),0);
+  const guadagnoStorico = totaleIncassato + totaleEntrateStorico - totaleSpeseStorico;
+  const incassatoMeseCorrente = paymentsTotaleMese(currentMonth()) + entrateTotaleMese(currentMonth());
+  const creditiAperti = state.orders.filter(o=>o.stato==="Consegnato").map(o=>({o, saldo:orderSaldo(o)})).filter(x=>x.saldo>0.001);
+  const totaleCrediti = creditiAperti.reduce((s,x)=>s+x.saldo,0);
+  const guadagno = (paymentsTotaleMese(f.mese) + entrateTotaleMese(f.mese)) - speseTotaleMese(f.mese);
+  const filtered = state.payments.filter(p => (!f.metodo||p.metodo===f.metodo) && paymentMatchesCategoria(p,f.categoria) && (!f.mese||p.data.slice(0,7)===f.mese));
+
+  let reportHtml = "";
+  if(f.view==="giorno"){
+    const rows = buildDailyRows(7);
+    const tot = rows.reduce((a,r)=>({incassi:a.incassi+r.incassi, entrate:a.entrate+r.entrate, spese:a.spese+r.spese, diff:a.diff+r.diff}), {incassi:0,entrate:0,spese:0,diff:0});
+    reportHtml = `
+      <p class="helptext">Periodo: ${fmtDate(rows[rows.length-1].start)} → ${fmtDate(rows[0].end)}</p>
+      <div class="table-wrap" style="margin-bottom:20px;">
+        <table>
+          <thead><tr><th>Giorno</th><th>Incassi</th><th>Entrate</th><th>Spese</th><th>Differenza</th><th>Azioni</th></tr></thead>
+          <tbody>
+            ${rows.map(r=>`<tr><td style="text-transform:capitalize;">${r.label}</td><td>${fmtMoney(r.incassi)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td style="font-weight:600;${r.diff<0?'color:var(--danger)':''}">${fmtMoney(r.diff)}</td><td><button class="btn btn-outline btn-sm" onclick="openReportDetails('${r.start}','${r.end}','${r.label.replace(/'/g,"")}')">Dettagli</button></td></tr>`).join("")}
+            <tr style="font-weight:700;background:var(--paper);"><td>TOTALE PERIODO</td><td>${fmtMoney(tot.incassi)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.diff)}</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>`;
+  } else if(f.view==="settimana"){
+    const rows = buildWeeklyRows(8);
+    const tot = rows.reduce((a,r)=>({incassi:a.incassi+r.incassi, entrate:a.entrate+r.entrate, spese:a.spese+r.spese, diff:a.diff+r.diff}), {incassi:0,entrate:0,spese:0,diff:0});
+    reportHtml = `
+      <div class="table-wrap" style="margin-bottom:20px;">
+        <table>
+          <thead><tr><th>Settimana</th><th>Incassi</th><th>Entrate</th><th>Spese</th><th>Differenza</th><th>Azioni</th></tr></thead>
+          <tbody>
+            ${rows.map(r=>`<tr><td>${r.label}</td><td>${fmtMoney(r.incassi)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td style="font-weight:600;${r.diff<0?'color:var(--danger)':''}">${fmtMoney(r.diff)}</td><td><button class="btn btn-outline btn-sm" onclick="openReportDetails('${r.start}','${r.end}','${r.label.replace(/'/g,"")}')">Dettagli</button></td></tr>`).join("")}
+            <tr style="font-weight:700;background:var(--paper);"><td>TOTALE PERIODO</td><td>${fmtMoney(tot.incassi)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.diff)}</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>`;
+  } else {
+    const year = new Date().getFullYear();
+    const rows = buildMonthlyRows(year);
+    const tot = rows.reduce((a,r)=>({nOrdini:a.nOrdini+r.nOrdini, totaleOrdini:a.totaleOrdini+r.totaleOrdini, nPagamenti:a.nPagamenti+r.nPagamenti, contanti:a.contanti+r.contanti, carta:a.carta+r.carta, bonifico:a.bonifico+r.bonifico, soldiIncassati:a.soldiIncassati+r.soldiIncassati, entrate:a.entrate+r.entrate, spese:a.spese+r.spese, differenza:a.differenza+r.differenza}), {nOrdini:0,totaleOrdini:0,nPagamenti:0,contanti:0,carta:0,bonifico:0,soldiIncassati:0,entrate:0,spese:0,differenza:0});
+    reportHtml = `
+      <div class="card" style="margin-bottom:18px;"><canvas id="monthlyChart" height="90"></canvas></div>
+      <div class="table-wrap" style="margin-bottom:20px;overflow-x:auto;">
+        <table>
+          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta</th><th>Bonifico</th><th>Soldi Incassati</th><th>Entrate</th><th>Spese</th><th>Differenza</th></tr></thead>
+          <tbody>
+            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td>${fmtMoney(r.totaleOrdini)}</td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td>${fmtMoney(r.soldiIncassati)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
+            <tr style="font-weight:700;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  document.getElementById("view-incassi").innerHTML = `
+    <div class="form-panel" id="paymentForm">
+      <h3>Registra incasso</h3>
+      <div class="form-grid">
+        <div class="field" style="grid-column:1/-1;"><label>Ordine collegato</label><select id="pf-ordine" onchange="suggestPfImporto()">${orderOptionsForPayments()}</select></div>
+        <div class="field"><label>Tipo</label><select id="pf-tipo">${PAY_TIPI.map(t=>`<option>${t}</option>`).join("")}</select></div>
+        <div class="field"><label>Importo (€)</label><input id="pf-importo" type="number" min="0" step="0.01" value="${state.orders[0] ? Math.max(0,orderSaldo(state.orders[0])).toFixed(2) : ''}"></div>
+        <div class="field"><label>Giorno di incasso</label><input id="pf-data" type="date" value="${today()}"></div>
+        <div class="field"><label>Metodo</label><select id="pf-metodo">${PAY_METHODS.map(m=>`<option>${m}</option>`).join("")}</select></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addPayment()">Salva incasso</button>
+        <button class="btn btn-outline" onclick="toggleForm('paymentForm')">Annulla</button>
+      </div>
+    </div>
+    <div class="grid grid-auto" style="margin-bottom:18px;">
+      <div class="card stat"><p class="stat-label">Totale incassato (storico)</p><p class="stat-value">${fmtMoney(totaleIncassato)}</p></div>
+      <div class="card stat"><p class="stat-label">Incassato mese corrente</p><p class="stat-value">${fmtMoney(incassatoMeseCorrente)}</p></div>
+      <div class="card stat"><p class="stat-label">Crediti aperti</p><p class="stat-value" style="${totaleCrediti>0?'color:var(--danger)':''}">${fmtMoney(totaleCrediti)}</p><p class="stat-sub">${creditiAperti.length} ordini consegnati non pagati</p></div>
+      <div class="card stat"><p class="stat-label">Guadagno netto (mese filtro)</p><p class="stat-value" style="${guadagno<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagno)}</p><p class="stat-sub">incassi + entrate − spese del mese</p></div>
+      <div class="card stat"><p class="stat-label">Guadagno netto (storico)</p><p class="stat-value" style="${guadagnoStorico<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagnoStorico)}</p><p class="stat-sub">totale incassi + entrate − spese</p></div>
+    </div>
+
+    <div class="section-header">
+      <h3 style="margin:0;">Report</h3>
+      <div class="filters">
+        <select class="inline" onchange="incassiFilters.view=this.value; renderIncassi();">
+          <option value="giorno" ${f.view==='giorno'?'selected':''}>Giornaliero</option>
+          <option value="settimana" ${f.view==='settimana'?'selected':''}>Settimanale</option>
+          <option value="mese" ${f.view==='mese'?'selected':''}>Mensile</option>
+        </select>
+      </div>
+    </div>
+    ${reportHtml}
+
+    <div class="section-header">
+      <h3 style="margin:0;">Storico pagamenti</h3>
+      <div class="filters">
+        <select class="inline" onchange="incassiFilters.metodo=this.value; renderIncassi();"><option value="">Tutte le modalità</option>${PAY_METHODS.map(m=>`<option ${m===f.metodo?'selected':''}>${m}</option>`).join("")}</select>
+        <select class="inline" onchange="incassiFilters.categoria=this.value; renderIncassi();"><option value="">Tutti i lavori</option>${CATEGORIES.map(c=>`<option ${c===f.categoria?'selected':''}>${c}</option>`).join("")}</select>
+        <input class="inline" type="month" value="${f.mese}" onchange="incassiFilters.mese=this.value; renderIncassi();">
+      </div>
+    </div>
+    <div class="table-wrap" style="margin-bottom:20px;">
+      <table>
+        <thead><tr><th>Data</th><th>Cliente</th><th>Lavoro</th><th>Tipo</th><th>Importo</th><th>Metodo</th><th></th></tr></thead>
+        <tbody>
+          ${filtered.length ? [...filtered].sort((a,b)=>b.data.localeCompare(a.data)).map(p=>`
+            <tr>
+              <td>${fmtDate(p.data)}</td><td>${clientName(p.clientId)}</td><td>${paymentCategorieLabel(p)}</td><td>${p.tipo||"—"}</td>
+              <td>${fmtMoney(p.importo)}</td><td>${p.metodo}</td>
+              <td><button class="btn btn-ghost btn-sm" onclick="deletePayment('${p.id}')">Elimina</button></td>
+            </tr>`).join("") : `<tr><td colspan="7" class="empty">Nessun incasso con questi filtri.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+    <h3 style="margin:0 0 10px;">Crediti aperti per ordine (consegnati, non pagati)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Cliente</th><th>Categoria</th><th>Totale ordine</th><th>Saldo da incassare</th></tr></thead>
+        <tbody>
+          ${creditiAperti.length ? creditiAperti.map(x=>`<tr><td>${clientName(x.o.clientId)}</td><td>${orderCategorieLabel(x.o)}</td><td>${fmtMoney(orderTotale(x.o))}</td><td style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)}</td></tr>`).join("") : `<tr><td colspan="4" class="empty">Nessun credito aperto.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+  if(f.view==="mese"){ setTimeout(()=>drawMonthlyChart(buildMonthlyRows(new Date().getFullYear())), 0); }
+}
+function suggestPfImporto(){
+  const o = findItem('orders', document.getElementById("pf-ordine").value);
+  if(o) document.getElementById("pf-importo").value = Math.max(0, orderSaldo(o)).toFixed(2);
+}
+function addPayment(){
+  const orderId = document.getElementById("pf-ordine").value;
+  if(!orderId){ showToast("Crea prima almeno un ordine"); return; }
+  const order = findItem('orders', orderId);
+  const importo = Number(document.getElementById("pf-importo").value)||0;
+  if(importo<=0){ showToast("Inserisci un importo valido"); return; }
+  state.payments.push({id:uid(), orderId, clientId:order.clientId,
+    tipo:document.getElementById("pf-tipo").value, importo,
+    data:document.getElementById("pf-data").value || today(), metodo:document.getElementById("pf-metodo").value});
+  saveState('payments'); toggleForm('paymentForm'); renderIncassi(); showToast("Incasso registrato");
+}
+function deletePayment(id){
+  askConfirm("Eliminare questo incasso?", ()=>{
+    state.payments = state.payments.filter(p=>p.id!==id); dbDelete('payments', id); renderIncassi();
+  });
+}
+
+/* ============ SPESE ============ */
+function renderSpese(){
+  const totaleSpese = state.expenses.reduce((s,e)=>s+Number(e.importo),0);
+  const speseMese = speseTotaleMese(currentMonth());
+  const guadagnoMese = (paymentsTotaleMese(currentMonth()) + entrateTotaleMese(currentMonth())) - speseMese;
+  document.getElementById("view-spese").innerHTML = `
+    <div class="form-panel" id="expenseForm">
+      <h3>Nuova spesa</h3>
+      <div class="form-grid">
+        <div class="field" style="grid-column:1/-1;"><label>Descrizione</label><input id="ef-descrizione" placeholder="Es. Acquisto materiale di consumo"></div>
+        <div class="field"><label>Spesa sostenuta (€)</label><input id="ef-importo" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Data</label><input id="ef-data" type="date" value="${today()}"></div>
+        <div class="field"><label>Modalità di pagamento</label><select id="ef-metodo">${PAY_METHODS.map(m=>`<option>${m}</option>`).join("")}</select></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addExpense()">Salva spesa</button>
+        <button class="btn btn-outline" onclick="toggleForm('expenseForm')">Annulla</button>
+      </div>
+    </div>
+    <div class="grid grid-auto" style="margin-bottom:18px;">
+      <div class="card stat"><p class="stat-label">Totale spese (storico)</p><p class="stat-value">${fmtMoney(totaleSpese)}</p></div>
+      <div class="card stat"><p class="stat-label">Spese mese corrente</p><p class="stat-value">${fmtMoney(speseMese)}</p></div>
+      <div class="card stat"><p class="stat-label">Guadagno netto mese corrente</p><p class="stat-value" style="${guadagnoMese<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagnoMese)}</p><p class="stat-sub">incassi ordini + entrate − spese</p></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Descrizione</th><th>Importo</th><th>Metodo</th><th></th></tr></thead>
+        <tbody>
+          ${state.expenses.length ? [...state.expenses].sort((a,b)=>b.data.localeCompare(a.data)).map(e=>`
+            <tr><td>${fmtDate(e.data)}</td><td>${e.descrizione}</td><td>${fmtMoney(e.importo)}</td><td>${e.metodo}</td>
+            <td><button class="btn btn-ghost btn-sm" onclick="deleteExpense('${e.id}')">Elimina</button></td></tr>
+          `).join("") : `<tr><td colspan="5" class="empty">Nessuna spesa registrata.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+function addExpense(){
+  const descrizione = document.getElementById("ef-descrizione").value.trim();
+  const importo = Number(document.getElementById("ef-importo").value)||0;
+  if(!descrizione){ showToast("Inserisci una descrizione"); return; }
+  if(importo<=0){ showToast("Inserisci un importo valido"); return; }
+  state.expenses.push({id:uid(), descrizione, importo, metodo:document.getElementById("ef-metodo").value, data:document.getElementById("ef-data").value||today()});
+  saveState('expenses'); toggleForm('expenseForm'); renderSpese(); showToast("Spesa registrata");
+}
+function deleteExpense(id){
+  askConfirm("Eliminare questa spesa?", ()=>{
+    state.expenses = state.expenses.filter(e=>e.id!==id); dbDelete('expenses', id); renderSpese();
+  });
+}
+
+/* ============ ENTRATE ============ */
+function renderEntrate(){
+  const totaleEntrate = (state.entrate||[]).reduce((s,e)=>s+Number(e.importo),0);
+  const entrateMese = entrateTotaleMese(currentMonth());
+  document.getElementById("view-entrate").innerHTML = `
+    <div class="form-panel" id="incomeForm">
+      <h3>Nuova entrata</h3>
+      <div class="form-grid">
+        <div class="field" style="grid-column:1/-1;"><label>Descrizione</label><input id="if2-descrizione" placeholder="Es. Rimborso, vendita materiale usato..."></div>
+        <div class="field"><label>Importo (€)</label><input id="if2-importo" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Data</label><input id="if2-data" type="date" value="${today()}"></div>
+        <div class="field"><label>Modalità di pagamento</label><select id="if2-metodo">${PAY_METHODS.map(m=>`<option>${m}</option>`).join("")}</select></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addEntrata()">Salva entrata</button>
+        <button class="btn btn-outline" onclick="toggleForm('incomeForm')">Annulla</button>
+      </div>
+      <p class="helptext" style="margin-top:10px;">Le entrate qui registrate si sommano agli incassi degli ordini nel calcolo del guadagno netto.</p>
+    </div>
+    <div class="grid grid-auto" style="margin-bottom:18px;">
+      <div class="card stat"><p class="stat-label">Totale entrate (storico)</p><p class="stat-value">${fmtMoney(totaleEntrate)}</p></div>
+      <div class="card stat"><p class="stat-label">Entrate mese corrente</p><p class="stat-value">${fmtMoney(entrateMese)}</p></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Descrizione</th><th>Importo</th><th>Metodo</th><th></th></tr></thead>
+        <tbody>
+          ${(state.entrate||[]).length ? [...state.entrate].sort((a,b)=>b.data.localeCompare(a.data)).map(e=>`
+            <tr><td>${fmtDate(e.data)}</td><td>${e.descrizione}</td><td style="color:var(--ok);font-weight:600;">+ ${fmtMoney(e.importo)}</td><td>${e.metodo}</td>
+            <td><button class="btn btn-ghost btn-sm" onclick="deleteEntrata('${e.id}')">Elimina</button></td></tr>
+          `).join("") : `<tr><td colspan="5" class="empty">Nessuna entrata registrata.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+function addEntrata(){
+  const descrizione = document.getElementById("if2-descrizione").value.trim();
+  const importo = Number(document.getElementById("if2-importo").value)||0;
+  if(!descrizione){ showToast("Inserisci una descrizione"); return; }
+  if(importo<=0){ showToast("Inserisci un importo valido"); return; }
+  state.entrate.push({id:uid(), descrizione, importo, metodo:document.getElementById("if2-metodo").value, data:document.getElementById("if2-data").value||today()});
+  saveState('entrate'); toggleForm('incomeForm'); renderEntrate(); showToast("Entrata registrata");
+}
+function deleteEntrata(id){
+  askConfirm("Eliminare questa entrata?", ()=>{
+    state.entrate = state.entrate.filter(e=>e.id!==id); dbDelete('entrate', id); renderEntrate();
+  });
+}
+
+/* ============ AUTENTICAZIONE E AVVIO ============ */
+async function fetchUserProfile(userId, email){
+  const { data, error } = await sb.from("profiles").select("*").eq("id", userId).single();
+  if(error || !data) return {id:userId, email, role:"staff"};
+  return {id:userId, email, role:data.role||"staff", nome:data.nome};
+}
+async function doSignIn(){
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  const errEl = document.getElementById("login-error");
+  errEl.style.display = "none";
+  if(!email || !password){ errEl.textContent = "Inserisci email e password"; errEl.style.display = "block"; return; }
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ errEl.textContent = "Credenziali non valide"; errEl.style.display = "block"; return; }
+  await onSignedIn(data.session);
+}
+async function signOut(){
+  await sb.auth.signOut();
+  currentUser = null;
+  setAuthView(false);
+}
+async function onSignedIn(session){
+  currentUser = await fetchUserProfile(session.user.id, session.user.email);
+  setAuthView(true);
+  await loadAllFromSupabase();
+  subscribeRealtime();
+  renderNav();
+  goTo("dashboard");
+}
+function setAuthView(isLoggedIn){
+  document.getElementById("loginScreen").style.display = isLoggedIn ? "none" : "flex";
+  document.getElementById("app").style.display = isLoggedIn ? "flex" : "none";
+}
+
+async function initAuth(){
+  const { data } = await sb.auth.getSession();
+  if(data && data.session){
+    await onSignedIn(data.session);
+  } else {
+    setAuthView(false);
+  }
+}
+
+sb.auth.onAuthStateChange((event, session) => {
+  if(event === "SIGNED_OUT") setAuthView(false);
+  if(event === "SIGNED_IN" && session) setAuthView(true);
+});
+
+initAuth();
+</script>
+</body>
+</html>
+
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
