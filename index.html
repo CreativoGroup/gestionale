@@ -589,7 +589,6 @@ function renderDashboard(){
   const ordiniImportanti = state.orders.filter(o=>o.importante && o.stato!=="Consegnato");
   const magazzinoDaOrdinare = computeMagazzinoDaOrdinare();
   const pezziDaOrdinare = magazzinoDaOrdinare.reduce((s,x)=>s + Number(x.entry.daOrdinareQty||0), 0);
-  const daAvvisare = state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato);
   const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>o.worker===w && o.stato!=="Consegnato").length}));
   const oggi = today();
   const consegneGiornaliere = activeOrders.filter(o=>o.dataConsegna===oggi);
@@ -598,10 +597,8 @@ function renderDashboard(){
   document.getElementById("view-dashboard").innerHTML = `
     <div class="grid grid-auto" style="margin-bottom:18px;">
       <div class="card stat clickable" onclick="openDashboardList('attivi')"><p class="stat-label">Ordini attivi</p><p class="stat-value">${ordiniInLavorazione.length}</p><p class="stat-sub">su ${state.orders.length} totali</p></div>
-      <div class="card stat clickable" onclick="openDashboardList('completati')"><p class="stat-label">Completati da consegnare</p><p class="stat-value" style="${completatiDaConsegnare.length?'color:var(--warn)':''}">${completatiDaConsegnare.length}</p><p class="stat-sub">pronti, in attesa di consegna</p></div>
       <div class="card stat clickable" onclick="openDashboardList('fatturare')"><p class="stat-label">Schede da fatturare</p><p class="stat-value" style="${daFatturare.length?'color:var(--accent)':''}">${daFatturare.length}</p><p class="stat-sub">contrassegnate "da fatturare"</p></div>
       <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${pezziDaOrdinare?'color:var(--teal)':''}">${pezziDaOrdinare}</p><p class="stat-sub">pezzi confermati da ordinare</p></div>
-      <div class="card stat clickable" onclick="openDashboardList('avvisare')"><p class="stat-label">Cliente da avvisare</p><p class="stat-value" style="${daAvvisare.length?'color:var(--warn)':''}">${daAvvisare.length}</p><p class="stat-sub">lavori completati non ancora comunicati</p></div>
       <div class="card stat clickable" onclick="openDashboardList('preventivi')"><p class="stat-label">Preventivi in attesa</p><p class="stat-value">${preventiviAperti}</p><p class="stat-sub">bozza o inviati</p></div>
     </div>
 
@@ -636,7 +633,19 @@ function renderDashboard(){
       <div class="card">
         <h3 style="margin-top:0;">Completati da consegnare</h3>
         ${completatiDaConsegnare.length ? `<table><tbody>${completatiDaConsegnare.map(o=>`
-          <tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td>${o.consegnaTipo}</td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>
+          <tr>
+            <td>${clientName(o.clientId)}</td>
+            <td>${orderCategorieLabel(o)}</td>
+            <td>${o.consegnaTipo}</td>
+            <td>
+              <button class="btn btn-sm ${o.clienteAvvisato?'btn-outline':'btn-primary'}"
+                style="${o.clienteAvvisato?'border-color:var(--ok);color:var(--ok);':'background:var(--warn);color:#fff;'}"
+                onclick="toggleClienteAvvisatoDashboard('${o.id}')">
+                ${o.clienteAvvisato?'AVVISATO':'DA AVVISARE'}
+              </button>
+            </td>
+            <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td>
+          </tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`}
       </div>
       <div class="card">
@@ -671,6 +680,14 @@ function renderDashboard(){
       ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Categoria</th><th>Totale ordine</th><th>Saldo da incassare</th></tr></thead><tbody>${creditiApertiDash.map(x=>`<tr><td>${clientName(x.o.clientId)}</td><td>${orderCategorieLabel(x.o)}</td><td>${fmtMoney(orderTotale(x.o))}</td><td style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)}</td></tr>`).join("")}</tbody></table>` : `<p class="empty">Nessun credito aperto.</p>`}
     </div>` : ``}
   `;
+}
+function toggleClienteAvvisatoDashboard(orderId){
+  const o = findItem('orders', orderId);
+  if(!o) return;
+  o.clienteAvvisato = !o.clienteAvvisato;
+  saveState('orders');
+  renderDashboard();
+  showToast(o.clienteAvvisato ? "Cliente segnato come AVVISATO" : "Cliente segnato DA AVVISARE");
 }
 function addAppuntamento(){
   const titolo = document.getElementById("af-titolo").value.trim();
@@ -711,9 +728,15 @@ function openDashboardList(type){
       </div>`).join("");
   } else if(cfg.isMagazzino){
     rows = cfg.items.map(({order,entry})=>`
-      <div class="list-row" onclick="openJobCard('${order.id}')">
-        <div><div class="lr-main">${clientName(order.clientId)} ${order.numero?('#'+order.numero):''}</div><div class="lr-sub">${entry.codice||''} — ${entry.colore||''} — ${entry.taglia||''}</div></div>
-        <div class="lr-sub" style="color:var(--danger);font-weight:600;">${entry.daOrdinareQty} pz da ordinare</div>
+      <div class="list-row" style="cursor:default;">
+        <div style="cursor:pointer;flex:1;" onclick="openJobCard('${order.id}')">
+          <div class="lr-main">${clientName(order.clientId)} ${order.numero?('#'+order.numero):''}</div>
+          <div class="lr-sub">${entry.codice||''} — ${entry.colore||''} — ${entry.taglia||''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="lr-sub" style="color:var(--danger);font-weight:600;">${entry.daOrdinareQty} pz da ordinare</div>
+          <button class="btn btn-primary btn-sm" onclick="segnaInseritoNelCarrello('${order.id}','${entry.id}')">INSERITO NEL CARRELLO</button>
+        </div>
       </div>`).join("");
   } else if(cfg.isQuote){
     rows = cfg.items.map(q=>`
@@ -1186,6 +1209,8 @@ function tryStornoMagazzino(entry){
   entry.articoloId = "";
   entry.daOrdinareQty = 0;
   entry.ordineConfermato = false;
+  entry.inCarrello = false;
+  entry.inCarrelloAt = null;
 
   const richiesta = Math.max(0,Number(entry.quantita)||0);
   if(!entry.codice || !entry.colore || !entry.taglia || !richiesta) return;
@@ -1216,7 +1241,7 @@ function tryStornoMagazzino(entry){
 function addMagazzinoRiga(orderId){
   const o = findItem('orders', orderId);
   if(!o.magazzino) o.magazzino = [];
-  o.magazzino.push({id:uid(), codice:"", nome:"", colore:"", taglia:"", quantita:1, stornato:false, _reservedQty:0, articoloId:"", daOrdinareQty:0, ordineConfermato:false});
+  o.magazzino.push({id:uid(), codice:"", nome:"", colore:"", taglia:"", quantita:1, stornato:false, _reservedQty:0, articoloId:"", daOrdinareQty:0, ordineConfermato:false, inCarrello:false, inCarrelloAt:null});
   saveState('orders');
   openJobCard(orderId);
 }
@@ -1254,11 +1279,22 @@ function confermaOrdineMagazzino(orderId, rigaId){
   openJobCard(orderId);
   showToast(`${entry.daOrdinareQty} pz aggiunti a Materiale da ordinare`);
 }
+function segnaInseritoNelCarrello(orderId, rigaId){
+  const o = findItem('orders', orderId);
+  const entry = (o && o.magazzino ? o.magazzino : []).find(m=>m.id===rigaId);
+  if(!entry || !entry.ordineConfermato || Number(entry.daOrdinareQty)<=0) return;
+  entry.inCarrello = true;
+  entry.inCarrelloAt = new Date().toISOString();
+  saveState('orders');
+  renderDashboard();
+  openDashboardList('materiale');
+  showToast(`${entry.daOrdinareQty} pz segnati come inseriti nel carrello`);
+}
 function computeMagazzinoDaOrdinare(){
   const list = [];
   state.orders.filter(o=>o.stato!=='Consegnato').forEach(order=>{
     (order.magazzino||[]).forEach(entry=>{
-      if(entry.codice && entry.colore && entry.taglia && Number(entry.daOrdinareQty)>0 && entry.ordineConfermato){
+      if(entry.codice && entry.colore && entry.taglia && Number(entry.daOrdinareQty)>0 && entry.ordineConfermato && !entry.inCarrello){
         list.push({order, entry});
       }
     });
@@ -1293,9 +1329,11 @@ function renderMagazzinoSection(o){
               : mancano===0
                 ? `<span class="pill pill-done">Disponibile</span>${usati?` <span style="font-size:12px;color:var(--muted);">${usati} pz stornati</span>`:''}`
                 : `${usati?`<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">${usati} pz presi dal magazzino</div>`:''}
-                   ${m.ordineConfermato
-                     ? `<span class="pill pill-open">ORDINE CONFERMATO · ${mancano} pz</span>`
-                     : `<button class="btn btn-outline btn-sm" style="border-color:var(--danger);color:var(--danger);" onclick="confermaOrdineMagazzino('${o.id}','${m.id}')">ORDINA ${mancano} pz</button>`}`;
+                   ${m.inCarrello
+                     ? `<span class="pill pill-sent">NEL CARRELLO · ${mancano} pz</span>`
+                     : m.ordineConfermato
+                       ? `<span class="pill pill-open">ORDINE CONFERMATO · ${mancano} pz</span>`
+                       : `<button class="btn btn-outline btn-sm" style="border-color:var(--danger);color:var(--danger);" onclick="confermaOrdineMagazzino('${o.id}','${m.id}')">ORDINA ${mancano} pz</button>`}`;
             return `
             <tr style="${mancano>0?'background:#FFF7F5;':''}">
               <td style="min-width:210px;">
@@ -1812,16 +1850,64 @@ function filteredMagazzinoRows(q){
       return (a.codice||"").localeCompare(b.codice||"");
     });
 }
+
+function sameVariant(a,b){
+  const codeA = String(a.codice||"").trim().toUpperCase();
+  const codeB = String(b.codice||"").trim().toUpperCase();
+  const colorA = String(a.colore||"").trim().toLowerCase();
+  const colorB = String(b.colore||"").trim().toLowerCase();
+  const sizeA = String(a.taglia||"UNICA").trim().toUpperCase() || "UNICA";
+  const sizeB = String(b.taglia||"UNICA").trim().toUpperCase() || "UNICA";
+  return codeA===codeB && colorA===colorB && sizeA===sizeB;
+}
+function destinazioniCarrelloPerMagazzino(w){
+  let disponibile = Math.max(0, Number(w.quantita)||0);
+  if(disponibile<=0) return [];
+  const richieste = [];
+  state.orders
+    .filter(o=>o.stato!=="Consegnato")
+    .forEach(order=>{
+      (order.magazzino||[]).forEach(entry=>{
+        if(entry.inCarrello && Number(entry.daOrdinareQty)>0 && sameVariant(w,entry)){
+          richieste.push({order,entry});
+        }
+      });
+    });
+  richieste.sort((a,b)=>{
+    const da = a.entry.inCarrelloAt || a.order.createdAt || "";
+    const db = b.entry.inCarrelloAt || b.order.createdAt || "";
+    return da.localeCompare(db);
+  });
+  const out = [];
+  for(const r of richieste){
+    if(disponibile<=0) break;
+    const q = Math.min(disponibile, Number(r.entry.daOrdinareQty)||0);
+    if(q>0){
+      out.push({order:r.order, entry:r.entry, quantita:q});
+      disponibile -= q;
+    }
+  }
+  return out;
+}
+
 function magazzinoRowsHtml(list){
   return list.length ? list.map(w=>{
     const low = Number(w.quantita) <= Number(w.scortaMinima);
-    return `<tr>
+    const destinazioni = destinazioniCarrelloPerMagazzino(w);
+    const destHtml = destinazioni.length
+      ? destinazioni.map(d=>`<div style="margin-bottom:4px;">
+          <span class="pill pill-produzione">DESTINATO</span>
+          <strong>${d.quantita} pz</strong> → ${clientName(d.order.clientId)} ${d.order.numero?('#'+d.order.numero):''}
+        </div>`).join("")
+      : `<span style="color:var(--muted);">—</span>`;
+    return `<tr style="${destinazioni.length?'background:#FFF8DF;':''}">
       <td style="font-weight:700;">${w.codice||"—"}</td>
       <td><input id="wn-${w.id}" value="${w.nome||''}" style="min-width:160px;"></td>
       <td>${w.categoria||"—"}</td><td>${w.colore||"—"}</td><td>${w.taglia||"—"}</td>
       <td class="${low?'low-stock':''}"><input id="wq-${w.id}" type="number" min="0" value="${w.quantita}" style="width:70px;"> ${w.unita}</td>
       <td><input id="wm-${w.id}" type="number" min="0" value="${w.scortaMinima}" style="width:70px;"> ${w.unita}</td>
       <td>${low?'<span class="pill pill-open">Sotto scorta</span>':'<span class="pill pill-done">OK</span>'}</td>
+      <td style="min-width:230px;">${destHtml}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-primary btn-sm" onclick="saveWarehouseRow('${w.id}')">Aggiorna</button>
         <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',1)">+1</button>
@@ -1829,7 +1915,7 @@ function magazzinoRowsHtml(list){
         <button class="btn btn-ghost btn-sm" onclick="deleteItem('${w.id}')">Elimina</button>
       </td>
     </tr>`;
-  }).join("") : `<tr><td colspan="9" class="empty">Nessun articolo disponibile con questi filtri.</td></tr>`;
+  }).join("") : `<tr><td colspan="10" class="empty">Nessun articolo disponibile con questi filtri.</td></tr>`;
 }
 function filterMagazzino(input){
   magazzinoSearch = input.value;
@@ -1876,7 +1962,7 @@ function renderMagazzino(){
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Codice</th><th>Nome</th><th>Categoria</th><th>Colore</th><th>Taglia</th><th>Quantità</th><th>Scorta minima</th><th></th><th></th></tr></thead>
+        <thead><tr><th>Codice</th><th>Nome</th><th>Categoria</th><th>Colore</th><th>Taglia</th><th>Quantità</th><th>Scorta minima</th><th>Stato</th><th>Destinazione</th><th></th></tr></thead>
         <tbody id="warehouseTableBody">
           ${magazzinoRowsHtml(list)}
         </tbody>
