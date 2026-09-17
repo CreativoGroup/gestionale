@@ -237,6 +237,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
 <script>
 /* ============ CONFIGURAZIONE SUPABASE ============ */
 const SUPABASE_URL = "https://isvanzqcifypsejdlmjx.supabase.co";
@@ -266,8 +268,8 @@ const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
 const QUOTE_CLASS = {"Bozza":"pill-draft","Inviato":"pill-sent","Accettato":"pill-accepted","Rifiutato":"pill-refused"};
 const STEP_TEMPLATES = {
   "Servizio": ["Appuntamento effettuato","Bozza grafica","Revisione cliente","Approvazione finale","Consegna file"],
-  "Stampa": ["Materiale da ordinare","Materiale in arrivo","Pronto per la stampa","Stampa DTF","Stampa taglio","Stampa digitale","Stampa sublimata"],
-  "Ricamo": ["Materiale da ordinare","Digitalizzazione ricamo","Ricamo personalizzato con nome","Ricamo standard","Pulizia ricamo"],
+  "Stampa": ["Materiale in arrivo","Pronto per la stampa","Stampa DTF","Stampa taglio","Stampa digitale","Stampa sublimata"],
+  "Ricamo": ["Digitalizzazione ricamo","Ricamo personalizzato con nome","Ricamo standard","Pulizia ricamo"],
   "Allestimenti": ["Materiale da ordinare","Sopralluogo/misure","Mimaki","Summa","Montaggio","Piccola produzione"],
   "Gadget": ["UV","Laser","Sublimatica","Materiale da ordinare","Nel carrello"],
   "Piccolo Formato": ["Materiale da ordinare","File pronto per la stampa","Stampa","Taglio/rifinitura","Confezionamento"],
@@ -293,7 +295,7 @@ function toDbRow(collection, o){
   switch(collection){
     case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null};
     case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito};
-    case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, materiale_ordinato:!!o.materialeOrdinato, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[]};
+    case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
     case "warehouse": return {id:o.id, codice:o.codice||null, nome:o.nome||null, categoria:o.categoria||null, colore:o.colore||null, taglia:o.taglia||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
     case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
@@ -306,7 +308,7 @@ function fromDbRow(collection, r){
     case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||""};
     case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito};
     case "orders": {
-      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:r.worker||"", stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, materialeOrdinato:!!r.materiale_ordinato, fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], createdAt:r.created_at};
+      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:r.worker||"", stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:r.metodo};
@@ -420,9 +422,9 @@ function orderWorkersLabel(o){ return o.worker || "non assegnato"; }
 function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, consegnaTipo){
   const order = {id, clientId, descrizione, worker, stato, dataConsegna,
     righe: (righe && righe.length) ? righe : [emptyRiga(true)],
-    ivaApplicata:false, daFatturare:false, importante:false, sconto:0, costoSpedizione:0, clienteAvvisato:false, materialeOrdinato:false, fatturato:false,
+    ivaApplicata:false, daFatturare:false, importante:false, sconto:0, costoSpedizione:0, clienteAvvisato:false, fatturato:false,
     consegnaTipo: consegnaTipo || "Ritiro in sede", spedito:false,
-    fasi: [], note:""};
+    fasi: [], magazzino: [], note:""};
   recalcFasi(order);
   return order;
 }
@@ -506,7 +508,7 @@ function renderDashboard(){
   const daSpedire = state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato");
   const daFatturare = state.orders.filter(o=>o.daFatturare && !o.fatturato);
   const ordiniImportanti = state.orders.filter(o=>o.importante && o.stato!=="Consegnato");
-  const materialeDaOrdinare = state.orders.filter(o=>o.stato!=="Consegnato" && !o.materialeOrdinato && o.fasi.some(f=>f.nome==="Materiale da ordinare" && f.completata));
+  const magazzinoDaOrdinare = computeMagazzinoDaOrdinare();
   const daAvvisare = state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato);
   const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>o.worker===w && o.stato!=="Consegnato").length}));
   const oggi = today();
@@ -520,7 +522,7 @@ function renderDashboard(){
       <div class="card stat clickable" onclick="openDashboardList('spedire')"><p class="stat-label">Da spedire</p><p class="stat-value" style="${daSpedire.length?'color:var(--teal)':''}">${daSpedire.length}</p><p class="stat-sub">ordini con consegna a spedizione</p></div>
       <div class="card stat clickable" onclick="openDashboardList('fatturare')"><p class="stat-label">Schede da fatturare</p><p class="stat-value" style="${daFatturare.length?'color:var(--accent)':''}">${daFatturare.length}</p><p class="stat-sub">contrassegnate "da fatturare"</p></div>
       <div class="card stat clickable" onclick="openDashboardList('importanti')"><p class="stat-label">Ordini importanti</p><p class="stat-value" style="${ordiniImportanti.length?'color:var(--accent)':''}">${ordiniImportanti.length}</p><p class="stat-sub">segnalati con la stella ★</p></div>
-      <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${materialeDaOrdinare.length?'color:var(--teal)':''}">${materialeDaOrdinare.length}</p><p class="stat-sub">schede in attesa di materiale</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${magazzinoDaOrdinare.length?'color:var(--teal)':''}">${magazzinoDaOrdinare.length}</p><p class="stat-sub">articoli mancanti in magazzino</p></div>
       <div class="card stat clickable" onclick="openDashboardList('avvisare')"><p class="stat-label">Cliente da avvisare</p><p class="stat-value" style="${daAvvisare.length?'color:var(--warn)':''}">${daAvvisare.length}</p><p class="stat-sub">lavori completati non ancora comunicati</p></div>
       <div class="card stat clickable" onclick="openDashboardList('preventivi')"><p class="stat-label">Preventivi in attesa</p><p class="stat-value">${preventiviAperti}</p><p class="stat-sub">bozza o inviati</p></div>
       <div class="card stat clickable" onclick="openDashboardList('scorte')"><p class="stat-label">Articoli sotto scorta</p><p class="stat-value" style="${scorteBasse.length?'color:var(--danger)':''}">${scorteBasse.length}</p><p class="stat-sub">su ${state.warehouse.length} in magazzino</p></div>
@@ -617,7 +619,7 @@ function openDashboardList(type){
     spedire: {title:"Ordini da spedire", items: state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato")},
     fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato)},
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
-    materiale: {title:"Materiale da ordinare", items: state.orders.filter(o=>o.stato!=="Consegnato" && !o.materialeOrdinato && o.fasi.some(f=>f.nome==="Materiale da ordinare" && f.completata))},
+    materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
     avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato)},
     preventivi: {title:"Preventivi in attesa", items: state.quotes.filter(q=>q.stato==="Bozza"||q.stato==="Inviato"), isQuote:true},
     scorte: {title:"Articoli sotto scorta", items: state.warehouse.filter(w=>Number(w.quantita)<=Number(w.scortaMinima)), isStock:true}
@@ -629,6 +631,12 @@ function openDashboardList(type){
       <div class="list-row" onclick="closeModal(); goTo('magazzino');">
         <div><div class="lr-main">${w.nome}</div><div class="lr-sub">${w.categoria}</div></div>
         <div class="lr-sub low-stock">${w.quantita} ${w.unita} (min. ${w.scortaMinima})</div>
+      </div>`).join("");
+  } else if(cfg.isMagazzino){
+    rows = cfg.items.map(({order,entry})=>`
+      <div class="list-row" onclick="openJobCard('${order.id}')">
+        <div><div class="lr-main">${clientName(order.clientId)} ${order.numero?('#'+order.numero):''}</div><div class="lr-sub">${entry.codice||''} — ${entry.colore||''} — ${entry.taglia||''}</div></div>
+        <div class="lr-sub" style="color:var(--danger);font-weight:600;">${entry.quantita} pz mancanti</div>
       </div>`).join("");
   } else if(cfg.isQuote){
     rows = cfg.items.map(q=>`
@@ -1014,10 +1022,107 @@ function prodottoOptions(categoria, selected){
   const opts = PRODOTTI_PER_CATEGORIA[categoria] || [];
   return `<option value="">Seleziona…</option>` + opts.map(p=>`<option value="${p}" ${p===selected?'selected':''}>${p}</option>`).join("");
 }
-function warehouseArticoloOptions(prodotto, selected){
-  const items = state.warehouse.filter(w=>w.categoria===prodotto);
-  if(!items.length) return `<option value="">Nessun articolo in magazzino</option>`;
-  return `<option value="">Da magazzino (facoltativo)…</option>` + items.map(w=>`<option value="${w.id}" ${w.id===selected?'selected':''}>${w.codice||''} ${w.colore||''} ${w.taglia||''} (${w.quantita} pz)</option>`).join("");
+function magazzinoAllowedCategorie(o){
+  const set = new Set();
+  o.righe.forEach(r=>{
+    if(r.categoria==='Stampa' && r.prodotto) set.add(r.prodotto);
+    if(r.categoria==='Ricamo' && r.prodotto && r.prodotto!=='Patch') set.add(r.prodotto);
+  });
+  return set;
+}
+function magazzinoCodiceOptions(allowedSet, selected){
+  const codes = [...new Set(state.warehouse.filter(w=>allowedSet.has(w.categoria)).map(w=>w.codice))].filter(Boolean).sort();
+  return `<option value="">Seleziona codice…</option>` + codes.map(c=>{
+    const sample = state.warehouse.find(w=>w.codice===c);
+    return `<option value="${c}" ${c===selected?'selected':''}>${c} — ${sample?sample.nome:''}</option>`;
+  }).join("");
+}
+function magazzinoColoreOptions(codice, selected){
+  if(!codice) return `<option value="">—</option>`;
+  const colors = [...new Set(state.warehouse.filter(w=>w.codice===codice).map(w=>w.colore))].filter(Boolean).sort();
+  return `<option value="">Seleziona colore…</option>` + colors.map(c=>`<option value="${c}" ${c===selected?'selected':''}>${c}</option>`).join("");
+}
+function magazzinoTagliaOptions(codice, colore, selected){
+  if(!codice || !colore) return `<option value="">—</option>`;
+  const sizes = [...new Set(state.warehouse.filter(w=>w.codice===codice && w.colore===colore).map(w=>w.taglia))].filter(Boolean);
+  return `<option value="">Seleziona taglia…</option>` + sizes.map(s=>`<option value="${s}" ${s===selected?'selected':''}>${s}</option>`).join("");
+}
+function tryStornoMagazzino(entry){
+  if(entry.stornato && entry.articoloId && entry._reservedQty){ adjustWarehouseQty(entry.articoloId, entry._reservedQty); }
+  entry.stornato = false; entry._reservedQty = 0; entry.articoloId = "";
+  if(!entry.codice || !entry.colore || !entry.taglia || !entry.quantita) return;
+  const w = state.warehouse.find(x=>x.codice===entry.codice && x.colore===entry.colore && x.taglia===entry.taglia);
+  if(w && Number(w.quantita) >= Number(entry.quantita)){
+    w.quantita = Number(w.quantita) - Number(entry.quantita);
+    entry.stornato = true;
+    entry._reservedQty = Number(entry.quantita);
+    entry.articoloId = w.id;
+  }
+}
+function addMagazzinoRiga(orderId){
+  const o = findItem('orders', orderId);
+  if(!o.magazzino) o.magazzino = [];
+  o.magazzino.push({id:uid(), codice:"", colore:"", taglia:"", quantita:1, stornato:false, _reservedQty:0, articoloId:""});
+  saveState('orders');
+  openJobCard(orderId);
+}
+function removeMagazzinoRiga(orderId, rigaId){
+  const o = findItem('orders', orderId);
+  const entry = o.magazzino.find(m=>m.id===rigaId);
+  if(entry && entry.stornato && entry.articoloId && entry._reservedQty){ adjustWarehouseQty(entry.articoloId, entry._reservedQty); saveState('warehouse'); }
+  o.magazzino = o.magazzino.filter(m=>m.id!==rigaId);
+  saveState('orders');
+  openJobCard(orderId);
+}
+function updateMagazzinoField(orderId, rigaId, field, value){
+  const o = findItem('orders', orderId);
+  const entry = o.magazzino.find(m=>m.id===rigaId);
+  if(field==='codice'){ entry.codice = value; entry.colore=""; entry.taglia=""; }
+  else if(field==='colore'){ entry.colore = value; entry.taglia=""; }
+  else if(field==='taglia'){ entry.taglia = value; }
+  else if(field==='quantita'){ entry.quantita = Number(value)||0; }
+  tryStornoMagazzino(entry);
+  saveState('orders'); saveState('warehouse');
+  openJobCard(orderId);
+}
+function computeMagazzinoDaOrdinare(){
+  const list = [];
+  state.orders.filter(o=>o.stato!=='Consegnato').forEach(order=>{
+    (order.magazzino||[]).forEach(entry=>{
+      if(entry.codice && entry.colore && entry.taglia && entry.quantita>0 && !entry.stornato){
+        list.push({order, entry});
+      }
+    });
+  });
+  return list;
+}
+function renderMagazzinoSection(o){
+  const allowed = magazzinoAllowedCategorie(o);
+  if(!allowed.size) return "";
+  const entries = o.magazzino || [];
+  return `
+    <div class="modal-section">
+      <h3>Magazzino</h3>
+      ${entries.length ? `
+      <div style="overflow-x:auto;">
+      <table class="lines-table">
+        <thead><tr><th>Codice</th><th>Colore</th><th>Taglia</th><th>Quantità</th><th>Disponibilità</th><th></th></tr></thead>
+        <tbody>
+          ${entries.map(m=>`
+            <tr>
+              <td><select class="inline" onchange="updateMagazzinoField('${o.id}','${m.id}','codice',this.value)">${magazzinoCodiceOptions(allowed, m.codice)}</select></td>
+              <td><select class="inline" onchange="updateMagazzinoField('${o.id}','${m.id}','colore',this.value)">${magazzinoColoreOptions(m.codice, m.colore)}</select></td>
+              <td><select class="inline" onchange="updateMagazzinoField('${o.id}','${m.id}','taglia',this.value)">${magazzinoTagliaOptions(m.codice, m.colore, m.taglia)}</select></td>
+              <td><input class="num" type="number" min="1" value="${m.quantita}" onchange="updateMagazzinoField('${o.id}','${m.id}','quantita',this.value)"></td>
+              <td>${m.codice && m.colore && m.taglia ? (m.stornato ? `<span class="pill pill-done">Disponibile</span>` : `<span style="color:var(--danger);font-weight:700;">Non disponibile</span> <button class="btn btn-outline btn-sm" style="margin-left:6px;border-color:var(--danger);color:var(--danger);" onclick="showToast('Già segnalato nel widget Materiale da ordinare della dashboard')">DA ORDINARE</button>`) : `<span style="color:var(--muted);">—</span>`}</td>
+              <td><button class="btn btn-ghost btn-sm" onclick="removeMagazzinoRiga('${o.id}','${m.id}')">✕</button></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+      </div>` : `<p class="empty" style="padding:6px 0;">Nessun prodotto selezionato dal magazzino.</p>`}
+      <button class="btn btn-outline btn-sm" onclick="addMagazzinoRiga('${o.id}')">+ Seleziona prodotto</button>
+    </div>
+  `;
 }
 function workerOptions(selected){ return `<option value="">Non assegnato</option>` + WORKERS.map(w=>`<option value="${w}" ${w===selected?'selected':''}>${w}</option>`).join(""); }
 
@@ -1038,7 +1143,7 @@ function linesEditor(collection, id, righe){
         ${righe.map(r=>`
           <tr>
             ${isOrder ? `<td><select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">${categoryOptions(r.categoria, true)}</select></td>
-            <td>${PRODOTTI_PER_CATEGORIA[r.categoria] ? `<select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">${prodottoOptions(r.categoria, r.prodotto)}</select>${(r.categoria==='Stampa'||r.categoria==='Ricamo') && r.prodotto ? `<select class="inline" style="margin-top:6px;font-size:12.5px;" onchange="updateRigaField('${collection}','${id}','${r.id}','articoloId',this.value)">${warehouseArticoloOptions(r.prodotto, r.articoloId)}</select>` : ``}` : `<span style="color:var(--muted);">—</span>`}</td>` : `<td><input class="desc-input" value="${r.descrizione||''}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>`}
+            <td>${PRODOTTI_PER_CATEGORIA[r.categoria] ? `<select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">${prodottoOptions(r.categoria, r.prodotto)}</select>` : `<span style="color:var(--muted);">—</span>`}</td>` : `<td><input class="desc-input" value="${r.descrizione||''}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>`}
             <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
             <td class="num"><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)"></td>
             <td class="num" style="padding-top:8px;">${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</td>
@@ -1061,8 +1166,6 @@ function addRiga(collection, id){
 }
 function removeRiga(collection, id, rigaId){
   const item = findItem(collection, id);
-  const riga = item.righe.find(r=>r.id===rigaId);
-  if(collection==='orders' && riga){ releaseArticoloReservation(riga); saveState('warehouse'); }
   item.righe = item.righe.filter(r=>r.id!==rigaId);
   if(collection==='orders') recalcFasi(item);
   saveState(collection);
@@ -1074,39 +1177,13 @@ function adjustWarehouseQty(articoloId, delta){
   if(!w) return;
   w.quantita = Math.max(0, Number(w.quantita) + delta);
 }
-function releaseArticoloReservation(riga){
-  if(riga.articoloId && riga._reservedQty){ adjustWarehouseQty(riga.articoloId, riga._reservedQty); }
-  riga.articoloId = "";
-  riga._reservedQty = 0;
-}
 function updateRigaField(collection, id, rigaId, field, value){
   const item = findItem(collection, id);
   const riga = item.righe.find(r=>r.id===rigaId);
-  const isOrderCollection = collection==='orders';
-
-  if(isOrderCollection && field==='articoloId'){
-    if(riga.articoloId && riga._reservedQty) adjustWarehouseQty(riga.articoloId, riga._reservedQty);
-    riga.articoloId = value;
-    riga._reservedQty = value ? (Number(riga.quantita)||0) : 0;
-    if(value) adjustWarehouseQty(value, -riga._reservedQty);
-    saveState(collection); saveState('warehouse');
-    openJobCard(id);
-    return;
-  }
-  if(isOrderCollection && field==='prodotto'){ releaseArticoloReservation(riga); }
-  if(isOrderCollection && field==='categoria'){ releaseArticoloReservation(riga); riga.prodotto = ""; }
-
   riga[field] = (field==='quantita'||field==='prezzoUnitario') ? Number(value)||0 : value;
-
-  if(isOrderCollection && field==='quantita' && riga.articoloId){
-    const newQty = Number(riga.quantita)||0;
-    adjustWarehouseQty(riga.articoloId, riga._reservedQty - newQty);
-    riga._reservedQty = newQty;
-    saveState('warehouse');
-  }
-  if(isOrderCollection && field==='categoria') recalcFasi(item);
+  if(collection==='orders' && field==='categoria'){ recalcFasi(item); riga.prodotto = ""; }
   saveState(collection);
-  if(isOrderCollection) openJobCard(id); else openQuoteDetail(id);
+  if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
 }
 
 
@@ -1282,7 +1359,7 @@ function deleteOrder(id){
   askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati.", ()=>{
     const paymentIds = state.payments.filter(p=>p.orderId===id).map(p=>p.id);
     const order = findItem('orders', id);
-    if(order){ order.righe.forEach(r=>{ if(r.articoloId && r._reservedQty) adjustWarehouseQty(r.articoloId, r._reservedQty); }); saveState('warehouse'); }
+    if(order){ (order.magazzino||[]).forEach(m=>{ if(m.stornato && m._reservedQty) adjustWarehouseQty(m.articoloId, m._reservedQty); }); saveState('warehouse'); }
     state.orders = state.orders.filter(o=>o.id!==id);
     state.payments = state.payments.filter(p=>p.orderId!==id);
     dbDelete('orders', id); dbDeleteMany('payments', paymentIds);
@@ -1375,7 +1452,6 @@ function openJobCard(orderId){
       <div class="jobcard-flags">
         <label class="checkfield"><input type="checkbox" ${o.importante?'checked':''} onchange="updateOrderCheck('${o.id}','importante',this.checked)"> <span class="star ${o.importante?'active':''}" style="font-size:18px;">★</span> Importante</label>
         ${o.consegnaTipo==="Spedizione" ? `<label class="checkfield"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Spedito</label>` : ``}
-        ${o.fasi.some(f=>f.nome==="Materiale da ordinare" && f.completata) ? `<label class="checkfield"><input type="checkbox" ${o.materialeOrdinato?'checked':''} onchange="updateOrderCheck('${o.id}','materialeOrdinato',this.checked)"> Materiale ordinato</label>` : ``}
         ${o.daFatturare ? `<label class="checkfield"><input type="checkbox" ${o.fatturato?'checked':''} onchange="updateOrderCheck('${o.id}','fatturato',this.checked)"> Fatturato</label>` : ``}
         ${o.stato==="Completato" ? `<label class="checkfield"><input type="checkbox" ${o.clienteAvvisato?'checked':''} onchange="updateOrderCheck('${o.id}','clienteAvvisato',this.checked)"> Cliente avvisato</label>` : ``}
       </div>
@@ -1391,6 +1467,8 @@ function openJobCard(orderId){
       <p class="helptext" style="margin-top:-4px;">Ogni riga ha una propria categoria di lavoro.${o.righe.length>1 ? ' Scegli lo stato di ciascuna riga dal menu colorato.' : ''}</p>
       ${linesEditor('orders', o.id, o.righe)}
     </div>
+
+    ${renderMagazzinoSection(o)}
 
     <div class="modal-section">
       <h3>Descrizione generale del lavoro</h3>
@@ -1525,6 +1603,13 @@ function renderMagazzino(){
   const q = magazzinoSearch.toLowerCase();
   const list = state.warehouse.filter(w => !q || (w.codice||"").toLowerCase().includes(q) || (w.nome||"").toLowerCase().includes(q) || (w.colore||"").toLowerCase().includes(q));
   document.getElementById("view-magazzino").innerHTML = `
+    <div class="form-panel" id="pdfImportForm">
+      <h3>Importa DDT Action Wear (PDF)</h3>
+      <p class="helptext" style="margin-top:0;">Riconosce automaticamente codice, colore, taglia e quantità dal formato dei DDT Action Wear. Controlla sempre l'anteprima prima di confermare.</p>
+      <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfImport(event)">
+      <p id="pdfImportStatus" class="helptext"></p>
+      <div id="pdfImportPreview"></div>
+    </div>
     <div class="form-panel" id="itemForm">
       <h3>Nuovo articolo</h3>
       <div class="form-grid">
@@ -1543,6 +1628,10 @@ function renderMagazzino(){
     </div>
     <div class="section-header">
       <div class="filters"><input class="inline" style="min-width:220px;" placeholder="Cerca per codice, nome o colore…" value="${magazzinoSearch}" oninput="magazzinoSearch=this.value; renderMagazzino();"></div>
+      <div class="filters">
+        <button class="btn btn-outline" onclick="toggleForm('pdfImportForm')">📄 Importa da DDT (PDF)</button>
+        <button class="btn btn-outline" onclick="toggleForm('itemForm')">+ Nuovo articolo</button>
+      </div>
     </div>
     <div class="table-wrap">
       <table>
@@ -1552,11 +1641,13 @@ function renderMagazzino(){
             const low = Number(w.quantita) <= Number(w.scortaMinima);
             return `<tr>
               <td style="font-weight:700;">${w.codice||"—"}</td>
-              <td>${w.nome}</td><td>${w.categoria||"—"}</td><td>${w.colore||"—"}</td><td>${w.taglia||"—"}</td>
-              <td class="${low?'low-stock':''}"><input type="number" min="0" value="${w.quantita}" style="width:70px;" onchange="updateWarehouseField('${w.id}','quantita',this.value)"> ${w.unita}</td>
-              <td><input type="number" min="0" value="${w.scortaMinima}" style="width:70px;" onchange="updateWarehouseField('${w.id}','scortaMinima',this.value)"> ${w.unita}</td>
+              <td><input id="wn-${w.id}" value="${w.nome||''}" style="min-width:160px;"></td>
+              <td>${w.categoria||"—"}</td><td>${w.colore||"—"}</td><td>${w.taglia||"—"}</td>
+              <td class="${low?'low-stock':''}"><input id="wq-${w.id}" type="number" min="0" value="${w.quantita}" style="width:70px;"> ${w.unita}</td>
+              <td><input id="wm-${w.id}" type="number" min="0" value="${w.scortaMinima}" style="width:70px;"> ${w.unita}</td>
               <td>${low?'<span class="pill pill-open">Sotto scorta</span>':'<span class="pill pill-done">OK</span>'}</td>
               <td style="white-space:nowrap;">
+                <button class="btn btn-primary btn-sm" onclick="saveWarehouseRow('${w.id}')">Aggiorna</button>
                 <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',1)">+1</button>
                 <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',-1)">-1</button>
                 <button class="btn btn-ghost btn-sm" onclick="deleteItem('${w.id}')">Elimina</button>
@@ -1568,10 +1659,14 @@ function renderMagazzino(){
     </div>
   `;
 }
-function updateWarehouseField(id, field, value){
+function saveWarehouseRow(id){
   const w = findItem('warehouse', id);
-  w[field] = Number(value)||0;
+  w.nome = document.getElementById(`wn-${id}`).value.trim();
+  w.quantita = Number(document.getElementById(`wq-${id}`).value)||0;
+  w.scortaMinima = Number(document.getElementById(`wm-${id}`).value)||0;
   saveState('warehouse');
+  renderMagazzino();
+  showToast("Articolo aggiornato");
 }
 function addItem(){
   const nome = document.getElementById("if-nome").value.trim();
@@ -1592,6 +1687,121 @@ function deleteItem(id){
   askConfirm("Eliminare questo articolo?", ()=>{
     state.warehouse = state.warehouse.filter(w=>w.id!==id); dbDelete('warehouse', id); renderMagazzino();
   });
+}
+
+/* ============ IMPORT DDT ACTION WEAR DA PDF ============ */
+let pdfParsedRows = [];
+async function extractPdfLines(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const allLines = [];
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const groups = {};
+    content.items.forEach(it=>{
+      const y = Math.round(it.transform[5]/3)*3;
+      (groups[y] = groups[y]||[]).push({str:it.str, x:it.transform[4]});
+    });
+    Object.keys(groups).map(Number).sort((a,b)=>b-a).forEach(y=>{
+      const line = groups[y].sort((a,b)=>a.x-b.x).map(i=>i.str).join(" ").replace(/\s+/g," ").trim();
+      if(line) allLines.push(line);
+    });
+  }
+  return allLines;
+}
+function guessArticoloCategoria(nome){
+  const n = nome.toLowerCase();
+  if(n.includes("t-shirt") || n.includes("t kids") || n.includes("tshirt")) return "T-shirt";
+  if(n.includes("polo")) return "Polo";
+  if(n.includes("jacket") || n.includes("felpa") || n.includes("hoodie") || n.includes("sweat") || n.includes("zip")) return "Felpa";
+  if(n.includes("bag") || n.includes("shopper")) return "Shopper";
+  if(n.includes("cap") || n.includes("hat") || n.includes("five")) return "Cappello";
+  return "Altro tessuto";
+}
+function parseActionWearLines(lines){
+  const lineRe = /^([A-Z0-9]{3,10})\s+([A-Z]{2,4})\s+\d{5,7}\s+(.+?)\s+N\.\s+(\d+)\s*$/;
+  const sizeRe = /(\S+)\/(\d+)/g;
+  const results = [];
+  for(let i=0;i<lines.length;i++){
+    const m = lines[i].match(lineRe);
+    if(!m) continue;
+    const [, codice, colore, nomeRaw, qtaTotale] = m;
+    const nome = nomeRaw.trim();
+    const nextLine = lines[i+1] || "";
+    const sizes = [...nextLine.matchAll(sizeRe)];
+    if(sizes.length){
+      sizes.forEach(s=>{
+        results.push({codice, colore, nome, taglia:s[1], quantita:parseInt(s[2],10), categoria:guessArticoloCategoria(nome), include:true});
+      });
+    } else {
+      results.push({codice, colore, nome, taglia:"", quantita:parseInt(qtaTotale,10), categoria:guessArticoloCategoria(nome), include:true});
+    }
+  }
+  return results;
+}
+async function handlePdfImport(evt){
+  const file = evt.target.files[0]; if(!file) return;
+  const statusEl = document.getElementById("pdfImportStatus");
+  statusEl.textContent = "Lettura del PDF in corso…";
+  try{
+    const lines = await extractPdfLines(file);
+    pdfParsedRows = parseActionWearLines(lines);
+    if(!pdfParsedRows.length){
+      statusEl.textContent = "Non ho riconosciuto articoli in questo PDF. Controlla che sia un DDT Action Wear nello stesso formato, oppure mandamelo in chat.";
+      document.getElementById("pdfImportPreview").innerHTML = "";
+      return;
+    }
+    statusEl.textContent = `Trovate ${pdfParsedRows.length} righe. Controlla e correggi prima di confermare.`;
+    renderPdfPreview();
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = "Errore nella lettura del PDF. Prova a mandarmelo in chat invece.";
+  }
+}
+function renderPdfPreview(){
+  document.getElementById("pdfImportPreview").innerHTML = `
+    <div class="table-wrap" style="margin-top:12px;">
+      <table class="lines-table">
+        <thead><tr><th></th><th>Codice</th><th>Nome</th><th>Categoria</th><th>Colore</th><th>Taglia</th><th>Quantità</th></tr></thead>
+        <tbody>
+          ${pdfParsedRows.map((r,i)=>`
+            <tr>
+              <td><input type="checkbox" ${r.include?'checked':''} onchange="pdfParsedRows[${i}].include=this.checked"></td>
+              <td><input value="${r.codice}" onchange="pdfParsedRows[${i}].codice=this.value"></td>
+              <td><input value="${r.nome}" onchange="pdfParsedRows[${i}].nome=this.value"></td>
+              <td><select onchange="pdfParsedRows[${i}].categoria=this.value">${warehouseCategoryOptions(r.categoria)}</select></td>
+              <td><input value="${r.colore}" onchange="pdfParsedRows[${i}].colore=this.value"></td>
+              <td><input value="${r.taglia}" onchange="pdfParsedRows[${i}].taglia=this.value"></td>
+              <td><input type="number" min="0" value="${r.quantita}" onchange="pdfParsedRows[${i}].quantita=Number(this.value)||0"></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="form-actions" style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="confirmPdfImport()">Conferma e importa nel magazzino</button>
+      <button class="btn btn-outline" onclick="pdfParsedRows=[]; document.getElementById('pdfImportPreview').innerHTML=''; document.getElementById('pdfImportStatus').textContent=''; document.getElementById('pdfFileInput').value='';">Annulla</button>
+    </div>
+  `;
+}
+function confirmPdfImport(){
+  const toInclude = pdfParsedRows.filter(r=>r.include);
+  toInclude.forEach(r=>{
+    const existing = state.warehouse.find(w => w.codice===r.codice && w.colore===r.colore && w.taglia===r.taglia);
+    if(existing){
+      existing.quantita = Number(existing.quantita) + Number(r.quantita);
+      existing.nome = existing.nome || r.nome;
+      if(!existing.categoria) existing.categoria = r.categoria;
+    } else {
+      state.warehouse.push({id:uid(), codice:r.codice, nome:r.nome, categoria:r.categoria, colore:r.colore, taglia:r.taglia, unita:"pz", quantita:r.quantita, scortaMinima:0});
+    }
+  });
+  saveState('warehouse');
+  pdfParsedRows = [];
+  toggleForm('pdfImportForm');
+  document.getElementById('pdfFileInput').value = "";
+  renderMagazzino();
+  showToast(`${toInclude.length} articoli importati/aggiornati in magazzino`);
 }
 
 /* ============ INCASSI / REPORT PAGAMENTI ============ */
