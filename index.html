@@ -16,8 +16,7 @@
     --radius-card:10px; --radius-pill:999px;
   }
   *{box-sizing:border-box;}
-  html,body{width:100%;min-height:100%;}
-  body{margin:0;background:var(--paper);color:var(--text);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+  body{margin:0;background:var(--paper);color:var(--text);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
   h1,h2,h3,.brand{font-family:'Space Grotesk',system-ui,sans-serif;}
   #app{display:flex;min-height:100vh;}
   aside.sidebar{width:236px;flex-shrink:0;background:var(--sidebar-bg);color:var(--text);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;}
@@ -124,6 +123,8 @@
   .kanban-col{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card);padding:12px;min-width:250px;}
   .kanban-col h4{margin:2px 8px 12px;font-size:13.5px;color:var(--muted);display:flex;justify-content:space-between;font-weight:600;}
   .job-card{background:var(--paper);border:1px solid var(--border);border-radius:9px;padding:14px;margin-bottom:12px;border-top:4px dashed var(--accent);font-size:14px;cursor:pointer;}
+  .job-card.job-card-business{border-top-color:#1D5A9E;}
+  .job-card.job-card-family{border-top-color:#B9660C;}
   .job-card:hover{border-color:var(--accent);}
   .job-card.job-card-importante{border:2px solid #F1C40F;border-top:4px solid #F1C40F;background:#FFFBEB;box-shadow:0 2px 8px rgba(241,196,15,.25);}
   .job-card .jc-star{color:#B8860B;font-size:11.5px;font-weight:800;letter-spacing:.4px;margin-bottom:6px;}
@@ -141,7 +142,9 @@
   .jobcard-flags{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
   .jobcard-flags .checkfield{font-size:13px;white-space:nowrap;gap:6px;}
   .ticket-meta-big{grid-template-columns:1fr 1fr 1fr;}
-  .inline-big{font-size:16px !important;padding:10px 12px !important;font-weight:700;}
+  .inline-big{font-size:19px !important;padding:13px 14px !important;font-weight:700;}
+  input[type="date"].inline-big{font-size:19px !important;padding:13px 14px !important;}
+  input[type="date"].inline-big::-webkit-calendar-picker-indicator{transform:scale(1.5);margin-left:8px;cursor:pointer;}
   .status-select-big{border:none;border-radius:7px;}
   @media(max-width:700px){.ticket-meta-big{grid-template-columns:1fr;}}
   .modal h3{font-size:18.5px;font-weight:800;margin:22px 0 12px;}
@@ -163,18 +166,18 @@
   a.link{color:var(--teal);text-decoration:none;font-weight:600;}
   .helptext{font-size:12.5px;color:var(--muted);margin-top:-6px;margin-bottom:14px;line-height:1.5;}
   .lines-table{width:100%;border-collapse:collapse;margin-bottom:10px;}
-  .lines-table th{font-size:12.5px;padding:8px 8px;}
-  .lines-table td{padding:8px 8px;border-bottom:none;}
+  .lines-table th{font-size:14px;padding:8px 10px;}
+  .lines-table td{padding:10px 10px;border-bottom:none;}
   .lines-table input{width:100%;padding:9px 10px;font-size:15px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);}
   .lines-table .num{width:78px;}
   .lines-table .desc-input{min-width:260px;font-weight:600;}
-  .riga-categoria-select{width:100%;min-width:170px;padding:9px 10px;font-size:14.5px;font-weight:700;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);}
+  .riga-categoria-select{width:100%;min-width:190px;padding:12px 12px;font-size:17px;font-weight:700;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--text);}
   .totals-box{background:var(--card);border-radius:8px;padding:14px 18px;margin:12px 0 16px;font-size:15px;}
   .totals-box .trow{display:flex;justify-content:space-between;padding:4px 0;}
   .totals-box .trow.grand{font-weight:700;font-size:19px;border-top:1px solid var(--border);margin-top:8px;padding-top:10px;}
   .pay-list{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;}
   .pay-row{display:flex;justify-content:space-between;align-items:center;background:var(--card);border-radius:6px;padding:9px 12px;font-size:14.5px;}
-  .login-screen{position:fixed;inset:0;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;background:var(--paper);z-index:9999;padding:20px;}
+  .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--paper);}
   .login-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:32px;width:100%;max-width:360px;}
 </style>
 </head>
@@ -262,7 +265,7 @@ const STEP_TEMPLATES = {
 const PAY_METHODS = ["Bonifico","Contanti","Carta"];
 const PAY_TIPI = ["Acconto","Saldo"];
 const CLIENT_TYPES = ["Business","Family"];
-const SETTORI = ["Ristorazione","Eventi / Marketing","Associazione Sportiva","Danza","Palestra","Fisioterapia","Medicina Estetica","Medico","Ospedale","Università","Scuola/Parrocchia","Editoria","Cinema/Spettacolo","Piccolo Commerciante","Hotellerie","Legale/Tributario/Assicurativo","Lusso","Tecnologico","Arte","Agenzia","Automotive","Edile","Agenzia Viaggi/Auto/Funebre","Cura Persona"];
+const SETTORI = ["Agenzia", "Agenzia Viaggi/Auto/Funebre", "Arte", "Associazione Sportiva", "Automotive", "Cinema/Spettacolo", "Cura Persona", "Danza", "Edile", "Editoria", "Eventi / Marketing", "Fisioterapia", "Hotellerie", "Legale/Tributario/Assicurativo", "Lusso", "Medicina Estetica", "Medico", "Ospedale", "Palestra", "Piccolo Commerciante", "Ristorazione", "Scuola/Parrocchia", "Tecnologico", "Università"];
 const CONSEGNA_TIPI = ["Ritiro in sede","Spedizione"];
 
 /* ============ STATO ============ */
@@ -658,14 +661,15 @@ function clientFieldsHTML(prefix, existing){
       </div>
     </div>
     <div class="form-grid" id="${prefix}-business" style="margin-top:12px;">
-      <div class="field"><label>Ragione sociale / Nome azienda</label><input id="${prefix}-ragsoc" placeholder="Es. Bar Centrale Srl" value="${e.ragioneSociale||''}"></div>
-      <div class="field"><label>Nome</label><input id="${prefix}-refnome" value="${e.refNome||''}"></div>
-      <div class="field"><label>Cognome</label><input id="${prefix}-refcognome" value="${e.refCognome||''}"></div>
+      <div class="field"><label>Ragione sociale / Nome azienda</label><input id="${prefix}-ragsoc" placeholder="Es. Bar Centrale Srl" value="${e.ragioneSociale||''}" oninput="checkDuplicateClient('${prefix}')"></div>
+      <div class="field"><label>Nome</label><input id="${prefix}-refnome" value="${e.refNome||''}" oninput="checkDuplicateClient('${prefix}')"></div>
+      <div class="field"><label>Cognome</label><input id="${prefix}-refcognome" value="${e.refCognome||''}" oninput="checkDuplicateClient('${prefix}')"></div>
     </div>
     <div class="form-grid" id="${prefix}-family" style="margin-top:12px;display:none;">
-      <div class="field"><label>Nome</label><input id="${prefix}-nome" value="${e.nome||''}"></div>
-      <div class="field"><label>Cognome</label><input id="${prefix}-cognome" value="${e.cognome||''}"></div>
+      <div class="field"><label>Nome</label><input id="${prefix}-nome" value="${e.nome||''}" oninput="checkDuplicateClient('${prefix}')"></div>
+      <div class="field"><label>Cognome</label><input id="${prefix}-cognome" value="${e.cognome||''}" oninput="checkDuplicateClient('${prefix}')"></div>
     </div>
+    <p id="${prefix}-dup-warning" style="display:none;color:var(--warn);font-size:13px;font-weight:600;margin:-6px 0 10px;">⚠ Esiste già un cliente con un nome simile</p>
     <div class="form-grid" style="margin-top:12px;">
       <div class="field"><label>Telefono</label><input id="${prefix}-telefono" value="${e.telefono||''}"></div>
       <div class="field"><label>Email</label><input id="${prefix}-email" type="email" value="${e.email||''}"></div>
@@ -693,6 +697,27 @@ function clientFieldsHTML(prefix, existing){
 function toggleFatturazione(prefix){
   const el = document.getElementById(`${prefix}-fatturazione`);
   el.style.display = el.style.display==="none" ? "block" : "none";
+}
+function checkDuplicateClient(prefix){
+  const tipoEl = document.getElementById(`${prefix}-tipo`);
+  const tipo = tipoEl ? tipoEl.value : "Business";
+  let candidate = "";
+  if(tipo==="Business"){
+    candidate = (document.getElementById(`${prefix}-ragsoc`)?.value||"").trim();
+  } else {
+    const n = (document.getElementById(`${prefix}-nome`)?.value||"").trim();
+    const c = (document.getElementById(`${prefix}-cognome`)?.value||"").trim();
+    candidate = `${n} ${c}`.trim();
+  }
+  const warningEl = document.getElementById(`${prefix}-dup-warning`);
+  if(!warningEl) return;
+  if(candidate.length < 3){ warningEl.style.display = "none"; return; }
+  const norm = s => (s||"").toLowerCase().trim();
+  const match = state.clients.some(c => {
+    const name = c.tipo==="Business" ? c.ragioneSociale : `${c.nome} ${c.cognome}`;
+    return norm(name) === norm(candidate);
+  });
+  warningEl.style.display = match ? "block" : "none";
 }
 function toggleClientTypeFields(prefix){
   const tipo = document.getElementById(`${prefix}-tipo`).value;
@@ -967,7 +992,7 @@ function linesEditor(collection, id, righe){
   return `
     <table class="lines-table">
       <thead><tr>
-        ${isOrder ? `<th style="width:170px;">Categoria</th><th style="width:170px;">Prodotto</th>` : `<th>Descrizione</th>`}
+        ${isOrder ? `<th style="width:210px;">Categoria</th><th style="width:210px;">Prodotto</th>` : `<th>Descrizione</th>`}
         <th class="num">Quantità</th><th class="num">Prezzo unit. €</th><th class="num">Totale</th>
         ${showDots ? `<th>Stato riga</th>` : ``}
         <th></th>
@@ -1209,16 +1234,19 @@ function renderFlusso(){
         const items = list.filter(o=>o.stato===st);
         return `<div class="kanban-col">
           <h4>${statusDot(st)}${st}<span>${items.length}</span></h4>
-          ${items.map(o=>`
-            <div class="job-card ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
+          ${items.map(o=>{
+            const cl = findItem('clients', o.clientId);
+            const tipoClass = cl && cl.tipo==="Family" ? "job-card-family" : "job-card-business";
+            return `
+            <div class="job-card ${tipoClass} ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
               ${o.importante ? `<div class="jc-star">★ IMPORTANTE</div>` : ``}
               <div class="jc-client">${o.numero?('#'+o.numero+' — '):''}${clientName(o.clientId)}</div>
               <div class="jc-lines">
-                ${o.righe.filter(r=>r.categoria).map(r=>`<div class="jc-line">${r.categoria}</div>`).join("") || `<div class="jc-line" style="color:var(--muted)">Nessuna categoria assegnata</div>`}
+                ${o.righe.filter(r=>r.categoria).map(r=>`<div class="jc-line">${r.categoria}${r.prodotto?' — '+r.prodotto:''} <span style="color:var(--muted);font-weight:500;">×${r.quantita}</span></div>`).join("") || `<div class="jc-line" style="color:var(--muted)">Nessuna categoria assegnata</div>`}
               </div>
-              <div class="jc-desc">${o.descrizione ? o.descrizione.slice(0,80) : ""}</div>
               <div class="jc-meta"><span>${o.worker||"n.a."}</span><span>${fmtDate(o.dataConsegna)}</span></div>
-            </div>`).join("") || `<p class="empty" style="padding:14px 4px;">Vuoto</p>`}
+            </div>`;
+          }).join("") || `<p class="empty" style="padding:14px 4px;">Vuoto</p>`}
         </div>`;
       }).join("")}
     </div>
@@ -1826,35 +1854,27 @@ async function doSignIn(){
 async function signOut(){
   await sb.auth.signOut();
   currentUser = null;
-  setAuthView(false);
+  document.getElementById("app").style.display = "none";
+  document.getElementById("loginScreen").style.display = "flex";
 }
 async function onSignedIn(session){
   currentUser = await fetchUserProfile(session.user.id, session.user.email);
-  setAuthView(true);
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("app").style.display = "flex";
   await loadAllFromSupabase();
   subscribeRealtime();
   renderNav();
   goTo("dashboard");
 }
-function setAuthView(isLoggedIn){
-  document.getElementById("loginScreen").style.display = isLoggedIn ? "none" : "flex";
-  document.getElementById("app").style.display = isLoggedIn ? "flex" : "none";
-}
-
 async function initAuth(){
   const { data } = await sb.auth.getSession();
   if(data && data.session){
     await onSignedIn(data.session);
   } else {
-    setAuthView(false);
+    document.getElementById("loginScreen").style.display = "flex";
+    document.getElementById("app").style.display = "none";
   }
 }
-
-sb.auth.onAuthStateChange((event, session) => {
-  if(event === "SIGNED_OUT") setAuthView(false);
-  if(event === "SIGNED_IN" && session) setAuthView(true);
-});
-
 initAuth();
 </script>
 </body>
