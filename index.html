@@ -2,7 +2,13 @@
 <html lang="it" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#E8552F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Gestionale">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <title>Gestionale — Agenzia Grafica &amp; Stampa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -186,6 +192,55 @@
   .pay-row{display:flex;justify-content:space-between;align-items:center;background:var(--card);border-radius:6px;padding:9px 12px;font-size:14.5px;}
   .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--paper);}
   .login-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:32px;width:100%;max-width:360px;}
+
+  /* ============ MOBILE APP / PWA ============ */
+  @media(max-width:760px){
+    html,body{min-height:100%;overscroll-behavior-y:none;}
+    body{
+      padding-top:env(safe-area-inset-top);
+      padding-bottom:env(safe-area-inset-bottom);
+      background:var(--paper);
+    }
+    #app{flex-direction:column;min-height:100dvh;}
+    aside.sidebar{
+      width:100%;height:auto;position:sticky;top:0;z-index:40;
+      padding:8px 10px;border-right:none;border-bottom:1px solid var(--border);
+      overflow:visible;background:var(--card);
+    }
+    .brand-logo{display:none;}
+    nav.tabs{
+      margin-top:0;flex-direction:row;gap:6px;overflow-x:auto;
+      -webkit-overflow-scrolling:touch;padding:2px 0 6px;scrollbar-width:none;
+    }
+    nav.tabs::-webkit-scrollbar{display:none;}
+    nav.tabs button{
+      flex:0 0 auto;padding:10px 12px;font-size:12.5px;white-space:nowrap;
+    }
+    .sidebar-footer{display:none;}
+    main{padding:14px 12px 34px;width:100%;}
+    .topbar{align-items:stretch;margin-bottom:14px;gap:10px;}
+    .topbar>div:first-child{width:100%;}
+    .topbar h1{font-size:20px;}
+    .global-search{order:3;max-width:none;width:100%;}
+    #topbarActions{width:100%;display:flex;gap:8px;flex-wrap:wrap;}
+    #topbarActions .btn{flex:1;justify-content:center;min-width:120px;}
+    .grid-2,.grid-auto{grid-template-columns:1fr;}
+    .card{padding:14px;}
+    .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    table{min-width:720px;}
+    .modal-backdrop{padding:8px;align-items:flex-start;}
+    .modal{padding:18px 14px 28px;border-radius:12px;max-width:none;}
+    .modal h2{font-size:22px;padding-right:28px;}
+    .ticket-meta,.ticket-meta-big{grid-template-columns:1fr;}
+    .lines-table{min-width:760px;}
+    .form-grid{grid-template-columns:1fr;}
+    .field input,.field select,.field textarea{font-size:16px;}
+    input.inline,select.inline{font-size:16px;}
+    .btn{min-height:42px;}
+    .kanban{grid-template-columns:repeat(5,82vw);}
+    .toast{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));text-align:center;}
+  }
+
 </style>
 </head>
 <body>
@@ -629,7 +684,7 @@ function renderTopbarActions(){
     incassi: `<button class="btn btn-primary" onclick="toggleForm('paymentForm')">+ Registra incasso</button>`,
     spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
     entrate: `<button class="btn btn-primary" onclick="toggleForm('incomeForm')">+ Nuova entrata</button>`,
-    dashboard: `<button class="btn btn-outline" onclick="exportBackup()">Esporta backup</button> <button class="btn btn-outline" onclick="signOut()">Esci (${currentUser?currentUser.email:''})</button>`
+    dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa app</button> <button class="btn btn-outline" onclick="exportBackup()">Esporta backup</button> <button class="btn btn-outline" onclick="signOut()">Esci (${currentUser?currentUser.email:''})</button>`
   };
   document.getElementById("topbarActions").innerHTML = map[currentView] || "";
 }
@@ -2885,6 +2940,112 @@ async function initAuth(){
   }
 }
 initAuth();
+
+/* ============ INSTALLAZIONE APP ============ */
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (event)=>{
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  const btn = document.getElementById("installAppBtn");
+  if(btn) btn.style.display = "inline-flex";
+});
+
+window.addEventListener("appinstalled", ()=>{
+  deferredInstallPrompt = null;
+  const btn = document.getElementById("installAppBtn");
+  if(btn) btn.style.display = "none";
+  if(typeof showToast === "function") showToast("App installata");
+});
+
+async function installPwa(){
+  if(!deferredInstallPrompt){
+    if(typeof showToast === "function") showToast("Su iPhone: Condividi → Aggiungi a schermata Home");
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  const btn = document.getElementById("installAppBtn");
+  if(btn) btn.style.display = "none";
+}
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("./service-worker.js").catch(err=>{
+      console.error("Service Worker non registrato", err);
+    });
+  });
+}
+
 </script>
 </body>
 </html>
+
+{
+  "name": "Gestionale — Grafica & Stampa",
+  "short_name": "Gestionale",
+  "description": "Gestionale clienti, ordini, lavorazioni, pagamenti e magazzino",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F6F7",
+  "theme_color": "#E8552F",
+  "orientation": "any",
+  "icons": [
+    {"src":"./icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"./icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
+
+const CACHE_NAME = "gestionale-app-v2";
+const STATIC_ASSETS = [
+  "./manifest.webmanifest",
+  "./catalogo-actionwear.js",
+  "./icon-192.png",
+  "./icon-512.png"
+];
+
+self.addEventListener("install", event => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache =>
+      Promise.all(STATIC_ASSETS.map(url => cache.add(url).catch(()=>null)))
+    )
+  );
+});
+
+self.addEventListener("activate", event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    ).then(()=>self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", event => {
+  const req = event.request;
+  if(req.method !== "GET") return;
+
+  if(req.mode === "navigate"){
+    event.respondWith(
+      fetch(req).then(resp => {
+        const copy = resp.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put("./", copy));
+        return resp;
+      }).catch(() => caches.match("./"))
+    );
+    return;
+  }
+
+  const url = new URL(req.url);
+  if(url.origin === self.location.origin){
+    event.respondWith(
+      caches.match(req).then(cached => cached || fetch(req).then(resp => {
+        const copy = resp.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
+        return resp;
+      }))
+    );
+  }
+});
