@@ -241,6 +241,303 @@
     .toast{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));text-align:center;}
   }
 
+
+  /* ============ APP STYLE REFRESH ============ */
+  :root{
+    --menuWeight: 700;
+    --headingWeight: 800;
+  }
+  h1,h2,h3,.section-title,.stat-value,.brand-title{font-weight:var(--headingWeight);}
+  .btn{font-weight:700; letter-spacing:.01em;}
+  .pill{font-weight:700;}
+  .topbar h1{font-weight:800;}
+  nav.tabs button{
+    font-weight:var(--menuWeight);
+    color:#5E6673;
+    border-radius:14px;
+    transition:all .15s ease;
+  }
+  nav.tabs button.active{
+    font-weight:800;
+    color:#fff;
+    background:var(--accent);
+    box-shadow:0 8px 18px rgba(232,85,47,.18);
+  }
+  nav.tabs button:not(.active){background:transparent;}
+  .table-wrap table thead th{font-weight:800;}
+  .card, .modal{
+    box-shadow:0 8px 24px rgba(20, 29, 43, .04);
+  }
+
+  @media(max-width:760px){
+    body{
+      background:#F4F6F7;
+    }
+    aside.sidebar{
+      box-shadow:0 6px 18px rgba(20,29,43,.06);
+      border-bottom:1px solid #E5E7EB;
+    }
+    nav.tabs{
+      gap:10px;
+      padding:6px 2px 8px;
+    }
+    nav.tabs button{
+      padding:12px 16px;
+      font-size:14px;
+      border:1px solid transparent;
+      min-height:48px;
+    }
+    nav.tabs button.active{
+      min-width:max-content;
+    }
+    .topbar h1{
+      font-size:28px;
+      line-height:1.08;
+    }
+    .section-sub, .muted{
+      font-size:15px;
+    }
+    .card{
+      border-radius:18px;
+    }
+    .table-wrap{
+      border-radius:18px;
+      overflow:hidden;
+    }
+    .table-wrap table{
+      min-width:780px;
+    }
+    .field label{
+      font-weight:700;
+      color:#6B7280;
+      letter-spacing:.01em;
+    }
+    .field input,.field select,.field textarea{
+      border-radius:14px;
+      min-height:48px;
+      font-weight:600;
+    }
+    .modal{
+      border-radius:18px;
+    }
+    .modal h2{
+      font-weight:800;
+    }
+    .btn{
+      border-radius:14px;
+    }
+  }
+
+
+  /* ============ PREMIUM APP UI ============ */
+  :root{
+    --paper:#F3F5F7;
+    --card:#FFFFFF;
+    --text:#1F2937;
+    --muted:#6B7280;
+    --border:#E7EBF0;
+    --accent:#E85A32;
+    --accentDark:#D84E26;
+    --shadowSoft:0 10px 30px rgba(20,29,43,.06);
+    --shadowTiny:0 4px 12px rgba(20,29,43,.05);
+    --radius-xl:24px;
+    --radius-lg:18px;
+    --radius-md:14px;
+  }
+
+  body{
+    background:
+      radial-gradient(circle at top left, rgba(232,90,50,.05), transparent 30%),
+      radial-gradient(circle at top right, rgba(41,98,255,.04), transparent 25%),
+      var(--paper);
+    color:var(--text);
+  }
+
+  aside.sidebar{
+    background:rgba(255,255,255,.88);
+    backdrop-filter: blur(10px);
+  }
+
+  .brand-title,h1,h2,h3,h4,.section-title{letter-spacing:-0.02em;}
+  h1{font-size:clamp(28px, 4vw, 38px);}
+  h2{font-size:clamp(22px, 3vw, 30px);}
+
+  .card,
+  .modal,
+  .table-wrap,
+  .list-row{
+    background:var(--card);
+    border:1px solid var(--border);
+    box-shadow:var(--shadowSoft);
+    border-radius:var(--radius-xl);
+  }
+
+  .card{padding:20px;}
+  .modal{box-shadow:0 20px 50px rgba(20,29,43,.12);}
+  .table-wrap{overflow:hidden;}
+
+  .btn{
+    border-radius:999px;
+    font-weight:800;
+    box-shadow:none;
+  }
+  .btn-primary{
+    background:linear-gradient(180deg, #EB6A43 0%, #E85A32 100%);
+    border-color:#E85A32;
+  }
+  .btn-primary:hover{background:linear-gradient(180deg, #E85A32 0%, #D84E26 100%);}
+  .btn-outline{
+    background:#fff;
+    border-color:#DDE3EA;
+  }
+
+  .field input,.field select,.field textarea,
+  input.inline,select.inline{
+    border-radius:16px;
+    border:1px solid #DDE3EA;
+    background:#fff;
+    box-shadow:inset 0 1px 2px rgba(20,29,43,.03);
+  }
+
+  .field input:focus,.field select:focus,.field textarea:focus,
+  input.inline:focus,select.inline:focus{
+    outline:none;
+    border-color:#F09B84;
+    box-shadow:0 0 0 4px rgba(232,90,50,.10);
+  }
+
+  .topbar{
+    background:rgba(255,255,255,.78);
+    backdrop-filter: blur(10px);
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:16px 18px;
+    box-shadow:var(--shadowTiny);
+  }
+  .global-search input{
+    border-radius:999px !important;
+    background:#fff;
+  }
+
+  nav.tabs button{
+    border-radius:999px;
+    padding:11px 15px;
+    min-height:44px;
+  }
+
+  table thead th{
+    background:#FAFBFC;
+    color:#5A6573;
+    font-size:13px;
+    letter-spacing:.01em;
+  }
+  table tbody tr{background:#fff;}
+  table tbody tr:nth-child(even){background:#FCFDFE;}
+  table td, table th{border-color:#EDF1F5;}
+
+  .pill{
+    border-radius:999px;
+    padding:.42rem .72rem;
+    font-weight:800;
+  }
+
+  .stat{
+    position:relative;
+    overflow:hidden;
+  }
+  .stat::after{
+    content:"";
+    position:absolute;
+    top:0;left:0;right:0;
+    height:5px;
+    background:linear-gradient(90deg, #E85A32, #F3B09A);
+  }
+  .stat-label{font-weight:700;color:#6B7280;}
+  .stat-value{font-size:44px;line-height:1;}
+
+  .close-x{
+    border-radius:999px;
+    width:36px;height:36px;
+    display:flex;align-items:center;justify-content:center;
+    background:#F7F8FA;
+    border:1px solid #E5E7EB;
+  }
+
+  .list-row{
+    padding:16px 18px;
+    margin-bottom:10px;
+    border-radius:18px;
+  }
+
+  .toast{
+    border-radius:16px;
+    box-shadow:0 16px 40px rgba(17,24,39,.18);
+  }
+
+  @media(max-width:760px){
+    body{
+      background:linear-gradient(180deg, #F8FAFB 0%, #F3F5F7 100%);
+    }
+    main{
+      padding:12px 12px 32px;
+    }
+    aside.sidebar{
+      margin:8px 8px 0;
+      width:calc(100% - 16px);
+      border-radius:22px;
+      border:1px solid var(--border);
+      padding:10px 10px 8px;
+    }
+    nav.tabs{
+      gap:8px;
+      padding:4px 2px 4px;
+    }
+    nav.tabs button{
+      min-height:46px;
+      padding:12px 16px;
+      font-size:14px;
+    }
+    .topbar{
+      margin-top:8px;
+      border-radius:22px;
+      padding:16px;
+    }
+    .topbar h1{
+      font-size:30px;
+      margin-bottom:4px;
+    }
+    .section-sub{
+      font-size:16px;
+    }
+    .card{
+      padding:16px;
+      border-radius:22px;
+    }
+    .btn{
+      min-height:46px;
+      font-size:15px;
+      padding-left:18px;
+      padding-right:18px;
+    }
+    .field input,.field select,.field textarea,
+    input.inline,select.inline{
+      min-height:50px;
+      border-radius:16px;
+    }
+    .table-wrap{
+      border-radius:22px;
+      box-shadow:var(--shadowTiny);
+    }
+    .modal{
+      border-radius:24px;
+      padding:18px 14px 28px;
+    }
+    h2{
+      font-size:28px;
+    }
+    .stat-value{font-size:38px;}
+  }
+
 </style>
 </head>
 <body>
@@ -267,7 +564,7 @@
     <div class="sidebar-footer">Dati sincronizzati in tempo reale con tutto lo staff.</div>
   </aside>
   <main>
-    <div class="topbar">
+    <div class="topbar app-topbar">
       <div><h1 id="viewTitle">Dashboard</h1><p id="viewSubtitle">Panoramica generale dell'attività</p></div>
       <div class="global-search">
         <input type="text" id="globalClientSearch" placeholder="🔎 Cerca cliente…" oninput="updateGlobalClientSuggestions(this.value)" onkeydown="globalSearchKeydown(event,this)" onblur="setTimeout(()=>document.getElementById('globalSearchDropdown').style.display='none',150)" autocomplete="off">
@@ -684,7 +981,7 @@ function renderTopbarActions(){
     incassi: `<button class="btn btn-primary" onclick="toggleForm('paymentForm')">+ Registra incasso</button>`,
     spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
     entrate: `<button class="btn btn-primary" onclick="toggleForm('incomeForm')">+ Nuova entrata</button>`,
-    dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa app</button> <button class="btn btn-outline" onclick="exportBackup()">Esporta backup</button> <button class="btn btn-outline" onclick="signOut()">Esci (${currentUser?currentUser.email:''})</button>`
+    dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa l’app</button> <button class="btn btn-outline" onclick="exportBackup()">Esporta backup</button> <button class="btn btn-outline" onclick="signOut()">Esci (${currentUser?currentUser.email:''})</button>`
   };
   document.getElementById("topbarActions").innerHTML = map[currentView] || "";
 }
