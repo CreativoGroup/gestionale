@@ -254,7 +254,7 @@ const PRODOTTI_PER_CATEGORIA = {
   "Gadget": ["Penna","USB","Tessera","Tazza","Borraccia","Tela canvas","Altro"],
   "Allestimenti": ["Sticker","Prespaziato","Poster","Banner","Velcro","Altro"],
   "Piccolo Formato": ["Biglietti da visita","A4","A3","Carta adesiva","Altro"],
-  "Lavorazioni Esterne": ["Serigrafia","Grande Formato","Piccolo Formato","Biglietti da visita","Volantini","Pieghevoli","Cartelline","Blocnotes","Gadget","Altro"]
+  "Lavorazioni Esterne": ["Tipografia","Serigrafia","Grande Formato","Piccolo Formato","Biglietti da visita","Volantini","Pieghevoli","Cartelline","Blocnotes","Gadget","Altro"]
 };
 const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone","Misto"];
 const STATUSES = ["Da fare","In lavorazione","In produzione","Completato","Consegnato"];
@@ -282,16 +282,18 @@ function fasiSectionLabel(o){
   return (hasTipologia && !hasServizio) ? "Tipologia di lavorazione" : "Fasi di lavorazione";
 }
 /* Fornitori suggeriti per prodotto di Lavorazioni Esterne. Solo "Altro" usa un campo di testo libero. */
+const FORNITORI_STANDARD_TIPOGRAFIA = ["Former","Presstime","Flyeralarm","Pressup","Pixart"];
 const FORNITORI_PER_PRODOTTO_ESTERNO = {
+  "Tipografia": FORNITORI_STANDARD_TIPOGRAFIA,
   "Serigrafia": ["Officine del Cotone","4C Serigrafia","Ricamarte"],
-  "Grande Formato": ["Presstime","Coke","Former","Hi Print","Altro"],
-  "Gadget": ["Photosi","Cosimo Amalio","Get Impressed","AMGS"],
-  "Piccolo Formato": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
-  "Biglietti da visita": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
-  "Volantini": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
-  "Pieghevoli": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
-  "Cartelline": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
-  "Blocnotes": ["Former","Presstime","Flyeralarm","Pressup","Pixart"]
+  "Grande Formato": ["PRESSTIME","COKE","FORMER","HI PRINT","ALTRO"],
+  "Gadget": ["Photosi","COSIMO AMALIO","GET IMPRESSED","AMGS"],
+  "Piccolo Formato": FORNITORI_STANDARD_TIPOGRAFIA,
+  "Biglietti da visita": FORNITORI_STANDARD_TIPOGRAFIA,
+  "Volantini": FORNITORI_STANDARD_TIPOGRAFIA,
+  "Pieghevoli": FORNITORI_STANDARD_TIPOGRAFIA,
+  "Cartelline": FORNITORI_STANDARD_TIPOGRAFIA,
+  "Blocnotes": FORNITORI_STANDARD_TIPOGRAFIA
 };
 const PAY_METHODS = ["Bonifico","Contanti","Carta"];
 const PAY_TIPI = ["Acconto","Saldo"];
@@ -414,6 +416,16 @@ async function upsertOne(collection, obj){
     return false;
   }
   return true;
+}
+async function upsertOneReturning(collection, obj){
+  const row = toDbRow(collection, obj);
+  const { data, error } = await sb.from(TABLES[collection]).upsert(row).select("*").single();
+  if(error){
+    console.error("Errore salvataggio", collection, error);
+    showToast(`Errore salvataggio ${collection}: ${error.message || "riprova"}`);
+    return null;
+  }
+  return data ? fromDbRow(collection, data) : obj;
 }
 /* ---- Cancellazione mirata ---- */
 async function dbDelete(name, id){
@@ -1184,6 +1196,7 @@ function openClientHistory(clientId){
       <div><span>PEC</span>${c.pec||"—"}</div>
     </div>
     <div class="form-actions" style="margin-bottom:18px;">
+      <button class="btn btn-primary btn-sm" onclick="newOrderForClient('${c.id}')">+ NUOVO ORDINE</button>
       <button class="btn btn-outline btn-sm" onclick="openEditClient('${c.id}')">Modifica anagrafica</button>
     </div>
     <h3>Storico ordini</h3>
@@ -1200,6 +1213,19 @@ function openClientHistory(clientId){
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
+}
+function newOrderForClient(clientId){
+  closeModal();
+  goTo("ordini");
+  const form = document.getElementById("orderForm");
+  if(form) form.classList.add("open");
+  const sel = document.getElementById("of-cliente");
+  if(sel){
+    sel.value = clientId;
+    const wrap = document.getElementById("of-newclient");
+    if(wrap) wrap.style.display = "none";
+  }
+  window.scrollTo({top:0,behavior:"smooth"});
 }
 function openEditClient(clientId){
   const c = state.clients.find(x=>x.id===clientId);
@@ -1826,16 +1852,17 @@ async function addOrder(){
   const id = uid();
   const order = mkOrder(id, clientId, "", "", "Da fare", "", undefined, undefined);
 
-  // Il cliente è già stato confermato su Supabase prima di arrivare qui.
-  // Ora salviamo l'ordine e apriamo la scheda solo dopo conferma del database.
-  const ok = await upsertOne('orders', order);
-  if(!ok) return;
+  // Salva prima su Supabase e usa la riga restituita dal database.
+  // In questo modo recuperiamo subito anche il numero ordine assegnato dal database.
+  const savedOrder = await upsertOneReturning('orders', order);
+  if(!savedOrder) return;
 
-  if(!state.orders.some(o=>o.id===id)) state.orders.push(order);
+  const idx = state.orders.findIndex(o=>o.id===savedOrder.id);
+  if(idx>=0) state.orders[idx] = savedOrder; else state.orders.push(savedOrder);
   toggleForm('orderForm');
   renderOrdini();
-  showToast("Ordine creato");
-  openJobCard(id);
+  showToast(savedOrder.numero ? `Ordine #${savedOrder.numero} creato` : "Ordine creato");
+  openJobCard(savedOrder.id);
 }
 function deleteOrderFromCreditiCliente(orderId, clientId){
   askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati.", ()=>{
