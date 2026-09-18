@@ -1190,8 +1190,19 @@ function updateClientCarattere(clientId, value){
   showToast(value ? `Carattere impostato: ${value}` : "Carattere rimosso");
 }
 function deleteClient(id){
-  askConfirm("Eliminare questo cliente? Gli ordini e preventivi collegati resteranno ma senza cliente associato.", ()=>{
-    state.clients = state.clients.filter(c=>c.id!==id); dbDelete('clients', id); renderClienti();
+  askConfirm("Eliminare questo cliente? Gli ordini, preventivi e pagamenti collegati resteranno ma senza cliente associato.", ()=>{
+    const ordiniCollegati = state.orders.filter(o=>o.clientId===id);
+    const preventiviCollegati = state.quotes.filter(q=>q.clientId===id);
+    const pagamentiCollegati = state.payments.filter(p=>p.clientId===id);
+    ordiniCollegati.forEach(o=>o.clientId=null);
+    preventiviCollegati.forEach(q=>q.clientId=null);
+    pagamentiCollegati.forEach(p=>p.clientId=null);
+    state.clients = state.clients.filter(c=>c.id!==id);
+    dbDelete('clients', id);
+    if(ordiniCollegati.length) saveState('orders');
+    if(preventiviCollegati.length) saveState('quotes');
+    if(pagamentiCollegati.length) saveState('payments');
+    renderClienti();
   });
 }
 
