@@ -255,7 +255,7 @@ const PRODOTTI_PER_CATEGORIA = {
   "Gadget": ["Penna","USB","Tessera","Tazza","Borraccia","Tela canvas","Altro"],
   "Allestimenti": ["Sticker","Prespaziato","Poster","Banner","Velcro","Altro"],
   "Piccolo Formato": ["Biglietti da visita","A4","A3","Carta adesiva","Altro"],
-  "Lavorazioni Esterne": ["Serigrafia","Grande Formato","Piccolo Formato","Tipografia","Gadget","Altro"]
+  "Lavorazioni Esterne": ["Serigrafia","Grande Formato","Piccolo Formato","Biglietti da visita","Volantini","Pieghevoli","Cartelline","Blocnotes","Gadget","Altro"]
 };
 const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone","Misto"];
 const STATUSES = ["Da fare","In lavorazione","In produzione","Completato","Consegnato"];
@@ -280,6 +280,43 @@ const PAY_TIPI = ["Acconto","Saldo"];
 const CLIENT_TYPES = ["Business","Family"];
 const SETTORI = ["Abbigliamento", "Agenzia Viaggi/Auto/Funebre", "Architetti", "Arte", "Associazione Sportiva", "Automotive", "Cinema/Spettacolo", "Creativi", "Cura Persona", "Danza", "Edile", "Editoria", "Ente e Associazioni", "Eventi / Marketing", "Fisioterapia", "Hotellerie", "Immobiliare", "Legale/Tributario/Assicurativo", "Lusso", "Medicina Estetica", "Medico", "Ospedale", "Palestra", "Piccolo Commerciante", "Ristorazione", "Scuola/Parrocchia", "Settore Politica", "Studio Professionale", "Tecnologico", "Università"];
 const CONSEGNA_TIPI = ["Ritiro in sede","Spedizione"];
+
+/* Scorte minime monitorate: solo articoli richiesti */
+const STOCK_ALERT_RULES = [
+  {codice:"BS010", colori:["BK","BLACK","NERO","WH","WHITE","BIANCO"], taglie:["S","M","L","XL"], minimo:10},
+  {codice:"BSW150", colori:["BK","BLACK","NERO","WH","WHITE","BIANCO"], taglie:["S","M","L","XL"], minimo:10},
+  {codice:"BS201", colori:["WH","WHITE","BIANCO"], taglie:["M"], minimo:1},
+  {codice:"BSW201", colori:["WH","WHITE","BIANCO"], taglie:["L"], minimo:1}
+];
+function normalizeStockColor(v){ return String(v||"").trim().toUpperCase(); }
+function minimoRichiestoMagazzino(w){
+  const code=String(w.codice||"").trim().toUpperCase();
+  const color=normalizeStockColor(w.colore);
+  const size=String(w.taglia||"").trim().toUpperCase();
+  const rule=STOCK_ALERT_RULES.find(r=>r.codice===code && r.colori.includes(color) && r.taglie.includes(size));
+  return rule ? rule.minimo : 0;
+}
+function computeScorteMonitorate(){
+  const targets=[];
+  const addTarget=(codice,colorLabel,colorAliases,taglia,minimo)=>{
+    const w=state.warehouse.find(x=>String(x.codice||"").trim().toUpperCase()===codice && colorAliases.includes(normalizeStockColor(x.colore)) && String(x.taglia||"").trim().toUpperCase()===taglia);
+    const quantita=w ? Number(w.quantita)||0 : 0;
+    if(quantita<=minimo) targets.push({
+      id:w?w.id:`virtual-${codice}-${colorLabel}-${taglia}`,
+      codice, nome:w?.nome||codice, categoria:w?.categoria||"Abbigliamento",
+      colore:w?.colore||colorLabel, taglia, quantita, scortaMinima:minimo, unita:w?.unita||"pz", virtuale:!w
+    });
+  };
+  ["BS010","BSW150"].forEach(codice=>{
+    ["S","M","L","XL"].forEach(taglia=>{
+      addTarget(codice,"BK",["BK","BLACK","NERO"],taglia,10);
+      addTarget(codice,"WH",["WH","WHITE","BIANCO"],taglia,10);
+    });
+  });
+  addTarget("BS201","WH",["WH","WHITE","BIANCO"],"M",1);
+  addTarget("BSW201","WH",["WH","WHITE","BIANCO"],"L",1);
+  return targets;
+}
 
 /* ============ STATO ============ */
 let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], entrate:[], appuntamenti:[]};
@@ -330,6 +367,8 @@ async function loadAllFromSupabase(){
   });
   // Le fasi vanno ricalcolate se qualche categoria non ha più il template previsto, preservando le spunte già fatte
   state.orders.forEach(o => recalcFasi(o));
+  // Le scorte minime sono gestite automaticamente solo per le varianti monitorate.
+  state.warehouse.forEach(w=>{ w.scortaMinima = minimoRichiestoMagazzino(w); });
 }
 
 /* ---- Scrittura: aggiorna/crea tutte le righe attuali di una collezione (upsert) ---- */
@@ -582,7 +621,7 @@ function renderDashboard(){
   const ordiniInLavorazione = state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato");
   const creditiApertiDash = state.orders.filter(o=>o.stato==="Consegnato").map(o=>({o, saldo:orderSaldo(o)})).filter(x=>x.saldo>0.001);
   const preventiviAperti = state.quotes.filter(q=>q.stato==="Inviato"||q.stato==="Bozza").length;
-  const scorteBasse = state.warehouse.filter(w=>Number(w.quantita)<=Number(w.scortaMinima));
+  const scorteBasse = computeScorteMonitorate();
   const completatiDaConsegnare = state.orders.filter(o=>o.stato==="Completato");
   const daSpedire = state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato");
   const daFatturare = state.orders.filter(o=>o.daFatturare && !o.fatturato);
@@ -591,7 +630,12 @@ function renderDashboard(){
   const pezziDaOrdinare = magazzinoDaOrdinare.reduce((s,x)=>s + Number(x.entry.daOrdinareQty||0), 0);
   const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>o.worker===w && o.stato!=="Consegnato").length}));
   const oggi = today();
-  const consegneGiornaliere = activeOrders.filter(o=>o.dataConsegna===oggi);
+  const consegneGiornaliere = activeOrders.filter(o=>o.dataConsegna===oggi).sort((a,b)=>{
+    const sa=STATUSES.indexOf(a.stato), sb=STATUSES.indexOf(b.stato);
+    if(sa!==sb) return sa-sb;
+    return clientName(a.clientId).localeCompare(clientName(b.clientId));
+  });
+  const ritiriDaFare = state.orders.filter(o=>o.stato!=="Consegnato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"));
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
 
   document.getElementById("view-dashboard").innerHTML = `
@@ -599,6 +643,7 @@ function renderDashboard(){
       <div class="card stat clickable" onclick="openDashboardList('attivi')"><p class="stat-label">Ordini attivi</p><p class="stat-value">${ordiniInLavorazione.length}</p><p class="stat-sub">su ${state.orders.length} totali</p></div>
       <div class="card stat clickable" onclick="openDashboardList('fatturare')"><p class="stat-label">Schede da fatturare</p><p class="stat-value" style="${daFatturare.length?'color:var(--accent)':''}">${daFatturare.length}</p><p class="stat-sub">contrassegnate "da fatturare"</p></div>
       <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${pezziDaOrdinare?'color:var(--teal)':''}">${pezziDaOrdinare}</p><p class="stat-sub">pezzi confermati da ordinare</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('ritirare')"><p class="stat-label">Ordini da ritirare</p><p class="stat-value" style="${ritiriDaFare.length?'color:var(--warn)':''}">${ritiriDaFare.length}</p><p class="stat-sub">lavorazioni esterne da ritirare</p></div>
       <div class="card stat clickable" onclick="openDashboardList('preventivi')"><p class="stat-label">Preventivi in attesa</p><p class="stat-value">${preventiviAperti}</p><p class="stat-sub">bozza o inviati</p></div>
     </div>
 
@@ -667,13 +712,13 @@ function renderDashboard(){
       </div>
       <div class="card">
         <h3 style="margin-top:0;">Consegne giornaliere</h3>
-        ${consegneGiornaliere.length ? `<table><tbody>${consegneGiornaliere.map(o=>`
-          <tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td></tr>
+        ${consegneGiornaliere.length ? `<table><thead><tr><th>Cliente</th><th>Lavorazione</th><th>Stato</th><th></th></tr></thead><tbody>${consegneGiornaliere.map(o=>`
+          <tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessuna consegna prevista per oggi.</p>`}
       </div>
     </div>
     ${ordiniImportanti.length ? `<div class="card" style="margin-top:16px;border:1px solid var(--accent);"><h3 style="margin-top:0;">★ Ordini importanti</h3><table><tbody>${ordiniImportanti.map(o=>`<tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>`).join("")}</tbody></table></div>` : ""}
-    ${scorteBasse.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">Avvisi magazzino</h3><table><tbody>${scorteBasse.map(w=>`<tr><td>${w.nome}</td><td class="low-stock">${w.quantita} ${w.unita} (minimo ${w.scortaMinima})</td></tr>`).join("")}</tbody></table></div>` : ""}
+    ${scorteBasse.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">Avvisi magazzino</h3><table><thead><tr><th>Codice</th><th>Colore</th><th>Taglia</th><th>Disponibili</th><th>Scorta minima</th></tr></thead><tbody>${scorteBasse.map(w=>`<tr><td style="font-weight:700;">${w.codice}</td><td>${w.colore}</td><td>${w.taglia}</td><td class="low-stock">${w.quantita} ${w.unita}</td><td>${w.scortaMinima} ${w.unita}</td></tr>`).join("")}</tbody></table></div>` : ""}
     ${currentUser.role==='admin' ? `
     <div class="card" style="margin-top:16px;">
       <h3 style="margin-top:0;">Crediti aperti (ordini consegnati non pagati)</h3>
@@ -714,16 +759,17 @@ function openDashboardList(type){
     fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato)},
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
     materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
+    ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato!=="Consegnato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"))},
     avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato)},
     preventivi: {title:"Preventivi in attesa", items: state.quotes.filter(q=>q.stato==="Bozza"||q.stato==="Inviato"), isQuote:true},
-    scorte: {title:"Articoli sotto scorta", items: state.warehouse.filter(w=>Number(w.quantita)<=Number(w.scortaMinima)), isStock:true}
+    scorte: {title:"Articoli sotto scorta", items: computeScorteMonitorate(), isStock:true}
   };
   const cfg = configs[type];
   let rows;
   if(cfg.isStock){
     rows = cfg.items.map(w=>`
       <div class="list-row" onclick="closeModal(); goTo('magazzino');">
-        <div><div class="lr-main">${w.nome}</div><div class="lr-sub">${w.categoria}</div></div>
+        <div><div class="lr-main">${w.codice} — ${w.colore} — ${w.taglia}</div><div class="lr-sub">${w.nome||w.codice}</div></div>
         <div class="lr-sub low-stock">${w.quantita} ${w.unita} (min. ${w.scortaMinima})</div>
       </div>`).join("");
   } else if(cfg.isMagazzino){
@@ -1421,7 +1467,7 @@ function updateRigaField(collection, id, rigaId, field, value){
   const item = findItem(collection, id);
   const riga = item.righe.find(r=>r.id===rigaId);
   riga[field] = (field==='quantita'||field==='prezzoUnitario') ? Number(value)||0 : value;
-  if(collection==='orders' && field==='categoria'){ recalcFasi(item); riga.prodotto = ""; }
+  if(collection==='orders' && field==='categoria'){ recalcFasi(item); riga.prodotto = ""; if(value!=="Lavorazioni Esterne") delete riga.ritiroEsterno; }
   saveState(collection);
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
 }
@@ -1645,13 +1691,45 @@ function renderFlusso(){
 }
 
 /* ============ SCHEDE DI LAVORAZIONE ============ */
+let schedeFilters = {stato:"", worker:"", categoria:"", sort:"consegna_asc"};
+function setSchedeFilter(field,value){ schedeFilters[field]=value; renderSchede(); }
+function schedeFilteredSorted(){
+  let list=[...state.orders];
+  if(schedeFilters.stato) list=list.filter(o=>o.stato===schedeFilters.stato);
+  if(schedeFilters.worker) list=list.filter(o=>o.worker===schedeFilters.worker);
+  if(schedeFilters.categoria) list=list.filter(o=>orderCategorie(o).includes(schedeFilters.categoria));
+  const statusIndex=s=>{ const i=STATUSES.indexOf(s); return i<0?99:i; };
+  switch(schedeFilters.sort){
+    case "stato": list.sort((a,b)=>statusIndex(a.stato)-statusIndex(b.stato) || (a.dataConsegna||"9999").localeCompare(b.dataConsegna||"9999")); break;
+    case "cliente": list.sort((a,b)=>clientName(a.clientId).localeCompare(clientName(b.clientId))); break;
+    case "numero_desc": list.sort((a,b)=>(Number(b.numero)||0)-(Number(a.numero)||0)); break;
+    case "operatore": list.sort((a,b)=>(a.worker||"ZZZ").localeCompare(b.worker||"ZZZ") || clientName(a.clientId).localeCompare(clientName(b.clientId))); break;
+    default: list.sort((a,b)=>(a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
+  }
+  return list;
+}
 function renderSchede(){
+  const list=schedeFilteredSorted();
   document.getElementById("view-schede").innerHTML = `
+    <div class="card" style="margin-bottom:14px;padding:14px 16px;">
+      <div class="filters" style="align-items:end;">
+        <div class="field"><label>Stato</label><select class="inline" onchange="setSchedeFilter('stato',this.value)"><option value="">Tutti</option>${STATUSES.map(s=>`<option value="${s}" ${schedeFilters.stato===s?'selected':''}>${s}</option>`).join("")}</select></div>
+        <div class="field"><label>Operatore</label><select class="inline" onchange="setSchedeFilter('worker',this.value)"><option value="">Tutti</option>${WORKERS.map(w=>`<option value="${w}" ${schedeFilters.worker===w?'selected':''}>${w}</option>`).join("")}</select></div>
+        <div class="field"><label>Categoria</label><select class="inline" onchange="setSchedeFilter('categoria',this.value)"><option value="">Tutte</option>${CATEGORIES.map(c=>`<option value="${c}" ${schedeFilters.categoria===c?'selected':''}>${c}</option>`).join("")}</select></div>
+        <div class="field"><label>Ordina per</label><select class="inline" onchange="setSchedeFilter('sort',this.value)">
+          <option value="consegna_asc" ${schedeFilters.sort==='consegna_asc'?'selected':''}>Data consegna</option>
+          <option value="stato" ${schedeFilters.sort==='stato'?'selected':''}>Stato lavorazione</option>
+          <option value="cliente" ${schedeFilters.sort==='cliente'?'selected':''}>Cliente A-Z</option>
+          <option value="numero_desc" ${schedeFilters.sort==='numero_desc'?'selected':''}>Numero scheda (recenti)</option>
+          <option value="operatore" ${schedeFilters.sort==='operatore'?'selected':''}>Operatore</option>
+        </select></div>
+      </div>
+    </div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>N°</th><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Avanzamento</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
         <tbody>
-          ${state.orders.length ? state.orders.map(o=>{
+          ${list.length ? list.map(o=>{
             const done = o.fasi.filter(s=>s.completata).length;
             return `<tr>
               <td style="color:var(--muted);font-weight:600;">${o.numero?('#'+o.numero):'—'}</td>
@@ -1664,7 +1742,7 @@ function renderSchede(){
               <td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
               <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Apri scheda</button></td>
             </tr>`;
-          }).join("") : `<tr><td colspan="9" class="empty">Nessun ordine attivo. Crea un ordine per generare la sua scheda di lavorazione.</td></tr>`}
+          }).join("") : `<tr><td colspan="9" class="empty">Nessuna scheda corrisponde ai filtri selezionati.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -1674,6 +1752,33 @@ let fasiSectionOpen = {};
 function toggleFasiSection(orderId){
   fasiSectionOpen[orderId] = !fasiSectionOpen[orderId];
   openJobCard(orderId);
+}
+function renderRitiroEsternoSection(o){
+  const righe=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne");
+  if(!righe.length) return "";
+  return `<div class="modal-section">
+    <h3>Lavorazioni esterne — ritiro</h3>
+    <p class="helptext" style="margin-top:-4px;">Imposta manualmente lo stato del materiale affidato all'esterno. Solo <strong>DA RITIRARE</strong> compare nel widget della dashboard.</p>
+    ${righe.map((r,idx)=>{
+      const val=r.ritiroEsterno||"";
+      const label=r.prodotto || r.descrizione || `Lavorazione esterna ${idx+1}`;
+      return `<div style="padding:12px 0;border-bottom:1px solid var(--border);">
+        <div style="font-weight:700;margin-bottom:8px;">${label}</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          ${["CONSEGNA IN SEDE","DA RITIRARE","RITIRATO"].map(st=>`<label class="checkfield" style="font-weight:${val===st?'700':'500'};"><input type="radio" name="ritiro-${r.id}" ${val===st?'checked':''} onchange="updateRitiroEsterno('${o.id}','${r.id}','${st}')"> ${st}</label>`).join("")}
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+function updateRitiroEsterno(orderId,rigaId,status){
+  const o=findItem('orders',orderId);
+  const r=(o.righe||[]).find(x=>x.id===rigaId);
+  if(!r) return;
+  r.ritiroEsterno=status;
+  saveState('orders');
+  openJobCard(orderId);
+  showToast(status==="DA RITIRARE" ? "Aggiunto agli ordini da ritirare" : `Stato ritiro: ${status}`);
 }
 function openJobCard(orderId){
   const o = findItem('orders', orderId);
@@ -1707,6 +1812,8 @@ function openJobCard(orderId){
       <p class="helptext" style="margin-top:-4px;">Ogni riga ha una propria categoria di lavoro.${o.righe.length>1 ? ' Scegli lo stato di ciascuna riga dal menu colorato.' : ''}</p>
       ${linesEditor('orders', o.id, o.righe)}
     </div>
+
+    ${renderRitiroEsternoSection(o)}
 
     ${renderMagazzinoSection(o)}
 
@@ -1892,7 +1999,8 @@ function destinazioniCarrelloPerMagazzino(w){
 
 function magazzinoRowsHtml(list){
   return list.length ? list.map(w=>{
-    const low = Number(w.quantita) <= Number(w.scortaMinima);
+    const minimo = minimoRichiestoMagazzino(w);
+    const low = minimo>0 && Number(w.quantita) <= minimo;
     const destinazioni = destinazioniCarrelloPerMagazzino(w);
     const destHtml = destinazioni.length
       ? destinazioni.map(d=>`<div style="margin-bottom:4px;">
@@ -1905,7 +2013,7 @@ function magazzinoRowsHtml(list){
       <td><input id="wn-${w.id}" value="${w.nome||''}" style="min-width:160px;"></td>
       <td>${w.categoria||"—"}</td><td>${w.colore||"—"}</td><td>${w.taglia||"—"}</td>
       <td class="${low?'low-stock':''}"><input id="wq-${w.id}" type="number" min="0" value="${w.quantita}" style="width:70px;"> ${w.unita}</td>
-      <td><input id="wm-${w.id}" type="number" min="0" value="${w.scortaMinima}" style="width:70px;"> ${w.unita}</td>
+      <td><input id="wm-${w.id}" type="number" min="0" value="${minimo}" style="width:70px;background:var(--paper);" readonly> ${w.unita}</td>
       <td>${low?'<span class="pill pill-open">Sotto scorta</span>':'<span class="pill pill-done">OK</span>'}</td>
       <td style="min-width:230px;">${destHtml}</td>
       <td style="white-space:nowrap;">
@@ -1942,7 +2050,7 @@ function renderMagazzino(){
         <div class="field"><label>Colore</label><input id="if-colore" placeholder="Es. Bianco, NY, BK..."></div>
         <div class="field"><label>Taglia</label><input id="if-taglia" placeholder="Es. S, M, L, XL, UNICA..."></div>
         <div class="field"><label>Quantità attuale</label><input id="if-quantita" type="number" min="1" value="1"></div>
-        <div class="field"><label>Scorta minima</label><input id="if-scorta" type="number" min="0" value="0"></div>
+        <div class="field"><label>Scorta minima</label><input id="if-scorta" type="text" value="Automatica" disabled></div>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" onclick="addItem()">Salva articolo</button>
@@ -1974,7 +2082,7 @@ function saveWarehouseRow(id){
   const w = findItem('warehouse', id);
   w.nome = document.getElementById(`wn-${id}`).value.trim();
   w.quantita = Number(document.getElementById(`wq-${id}`).value)||0;
-  w.scortaMinima = Number(document.getElementById(`wm-${id}`).value)||0;
+  w.scortaMinima = minimoRichiestoMagazzino(w);
   saveState('warehouse');
   renderMagazzino();
   showToast("Articolo aggiornato");
@@ -1991,8 +2099,9 @@ function addItem(){
     taglia: document.getElementById("if-taglia").value.trim(),
     unita: "pz",
     quantita,
-    scortaMinima:Number(document.getElementById("if-scorta").value)||0
+    scortaMinima:0
   });
+  state.warehouse[state.warehouse.length-1].scortaMinima = minimoRichiestoMagazzino(state.warehouse[state.warehouse.length-1]);
   saveState('warehouse'); toggleForm('itemForm'); renderMagazzino(); showToast("Articolo aggiunto");
 }
 function adjustStock(id, delta){ const w = findItem('warehouse',id); w.quantita = Math.max(0, Number(w.quantita)+delta); saveState('warehouse'); renderMagazzino(); }
@@ -2115,8 +2224,11 @@ function confirmPdfImport(){
       existing.quantita = Number(existing.quantita) + Number(r.quantita);
       existing.nome = existing.nome || r.nome;
       if(!existing.categoria) existing.categoria = r.categoria;
+      existing.scortaMinima = minimoRichiestoMagazzino(existing);
     } else {
-      state.warehouse.push({id:uid(), codice:r.codice, nome:r.nome, categoria:r.categoria, colore:r.colore, taglia:r.taglia, unita:"pz", quantita:r.quantita, scortaMinima:0});
+      const nuovo={id:uid(), codice:r.codice, nome:r.nome, categoria:r.categoria, colore:r.colore, taglia:r.taglia, unita:"pz", quantita:r.quantita, scortaMinima:0};
+      nuovo.scortaMinima = minimoRichiestoMagazzino(nuovo);
+      state.warehouse.push(nuovo);
     }
   });
   saveState('warehouse');
