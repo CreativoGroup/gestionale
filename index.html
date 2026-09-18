@@ -760,9 +760,9 @@ function renderDashboard(){
         <tr>
           <td>${clientName(g.clientId)}</td>
           <td>${g.orders.length===1 ? orderCategorieLabel(g.orders[0].o) : `${g.orders.length} ordini — ${g.orders.map(x=>orderCategorieLabel(x.o)).join(", ")}`}</td>
-          <td style="color:var(--danger);font-weight:700;">${fmtMoney(g.totaleSaldo)} da saldare</td>
-          <td>${g.orders.length===1
-            ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button>`
+          <td style="color:var(--danger);font-weight:700;">${fmtMoney(g.totaleSaldo)}</td>
+          <td style="white-space:nowrap;">${g.orders.length===1
+            ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button> <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${g.orders[0].o.id}')">✕</button>`
             : `<button class="btn btn-outline btn-sm" onclick="openCreditiCliente('${g.clientId}')">Dettaglio</button>`}</td>
         </tr>`).join("")}</tbody></table>` : `<p class="empty">Nessun credito aperto.</p>`}
     </div>` : ``}
@@ -798,9 +798,14 @@ function openCreditiCliente(clientId){
     <p style="color:var(--muted);margin-top:0;">${orders.length} ordini da saldare — totale <strong style="color:var(--danger);">${fmtMoney(totale)} da saldare</strong></p>
     <div style="margin-top:14px;">
       ${orders.map(x=>`
-        <div class="list-row" onclick="openJobCard('${x.o.id}')">
-          <div><div class="lr-main">${orderCategorieLabel(x.o)}</div><div class="lr-sub">${fmtDate(x.o.dataConsegna)} — ${orderWorkersLabel(x.o)}</div></div>
-          <div style="text-align:right;"><div class="lr-main">${fmtMoney(orderTotale(x.o))}</div><div class="lr-sub" style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)} da saldare</div></div>
+        <div class="list-row" style="cursor:default;">
+          <div style="cursor:pointer;flex:1;" onclick="openJobCard('${x.o.id}')">
+            <div class="lr-main">${orderCategorieLabel(x.o)}</div><div class="lr-sub">${fmtDate(x.o.dataConsegna)} — ${orderWorkersLabel(x.o)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="text-align:right;"><div class="lr-main">${fmtMoney(orderTotale(x.o))}</div><div class="lr-sub" style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)} da saldare</div></div>
+            <button class="btn btn-ghost btn-sm" onclick="deleteOrderFromCreditiCliente('${x.o.id}','${clientId}')">✕</button>
+          </div>
         </div>`).join("")}
     </div>
     <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Chiudi</button></div>
@@ -837,7 +842,7 @@ function openDashboardList(type){
     attivi: {title:"Ordini attivi", items: state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato")},
     completati: {title:"Completati da consegnare", items: state.orders.filter(o=>o.stato==="Completato")},
     spedire: {title:"Ordini da spedire", items: state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato")},
-    fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato)},
+    fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato), isFatturare:true},
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
     materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
     ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato!=="Consegnato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"))},
@@ -857,12 +862,23 @@ function openDashboardList(type){
     rows = cfg.items.map(({order,entry})=>`
       <div class="list-row" style="cursor:default;">
         <div style="cursor:pointer;flex:1;" onclick="openJobCard('${order.id}')">
-          <div class="lr-main">${clientName(order.clientId)} ${order.numero?('#'+order.numero):''}</div>
+          <div class="lr-main">${clientName(order.clientId)} <span style="font-size:9px;font-weight:400;color:var(--border);">${order.numero?('#'+order.numero):''}</span></div>
           <div class="lr-sub">${entry.codice||''} — ${entry.colore||''} — ${entry.taglia||''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:12px;">
           <div class="lr-sub" style="color:var(--danger);font-weight:600;">${entry.daOrdinareQty} pz da ordinare</div>
           <button class="btn btn-primary btn-sm" onclick="segnaInseritoNelCarrello('${order.id}','${entry.id}')">INSERITO NEL CARRELLO</button>
+        </div>
+      </div>`).join("");
+  } else if(cfg.isFatturare){
+    rows = cfg.items.map(o=>`
+      <div class="list-row" style="cursor:default;">
+        <div style="cursor:pointer;flex:1;" onclick="openJobCard('${o.id}')">
+          <div class="lr-main">${clientName(o.clientId)}</div><div class="lr-sub">${orderCategorieLabel(o)} — ${orderWorkersLabel(o)} — ${fmtDate(o.dataConsegna)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span>
+          <button class="btn btn-primary btn-sm" onclick="segnaComeFatturato('${o.id}')">FATTURATO</button>
         </div>
       </div>`).join("");
   } else if(cfg.isQuote){
@@ -885,6 +901,15 @@ function openDashboardList(type){
     <div style="margin-top:14px;">${rows || `<p class="empty">Nessun elemento.</p>`}</div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
+}
+function segnaComeFatturato(orderId){
+  const o = findItem('orders', orderId);
+  if(!o) return;
+  o.fatturato = true;
+  saveState('orders');
+  showToast("Ordine segnato come fatturato");
+  openDashboardList('fatturare');
+  renderDashboard();
 }
 function exportBackup(){
   const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
@@ -1078,7 +1103,7 @@ function renderClienti(){
         <tbody>
           ${list.length ? list.map(c=>`
             <tr class="clickable-row" onclick="openClientHistory('${c.id}')">
-              <td style="color:var(--muted);font-weight:600;">${c.numero?('#'+c.numero):'—'}</td>
+              <td style="color:var(--border);font-weight:400;font-size:10px;">${c.numero?('#'+c.numero):'—'}</td>
               <td><span class="pill ${c.tipo==='Business'?'pill-business':'pill-family'}">${c.tipo}</span></td>
               <td><span class="status-dot client-dot-${c.tipo==='Business'?'business':'family'}"></span><span style="font-weight:600;color:${c.tipo==='Business'?'#1D5A9E':'#B9660C'}">${clientDisplayName(c)}</span></td>
               <td>${c.citta||"—"}</td>
@@ -1101,8 +1126,8 @@ function openClientHistory(clientId){
   const indirizzoCompleto = [c.indirizzo, [c.cap,c.citta].filter(Boolean).join(" "), c.provincia].filter(Boolean).join(", ");
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
-    <h2>${c.numero?('#'+c.numero+' — '):''}${clientDisplayName(c)}</h2>
-    <p style="color:var(--muted);margin-top:0;">${c.settore||(c.tipo==='Family'?'Cliente privato':'Settore da assegnare')} — Fatturato totale ${fmtMoney(totale)}</p>
+    <h2>${clientDisplayName(c)}</h2>
+    <p style="color:var(--muted);margin-top:0;">${c.settore||(c.tipo==='Family'?'Cliente privato':'Settore da assegnare')} — Fatturato totale ${fmtMoney(totale)} <span style="font-size:9.5px;color:var(--border);">${c.numero?('#'+c.numero):''}</span></p>
     <div class="ticket-meta">
       <div><span>Indirizzo</span>${indirizzoCompleto||"—"}</div>
       <div><span>Telefono</span>${c.telefono||"—"}</div>
@@ -1691,9 +1716,9 @@ function renderOrdini(){
           ${list.length ? list.map(o=>{
             const saldo = orderSaldo(o);
             return `<tr>
-              <td style="color:var(--muted);font-weight:600;">${o.numero?('#'+o.numero):'—'}</td>
+              <td style="color:var(--border);font-weight:400;font-size:10px;">${o.numero?('#'+o.numero):'—'}</td>
               <td><span class="star ${o.importante?'active':''}" onclick="toggleImportante('${o.id}')">★</span></td>
-              <td>${clientName(o.clientId)}</td>
+              <td>${clientName(o.clientId)}${o.createdAt?`<div class="lr-sub" style="font-size:10px;">Creato il ${fmtDate(o.createdAt.slice(0,10))}</div>`:''}</td>
               <td>${orderCategorieLabel(o)}</td>
               <td>${orderWorkersLabel(o)}</td>
               <td>${fmtDate(o.dataConsegna)}</td>
@@ -1723,6 +1748,18 @@ function addOrder(){
   state.orders.push(order);
   saveState('orders'); toggleForm('orderForm'); renderOrdini(); showToast("Ordine creato"); openJobCard(id);
 }
+function deleteOrderFromCreditiCliente(orderId, clientId){
+  askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati.", ()=>{
+    const paymentIds = state.payments.filter(p=>p.orderId===orderId).map(p=>p.id);
+    const order = findItem('orders', orderId);
+    if(order){ (order.magazzino||[]).forEach(m=>{ if(m.stornato && m._reservedQty) adjustWarehouseQty(m.articoloId, m._reservedQty); }); saveState('warehouse'); }
+    state.orders = state.orders.filter(o=>o.id!==orderId);
+    state.payments = state.payments.filter(p=>p.orderId!==orderId);
+    dbDelete('orders', orderId); dbDeleteMany('payments', paymentIds);
+    const rimasti = state.orders.filter(o=>o.clientId===clientId && o.stato==="Consegnato").map(o=>({o,saldo:orderSaldo(o)})).filter(x=>x.saldo>0.001);
+    if(rimasti.length) openCreditiCliente(clientId); else closeModal();
+  });
+}
 function deleteOrder(id){
   askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati.", ()=>{
     const paymentIds = state.payments.filter(p=>p.orderId===id).map(p=>p.id);
@@ -1731,7 +1768,7 @@ function deleteOrder(id){
     state.orders = state.orders.filter(o=>o.id!==id);
     state.payments = state.payments.filter(p=>p.orderId!==id);
     dbDelete('orders', id); dbDeleteMany('payments', paymentIds);
-    renderOrdini();
+    renderCurrentView();
   });
 }
 
@@ -1759,11 +1796,12 @@ function renderFlusso(){
             return `
             <div class="job-card ${tipoClass} ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
               ${o.importante ? `<div class="jc-star">★ IMPORTANTE</div>` : ``}
-              <div class="jc-client">${o.numero?('#'+o.numero+' — '):''}${clientName(o.clientId)}</div>
+              <div class="jc-client">${clientName(o.clientId)} <span style="font-size:9px;font-weight:400;color:var(--border);">${o.numero?('#'+o.numero):''}</span></div>
               <div class="jc-lines">
                 ${o.righe.filter(r=>r.categoria).map(r=>`<div class="jc-line">${r.categoria}${r.prodotto?' — '+r.prodotto:''} <span style="color:var(--muted);font-weight:500;">×${r.quantita}</span></div>`).join("") || `<div class="jc-line" style="color:var(--muted)">Nessuna categoria assegnata</div>`}
               </div>
               <div class="jc-meta"><span>${o.worker||"n.a."}</span><span>${fmtDate(o.dataConsegna)}</span></div>
+              ${o.createdAt ? `<div style="font-size:9px;color:var(--border);margin-top:2px;">Creato il ${fmtDate(o.createdAt.slice(0,10))}</div>` : ``}
             </div>`;
           }).join("") || `<p class="empty" style="padding:14px 4px;">Vuoto</p>`}
         </div>`;
@@ -1809,22 +1847,20 @@ function renderSchede(){
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>N°</th><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Avanzamento</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
+        <thead><tr><th>N°</th><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
         <tbody>
           ${list.length ? list.map(o=>{
-            const done = o.fasi.filter(s=>s.completata).length;
             return `<tr>
-              <td style="color:var(--muted);font-weight:600;">${o.numero?('#'+o.numero):'—'}</td>
-              <td>${clientName(o.clientId)}</td>
+              <td style="color:var(--muted);font-weight:400;font-size:10.5px;">${o.numero?('#'+o.numero):'—'}</td>
+              <td>${clientName(o.clientId)}<div class="lr-sub" style="font-size:10.5px;">${o.createdAt?`Creato il ${fmtDate(o.createdAt.slice(0,10))}`:''}</div></td>
               <td>${orderCategorieLabel(o)}</td>
               <td>${orderWorkersLabel(o)}</td>
-              <td>${done}/${o.fasi.length} fasi</td>
               <td>${fmtMoney(orderTotale(o))}</td>
               <td style="${orderSaldo(o)>0.001?'color:var(--danger);font-weight:600':''}">${fmtMoney(orderSaldo(o))}</td>
               <td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
               <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Apri scheda</button></td>
             </tr>`;
-          }).join("") : `<tr><td colspan="9" class="empty">Nessuna scheda corrisponde ai filtri selezionati.</td></tr>`}
+          }).join("") : `<tr><td colspan="8" class="empty">Nessuna scheda corrisponde ai filtri selezionati.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -1890,7 +1926,7 @@ function openJobCard(orderId){
     <button class="close-x" onclick="closeModal()">×</button>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
       <div>
-        <p class="jobcard-eyebrow">Scheda di lavorazione ${o.numero?('#'+o.numero):''}${o.createdAt?` — creata il ${fmtDate(o.createdAt.slice(0,10))}`:''}</p>
+        <p class="jobcard-eyebrow">Scheda di lavorazione${o.createdAt?` — creata il ${fmtDate(o.createdAt.slice(0,10))}`:''} <span style="font-size:8px;opacity:.5;text-transform:none;letter-spacing:0;">${o.numero?('#'+o.numero):''}</span></p>
         <h2 style="margin-bottom:2px;">${c?clientDisplayName(c):"—"}</h2>
       </div>
       <div class="jobcard-flags">
@@ -2104,7 +2140,7 @@ function magazzinoRowsHtml(list){
     const destHtml = destinazioni.length
       ? destinazioni.map(d=>`<div style="margin-bottom:4px;">
           <span class="pill pill-produzione">DESTINATO</span>
-          <strong>${d.quantita} pz</strong> → ${clientName(d.order.clientId)} ${d.order.numero?('#'+d.order.numero):''}
+          <strong>${d.quantita} pz</strong> → ${clientName(d.order.clientId)} <span style="font-size:9px;color:var(--border);">${d.order.numero?('#'+d.order.numero):''}</span>
         </div>`).join("")
       : `<span style="color:var(--muted);">—</span>`;
     return `<tr style="${destinazioni.length?'background:#FFF8DF;':''}">
