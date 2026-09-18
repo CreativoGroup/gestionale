@@ -296,6 +296,7 @@ const FORNITORI_PER_PRODOTTO_ESTERNO = {
 const PAY_METHODS = ["Bonifico","Contanti","Carta"];
 const PAY_TIPI = ["Acconto","Saldo"];
 const CLIENT_TYPES = ["Business","Family"];
+const CARATTERE_OPTIONS = ["Tra i migliori","Buon cliente","Potenziale","Ripetitivo","Grande ordine","Da coccolare","Dormiente","Da evitare"];
 const SETTORI = ["Abbigliamento", "Agenzia Viaggi/Auto/Funebre", "Architetti", "Arte", "Associazione Sportiva", "Automotive", "Cinema/Spettacolo", "Creativi", "Cura Persona", "Danza", "Edile", "Editoria", "Ente e Associazioni", "Eventi / Marketing", "Fisioterapia", "Hotellerie", "Immobiliare", "Legale/Tributario/Assicurativo", "Lusso", "Medicina Estetica", "Medico", "Ospedale", "Palestra", "Piccolo Commerciante", "Ristorazione", "Scuola/Parrocchia", "Settore Politica", "Studio Professionale", "Tecnologico", "Università"];
 const CONSEGNA_TIPI = ["Ritiro in sede","Spedizione"];
 
@@ -348,7 +349,7 @@ function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toIS
 /* ---- Mapping camelCase (app) <-> snake_case (database) ---- */
 function toDbRow(collection, o){
   switch(collection){
-    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null};
+    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, carattere:o.carattere||null, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null};
     case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito};
     case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
@@ -360,7 +361,7 @@ function toDbRow(collection, o){
 }
 function fromDbRow(collection, r){
   switch(collection){
-    case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||""};
+    case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", carattere:r.carattere||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||""};
     case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito};
     case "orders": {
       const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:r.worker||"", stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
@@ -1102,21 +1103,20 @@ function renderClienti(){
     <p class="helptext">${list.length} clienti su ${state.clients.length} totali.</p>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>N°</th><th>Tipo</th><th>Nome</th><th>Città</th><th>P.IVA</th><th>Telefono</th><th>Email</th><th>Settore</th><th>Fatturato</th><th></th></tr></thead>
+        <thead><tr><th>N°</th><th>Tipo</th><th>Nome</th><th>Telefono</th><th>Email</th><th>Settore</th><th>Carattere</th><th>Fatturato</th><th></th></tr></thead>
         <tbody>
           ${list.length ? list.map(c=>`
             <tr class="clickable-row" onclick="openClientHistory('${c.id}')">
               <td style="color:var(--border);font-weight:400;font-size:10px;">${c.numero?('#'+c.numero):'—'}</td>
               <td><span class="pill ${c.tipo==='Business'?'pill-business':'pill-family'}">${c.tipo}</span></td>
               <td><span class="status-dot client-dot-${c.tipo==='Business'?'business':'family'}"></span><span style="font-weight:600;color:${c.tipo==='Business'?'#1D5A9E':'#B9660C'}">${clientDisplayName(c)}</span></td>
-              <td>${c.citta||"—"}</td>
-              <td>${c.partitaIva||"—"}</td>
               <td>${c.telefono||"—"}</td>
               <td>${c.email? `<a class="link" href="mailto:${c.email}" onclick="event.stopPropagation()">${c.email}</a>`:"—"}</td>
               <td>${c.settore||`<span style="color:var(--warn);">da assegnare</span>`}</td>
+              <td onclick="event.stopPropagation()"><select class="inline" onchange="updateClientCarattere('${c.id}',this.value)"><option value="">—</option>${CARATTERE_OPTIONS.map(op=>`<option value="${op}" ${c.carattere===op?'selected':''}>${op}</option>`).join("")}</select></td>
               <td>${fmtMoney(clientFatturato(c.id))}</td>
               <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteClient('${c.id}')">Elimina</button></td>
-            </tr>`).join("") : `<tr><td colspan="10" class="empty">Nessun cliente con questi filtri.</td></tr>`}
+            </tr>`).join("") : `<tr><td colspan="9" class="empty">Nessun cliente con questi filtri.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -1181,6 +1181,13 @@ function addClient(){
   const id = createClientFromPrefix('cf');
   if(!id) return;
   toggleForm('clientForm'); renderClienti(); showToast("Cliente aggiunto");
+}
+function updateClientCarattere(clientId, value){
+  const c = findItem('clients', clientId);
+  if(!c) return;
+  c.carattere = value;
+  saveState('clients');
+  showToast(value ? `Carattere impostato: ${value}` : "Carattere rimosso");
 }
 function deleteClient(id){
   askConfirm("Eliminare questo cliente? Gli ordini e preventivi collegati resteranno ma senza cliente associato.", ()=>{
@@ -1679,39 +1686,9 @@ function openQuoteDetail(quoteId){
 function updateQuoteField(id, field, value){ findItem('quotes',id)[field] = value; saveState('quotes'); }
 
 /* ============ ORDINI ============ */
-let orderFilters = {categoria:"", stato:"", worker:"", search:""};
-function renderOrdini(){
-  const f = orderFilters;
-  const list = state.orders.filter(o =>
-    (!f.categoria || orderCategorie(o).includes(f.categoria)) &&
-    (!f.stato || o.stato===f.stato) &&
-    (!f.worker || orderWorkersList(o).includes(f.worker)) &&
-    (!f.search || (clientName(o.clientId)+" "+(o.descrizione||"")+" "+orderCategorieLabel(o)).toLowerCase().includes(f.search.toLowerCase()))
-  ).sort((a,b)=> (a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
-  document.getElementById("view-ordini").innerHTML = `
-    <div class="form-panel" id="orderForm">
-      <h3>Nuovo ordine</h3>
-      <div class="form-grid">
-        <div class="field"><label>Cliente</label><select id="of-cliente" onchange="onClientSelectChange(this,'of-newclient')">${clientOptions(null,true)}</select></div>
-      </div>
-      <div id="of-newclient" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
-        <p class="helptext" style="margin-top:0;">Dati del nuovo cliente</p>
-        ${clientFieldsHTML('ofnc')}
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" onclick="addOrder()">Crea ordine</button>
-        <button class="btn btn-outline" onclick="toggleForm('orderForm')">Annulla</button>
-      </div>
-      <p class="helptext" style="margin-top:10px;">Verrà creata subito la scheda di lavorazione: lì potrai impostare data di consegna, operatore, categoria e tutto il resto.</p>
-    </div>
-    <div class="section-header">
-      <div class="filters">
-        <input id="ordiniSearchInput" class="inline" style="min-width:200px;" placeholder="Cerca ordine…" value="${f.search}" oninput="orderFilters.search=this.value; rerenderKeepingFocus(renderOrdini);">
-        <select class="inline" onchange="orderFilters.categoria=this.value; renderOrdini();"><option value="">Tutte le categorie</option>${CATEGORIES.map(c=>`<option ${c===f.categoria?'selected':''}>${c}</option>`).join("")}</select>
-        <select class="inline" onchange="orderFilters.stato=this.value; renderOrdini();"><option value="">Tutti gli stati</option>${STATUSES.map(s=>`<option ${s===f.stato?'selected':''}>${s}</option>`).join("")}</select>
-        <select class="inline" onchange="orderFilters.worker=this.value; renderOrdini();"><option value="">Tutti gli operatori</option>${WORKERS.map(w=>`<option ${w===f.worker?'selected':''}>${w}</option>`).join("")}</select>
-      </div>
-    </div>
+let orderFilters = {categoria:"", worker:"", search:""};
+function ordiniTableHtml(list){
+  return `
     <div class="table-wrap">
       <table>
         <thead><tr><th>N°</th><th>★</th><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Consegna</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
@@ -1737,6 +1714,45 @@ function renderOrdini(){
         </tbody>
       </table>
     </div>
+  `;
+}
+function renderOrdini(){
+  const f = orderFilters;
+  const matches = o =>
+    (!f.categoria || orderCategorie(o).includes(f.categoria)) &&
+    (!f.worker || orderWorkersList(o).includes(f.worker)) &&
+    (!f.search || (clientName(o.clientId)+" "+(o.descrizione||"")+" "+orderCategorieLabel(o)).toLowerCase().includes(f.search.toLowerCase()));
+  const attivi = state.orders.filter(o=>o.stato!=="Consegnato" && matches(o))
+    .sort((a,b)=> (a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
+  const archiviati = state.orders.filter(o=>o.stato==="Consegnato" && matches(o))
+    .sort((a,b)=> (b.dataConsegna||"").localeCompare(a.dataConsegna||""));
+  document.getElementById("view-ordini").innerHTML = `
+    <div class="form-panel" id="orderForm">
+      <h3>Nuovo ordine</h3>
+      <div class="form-grid">
+        <div class="field"><label>Cliente</label><select id="of-cliente" onchange="onClientSelectChange(this,'of-newclient')">${clientOptions(null,true)}</select></div>
+      </div>
+      <div id="of-newclient" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
+        <p class="helptext" style="margin-top:0;">Dati del nuovo cliente</p>
+        ${clientFieldsHTML('ofnc')}
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addOrder()">Crea ordine</button>
+        <button class="btn btn-outline" onclick="toggleForm('orderForm')">Annulla</button>
+      </div>
+      <p class="helptext" style="margin-top:10px;">Verrà creata subito la scheda di lavorazione: lì potrai impostare data di consegna, operatore, categoria e tutto il resto.</p>
+    </div>
+    <div class="section-header">
+      <div class="filters">
+        <input id="ordiniSearchInput" class="inline" style="min-width:200px;" placeholder="Cerca ordine…" value="${f.search}" oninput="orderFilters.search=this.value; rerenderKeepingFocus(renderOrdini);">
+        <select class="inline" onchange="orderFilters.categoria=this.value; renderOrdini();"><option value="">Tutte le categorie</option>${CATEGORIES.map(c=>`<option ${c===f.categoria?'selected':''}>${c}</option>`).join("")}</select>
+        <select class="inline" onchange="orderFilters.worker=this.value; renderOrdini();"><option value="">Tutti gli operatori</option>${WORKERS.map(w=>`<option ${w===f.worker?'selected':''}>${w}</option>`).join("")}</select>
+      </div>
+    </div>
+    <h3 style="margin:0 0 10px;">In corso <span style="color:var(--muted);font-weight:500;font-size:14px;">(${attivi.length})</span></h3>
+    ${ordiniTableHtml(attivi)}
+    <h3 style="margin:26px 0 10px;">Archiviati — consegnati <span style="color:var(--muted);font-weight:500;font-size:14px;">(${archiviati.length})</span></h3>
+    ${ordiniTableHtml(archiviati)}
   `;
 }
 function toggleImportante(orderId){
