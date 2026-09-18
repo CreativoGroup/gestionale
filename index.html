@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<link rel="manifest" href="./manifest.webmanifest">
+<link rel="manifest" href="./manifest-creativo-v3.webmanifest">
 <meta name="theme-color" content="#E8552F">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Gestionale">
-<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-creativo-v3.png">
 <title>Gestionale — Agenzia Grafica &amp; Stampa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3269,7 +3269,7 @@ async function installPwa(){
 
 if("serviceWorker" in navigator){
   window.addEventListener("load", ()=>{
-    navigator.serviceWorker.register("./service-worker.js").catch(err=>{
+    navigator.serviceWorker.register("./service-worker-creativo-v3.js").catch(err=>{
       console.error("Service Worker non registrato", err);
     });
   });
@@ -3290,17 +3290,17 @@ if("serviceWorker" in navigator){
   "theme_color": "#E85A32",
   "orientation": "any",
   "icons": [
-    {"src":"./icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
-    {"src":"./icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {"src":"./icon-192-creativo-v3.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"./icon-512-creativo-v3.png","sizes":"512x512","type":"image/png","purpose":"any"}
   ]
 }
 
-const CACHE_NAME = "gestionale-app-v2";
+const CACHE_NAME = "gestionale-app-v3-creativo";
 const STATIC_ASSETS = [
-  "./manifest.webmanifest",
+  "./manifest-creativo-v3.webmanifest",
   "./catalogo-actionwear.js",
-  "./icon-192.png",
-  "./icon-512.png"
+  "./icon-192-creativo-v3.png",
+  "./icon-512-creativo-v3.png"
 ];
 
 self.addEventListener("install", event => {
