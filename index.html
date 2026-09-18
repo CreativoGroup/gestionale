@@ -225,7 +225,6 @@
     <section class="view" id="view-preventivi"></section>
     <section class="view" id="view-ordini"></section>
     <section class="view" id="view-flusso"></section>
-    <section class="view" id="view-schede"></section>
     <section class="view" id="view-magazzino"></section>
     <section class="view" id="view-incassi"></section>
     <section class="view" id="view-spese"></section>
@@ -282,12 +281,17 @@ function fasiSectionLabel(o){
   const hasTipologia = cats.some(c=>TIPOLOGIA_CATEGORIE.includes(c));
   return (hasTipologia && !hasServizio) ? "Tipologia di lavorazione" : "Fasi di lavorazione";
 }
-/* Fornitori suggeriti per prodotto di Lavorazioni Esterne. I prodotti non elencati qui (Piccolo Formato, Altro) usano un campo di testo libero. */
+/* Fornitori suggeriti per prodotto di Lavorazioni Esterne. Solo "Altro" usa un campo di testo libero. */
 const FORNITORI_PER_PRODOTTO_ESTERNO = {
-  "Tipografia": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
   "Serigrafia": ["Officine del Cotone","4C Serigrafia","Ricamarte"],
   "Grande Formato": ["Presstime","Coke","Former","Hi Print","Altro"],
-  "Gadget": ["Photosi","Cosimo Amalio","Get Impressed","AMGS"]
+  "Gadget": ["Photosi","Cosimo Amalio","Get Impressed","AMGS"],
+  "Piccolo Formato": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
+  "Biglietti da visita": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
+  "Volantini": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
+  "Pieghevoli": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
+  "Cartelline": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
+  "Blocnotes": ["Former","Presstime","Flyeralarm","Pressup","Pixart"]
 };
 const PAY_METHODS = ["Bonifico","Contanti","Carta"];
 const PAY_TIPI = ["Acconto","Saldo"];
@@ -567,7 +571,6 @@ const NAV = [
   {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi in corso e storico"},
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi"},
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase"},
-  {id:"schede", label:"Schede di lavorazione", icon:"▦", subtitle:"Dettaglio, righe, IVA e pagamenti per ordine"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili"},
   {id:"incassi", label:"Incassi", icon:"€", subtitle:"Report pagamenti e crediti aperti", adminOnly:true},
   {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine"},
@@ -601,7 +604,7 @@ function renderTopbarActions(){
 }
 function renderCurrentView(){
   ({dashboard:renderDashboard, clienti:renderClienti, preventivi:renderPreventivi,
-    ordini:renderOrdini, flusso:renderFlusso, schede:renderSchede,
+    ordini:renderOrdini, flusso:renderFlusso,
     magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, entrate:renderEntrate})[currentView]();
 }
 function toggleForm(id){ const el = document.getElementById(id); if(el) el.classList.toggle("open"); }
@@ -1776,7 +1779,8 @@ function deleteOrder(id){
 let flussoFilters = {categoria:"", worker:""};
 function renderFlusso(){
   const f = flussoFilters;
-  const list = state.orders.filter(o => o.stato!=="Consegnato" && (!f.categoria || orderCategorie(o).includes(f.categoria)) && (!f.worker || orderWorkersList(o).includes(f.worker)));
+  const list = state.orders.filter(o => o.stato!=="Consegnato" && (!f.categoria || orderCategorie(o).includes(f.categoria)) && (!f.worker || orderWorkersList(o).includes(f.worker)))
+    .sort((a,b)=> (a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
   document.getElementById("view-flusso").innerHTML = `
     <div class="section-header">
       <div class="filters">
@@ -1810,62 +1814,6 @@ function renderFlusso(){
   `;
 }
 
-/* ============ SCHEDE DI LAVORAZIONE ============ */
-let schedeFilters = {stato:"", worker:"", categoria:"", sort:"consegna_asc"};
-function setSchedeFilter(field,value){ schedeFilters[field]=value; renderSchede(); }
-function schedeFilteredSorted(){
-  let list=[...state.orders];
-  if(schedeFilters.stato) list=list.filter(o=>o.stato===schedeFilters.stato);
-  if(schedeFilters.worker) list=list.filter(o=>o.worker===schedeFilters.worker);
-  if(schedeFilters.categoria) list=list.filter(o=>orderCategorie(o).includes(schedeFilters.categoria));
-  const statusIndex=s=>{ const i=STATUSES.indexOf(s); return i<0?99:i; };
-  switch(schedeFilters.sort){
-    case "stato": list.sort((a,b)=>statusIndex(a.stato)-statusIndex(b.stato) || (a.dataConsegna||"9999").localeCompare(b.dataConsegna||"9999")); break;
-    case "cliente": list.sort((a,b)=>clientName(a.clientId).localeCompare(clientName(b.clientId))); break;
-    case "numero_desc": list.sort((a,b)=>(Number(b.numero)||0)-(Number(a.numero)||0)); break;
-    case "operatore": list.sort((a,b)=>(a.worker||"ZZZ").localeCompare(b.worker||"ZZZ") || clientName(a.clientId).localeCompare(clientName(b.clientId))); break;
-    default: list.sort((a,b)=>(a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
-  }
-  return list;
-}
-function renderSchede(){
-  const list=schedeFilteredSorted();
-  document.getElementById("view-schede").innerHTML = `
-    <div class="card" style="margin-bottom:14px;padding:14px 16px;">
-      <div class="filters" style="align-items:end;">
-        <div class="field"><label>Stato</label><select class="inline" onchange="setSchedeFilter('stato',this.value)"><option value="">Tutti</option>${STATUSES.map(s=>`<option value="${s}" ${schedeFilters.stato===s?'selected':''}>${s}</option>`).join("")}</select></div>
-        <div class="field"><label>Operatore</label><select class="inline" onchange="setSchedeFilter('worker',this.value)"><option value="">Tutti</option>${WORKERS.map(w=>`<option value="${w}" ${schedeFilters.worker===w?'selected':''}>${w}</option>`).join("")}</select></div>
-        <div class="field"><label>Categoria</label><select class="inline" onchange="setSchedeFilter('categoria',this.value)"><option value="">Tutte</option>${CATEGORIES.map(c=>`<option value="${c}" ${schedeFilters.categoria===c?'selected':''}>${c}</option>`).join("")}</select></div>
-        <div class="field"><label>Ordina per</label><select class="inline" onchange="setSchedeFilter('sort',this.value)">
-          <option value="consegna_asc" ${schedeFilters.sort==='consegna_asc'?'selected':''}>Data consegna</option>
-          <option value="stato" ${schedeFilters.sort==='stato'?'selected':''}>Stato lavorazione</option>
-          <option value="cliente" ${schedeFilters.sort==='cliente'?'selected':''}>Cliente A-Z</option>
-          <option value="numero_desc" ${schedeFilters.sort==='numero_desc'?'selected':''}>Numero scheda (recenti)</option>
-          <option value="operatore" ${schedeFilters.sort==='operatore'?'selected':''}>Operatore</option>
-        </select></div>
-      </div>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>N°</th><th>Cliente</th><th>Categorie</th><th>Operatore</th><th>Totale</th><th>Saldo</th><th>Stato</th><th></th></tr></thead>
-        <tbody>
-          ${list.length ? list.map(o=>{
-            return `<tr>
-              <td style="color:var(--muted);font-weight:400;font-size:10.5px;">${o.numero?('#'+o.numero):'—'}</td>
-              <td>${clientName(o.clientId)}<div class="lr-sub" style="font-size:10.5px;">${o.createdAt?`Creato il ${fmtDate(o.createdAt.slice(0,10))}`:''}</div></td>
-              <td>${orderCategorieLabel(o)}</td>
-              <td>${orderWorkersLabel(o)}</td>
-              <td>${fmtMoney(orderTotale(o))}</td>
-              <td style="${orderSaldo(o)>0.001?'color:var(--danger);font-weight:600':''}">${fmtMoney(orderSaldo(o))}</td>
-              <td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
-              <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Apri scheda</button></td>
-            </tr>`;
-          }).join("") : `<tr><td colspan="8" class="empty">Nessuna scheda corrisponde ai filtri selezionati.</td></tr>`}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
 let fasiSectionOpen = {};
 function toggleFasiSection(orderId){
   fasiSectionOpen[orderId] = !fasiSectionOpen[orderId];
