@@ -402,6 +402,19 @@ async function syncCollection(name){
   }
   return true;
 }
+
+/* Salvataggio mirato di una sola riga: usato nei flussi nuovo cliente -> nuovo ordine,
+   così l'ordine non può essere creato prima che il cliente esista davvero su Supabase. */
+async function upsertOne(collection, obj){
+  const row = toDbRow(collection, obj);
+  const { error } = await sb.from(TABLES[collection]).upsert(row);
+  if(error){
+    console.error("Errore salvataggio", collection, error);
+    showToast(`Errore salvataggio ${collection}: ${error.message || "riprova"}`);
+    return false;
+  }
+  return true;
+}
 /* ---- Cancellazione mirata ---- */
 async function dbDelete(name, id){
   const { error } = await sb.from(TABLES[name]).delete().eq("id", id);
@@ -413,16 +426,9 @@ async function dbDeleteMany(name, ids){
   if(error){ console.error("Errore eliminazione multipla", name, error); showToast("Errore nell'eliminazione: riprova"); }
 }
 /* Compatibilità: chiamate rimaste generiche vengono instradate sulla collezione giusta quando possibile */
-let saveQueue = Promise.resolve(true);
 function saveState(name){
-  if(name){
-    saveQueue = saveQueue
-      .catch(()=>true)
-      .then(()=>syncCollection(name));
-    return saveQueue;
-  }
+  if(name) { syncCollection(name); return; }
   console.warn("saveState() chiamato senza indicare la collezione: nessuna sincronizzazione effettuata.");
-  return Promise.resolve(false);
 }
 
 /* ---- Aggiornamenti in tempo reale da altri dispositivi ---- */
@@ -1045,34 +1051,60 @@ function readCommonClientFields(prefix){
     codiceSDI: document.getElementById(`${prefix}-sdi`).value.trim()
   };
 }
-/* Crea (o aggiorna, se existingId è passato) un cliente leggendo i campi con un dato prefisso. Ritorna l'id o null se non valido. */
-function createClientFromPrefix(prefix, existingId){
+/* Crea (o aggiorna, se existingId è passato) un cliente leggendo i campi con un dato prefisso.
+   IMPORTANTE: ritorna l'id solo DOPO che Supabase ha confermato il salvataggio. */
+async function createClientFromPrefix(prefix, existingId){
   const tipo = document.getElementById(`${prefix}-tipo`).value;
   const telefono = document.getElementById(`${prefix}-telefono`).value.trim();
   const email = document.getElementById(`${prefix}-email`).value.trim();
   if(!telefono && !email){ showToast("Inserisci almeno telefono o email"); return null; }
+
   const comuni = readCommonClientFields(prefix);
   let payload;
+
   if(tipo==="Business"){
     const ragioneSociale = document.getElementById(`${prefix}-ragsoc`).value.trim();
     const settore = document.getElementById(`${prefix}-settore`).value;
     if(!ragioneSociale){ showToast("Inserisci il nome dell'azienda"); return null; }
     if(!settore){ showToast("Il settore è obbligatorio per i clienti Business"); return null; }
-    payload = {tipo, ragioneSociale, refNome:document.getElementById(`${prefix}-refnome`).value.trim(), refCognome:document.getElementById(`${prefix}-refcognome`).value.trim(), settore, telefono, email, ...comuni};
+    payload = {
+      tipo, ragioneSociale,
+      refNome:document.getElementById(`${prefix}-refnome`).value.trim(),
+      refCognome:document.getElementById(`${prefix}-refcognome`).value.trim(),
+      settore, telefono, email, ...comuni
+    };
   } else {
     const nome = document.getElementById(`${prefix}-nome`).value.trim();
     if(!nome){ showToast("Inserisci il nome della persona"); return null; }
-    payload = {tipo, nome, cognome:document.getElementById(`${prefix}-cognome`).value.trim(), telefono, email, ...comuni};
+    payload = {
+      tipo, nome,
+      cognome:document.getElementById(`${prefix}-cognome`).value.trim(),
+      telefono, email, ...comuni
+    };
   }
+
   if(existingId){
     const c = findItem('clients', existingId);
+    if(!c) return null;
+    const backup = {...c};
     Object.assign(c, payload);
-    saveState('clients'); return existingId;
-  } else {
-    const id = uid();
-    state.clients.push({id, ...payload});
-    saveState('clients'); return id;
+    const ok = await upsertOne('clients', c);
+    if(!ok){
+      Object.keys(c).forEach(k=>delete c[k]);
+      Object.assign(c, backup);
+      return null;
+    }
+    return existingId;
   }
+
+  const id = uid();
+  const nuovo = {id, ...payload};
+  const ok = await upsertOne('clients', nuovo);
+  if(!ok) return null;
+
+  // Il realtime potrebbe averlo già inserito nello state mentre attendevamo.
+  if(!state.clients.some(c=>c.id===id)) state.clients.push(nuovo);
+  return id;
 }
 function clientFatturato(clientId){ return state.orders.filter(o=>o.clientId===clientId).reduce((s,o)=>s+orderTotale(o),0); }
 let clientiFilters = {search:"", settore:"", tipo:"", fatturatoMin:""};
@@ -1183,14 +1215,14 @@ function openEditClient(clientId){
   document.getElementById("modalBackdrop").classList.add("open");
   toggleClientTypeFields('ec');
 }
-function saveEditClient(clientId){
-  const id = createClientFromPrefix('ec', clientId);
+async function saveEditClient(clientId){
+  const id = await createClientFromPrefix('ec', clientId);
   if(!id) return;
   showToast("Cliente aggiornato");
   openClientHistory(clientId);
 }
-function addClient(){
-  const id = createClientFromPrefix('cf');
+async function addClient(){
+  const id = await createClientFromPrefix('cf');
   if(!id) return;
   toggleForm('clientForm'); renderClienti(); showToast("Cliente aggiunto");
 }
@@ -1296,10 +1328,10 @@ function onClientSelectChange(selectEl, wrapId){
   document.getElementById(wrapId).style.display = selectEl.value==="__new__" ? "block" : "none";
 }
 /* Ritorna l'id cliente da usare: se è stata scelta "Nuovo cliente" lo crea al volo. Ritorna null se non valido. */
-function resolveClientId(selectId, newClientPrefix){
+async function resolveClientId(selectId, newClientPrefix){
   const val = document.getElementById(selectId).value;
   if(!val){ showToast("Seleziona o crea un cliente"); return null; }
-  if(val === "__new__") return createClientFromPrefix(newClientPrefix);
+  if(val === "__new__") return await createClientFromPrefix(newClientPrefix);
   return val;
 }
 function categoryOptions(selected, includeBlank){ return (includeBlank?`<option value="">Seleziona categoria…</option>`:'') + CATEGORIES.map(c=>`<option value="${c}" ${c===selected?'selected':''}>${c}</option>`).join(""); }
@@ -1654,12 +1686,17 @@ function renderPreventivi(){
     </div>
   `;
 }
-function addQuote(){
-  const clientId = resolveClientId("qf-cliente", "qfnc");
+async function addQuote(){
+  const clientId = await resolveClientId("qf-cliente", "qfnc");
   if(!clientId) return;
+
   const id = uid();
-  state.quotes.push({id, clientId, categoria:document.getElementById("qf-categoria").value, descrizione:"", righe:[], stato:"Bozza", data:today()});
-  saveState('quotes'); toggleForm('quoteForm'); renderPreventivi(); showToast("Preventivo creato"); openQuoteDetail(id);
+  const quote = {id, clientId, categoria:document.getElementById("qf-categoria").value, descrizione:"", righe:[], stato:"Bozza", data:today()};
+  const ok = await upsertOne('quotes', quote);
+  if(!ok) return;
+
+  if(!state.quotes.some(q=>q.id===id)) state.quotes.push(quote);
+  toggleForm('quoteForm'); renderPreventivi(); showToast("Preventivo creato"); openQuoteDetail(id);
 }
 function setQuoteStatus(id, stato){ findItem('quotes',id).stato = stato; saveState('quotes'); renderPreventivi(); }
 function deleteQuote(id){
@@ -1782,13 +1819,23 @@ function toggleImportante(orderId){
   const o = findItem('orders', orderId);
   o.importante = !o.importante; saveState('orders'); renderOrdini();
 }
-function addOrder(){
-  const clientId = resolveClientId("of-cliente", "ofnc");
+async function addOrder(){
+  const clientId = await resolveClientId("of-cliente", "ofnc");
   if(!clientId) return;
+
   const id = uid();
   const order = mkOrder(id, clientId, "", "", "Da fare", "", undefined, undefined);
-  state.orders.push(order);
-  saveState('orders'); toggleForm('orderForm'); renderOrdini(); showToast("Ordine creato"); openJobCard(id);
+
+  // Il cliente è già stato confermato su Supabase prima di arrivare qui.
+  // Ora salviamo l'ordine e apriamo la scheda solo dopo conferma del database.
+  const ok = await upsertOne('orders', order);
+  if(!ok) return;
+
+  if(!state.orders.some(o=>o.id===id)) state.orders.push(order);
+  toggleForm('orderForm');
+  renderOrdini();
+  showToast("Ordine creato");
+  openJobCard(id);
 }
 function deleteOrderFromCreditiCliente(orderId, clientId){
   askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati.", ()=>{
@@ -2031,24 +2078,15 @@ function openAddPaymentModal(orderId){
     </div>
   `;
 }
-async function submitAddPayment(orderId){
+function submitAddPayment(orderId){
   const importo = Number(document.getElementById("ap-importo").value)||0;
   if(importo<=0){ showToast("Inserisci un importo valido"); return; }
   const o = findItem('orders', orderId);
-  if(!o){ showToast("Ordine non trovato"); return; }
-  const payment = {id:uid(), orderId, clientId:o.clientId,
+  state.payments.push({id:uid(), orderId, clientId:o.clientId,
     tipo:document.getElementById("ap-tipo").value, importo,
     data:document.getElementById("ap-data").value||today(),
-    metodo:document.getElementById("ap-metodo").value};
-  state.payments.push(payment);
-  const ok = await saveState('payments');
-  if(!ok){
-    state.payments = state.payments.filter(p=>p.id!==payment.id);
-    showToast("Pagamento NON salvato. I dati cliente/ordine restano invariati.");
-    return;
-  }
-  showToast("Pagamento registrato");
-  openJobCard(orderId);
+    metodo:document.getElementById("ap-metodo").value});
+  saveState('payments'); showToast("Pagamento registrato"); openJobCard(orderId);
 }
 function closeModal(){ document.getElementById("modalBackdrop").classList.remove("open"); renderCurrentView(); }
 function renderFasiGrouped(o){
