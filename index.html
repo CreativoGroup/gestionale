@@ -268,12 +268,26 @@ const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
 const QUOTE_CLASS = {"Bozza":"pill-draft","Inviato":"pill-sent","Accettato":"pill-accepted","Rifiutato":"pill-refused"};
 const STEP_TEMPLATES = {
   "Servizio": ["Appuntamento effettuato","Bozza grafica","Revisione cliente","Approvazione finale","Consegna file"],
-  "Stampa": ["Materiale in arrivo","Pronto per la stampa","Stampa DTF","Stampa taglio","Stampa digitale","Stampa sublimata"],
+  "Stampa": ["Stampa DTF","Stampa taglio","Stampa digitale","Stampa sublimata"],
   "Ricamo": ["Digitalizzazione ricamo","Ricamo personalizzato con nome","Ricamo standard","Pulizia ricamo"],
   "Allestimenti": ["Materiale da ordinare","Sopralluogo/misure","Mimaki","Summa","Montaggio","Piccola produzione"],
-  "Gadget": ["UV","Laser","Sublimatica","Materiale da ordinare","Nel carrello"],
-  "Piccolo Formato": ["Materiale da ordinare","File pronto per la stampa","Stampa","Taglio/rifinitura","Confezionamento"],
-  "Lavorazioni Esterne": ["Presstime","Flyeralarm","Former","Coke","Pressup","AMGS","Hi Print","Ricamarte","Pixart Printing","Officine del Cotone","Altro"]
+  "Gadget": ["UV","Laser","Sublimatica"]
+  /* "Lavorazioni Esterne" e "Piccolo Formato" non hanno più una checklist di fasi */
+};
+/* Categorie per cui l'etichetta della sezione è "Tipologia di lavorazione" invece di "Fasi di lavorazione" */
+const TIPOLOGIA_CATEGORIE = ["Gadget","Stampa","Ricamo"];
+function fasiSectionLabel(o){
+  const cats = orderCategorie(o);
+  const hasServizio = cats.includes("Servizio");
+  const hasTipologia = cats.some(c=>TIPOLOGIA_CATEGORIE.includes(c));
+  return (hasTipologia && !hasServizio) ? "Tipologia di lavorazione" : "Fasi di lavorazione";
+}
+/* Fornitori suggeriti per prodotto di Lavorazioni Esterne. I prodotti non elencati qui (Piccolo Formato, Altro) usano un campo di testo libero. */
+const FORNITORI_PER_PRODOTTO_ESTERNO = {
+  "Tipografia": ["Former","Presstime","Flyeralarm","Pressup","Pixart"],
+  "Serigrafia": ["Officine del Cotone","4C Serigrafia","Ricamarte"],
+  "Grande Formato": ["Presstime","Coke","Former","Hi Print","Altro"],
+  "Gadget": ["Photosi","Cosimo Amalio","Get Impressed","AMGS"]
 };
 const PAY_METHODS = ["Bonifico","Contanti","Carta"];
 const PAY_TIPI = ["Acconto","Saldo"];
@@ -591,6 +605,22 @@ function renderCurrentView(){
     magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, entrate:renderEntrate})[currentView]();
 }
 function toggleForm(id){ const el = document.getElementById(id); if(el) el.classList.toggle("open"); }
+/* Ridisegna una vista preservando il focus e la posizione del cursore sul campo attivo (usato dalle ricerche, che altrimenti perdono il focus a ogni lettera) */
+function rerenderKeepingFocus(renderFn){
+  const active = document.activeElement;
+  const id = active && active.id;
+  const canSelect = active && typeof active.selectionStart === "number";
+  const selStart = canSelect ? active.selectionStart : null;
+  const selEnd = canSelect ? active.selectionEnd : null;
+  renderFn();
+  if(id){
+    const el = document.getElementById(id);
+    if(el){
+      el.focus();
+      if(selStart !== null && el.setSelectionRange){ try{ el.setSelectionRange(selStart, selEnd); }catch(e){} }
+    }
+  }
+}
 
 /* Conferma personalizzata (window.confirm può non funzionare in ambienti sandboxed) */
 let _pendingConfirmAction = null;
@@ -619,7 +649,7 @@ function showToast(msg){ const t = document.getElementById("toast"); t.textConte
 function renderDashboard(){
   const activeOrders = state.orders.filter(o=>o.stato!=="Consegnato");
   const ordiniInLavorazione = state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato");
-  const creditiApertiDash = state.orders.filter(o=>o.stato==="Consegnato").map(o=>({o, saldo:orderSaldo(o)})).filter(x=>x.saldo>0.001);
+  const creditiApertiDash = creditiApertiRaggruppati();
   const preventiviAperti = state.quotes.filter(q=>q.stato==="Inviato"||q.stato==="Bozza").length;
   const scorteBasse = computeScorteMonitorate();
   const completatiDaConsegnare = state.orders.filter(o=>o.stato==="Completato");
@@ -696,7 +726,11 @@ function renderDashboard(){
       <div class="card">
         <h3 style="margin-top:0;">Ordini da spedire</h3>
         ${daSpedire.length ? `<table><tbody>${daSpedire.map(o=>`
-          <tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>
+          <tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-primary btn-sm" onclick="segnaComeSpedito('${o.id}')">Segna come spedito</button>
+            <button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button>
+          </td></tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessuna spedizione in sospeso.</p>`}
       </div>
     </div>
@@ -722,9 +756,56 @@ function renderDashboard(){
     ${currentUser.role==='admin' ? `
     <div class="card" style="margin-top:16px;">
       <h3 style="margin-top:0;">Crediti aperti (ordini consegnati non pagati)</h3>
-      ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Categoria</th><th>Totale ordine</th><th>Saldo da incassare</th></tr></thead><tbody>${creditiApertiDash.map(x=>`<tr><td>${clientName(x.o.clientId)}</td><td>${orderCategorieLabel(x.o)}</td><td>${fmtMoney(orderTotale(x.o))}</td><td style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)}</td></tr>`).join("")}</tbody></table>` : `<p class="empty">Nessun credito aperto.</p>`}
+      ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Ordini da saldare</th><th>Da saldare</th><th></th></tr></thead><tbody>${creditiApertiDash.map(g=>`
+        <tr>
+          <td>${clientName(g.clientId)}</td>
+          <td>${g.orders.length===1 ? orderCategorieLabel(g.orders[0].o) : `${g.orders.length} ordini — ${g.orders.map(x=>orderCategorieLabel(x.o)).join(", ")}`}</td>
+          <td style="color:var(--danger);font-weight:700;">${fmtMoney(g.totaleSaldo)} da saldare</td>
+          <td>${g.orders.length===1
+            ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button>`
+            : `<button class="btn btn-outline btn-sm" onclick="openCreditiCliente('${g.clientId}')">Dettaglio</button>`}</td>
+        </tr>`).join("")}</tbody></table>` : `<p class="empty">Nessun credito aperto.</p>`}
     </div>` : ``}
   `;
+}
+function segnaComeSpedito(orderId){
+  const o = findItem('orders', orderId);
+  if(!o) return;
+  o.spedito = true;
+  o.stato = "Consegnato";
+  saveState('orders');
+  renderDashboard();
+  showToast("Ordine segnato come spedito e archiviato");
+}
+function creditiApertiRaggruppati(){
+  const map = new Map();
+  state.orders.filter(o=>o.stato==="Consegnato").forEach(o=>{
+    const saldo = orderSaldo(o);
+    if(saldo<=0.001) return;
+    if(!map.has(o.clientId)) map.set(o.clientId, []);
+    map.get(o.clientId).push({o, saldo});
+  });
+  return [...map.entries()]
+    .map(([clientId, orders])=>({clientId, orders, totaleSaldo: orders.reduce((s,x)=>s+x.saldo,0)}))
+    .sort((a,b)=>b.totaleSaldo-a.totaleSaldo);
+}
+function openCreditiCliente(clientId){
+  const orders = state.orders.filter(o=>o.clientId===clientId && o.stato==="Consegnato").map(o=>({o, saldo:orderSaldo(o)})).filter(x=>x.saldo>0.001);
+  const totale = orders.reduce((s,x)=>s+x.saldo,0);
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>${clientName(clientId)}</h2>
+    <p style="color:var(--muted);margin-top:0;">${orders.length} ordini da saldare — totale <strong style="color:var(--danger);">${fmtMoney(totale)} da saldare</strong></p>
+    <div style="margin-top:14px;">
+      ${orders.map(x=>`
+        <div class="list-row" onclick="openJobCard('${x.o.id}')">
+          <div><div class="lr-main">${orderCategorieLabel(x.o)}</div><div class="lr-sub">${fmtDate(x.o.dataConsegna)} — ${orderWorkersLabel(x.o)}</div></div>
+          <div style="text-align:right;"><div class="lr-main">${fmtMoney(orderTotale(x.o))}</div><div class="lr-sub" style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)} da saldare</div></div>
+        </div>`).join("")}
+    </div>
+    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Chiudi</button></div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
 }
 function toggleClienteAvvisatoDashboard(orderId){
   const o = findItem('orders', orderId);
@@ -982,11 +1063,11 @@ function renderClienti(){
     </div>
     <div class="section-header">
       <div class="filters" style="flex:1;">
-        <input class="inline" style="min-width:220px;" list="clienti-suggerimenti" placeholder="Cerca cliente, città, P.IVA…" value="${f.search}" oninput="clientiFilters.search=this.value; renderClienti();">
+        <input id="clientiSearchInput" class="inline" style="min-width:220px;" list="clienti-suggerimenti" placeholder="Cerca cliente, città, P.IVA…" value="${f.search}" oninput="clientiFilters.search=this.value; rerenderKeepingFocus(renderClienti);">
         <datalist id="clienti-suggerimenti">${state.clients.map(c=>`<option value="${clientDisplayName(c)}">`).join("")}</datalist>
         <select class="inline" onchange="clientiFilters.tipo=this.value; renderClienti();"><option value="">Tutti i tipi</option>${CLIENT_TYPES.map(t=>`<option ${t===f.tipo?'selected':''}>${t}</option>`).join("")}</select>
         <select class="inline" onchange="clientiFilters.settore=this.value; renderClienti();"><option value="">Tutti i settori</option>${SETTORI.map(s=>`<option ${s===f.settore?'selected':''}>${s}</option>`).join("")}</select>
-        <input class="inline" style="width:150px;" type="number" min="0" placeholder="Fatturato minimo €" value="${f.fatturatoMin}" oninput="clientiFilters.fatturatoMin=this.value; renderClienti();">
+        <input id="clientiFatturatoMinInput" class="inline" style="width:150px;" type="number" min="0" placeholder="Fatturato minimo €" value="${f.fatturatoMin}" oninput="clientiFilters.fatturatoMin=this.value; rerenderKeepingFocus(renderClienti);">
         <button class="btn btn-outline btn-sm" onclick="toggleForm('importForm')">Importa da CSV</button>
       </div>
     </div>
@@ -1467,7 +1548,8 @@ function updateRigaField(collection, id, rigaId, field, value){
   const item = findItem(collection, id);
   const riga = item.righe.find(r=>r.id===rigaId);
   riga[field] = (field==='quantita'||field==='prezzoUnitario') ? Number(value)||0 : value;
-  if(collection==='orders' && field==='categoria'){ recalcFasi(item); riga.prodotto = ""; if(value!=="Lavorazioni Esterne") delete riga.ritiroEsterno; }
+  if(collection==='orders' && field==='categoria'){ recalcFasi(item); riga.prodotto = ""; if(value!=="Lavorazioni Esterne"){ delete riga.ritiroEsterno; delete riga.fornitore; } }
+  if(collection==='orders' && field==='prodotto'){ riga.fornitore = ""; }
   saveState(collection);
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
 }
@@ -1596,7 +1678,7 @@ function renderOrdini(){
     </div>
     <div class="section-header">
       <div class="filters">
-        <input class="inline" style="min-width:200px;" placeholder="Cerca ordine…" value="${f.search}" oninput="orderFilters.search=this.value; renderOrdini();">
+        <input id="ordiniSearchInput" class="inline" style="min-width:200px;" placeholder="Cerca ordine…" value="${f.search}" oninput="orderFilters.search=this.value; rerenderKeepingFocus(renderOrdini);">
         <select class="inline" onchange="orderFilters.categoria=this.value; renderOrdini();"><option value="">Tutte le categorie</option>${CATEGORIES.map(c=>`<option ${c===f.categoria?'selected':''}>${c}</option>`).join("")}</select>
         <select class="inline" onchange="orderFilters.stato=this.value; renderOrdini();"><option value="">Tutti gli stati</option>${STATUSES.map(s=>`<option ${s===f.stato?'selected':''}>${s}</option>`).join("")}</select>
         <select class="inline" onchange="orderFilters.worker=this.value; renderOrdini();"><option value="">Tutti gli operatori</option>${WORKERS.map(w=>`<option ${w===f.worker?'selected':''}>${w}</option>`).join("")}</select>
@@ -1762,14 +1844,31 @@ function renderRitiroEsternoSection(o){
     ${righe.map((r,idx)=>{
       const val=r.ritiroEsterno||"";
       const label=r.prodotto || r.descrizione || `Lavorazione esterna ${idx+1}`;
+      const fornitoriSuggeriti = FORNITORI_PER_PRODOTTO_ESTERNO[r.prodotto];
       return `<div style="padding:12px 0;border-bottom:1px solid var(--border);">
         <div style="font-weight:700;margin-bottom:8px;">${label}</div>
+        <div class="field" style="max-width:280px;margin-bottom:10px;">
+          <label>Fornitore</label>
+          ${fornitoriSuggeriti
+            ? `<select class="inline" onchange="updateFornitoreEsterno('${o.id}','${r.id}',this.value)">
+                <option value="">Seleziona fornitore…</option>
+                ${fornitoriSuggeriti.map(f=>`<option value="${f}" ${r.fornitore===f?'selected':''}>${f}</option>`).join("")}
+               </select>`
+            : `<input class="inline" placeholder="Inserisci fornitore…" value="${r.fornitore||''}" onchange="updateFornitoreEsterno('${o.id}','${r.id}',this.value)">`}
+        </div>
         <div style="display:flex;gap:16px;flex-wrap:wrap;">
           ${["CONSEGNA IN SEDE","DA RITIRARE","RITIRATO"].map(st=>`<label class="checkfield" style="font-weight:${val===st?'700':'500'};"><input type="radio" name="ritiro-${r.id}" ${val===st?'checked':''} onchange="updateRitiroEsterno('${o.id}','${r.id}','${st}')"> ${st}</label>`).join("")}
         </div>
       </div>`;
     }).join("")}
   </div>`;
+}
+function updateFornitoreEsterno(orderId,rigaId,value){
+  const o=findItem('orders',orderId);
+  const r=(o.righe||[]).find(x=>x.id===rigaId);
+  if(!r) return;
+  r.fornitore = value.trim();
+  saveState('orders');
 }
 function updateRitiroEsterno(orderId,rigaId,status){
   const o=findItem('orders',orderId);
@@ -1824,7 +1923,7 @@ function openJobCard(orderId){
 
     <div class="modal-section">
       <h3 style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="toggleFasiSection('${o.id}')">
-        <span>Fasi di lavorazione ${o.fasi.length ? `<span style="color:var(--muted);font-weight:500;font-size:14px;">(${o.fasi.filter(f=>f.completata).length}/${o.fasi.length} completate)</span>` : ''}</span>
+        <span>${fasiSectionLabel(o)} ${o.fasi.length ? `<span style="color:var(--muted);font-weight:500;font-size:14px;">(${o.fasi.filter(f=>f.completata).length}/${o.fasi.length} completate)</span>` : ''}</span>
         <span style="font-size:13px;color:var(--muted);">${fasiSectionOpen[o.id] ? '▾ chiudi' : '▸ apri'}</span>
       </h3>
       ${fasiSectionOpen[o.id] ? (o.fasi.length ? renderFasiGrouped(o) : `<p class="empty" style="padding:6px 0;">Assegna una categoria a una riga per generare la checklist delle fasi.</p>`) : ``}
