@@ -393,9 +393,14 @@ async function loadAllFromSupabase(){
 /* ---- Scrittura: aggiorna/crea tutte le righe attuali di una collezione (upsert) ---- */
 async function syncCollection(name){
   const rows = state[name].map(o => toDbRow(name, o));
-  if(!rows.length) return;
+  if(!rows.length) return true;
   const { error } = await sb.from(TABLES[name]).upsert(rows);
-  if(error){ console.error("Errore salvataggio", name, error); showToast("Errore nel salvataggio: riprova"); }
+  if(error){
+    console.error("Errore salvataggio", name, error);
+    showToast(`Errore salvataggio ${name}: ${error.message || "riprova"}`);
+    return false;
+  }
+  return true;
 }
 /* ---- Cancellazione mirata ---- */
 async function dbDelete(name, id){
@@ -408,9 +413,16 @@ async function dbDeleteMany(name, ids){
   if(error){ console.error("Errore eliminazione multipla", name, error); showToast("Errore nell'eliminazione: riprova"); }
 }
 /* Compatibilità: chiamate rimaste generiche vengono instradate sulla collezione giusta quando possibile */
+let saveQueue = Promise.resolve(true);
 function saveState(name){
-  if(name) { syncCollection(name); return; }
+  if(name){
+    saveQueue = saveQueue
+      .catch(()=>true)
+      .then(()=>syncCollection(name));
+    return saveQueue;
+  }
   console.warn("saveState() chiamato senza indicare la collezione: nessuna sincronizzazione effettuata.");
+  return Promise.resolve(false);
 }
 
 /* ---- Aggiornamenti in tempo reale da altri dispositivi ---- */
@@ -2019,15 +2031,24 @@ function openAddPaymentModal(orderId){
     </div>
   `;
 }
-function submitAddPayment(orderId){
+async function submitAddPayment(orderId){
   const importo = Number(document.getElementById("ap-importo").value)||0;
   if(importo<=0){ showToast("Inserisci un importo valido"); return; }
   const o = findItem('orders', orderId);
-  state.payments.push({id:uid(), orderId, clientId:o.clientId,
+  if(!o){ showToast("Ordine non trovato"); return; }
+  const payment = {id:uid(), orderId, clientId:o.clientId,
     tipo:document.getElementById("ap-tipo").value, importo,
     data:document.getElementById("ap-data").value||today(),
-    metodo:document.getElementById("ap-metodo").value});
-  saveState('payments'); showToast("Pagamento registrato"); openJobCard(orderId);
+    metodo:document.getElementById("ap-metodo").value};
+  state.payments.push(payment);
+  const ok = await saveState('payments');
+  if(!ok){
+    state.payments = state.payments.filter(p=>p.id!==payment.id);
+    showToast("Pagamento NON salvato. I dati cliente/ordine restano invariati.");
+    return;
+  }
+  showToast("Pagamento registrato");
+  openJobCard(orderId);
 }
 function closeModal(){ document.getElementById("modalBackdrop").classList.remove("open"); renderCurrentView(); }
 function renderFasiGrouped(o){
