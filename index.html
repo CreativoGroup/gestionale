@@ -254,7 +254,7 @@ const PRODOTTI_PER_CATEGORIA = {
   "Gadget": ["Penna","USB","Tessera","Tazza","Borraccia","Tela canvas","Altro"],
   "Allestimenti": ["Sticker","Prespaziato","Poster","Banner","Velcro","Altro"],
   "Piccolo Formato": ["Biglietti da visita","A4","A3","Carta adesiva","Altro"],
-  "Lavorazioni Esterne": ["Tipografia","Serigrafia","Grande Formato","Piccolo Formato","Biglietti da visita","Volantini","Pieghevoli","Cartelline","Blocnotes","Gadget","Altro"]
+  "Lavorazioni Esterne": ["Tipografia","Serigrafia","Grande Formato","Piccolo Formato","Biglietti da visita","Volantini","Pieghevoli","Cartelline","Blocco appunti","Gadget","Altro"]
 };
 const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone","Misto"];
 const STATUSES = ["Da fare","In lavorazione","In produzione","Completato","Consegnato"];
@@ -293,7 +293,7 @@ const FORNITORI_PER_PRODOTTO_ESTERNO = {
   "Volantini": FORNITORI_STANDARD_TIPOGRAFIA,
   "Pieghevoli": FORNITORI_STANDARD_TIPOGRAFIA,
   "Cartelline": FORNITORI_STANDARD_TIPOGRAFIA,
-  "Blocnotes": FORNITORI_STANDARD_TIPOGRAFIA
+  "Blocco appunti": FORNITORI_STANDARD_TIPOGRAFIA
 };
 const PAY_METHODS = ["Bonifico","Contanti","Carta"];
 const PAY_TIPI = ["Acconto","Saldo"];
@@ -2047,7 +2047,7 @@ function openJobCard(orderId){
         ${pagamenti.length ? pagamenti.map(p=>`
           <div class="pay-row">
             <span>${p.tipo} — ${fmtMoney(p.importo)} — ${p.metodo} — ${fmtDate(p.data)}</span>
-            <button class="btn btn-ghost btn-sm" onclick="deletePaymentFromCard('${p.id}','${o.id}')">✕</button>
+            <button class="btn btn-outline btn-sm" onclick="openEditPaymentModal('${p.id}','${o.id}')">MODIFICA</button>
           </div>`).join("") : `<p class="empty" style="padding:6px 0;">Nessun pagamento registrato.</p>`}
       </div>
       <div class="totals-box">
@@ -2114,6 +2114,67 @@ function submitAddPayment(orderId){
     data:document.getElementById("ap-data").value||today(),
     metodo:document.getElementById("ap-metodo").value});
   saveState('payments'); showToast("Pagamento registrato"); openJobCard(orderId);
+}
+
+function openEditPaymentModal(paymentId, returnOrderId){
+  const p = findItem('payments', paymentId);
+  if(!p) return;
+  const orderId = returnOrderId || p.orderId || "";
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="${orderId ? `openJobCard('${orderId}')` : `closeModal()`}">×</button>
+    <h2>Modifica pagamento</h2>
+    <div class="form-grid">
+      <div class="field"><label>Tipo</label>
+        <select id="ep-tipo">${PAY_TIPI.map(t=>`<option ${t===p.tipo?'selected':''}>${t}</option>`).join("")}</select>
+      </div>
+      <div class="field"><label>Importo €</label>
+        <input id="ep-importo" type="number" min="0" step="0.01" value="${Number(p.importo||0).toFixed(2)}">
+      </div>
+      <div class="field"><label>Giorno</label>
+        <input id="ep-data" type="date" value="${p.data||today()}">
+      </div>
+      <div class="field"><label>Modalità di pagamento</label>
+        <select id="ep-metodo">${PAY_METHODS.map(m=>`<option ${m===p.metodo?'selected':''}>${m}</option>`).join("")}</select>
+      </div>
+    </div>
+    <div class="form-actions" style="justify-content:space-between;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="savePaymentEdit('${paymentId}','${orderId}')">SALVA MODIFICHE</button>
+        <button class="btn btn-outline" onclick="${orderId ? `openJobCard('${orderId}')` : `closeModal()`}">Annulla</button>
+      </div>
+      <button class="btn btn-ghost" style="color:var(--danger);" onclick="deletePaymentFromEdit('${paymentId}','${orderId}')">ELIMINA PAGAMENTO</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function savePaymentEdit(paymentId, orderId){
+  const p = findItem('payments', paymentId);
+  if(!p) return;
+  const importo = Number(document.getElementById("ep-importo").value)||0;
+  if(importo<=0){ showToast("Inserisci un importo valido"); return; }
+
+  p.tipo = document.getElementById("ep-tipo").value;
+  p.importo = importo;
+  p.data = document.getElementById("ep-data").value || today();
+  p.metodo = document.getElementById("ep-metodo").value;
+
+  const ok = await syncCollection('payments');
+  if(ok===false) return;
+
+  showToast("Pagamento aggiornato");
+  if(orderId) openJobCard(orderId);
+  else { closeModal(); renderIncassi(); }
+}
+
+function deletePaymentFromEdit(paymentId, orderId){
+  askConfirm("Eliminare definitivamente questo pagamento?", async ()=>{
+    state.payments = state.payments.filter(p=>p.id!==paymentId);
+    await dbDelete('payments', paymentId);
+    showToast("Pagamento eliminato");
+    if(orderId) openJobCard(orderId);
+    else { closeModal(); renderIncassi(); }
+  });
 }
 function closeModal(){ document.getElementById("modalBackdrop").classList.remove("open"); renderCurrentView(); }
 function renderFasiGrouped(o){
@@ -2644,7 +2705,7 @@ function renderIncassi(){
             <tr>
               <td>${fmtDate(p.data)}</td><td>${clientName(p.clientId)}</td><td>${paymentCategorieLabel(p)}</td><td>${p.tipo||"—"}</td>
               <td>${fmtMoney(p.importo)}</td><td>${p.metodo}</td>
-              <td><button class="btn btn-ghost btn-sm" onclick="deletePayment('${p.id}')">Elimina</button></td>
+              <td><button class="btn btn-outline btn-sm" onclick="openEditPaymentModal('${p.id}')">MODIFICA</button></td>
             </tr>`).join("") : `<tr><td colspan="7" class="empty">Nessun incasso con questi filtri.</td></tr>`}
         </tbody>
       </table>
