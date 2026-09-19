@@ -1377,6 +1377,42 @@
     font-size:12px;
   }
 
+
+  /* ============ MENU PER MACRO AREE ============ */
+  .nav-group{margin:0 0 12px;}
+  .nav-group-title,
+  .sidebar-system-title{
+    margin:10px 12px 6px;
+    font-size:10px;
+    line-height:1;
+    font-weight:900;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--muted);
+    opacity:.9;
+  }
+  .nav-group + .nav-group{
+    padding-top:8px;
+    border-top:1px solid rgba(255,255,255,.08);
+  }
+  .sidebar-system-title{
+    margin:0 10px 8px;
+    padding-top:10px;
+    border-top:1px solid rgba(255,255,255,.08);
+  }
+  .mobile-nav-group-title{
+    padding:10px 12px 5px;
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .mobile-nav-group-title:not(:first-child){
+    margin-top:6px;
+    border-top:1px solid var(--border);
+  }
+
 </style>
 </head>
 <body>
@@ -1401,8 +1437,9 @@
     </div>
     <nav class="tabs" id="nav"></nav>
     <div class="sidebar-tools" id="sidebarTools">
+      <div class="sidebar-system-title">Sistema</div>
       <button class="sidebar-tool-btn" onclick="exportBackup()">↧ <span>Esporta backup</span></button>
-      <button class="sidebar-tool-btn" onclick="signOut()">↪ <span>Esci</span></button>
+      <button class="sidebar-tool-btn" onclick="signOut()">↪ <span>Esci / Login</span></button>
     </div>
     <div class="sidebar-footer">Dati sincronizzati in tempo reale con tutto lo staff.</div>
   </aside>
@@ -1870,27 +1907,50 @@ function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, 
 }
 /* ============ NAVIGAZIONE ============ */
 const NAV = [
-  {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività"},
-  {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family"},
-  {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi in corso e storico"},
-  {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi"},
-  {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase"},
-  {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili"},
-  {id:"incassi", label:"Incassi", icon:"€", subtitle:"Report pagamenti e crediti aperti", adminOnly:true},
-  {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine"},
-  {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti"},
-  {id:"costiFissi", label:"Costi fissi", icon:"▦", subtitle:"F24, bollette, abbonamenti e costi ricorrenti", adminOnly:true},
-  {id:"posta", label:"Posta", icon:"✉", subtitle:"Email aziendale collegata a Gmail"},
-  {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire"}
+  {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Info"},
+  {id:"posta", label:"Posta", icon:"✉", subtitle:"Email aziendale collegata a Gmail", group:"Info"},
+  {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info"},
+  {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi in corso e storico", group:"Info"},
+  {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Info"},
+
+  {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
+  {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
+  {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
+
+  {id:"incassi", label:"Incassi", icon:"€", subtitle:"Report pagamenti e crediti aperti", adminOnly:true, group:"Amministrazione"},
+  {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine", group:"Amministrazione"},
+  {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti", group:"Amministrazione"},
+  {id:"costiFissi", label:"Costi fissi", icon:"▦", subtitle:"F24, bollette, abbonamenti e costi ricorrenti", adminOnly:true, group:"Amministrazione"}
 ];
 function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && currentUser.role==="admin")); }
 function renderNav(){
   const items = visibleNav();
   const current = NAV.find(n=>n.id===currentView) || items[0];
+  const groups = ["Info","Operativa","Amministrazione"];
+
+  const groupedButtons = groups.map(group=>{
+    const groupItems = items.filter(n=>n.group===group);
+    if(!groupItems.length) return "";
+    return `
+      <div class="nav-group">
+        <div class="nav-group-title">${group}</div>
+        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${n.label}</button>`).join("")}
+      </div>
+    `;
+  }).join("");
+
+  const groupedMobile = groups.map(group=>{
+    const groupItems = items.filter(n=>n.group===group);
+    if(!groupItems.length) return "";
+    return `
+      <div class="mobile-nav-group-title">${group}</div>
+      ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span><span>${n.label}</span></button>`).join("")}
+    `;
+  }).join("");
 
   document.getElementById("nav").innerHTML = `
     <div class="desktop-nav-buttons">
-      ${items.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${n.label}</button>`).join("")}
+      ${groupedButtons}
     </div>
 
     <div class="mobile-nav-menu">
@@ -1899,12 +1959,11 @@ function renderNav(){
         <span class="mobile-nav-arrow">⌄</span>
       </button>
       <div class="mobile-nav-dropdown" id="mobileNavDropdown">
-        ${items.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span><span>${n.label}</span></button>`).join("")}
+        ${groupedMobile}
       </div>
     </div>
   `;
 }
-
 function toggleMobileNavDropdown(event){
   if(event) event.stopPropagation();
   const dd = document.getElementById("mobileNavDropdown");
