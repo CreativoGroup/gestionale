@@ -914,6 +914,52 @@
     }
   }
 
+
+  /* ============ DASHBOARD DESKTOP / MOBILE FIX ============ */
+  .dashboard-heading-desktop{display:block;}
+  .dashboard-heading-mobile{display:none;}
+  .workload-count-mobile{display:none;}
+
+  @media(max-width:760px){
+    .dashboard-heading-desktop{display:none !important;}
+    .dashboard-heading-mobile{
+      display:flex !important;
+      align-items:center;
+      width:100%;
+      min-height:52px;
+    }
+    .dashboard-heading-mobile img{
+      display:block;
+      width:min(62vw,230px);
+      max-width:230px;
+      height:auto;
+    }
+    .dashboard-crediti-aperti{
+      display:none !important;
+    }
+    .workload-count-mobile{
+      display:inline !important;
+    }
+    .workload-simple-row{
+      display:flex !important;
+      align-items:center !important;
+      justify-content:space-between !important;
+      gap:10px !important;
+      padding:10px 2px !important;
+    }
+    .workload-name{
+      min-width:0;
+      flex:1 1 auto;
+    }
+    .workload-count{
+      flex:0 0 auto;
+      white-space:nowrap;
+      font-size:12.5px;
+      font-weight:800;
+      color:var(--accent);
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -946,7 +992,11 @@
   <main>
     <div class="topbar app-topbar">
       <div id="topbarHeading">
-        <img id="dashboardHeaderLogo" alt="Creativo" style="display:block;max-width:250px;width:72%;height:auto;">
+        <div class="dashboard-heading-desktop">
+          <h1 id="viewTitle">Dashboard</h1>
+          <p id="viewSubtitle">Panoramica generale dell'attività</p>
+        </div>
+        <div class="dashboard-heading-mobile" style="display:none;"></div>
       </div>
       <div class="global-search">
         <input type="text" id="globalClientSearch" placeholder="🔎 Cerca cliente…" oninput="updateGlobalClientSuggestions(this.value)" onkeydown="globalSearchKeydown(event,this)" onblur="setTimeout(()=>document.getElementById('globalSearchDropdown').style.display='none',150)" autocomplete="off">
@@ -978,7 +1028,6 @@
 const SUPABASE_URL = "https://isvanzqcifypsejdlmjx.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Ln3Z6A31vG2VRumTfVQycA_FsA0X883";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-setTimeout(()=>{ const img=document.getElementById("dashboardHeaderLogo"); const src=document.querySelector(".brand-logo img")?.src; if(img&&src) img.src=src; },0);
 let currentUser = null; // {id, email, role}
 
 /* ============ CONFIGURAZIONE ============ */
@@ -1382,11 +1431,20 @@ function renderViewHeading(){
   const wrap = document.getElementById("topbarHeading");
   if(!wrap) return;
 
+  const meta = NAV.find(n=>n.id===currentView);
+
   if(currentView==="dashboard"){
     const src = document.querySelector(".brand-logo img")?.src || "";
-    wrap.innerHTML = `<img id="dashboardHeaderLogo" src="${src}" alt="Creativo" style="display:block;max-width:280px;width:min(72vw,280px);height:auto;">`;
+    wrap.innerHTML = `
+      <div class="dashboard-heading-desktop">
+        <h1 id="viewTitle">Dashboard</h1>
+        <p id="viewSubtitle">Panoramica generale dell'attività</p>
+      </div>
+      <div class="dashboard-heading-mobile">
+        <img id="dashboardHeaderLogo" src="${src}" alt="Creativo">
+      </div>
+    `;
   }else{
-    const meta = NAV.find(n=>n.id===currentView);
     wrap.innerHTML = `<h1 id="viewTitle">${meta?.label||""}</h1><p id="viewSubtitle">${meta?.subtitle||""}</p>`;
   }
 }
@@ -1554,7 +1612,7 @@ function renderDashboard(){
         ${workload.map(x=>`
           <div class="workload-simple-row">
             <span class="workload-name">${x.w}</span>
-            <span class="workload-count">${x.n} ${x.n===1?'lavoro':'lavori'}</span>
+            <span class="workload-count workload-count-mobile">${x.n} ${x.n===1?'lavoro':'lavori'}</span>
           </div>`).join("") || `<p class="empty">Nessun ordine assegnato.</p>`}
       </div>
       <div class="card">
