@@ -1415,13 +1415,78 @@
 
 
   .desktop-nav-buttons .nav-group-operativa{
-    background:#F6F3EE;
+    background:#FFF0E8;
     border-radius:14px;
     padding:8px 6px 10px;
     margin:6px 0 12px;
   }
   .desktop-nav-buttons .nav-group-operativa .nav-group-title{
     margin-top:4px;
+  }
+
+
+  /* ============ MOBILE: MENU / DASHBOARD ============ */
+  @media(max-width:760px){
+    .mobile-nav-trigger{
+      min-height:64px !important;
+      font-size:18px !important;
+      font-weight:900 !important;
+      text-transform:uppercase;
+      letter-spacing:.035em;
+      padding:0 18px !important;
+    }
+
+    .mobile-nav-dropdown{
+      padding:10px !important;
+    }
+
+    .mobile-nav-dropdown button{
+      min-height:58px !important;
+      padding:13px 14px !important;
+      font-size:16px !important;
+      font-weight:900 !important;
+      text-transform:uppercase;
+      letter-spacing:.025em;
+    }
+
+    .mobile-nav-group-title{
+      font-size:11px !important;
+      padding:12px 12px 7px !important;
+    }
+
+    .sidebar-tool-btn{
+      min-height:54px !important;
+      font-size:14px !important;
+      font-weight:900 !important;
+      text-transform:uppercase;
+      letter-spacing:.025em;
+    }
+
+    /* Evidenzia la macro area OPERATIVA anche nel menu mobile */
+    .mobile-nav-group-title:nth-of-type(2){
+      background:#FFF0E8;
+      border-radius:12px 12px 0 0;
+      margin-top:8px !important;
+      padding-top:12px !important;
+      border-top:0 !important;
+    }
+
+    .mobile-nav-group-title:nth-of-type(2) + button,
+    .mobile-nav-group-title:nth-of-type(2) + button + button,
+    .mobile-nav-group-title:nth-of-type(2) + button + button + button{
+      background:#FFF0E8;
+    }
+
+    .mobile-nav-group-title:nth-of-type(2) + button + button + button{
+      border-radius:0 0 12px 12px;
+      margin-bottom:8px;
+    }
+
+    /* Solo mobile: elimina interamente queste due sezioni dalla Dashboard */
+    #view-dashboard .dashboard-workload-section,
+    #view-dashboard .dashboard-crediti-aperti{
+      display:none !important;
+    }
   }
 
 </style>
@@ -1985,6 +2050,28 @@ document.addEventListener("click", ()=>{
   if(dd) dd.classList.remove("open");
 });
 
+
+function syncMobileDashboardHeaderOrder(){
+  const app=document.getElementById("app");
+  const sidebar=document.querySelector("aside.sidebar");
+  const main=document.querySelector("#app > main");
+  const topbar=document.querySelector(".app-topbar");
+  if(!app || !sidebar || !main || !topbar) return;
+
+  const isMobile=window.matchMedia("(max-width:760px)").matches;
+
+  if(isMobile && currentView==="dashboard"){
+    if(topbar.parentElement!==app || topbar.nextElementSibling!==sidebar){
+      app.insertBefore(topbar, sidebar);
+    }
+  }else{
+    if(topbar.parentElement!==main){
+      main.insertBefore(topbar, main.firstChild);
+    }
+  }
+}
+window.addEventListener("resize", ()=>syncMobileDashboardHeaderOrder());
+
 function renderViewHeading(){
   const wrap = document.getElementById("topbarHeading");
   if(!wrap) return;
@@ -2005,6 +2092,7 @@ function renderViewHeading(){
   }else{
     wrap.innerHTML = `<h1 id="viewTitle">${meta?.label||""}</h1><p id="viewSubtitle">${meta?.subtitle||""}</p>`;
   }
+  setTimeout(syncMobileDashboardHeaderOrder,0);
 }
 function goTo(id){
   currentView = id;
@@ -2428,7 +2516,7 @@ function renderDashboard(){
       </div>
     </div>
     <div class="grid grid-2" style="margin-top:16px;">
-      <div class="card">
+      <div class="card dashboard-workload-section">
         <h3 style="margin-top:0;">Carico di lavoro per operatore</h3>
         ${workload.map(x=>`
           <div class="workload-simple-row">
@@ -2446,7 +2534,7 @@ function renderDashboard(){
     ${ordiniImportanti.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">★ Ordini importanti</h3><table><tbody>${ordiniImportanti.map(o=>`<tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>`).join("")}</tbody></table></div>` : ""}
     ${scorteBasse.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">Avvisi magazzino</h3><table><thead><tr><th>Codice</th><th>Colore</th><th>Taglia</th><th>Disponibili</th><th>Scorta minima</th></tr></thead><tbody>${scorteBasse.map(w=>`<tr><td style="font-weight:700;">${w.codice}</td><td>${w.colore}</td><td>${w.taglia}</td><td class="low-stock">${w.quantita} ${w.unita}</td><td>${w.scortaMinima} ${w.unita}</td></tr>`).join("")}</tbody></table></div>` : ""}
     ${currentUser.role==='admin' ? `
-    <div class="card" style="margin-top:16px;">
+    <div class="card dashboard-crediti-aperti" style="margin-top:16px;">
       <h3 style="margin-top:0;">Crediti aperti (ordini consegnati non pagati)</h3>
       ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Ordini da saldare</th><th>Da saldare</th><th></th></tr></thead><tbody>${creditiApertiDash.map(g=>`
         <tr class="credit-mobile-row">
