@@ -1141,6 +1141,37 @@
     }
   }
 
+
+  /* ============ POSTA: LETTURA EMAIL IN PANNELLO ============ */
+  .mail-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(380px,46%);gap:14px;align-items:start;}
+  .mail-layout.no-reader{grid-template-columns:1fr;}
+  .mail-reader{background:#fff;border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadowTiny);min-height:420px;max-height:calc(100vh - 190px);overflow:auto;position:sticky;top:16px;}
+  .mail-reader-head{position:sticky;top:0;z-index:3;background:#fff;border-bottom:1px solid var(--border);padding:16px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;}
+  .mail-reader-subject{font-size:18px;font-weight:900;line-height:1.25;margin-bottom:6px;}
+  .mail-reader-meta{font-size:12px;color:var(--muted);line-height:1.55;}
+  .mail-reader-close{border:0;background:#F5F6F8;width:36px;height:36px;border-radius:999px;cursor:pointer;font-size:20px;flex:0 0 auto;}
+  .mail-reader-body{padding:16px;}
+  .mail-reader-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .mail-reader-actions .btn{min-height:38px;}
+  .mail-body-mode{display:flex;gap:8px;margin-bottom:12px;}
+  .mail-body-box{border:1px solid var(--border);border-radius:14px;padding:14px;background:#fff;line-height:1.55;overflow-wrap:anywhere;}
+  .mail-body-html{width:100%;min-height:300px;border:0;background:#fff;}
+  .mail-body-text{white-space:pre-wrap;font-family:inherit;font-size:14px;}
+  .mail-attachments{margin-top:16px;}
+  .mail-attachments h4{margin:0 0 10px;font-size:14px;}
+  .mail-attachment{border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;background:#FAFBFC;}
+  .mail-attachment-name{min-width:0;font-weight:800;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mail-attachment-meta{color:var(--muted);font-size:11px;margin-top:2px;}
+  .mail-reader-loading,.mail-reader-error{padding:34px 20px;text-align:center;color:var(--muted);}
+  .mail-reader-error{color:var(--danger);}
+  .mail-row.selected{background:#FFF0EB !important;box-shadow:inset 4px 0 0 var(--accent);}
+  @media(max-width:980px){
+    .mail-layout{grid-template-columns:1fr;}
+    .mail-reader{position:fixed;inset:0;z-index:180;max-height:none;border-radius:0;border:0;overflow:auto;}
+    .mail-reader-head{padding-top:max(16px,env(safe-area-inset-top));}
+    .mail-reader-body{padding-bottom:calc(24px + env(safe-area-inset-bottom));}
+  }
+
 </style>
 </head>
 <body>
@@ -1210,7 +1241,8 @@
 const SUPABASE_URL = "https://isvanzqcifypsejdlmjx.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Ln3Z6A31vG2VRumTfVQycA_FsA0X883";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-let currentUser = null; // {id, email, role}
+let currentUser = null;
+let gmailAutoRefreshTimer = null; // {id, email, role}
 
 /* ============ CONFIGURAZIONE ============ */
 const CATEGORIES = ["Stampa","Ricamo","Servizio","Gadget","Allestimenti","Piccolo Formato","Lavorazioni Esterne"];
@@ -4392,6 +4424,11 @@ let gmailLoaded = false;
 let gmailLoading = false;
 let gmailError = "";
 let gmailFilter = "inbox";
+let gmailSelectedId = null;
+let gmailSelectedMessage = null;
+let gmailMessageLoading = false;
+let gmailMessageError = "";
+let gmailBodyMode = "html";
 
 function mailHasLabel(message, label){
   return Array.isArray(message?.labels) && message.labels.includes(label);
@@ -4456,7 +4493,7 @@ function renderPosta(){
       const unread = mailHasLabel(m,"UNREAD");
       const party = sent && !inbox ? (m.to || "Destinatario sconosciuto") : (m.from || "Mittente sconosciuto");
       return `
-        <div class="mail-row ${unread?'mail-unread':''}" title="La lettura completa della mail verrà aggiunta nel prossimo passaggio">
+        <div class="mail-row ${unread?'mail-unread':''} ${gmailSelectedId===m.id?'selected':''}" onclick="openGmailMessage('${m.id}')">
           <div>
             <div class="mail-from">${escapeHtml(mailDisplayName(party))}</div>
             ${inbox?`<span class="mail-status mail-status-inbox">IN ARRIVO</span>`:""}
@@ -4496,12 +4533,169 @@ function renderPosta(){
           <span>Tutte</span><span class="mail-count-badge">${gmailMessages.length}</span>
         </button>
       </aside>
-      <div class="mail-panel">${body}</div>
+      <div class="mail-layout ${gmailSelectedId?'':'no-reader'}">
+        <div class="mail-panel">${body}</div>
+        ${gmailSelectedId ? renderGmailReader() : ""}
+      </div>
     </div>
   `;
 
   if(!gmailLoaded && !gmailLoading && !gmailError){
     setTimeout(()=>loadGmailMessages(false),0);
+  }
+}
+
+
+function closeGmailMessage(){
+  gmailSelectedId=null;
+  gmailSelectedMessage=null;
+  gmailMessageLoading=false;
+  gmailMessageError="";
+  renderPosta();
+}
+function setGmailBodyMode(mode){
+  gmailBodyMode=mode==="text"?"text":"html";
+  renderPosta();
+}
+function mailFileSize(bytes){
+  const n=Number(bytes)||0;
+  if(!n) return "";
+  if(n<1024) return `${n} B`;
+  if(n<1024*1024) return `${(n/1024).toFixed(1)} KB`;
+  return `${(n/(1024*1024)).toFixed(1)} MB`;
+}
+function sanitizeEmailHtml(raw){
+  return String(raw||"")
+    .replace(/<script[\s\S]*?<\/script>/gi,"")
+    .replace(/\son\w+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi,"")
+    .replace(/javascript:/gi,"");
+}
+function renderGmailReader(){
+  if(gmailMessageLoading){
+    return `<aside class="mail-reader"><div class="mail-reader-loading">Apro la mail completa…</div></aside>`;
+  }
+  if(gmailMessageError){
+    return `<aside class="mail-reader">
+      <div class="mail-reader-head">
+        <div><div class="mail-reader-subject">Errore lettura mail</div></div>
+        <button class="mail-reader-close" onclick="closeGmailMessage()">×</button>
+      </div>
+      <div class="mail-reader-error">${escapeHtml(gmailMessageError)}</div>
+    </aside>`;
+  }
+
+  const m=gmailSelectedMessage;
+  if(!m) return "";
+
+  const hasHtml=!!String(m.bodyHtml||"").trim();
+  const hasText=!!String(m.bodyText||"").trim();
+  let effectiveMode=gmailBodyMode;
+  if(effectiveMode==="html" && !hasHtml && hasText) effectiveMode="text";
+  if(effectiveMode==="text" && !hasText && hasHtml) effectiveMode="html";
+
+  let content="";
+  if(effectiveMode==="html" && hasHtml){
+    content=`<iframe class="mail-body-html" sandbox="" referrerpolicy="no-referrer" srcdoc="${escapeHtml(sanitizeEmailHtml(m.bodyHtml))}"></iframe>`;
+  }else{
+    content=`<div class="mail-body-box mail-body-text">${escapeHtml(m.bodyText||m.snippet||"Nessun testo disponibile")}</div>`;
+  }
+
+  const attachments=Array.isArray(m.attachments)?m.attachments:[];
+  const attachmentHtml=attachments.length?`
+    <div class="mail-attachments">
+      <h4>Allegati (${attachments.length})</h4>
+      ${attachments.map((a,i)=>`
+        <div class="mail-attachment">
+          <div style="min-width:0;">
+            <div class="mail-attachment-name">📎 ${escapeHtml(a.filename||`Allegato ${i+1}`)}</div>
+            <div class="mail-attachment-meta">${escapeHtml(a.mimeType||"")}${a.size?` · ${mailFileSize(a.size)}`:""}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); gmailAttachmentPending()">Apri</button>
+            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); gmailAttachmentPending()">Salva nel gestionale</button>
+          </div>
+        </div>`).join("")}
+    </div>`:"";
+
+  return `
+    <aside class="mail-reader">
+      <div class="mail-reader-head">
+        <div style="min-width:0;">
+          <div class="mail-reader-subject">${escapeHtml(m.subject||"(Senza oggetto)")}</div>
+          <div class="mail-reader-meta">
+            <strong>Da:</strong> ${escapeHtml(m.from||"")}<br>
+            <strong>A:</strong> ${escapeHtml(m.to||"")}
+            ${m.cc?`<br><strong>CC:</strong> ${escapeHtml(m.cc)}`:""}
+            <br><strong>Data:</strong> ${escapeHtml(m.date||"")}
+          </div>
+        </div>
+        <button class="mail-reader-close" onclick="closeGmailMessage()">×</button>
+      </div>
+      <div class="mail-reader-body">
+        <div class="mail-reader-actions">
+          <button class="btn btn-primary" onclick="gmailActionPending('Rispondi')">↩ Rispondi</button>
+          <button class="btn btn-outline" onclick="gmailActionPending('Crea Lead')">+ Crea Lead</button>
+          <button class="btn btn-outline" onclick="gmailActionPending('Collega a Cliente')">Collega a Cliente</button>
+          <button class="btn btn-outline" onclick="gmailActionPending('Crea Preventivo')">Crea Preventivo</button>
+          <button class="btn btn-outline" onclick="gmailActionPending('Crea Ordine')">Crea Ordine</button>
+          <button class="btn btn-outline" onclick="gmailActionPending('Aggiungi Nota')">Aggiungi Nota</button>
+        </div>
+        ${(hasHtml&&hasText)?`
+          <div class="mail-body-mode">
+            <button class="btn btn-sm ${effectiveMode==="html"?'btn-primary':'btn-outline'}" onclick="setGmailBodyMode('html')">Originale</button>
+            <button class="btn btn-sm ${effectiveMode==="text"?'btn-primary':'btn-outline'}" onclick="setGmailBodyMode('text')">Solo testo</button>
+          </div>`:""}
+        ${content}
+        ${attachmentHtml}
+      </div>
+    </aside>`;
+}
+function gmailActionPending(label){
+  showToast(`${label}: lo attiviamo nel passaggio successivo`);
+}
+function gmailAttachmentPending(){
+  showToast("Allegato rilevato. Apertura e salvataggio saranno attivati nel prossimo passaggio.");
+}
+async function openGmailMessage(id){
+  if(!id) return;
+  gmailSelectedId=id;
+  gmailSelectedMessage=null;
+  gmailMessageError="";
+  gmailMessageLoading=true;
+  gmailBodyMode="html";
+  renderPosta();
+
+  try{
+    const {data:sessionData}=await sb.auth.getSession();
+    const session=sessionData?.session;
+    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-message`,{
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "apikey":SUPABASE_KEY,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({id})
+    });
+
+    const raw=await response.text();
+    let result={};
+    try{ result=JSON.parse(raw); }
+    catch(e){ throw new Error(raw||`Errore HTTP ${response.status}`); }
+
+    if(!response.ok){
+      throw new Error(result?.error||result?.message||`Errore HTTP ${response.status}`);
+    }
+
+    gmailSelectedMessage=result;
+  }catch(err){
+    console.error("Gmail message error",err);
+    gmailMessageError=err?.message||"Errore durante l'apertura della mail";
+  }finally{
+    gmailMessageLoading=false;
+    renderPosta();
   }
 }
 
@@ -4553,6 +4747,22 @@ async function loadGmailMessages(force=false){
   }
 }
 
+
+
+function startGmailAutoRefresh(){
+  if(gmailAutoRefreshTimer) clearInterval(gmailAutoRefreshTimer);
+  gmailAutoRefreshTimer=setInterval(()=>{
+    if(document.visibilityState==="visible" && currentUser){
+      loadGmailMessages(true);
+    }
+  },5*60*1000);
+}
+function stopGmailAutoRefresh(){
+  if(gmailAutoRefreshTimer){
+    clearInterval(gmailAutoRefreshTimer);
+    gmailAutoRefreshTimer=null;
+  }
+}
 
 /* ============ AUTENTICAZIONE E AVVIO ============ */
 async function fetchUserProfile(userId, email){
