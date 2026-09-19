@@ -1338,6 +1338,35 @@
     .lead-field.full{grid-column:auto;}
   }
 
+
+  /* ============ SEZIONE LEAD ============ */
+  .lead-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px;}
+  .lead-stat{padding:14px 16px;border:1px solid var(--border);border-radius:16px;background:#fff;}
+  .lead-stat strong{display:block;font-size:26px;line-height:1.1;margin-top:4px;}
+  .lead-stat span{font-size:11.5px;color:var(--muted);font-weight:800;}
+  .lead-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  .lead-toolbar input,.lead-toolbar select{
+    min-height:42px;border:1px solid #DDE3EA;border-radius:12px;padding:8px 11px;background:#fff;font:inherit;font-size:13px;
+  }
+  .lead-toolbar input{flex:1;min-width:220px;}
+  .lead-status-pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:850;background:#F2F4F7;}
+  .lead-status-nuovo{background:#FFF0EA;color:#B94724;}
+  .lead-status-ok{background:#EAF8F0;color:#24764A;}
+  .lead-status-wait{background:#FFF7E8;color:#936319;}
+  .lead-status-lost{background:#F3F4F6;color:#69707A;}
+  .lead-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .lead-table-wrap{overflow:auto;}
+  .lead-table{width:100%;min-width:900px;border-collapse:collapse;}
+  .lead-table th,.lead-table td{padding:11px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle;font-size:12.5px;}
+  .lead-table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
+  .lead-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
+  .lead-detail-box{background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:11px 12px;}
+  .lead-detail-box small{display:block;color:var(--muted);font-weight:800;margin-bottom:4px;}
+  .lead-detail-request{white-space:pre-wrap;line-height:1.5;max-height:300px;overflow:auto;}
+  .dashboard-lead-row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
+  .dashboard-lead-row:last-child{border-bottom:0;}
+  @media(max-width:850px){.lead-stats{grid-template-columns:1fr 1fr;}.lead-detail-grid{grid-template-columns:1fr;}}
+
 </style>
 </head>
 <body>
@@ -1393,6 +1422,7 @@
     <section class="view" id="view-costiFissi"></section>
     <section class="view" id="view-entrate"></section>
     <section class="view" id="view-posta"></section>
+    <section class="view" id="view-leads"></section>
   </main>
 </div>
 <div class="modal-backdrop" id="modalBackdrop"><div class="modal" id="modalBody"></div></div>
@@ -1562,9 +1592,9 @@ function computeScorteMonitorate(){
 }
 
 /* ============ STATO ============ */
-let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[]};
+let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[], leads:[]};
 let currentView = "dashboard";
-const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti"};
+const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads"};
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -1582,6 +1612,7 @@ function toDbRow(collection, o){
     case "fixedCosts": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null, file_path:o.filePath||null, file_name:o.fileName||null};
     case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, note:o.note||null};
+    case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
   }
 }
 function fromDbRow(collection, r){
@@ -1598,6 +1629,7 @@ function fromDbRow(collection, r){
     case "fixedCosts": return {id:r.id, descrizione:r.descrizione||"", importo:Number(r.importo)||0, metodo:r.metodo||"", data:r.data, filePath:r.file_path||"", fileName:r.file_name||"", createdAt:r.created_at};
     case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
     case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, note:r.note||""};
+    case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
   }
 }
 
@@ -1838,7 +1870,8 @@ const NAV = [
   {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine"},
   {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti"},
   {id:"costiFissi", label:"Costi fissi", icon:"▦", subtitle:"F24, bollette, abbonamenti e costi ricorrenti", adminOnly:true},
-  {id:"posta", label:"Posta", icon:"✉", subtitle:"Email aziendale collegata a Gmail"}
+  {id:"posta", label:"Posta", icon:"✉", subtitle:"Email aziendale collegata a Gmail"},
+  {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire"}
 ];
 function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && currentUser.role==="admin")); }
 function renderNav(){
@@ -1913,6 +1946,7 @@ function renderTopbarActions(){
     costiFissi: currentUser&&currentUser.role==="admin" ? `<button class="btn btn-primary" onclick="toggleForm('fixedCostForm')">+ Nuovo costo fisso</button>` : ``,
     entrate: `<button class="btn btn-primary" onclick="toggleForm('incomeForm')">+ Nuova entrata</button>`,
     posta: `<button class="btn btn-primary" onclick="loadGmailMessages(true)">↻ Aggiorna posta</button>`,
+    leads: `<button class="btn btn-primary" onclick="goTo(\'posta\')">✉ Apri Posta</button>`,
     dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa l’app</button>`
   };
   document.getElementById("topbarActions").innerHTML = map[currentView] || "";
@@ -1921,7 +1955,7 @@ function renderCurrentView(){
   ({dashboard:renderDashboard, clienti:renderClienti, preventivi:renderPreventivi,
     ordini:renderOrdini, flusso:renderFlusso,
     magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
-    posta:renderPosta})[currentView]();
+    posta:renderPosta, leads:renderLeads})[currentView]();
 }
 function toggleForm(id){ const el = document.getElementById(id); if(el) el.classList.toggle("open"); }
 /* Ridisegna una vista preservando il focus e la posizione del cursore sul campo attivo (usato dalle ricerche, che altrimenti perdono il focus a ogni lettera) */
@@ -1964,6 +1998,172 @@ function _runPendingConfirm(){
 }
 function showToast(msg){ const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), 2200); }
 
+
+/* ============ LEAD ============ */
+let leadSearch = "";
+let leadStatusFilter = "Tutti";
+
+function leadDisplayName(l){
+  return String(l?.azienda||l?.nome||l?.email||"Lead").trim();
+}
+function leadStatusClass(stato){
+  if(stato==="Nuovo") return "lead-status-nuovo";
+  if(stato==="Accettato") return "lead-status-ok";
+  if(stato==="Perso") return "lead-status-lost";
+  return "lead-status-wait";
+}
+function fmtLeadDate(value){
+  if(!value) return "—";
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric"});
+}
+function renderLeads(){
+  const root=document.getElementById("view-leads");
+  if(!root) return;
+
+  const q=String(leadSearch||"").trim().toLowerCase();
+  const all=[...(state.leads||[])].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
+  const filtered=all.filter(l=>{
+    const matchStatus=leadStatusFilter==="Tutti" || l.stato===leadStatusFilter;
+    const hay=[l.nome,l.azienda,l.email,l.telefono,l.oggettoRichiesta,l.richiesta].join(" ").toLowerCase();
+    return matchStatus && (!q || hay.includes(q));
+  });
+
+  const nuovi=all.filter(l=>l.stato==="Nuovo").length;
+  const aperti=all.filter(l=>!["Accettato","Perso"].includes(l.stato)).length;
+  const accettati=all.filter(l=>l.stato==="Accettato").length;
+  const persi=all.filter(l=>l.stato==="Perso").length;
+
+  root.innerHTML=`
+    <div class="lead-stats">
+      <div class="lead-stat"><span>Da confermare</span><strong>${nuovi}</strong></div>
+      <div class="lead-stat"><span>Lead aperti</span><strong>${aperti}</strong></div>
+      <div class="lead-stat"><span>Accettati</span><strong>${accettati}</strong></div>
+      <div class="lead-stat"><span>Persi / scartati</span><strong>${persi}</strong></div>
+    </div>
+
+    <div class="card">
+      <div class="lead-toolbar">
+        <input id="lead-search" placeholder="🔎 Cerca nome, azienda, email, oggetto…" value="${escapeHtml(leadSearch)}"
+          oninput="leadSearch=this.value;rerenderKeepingFocus(renderLeads)">
+        <select onchange="leadStatusFilter=this.value;renderLeads()">
+          ${["Tutti","Nuovo","Da ricontattare","Preventivo inviato","In attesa","Accettato","Perso"].map(s=>`<option value="${s}" ${leadStatusFilter===s?"selected":""}>${s==="Nuovo"?"Da confermare":s}</option>`).join("")}
+        </select>
+      </div>
+
+      <div class="lead-table-wrap">
+        ${filtered.length ? `
+        <table class="lead-table">
+          <thead><tr><th>Nome / Azienda</th><th>Email</th><th>Oggetto</th><th>Stato</th><th>Data</th><th>Azioni</th></tr></thead>
+          <tbody>${filtered.map(l=>`
+            <tr>
+              <td><strong>${escapeHtml(leadDisplayName(l))}</strong>${l.azienda&&l.nome?`<div style="font-size:11px;color:var(--muted);">${escapeHtml(l.nome)}</div>`:""}</td>
+              <td>${escapeHtml(l.email||"—")}</td>
+              <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
+              <td><span class="lead-status-pill ${leadStatusClass(l.stato)}">${escapeHtml(l.stato==="Nuovo"?"Da confermare":l.stato)}</span></td>
+              <td>${fmtLeadDate(l.creatoIl)}</td>
+              <td>
+                <div class="lead-actions">
+                  <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button>
+                  ${l.stato==="Nuovo"?`<button class="btn btn-primary btn-sm" onclick="confirmLead('${l.id}')">Conferma</button>`:""}
+                  <button class="btn btn-ghost btn-sm" onclick="linkLeadToExistingClient('${l.id}')">Collega cliente</button>
+                  ${l.stato!=="Perso"?`<button class="btn btn-ghost btn-sm" onclick="discardLead('${l.id}')">Scarta</button>`:""}
+                </div>
+              </td>
+            </tr>`).join("")}
+          </tbody>
+        </table>` : `<p class="empty">Nessun Lead corrisponde ai filtri selezionati.</p>`}
+      </div>
+    </div>
+  `;
+}
+
+function openLeadDetail(id){
+  const l=(state.leads||[]).find(x=>x.id===id);
+  if(!l) return;
+
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>${escapeHtml(leadDisplayName(l))}</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <span class="lead-status-pill ${leadStatusClass(l.stato)}">${escapeHtml(l.stato==="Nuovo"?"Da confermare":l.stato)}</span>
+      <span style="font-size:12px;color:var(--muted);">${fmtLeadDate(l.creatoIl)}</span>
+    </div>
+    <div class="lead-detail-grid">
+      <div class="lead-detail-box"><small>Email</small>${escapeHtml(l.email||"—")}</div>
+      <div class="lead-detail-box"><small>Telefono</small>${escapeHtml(l.telefono||"—")}</div>
+      <div class="lead-detail-box"><small>Azienda</small>${escapeHtml(l.azienda||"—")}</div>
+      <div class="lead-detail-box"><small>Oggetto</small>${escapeHtml(l.oggettoRichiesta||"—")}</div>
+      <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(l.richiesta||"—")}</div></div>
+    </div>
+    <div class="form-actions" style="margin-top:16px;">
+      ${l.stato==="Nuovo"?`<button class="btn btn-primary" onclick="confirmLead('${l.id}');closeModal();">Conferma Lead</button>`:""}
+      <button class="btn btn-outline" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente esistente</button>
+      ${l.gmailMessageId?`<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri email</button>`:""}
+      ${l.stato!=="Perso"?`<button class="btn btn-ghost" onclick="discardLead('${l.id}');closeModal();">Scarta</button>`:""}
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function setLeadStatus(id,status){
+  const l=(state.leads||[]).find(x=>x.id===id);
+  if(!l) return;
+  const old=l.stato;
+  l.stato=status;
+  l.aggiornatoIl=new Date().toISOString();
+  const {error}=await sb.from("leads").update({stato:status,aggiornato_il:l.aggiornatoIl}).eq("id",id);
+  if(error){
+    l.stato=old;
+    console.error(error);
+    showToast("Errore aggiornamento Lead");
+    return;
+  }
+  showToast("Lead aggiornato");
+  if(currentView==="leads") renderLeads();
+  if(currentView==="dashboard") renderDashboard();
+}
+
+function confirmLead(id){ setLeadStatus(id,"Da ricontattare"); }
+function discardLead(id){
+  askConfirm("Vuoi scartare questo Lead? Rimarrà nello storico con stato Perso.",()=>setLeadStatus(id,"Perso"));
+}
+
+async function linkLeadToExistingClient(id){
+  const l=(state.leads||[]).find(x=>x.id===id);
+  if(!l) return;
+  const matches=(state.clients||[]).filter(c=>{
+    const email=String(c.email||"").toLowerCase();
+    const term=String(l.email||"").toLowerCase();
+    return term && email===term;
+  });
+
+  const options=(state.clients||[]).map(c=>`<option value="${c.id}" ${matches.some(m=>m.id===c.id)?"selected":""}>${escapeHtml(clientDisplayName(c))}${c.email?` — ${escapeHtml(c.email)}`:""}</option>`).join("");
+
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Collega Lead a cliente</h2>
+    <p style="color:var(--muted);">Scegli il cliente esistente. Il Lead verrà segnato come Accettato.</p>
+    <div class="field"><label>Cliente</label><select id="lead-client-link"><option value="">Seleziona cliente…</option>${options}</select></div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="finishLinkLeadToClient('${id}')">Collega</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function finishLinkLeadToClient(id){
+  const clientId=document.getElementById("lead-client-link")?.value;
+  if(!clientId){ showToast("Seleziona un cliente"); return; }
+  // La tabella attuale dei Lead non necessita ancora di una FK: conserviamo il Lead nello storico
+  // e lo marchiamo Accettato; il collegamento operativo è riconoscibile tramite email cliente.
+  await setLeadStatus(id,"Accettato");
+  closeModal();
+  showToast("Lead collegato al cliente");
+}
+
 /* ============ DASHBOARD ============ */
 function renderDashboard(){
   const activeOrders = state.orders.filter(o=>o.stato!=="Consegnato");
@@ -1986,6 +2186,8 @@ function renderDashboard(){
   });
   const ritiriDaFare = state.orders.filter(o=>o.stato!=="Consegnato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"));
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
+  const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo");
+  const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
 
   document.getElementById("view-dashboard").innerHTML = `
     <div class="grid grid-auto" style="margin-bottom:18px;">
@@ -1994,6 +2196,22 @@ function renderDashboard(){
       <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${pezziDaOrdinare?'color:var(--teal)':''}">${pezziDaOrdinare}</p><p class="stat-sub">pezzi confermati da ordinare</p></div>
       <div class="card stat clickable" onclick="openDashboardList('ritirare')"><p class="stat-label">Ordini da ritirare</p><p class="stat-value" style="${ritiriDaFare.length?'color:var(--warn)':''}">${ritiriDaFare.length}</p><p class="stat-sub">lavorazioni esterne da ritirare</p></div>
       <div class="card stat clickable" onclick="openDashboardList('preventivi')"><p class="stat-label">Preventivi in attesa</p><p class="stat-value">${preventiviAperti}</p><p class="stat-sub">bozza o inviati</p></div>
+      <div class="card stat clickable" onclick="goTo('leads')"><p class="stat-label">Lead da confermare</p><p class="stat-value" style="${leadDaConfermare.length?'color:var(--accent)':''}">${leadDaConfermare.length}</p><p class="stat-sub">nuove richieste da qualificare</p></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="section-header" style="margin-bottom:8px;">
+        <h3 style="margin:0;">Lead da confermare</h3>
+        <button class="btn btn-outline btn-sm" onclick="goTo('leads')">Apri Lead</button>
+      </div>
+      ${leadRecenti.length ? leadRecenti.map(l=>`
+        <div class="dashboard-lead-row">
+          <div style="min-width:0;">
+            <div style="font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(leadDisplayName(l))}</div>
+            <div style="font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(l.email||"")} · ${escapeHtml(l.oggettoRichiesta||"Senza oggetto")}</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button>
+        </div>`).join("") : `<p class="empty">Nessun nuovo Lead da confermare.</p>`}
     </div>
 
     <div class="card" style="margin-bottom:16px;">
@@ -5217,7 +5435,7 @@ async function saveLeadFromGmail(){
       }
     }
 
-    const {error}=await sb.from("leads").insert(payload);
+    const {data,error}=await sb.from("leads").insert(payload).select("*").single();
     if(error){
       if(String(error.code||"")==="23505"){
         throw new Error("Questa mail è già stata trasformata in Lead.");
@@ -5225,8 +5443,13 @@ async function saveLeadFromGmail(){
       throw error;
     }
 
+    if(data){
+      state.leads = state.leads || [];
+      state.leads.unshift(fromDbRow("leads",data));
+    }
     closeLeadModal();
     showToast("Lead creato correttamente");
+    if(currentView==="dashboard") renderDashboard();
   }catch(err){
     console.error("Creazione Lead error",err);
     showToast(err?.message||"Errore durante la creazione del Lead");
