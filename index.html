@@ -2210,14 +2210,14 @@ function renderLeads(){
   });
 
   const nuovi=all.filter(l=>l.stato==="Nuovo").length;
-  const aperti=all.filter(l=>!["Accettato","Perso"].includes(l.stato)).length;
+  const inAttesa=all.filter(l=>l.stato==="In attesa di conferma").length;
   const accettati=all.filter(l=>l.stato==="Accettato").length;
   const persi=all.filter(l=>l.stato==="Perso").length;
 
   root.innerHTML=`
     <div class="lead-stats">
-      <div class="lead-stat"><span>Da confermare</span><strong>${nuovi}</strong></div>
-      <div class="lead-stat"><span>Lead aperti</span><strong>${aperti}</strong></div>
+      <div class="lead-stat"><span>Nuovi</span><strong>${nuovi}</strong></div>
+      <div class="lead-stat"><span>In attesa di conferma</span><strong>${inAttesa}</strong></div>
       <div class="lead-stat"><span>Accettati</span><strong>${accettati}</strong></div>
       <div class="lead-stat"><span>Persi / scartati</span><strong>${persi}</strong></div>
     </div>
@@ -2227,7 +2227,7 @@ function renderLeads(){
         <input id="lead-search" placeholder="🔎 Cerca nome, azienda, email, oggetto…" value="${escapeHtml(leadSearch)}"
           oninput="leadSearch=this.value;rerenderKeepingFocus(renderLeads)">
         <select onchange="leadStatusFilter=this.value;renderLeads()">
-          ${["Tutti","Nuovo","Da ricontattare","Preventivo inviato","In attesa","Accettato","Perso"].map(s=>`<option value="${s}" ${leadStatusFilter===s?"selected":""}>${s==="Nuovo"?"Da confermare":s}</option>`).join("")}
+          ${["Tutti","Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${leadStatusFilter===s?"selected":""}>${s}</option>`).join("")}
         </select>
       </div>
 
@@ -2242,7 +2242,7 @@ function renderLeads(){
               <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
               <td>
                 <select class="inline" style="min-width:145px;" onchange="changeLeadStatusFromSelect('${l.id}',this.value)">
-                  ${["Nuovo","Da ricontattare","Preventivo inviato","In attesa","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s==="Nuovo"?"Da confermare":s}</option>`).join("")}
+                  ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
                 </select>
               </td>
               <td>${fmtLeadDate(l.creatoIl)}</td>
@@ -2250,6 +2250,7 @@ function renderLeads(){
                 <div class="lead-actions">
                   <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button>
                   <button class="btn btn-ghost btn-sm" onclick="discardLead('${l.id}')">Scarta</button>
+                  <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLead('${l.id}')">Elimina</button>
                 </div>
               </td>
             </tr>`).join("")}
@@ -2269,7 +2270,7 @@ function openLeadDetail(id){
     <h2>${escapeHtml(leadDisplayName(l))}</h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
       <select class="inline" onchange="changeLeadStatusFromSelect('${l.id}',this.value,true)">
-        ${["Nuovo","Da ricontattare","Preventivo inviato","In attesa","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s==="Nuovo"?"Da confermare":s}</option>`).join("")}
+        ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
       </select>
       <span style="font-size:12px;color:var(--muted);">${fmtLeadDate(l.creatoIl)}</span>
     </div>
@@ -2281,8 +2282,10 @@ function openLeadDetail(id){
       <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(l.richiesta||"—")}</div></div>
     </div>
     <div class="form-actions" style="margin-top:16px;">
-      <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">Trasforma in cliente ed effettua ordine</button>
-      <button class="btn btn-primary" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente ed effettua ordine</button>
+      ${l.stato==="Accettato" ? `
+        <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">Trasforma in cliente ed effettua ordine</button>
+        <button class="btn btn-primary" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente ed effettua ordine</button>
+      ` : ""}
       ${l.gmailMessageId?`<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>`:""}
       <button class="btn btn-ghost" onclick="discardLead('${l.id}');closeModal();">Scarta</button>
     </div>
@@ -2406,6 +2409,27 @@ async function saveLeadAsClientAndOrder(leadId){
   return saveLeadAsClient(leadId, true);
 }
 
+
+function deleteLead(id){
+  const l=(state.leads||[]).find(x=>x.id===id);
+  if(!l) return;
+  askConfirm(
+    `Eliminare definitivamente il Lead "${escapeHtml(leadDisplayName(l))}"?`,
+    async ()=>{
+      const {error}=await sb.from("leads").delete().eq("id",id);
+      if(error){
+        console.error(error);
+        showToast("Errore eliminazione Lead");
+        return;
+      }
+      state.leads=(state.leads||[]).filter(x=>x.id!==id);
+      showToast("Lead eliminato");
+      if(currentView==="leads") renderLeads();
+      if(currentView==="dashboard") renderDashboard();
+    }
+  );
+}
+
 function confirmLead(id){ setLeadStatus(id,"Da ricontattare"); }
 function discardLead(id){
   askConfirm("Vuoi scartare questo Lead? Rimarrà nello storico con stato Perso.",()=>setLeadStatus(id,"Perso"));
@@ -2448,6 +2472,36 @@ async function finishLinkLeadToClient(id, inserisciOrdine=false){
   }
 }
 
+
+async function expireStaleWaitingLeads(){
+  const now=Date.now();
+  const sevenDays=7*24*60*60*1000;
+  const stale=(state.leads||[]).filter(l=>{
+    if(l.stato!=="In attesa di conferma") return false;
+    const ts=new Date(l.aggiornatoIl||l.creatoIl||0).getTime();
+    return ts && (now-ts)>=sevenDays;
+  });
+
+  if(!stale.length) return;
+
+  const nowIso=new Date().toISOString();
+  for(const l of stale){
+    const {error}=await sb.from("leads")
+      .update({stato:"Perso",aggiornato_il:nowIso})
+      .eq("id",l.id);
+
+    if(!error){
+      l.stato="Perso";
+      l.aggiornatoIl=nowIso;
+    }else{
+      console.error("Errore scadenza automatica Lead",l.id,error);
+    }
+  }
+
+  if(currentView==="leads") renderLeads();
+  if(currentView==="dashboard") renderDashboard();
+}
+
 /* ============ DASHBOARD ============ */
 function renderDashboard(){
   const activeOrders = state.orders.filter(o=>o.stato!=="Consegnato");
@@ -2470,7 +2524,7 @@ function renderDashboard(){
   });
   const ritiriDaFare = state.orders.filter(o=>o.stato!=="Consegnato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"));
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
-  const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo");
+  const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
 
   document.getElementById("view-dashboard").innerHTML = `
@@ -5309,7 +5363,7 @@ function renderGmailReader(){
           <button class="btn btn-outline" onclick="openLeadFromGmail()">+ Crea Lead</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Collega a Cliente')">Collega a Cliente</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Crea Preventivo')">Crea Preventivo</button>
-          <button class="btn btn-outline" onclick="gmailActionPending('Crea Ordine')">Crea Ordine</button>
+          <button class="btn btn-outline" onclick="createOrderFromGmail()">Crea Ordine</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Aggiungi Nota')">Aggiungi Nota</button>
         </div>
         ${gmailReplyOpen ? renderGmailReplyComposer(m) : ""}
@@ -5642,9 +5696,8 @@ function openLeadFromGmail(){
             <label>Stato</label>
             <select id="lead-stato">
               <option value="Nuovo" selected>Nuovo</option>
+              <option value="In attesa di conferma">In attesa di conferma</option>
               <option value="Da ricontattare">Da ricontattare</option>
-              <option value="Preventivo inviato">Preventivo inviato</option>
-              <option value="In attesa">In attesa</option>
               <option value="Accettato">Accettato</option>
               <option value="Perso">Perso</option>
             </select>
@@ -5725,6 +5778,61 @@ async function saveLeadFromGmail(){
     showToast(err?.message||"Errore durante la creazione del Lead");
     if(btn){ btn.disabled=false; btn.textContent="Salva Lead"; }
   }
+}
+
+
+function createOrderFromGmail(){
+  const m=gmailSelectedMessage;
+  if(!m){
+    showToast("Apri prima una mail");
+    return;
+  }
+
+  const email=gmailExtractAddress(m.from||"");
+  const existing=findClientByEmail(email);
+
+  if(existing){
+    closeGmailMessage();
+    newOrderForClient(existing.id);
+    return;
+  }
+
+  const fullName=gmailExtractName(m.from||"");
+  const parts=fullName.split(/\s+/).filter(Boolean);
+  const nome=parts.length ? parts[0] : "";
+  const cognome=parts.length>1 ? parts.slice(1).join(" ") : "";
+  const telefono=gmailExtractPhone(`${m.bodyText||""} ${m.bodyHtml||""}`);
+
+  const prefill={
+    tipo:"Family",
+    nome:nome||fullName,
+    cognome,
+    email,
+    telefono
+  };
+
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Crea cliente e ordine</h2>
+    <p style="color:var(--muted);margin-top:0;">
+      Questa email non appartiene ancora a un cliente. Controlla i dati e salva: subito dopo si aprirà il nuovo ordine.
+    </p>
+    ${clientFieldsHTML('mailorder',prefill)}
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveMailClientAndOpenOrder()">Salva cliente e crea ordine</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+  toggleClientTypeFields('mailorder');
+}
+
+async function saveMailClientAndOpenOrder(){
+  const clientId=await createClientFromPrefix('mailorder');
+  if(!clientId) return;
+  closeModal();
+  showToast("Cliente creato");
+  newOrderForClient(clientId);
 }
 
 function gmailActionPending(label){
@@ -5877,9 +5985,13 @@ async function onSignedIn(session){
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("app").style.display = "flex";
   await loadAllFromSupabase();
+  await expireStaleWaitingLeads();
   subscribeRealtime();
   renderNav();
   goTo("dashboard");
+  if(!window._leadExpiryTimer){
+    window._leadExpiryTimer=setInterval(expireStaleWaitingLeads,60*60*1000);
+  }
 }
 async function initAuth(){
   const { data } = await sb.auth.getSession();
