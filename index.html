@@ -1095,33 +1095,36 @@ const STOCK_ALERT_RULES = [
   {codice:"BSW201", colori:["WH","WHITE","BIANCO"], taglie:["L"], minimo:1}
 ];
 function normalizeStockColor(v){ return String(v||"").trim().toUpperCase(); }
-function minimoRichiestoMagazzino(w){
+function minimoDefaultMagazzino(w){
   const code=String(w.codice||"").trim().toUpperCase();
   const color=normalizeStockColor(w.colore);
   const size=String(w.taglia||"").trim().toUpperCase();
   const rule=STOCK_ALERT_RULES.find(r=>r.codice===code && r.colori.includes(color) && r.taglie.includes(size));
   return rule ? rule.minimo : 0;
 }
+function minimoRichiestoMagazzino(w){
+  if(w && w.scortaMinima!==null && w.scortaMinima!==undefined && !Number.isNaN(Number(w.scortaMinima))){
+    return Math.max(0, Number(w.scortaMinima)||0);
+  }
+  return minimoDefaultMagazzino(w);
+}
 function computeScorteMonitorate(){
-  const targets=[];
-  const addTarget=(codice,colorLabel,colorAliases,taglia,minimo)=>{
-    const w=state.warehouse.find(x=>String(x.codice||"").trim().toUpperCase()===codice && colorAliases.includes(normalizeStockColor(x.colore)) && String(x.taglia||"").trim().toUpperCase()===taglia);
-    const quantita=w ? Number(w.quantita)||0 : 0;
-    if(quantita<=minimo) targets.push({
-      id:w?w.id:`virtual-${codice}-${colorLabel}-${taglia}`,
-      codice, nome:w?.nome||codice, categoria:w?.categoria||"Abbigliamento",
-      colore:w?.colore||colorLabel, taglia, quantita, scortaMinima:minimo, unita:w?.unita||"pz", virtuale:!w
-    });
-  };
-  ["BS010","BSW150"].forEach(codice=>{
-    ["S","M","L","XL"].forEach(taglia=>{
-      addTarget(codice,"BK",["BK","BLACK","NERO"],taglia,10);
-      addTarget(codice,"WH",["WH","WHITE","BIANCO"],taglia,10);
-    });
-  });
-  addTarget("BS201","WH",["WH","WHITE","BIANCO"],"M",1);
-  addTarget("BSW201","WH",["WH","WHITE","BIANCO"],"L",1);
-  return targets;
+  return state.warehouse
+    .filter(w=>{
+      const minimo = Math.max(0, Number(w.scortaMinima)||0);
+      return minimo>0 && Number(w.quantita||0) <= minimo;
+    })
+    .map(w=>({
+      ...w,
+      quantita:Number(w.quantita)||0,
+      scortaMinima:Math.max(0, Number(w.scortaMinima)||0),
+      virtuale:false
+    }))
+    .sort((a,b)=>
+      String(a.codice||a.nome||"").localeCompare(String(b.codice||b.nome||"")) ||
+      String(a.colore||"").localeCompare(String(b.colore||"")) ||
+      String(a.taglia||"").localeCompare(String(b.taglia||""))
+    );
 }
 
 /* ============ STATO ============ */
@@ -1175,8 +1178,15 @@ async function loadAllFromSupabase(){
   });
   // Le fasi vanno ricalcolate se qualche categoria non ha più il template previsto, preservando le spunte già fatte
   state.orders.forEach(o => recalcFasi(o));
-  // Le scorte minime sono gestite automaticamente solo per le varianti monitorate.
-  state.warehouse.forEach(w=>{ w.scortaMinima = minimoRichiestoMagazzino(w); });
+  // Le scorte minime vengono lette dal database e possono essere modificate manualmente.
+  // Per le vecchie varianti monitorate resta solo un valore iniziale di sicurezza se manca del tutto.
+  state.warehouse.forEach(w=>{
+    if(w.scortaMinima===null || w.scortaMinima===undefined || Number.isNaN(Number(w.scortaMinima))){
+      w.scortaMinima = minimoDefaultMagazzino(w);
+    } else {
+      w.scortaMinima = Math.max(0, Number(w.scortaMinima)||0);
+    }
+  });
 }
 
 /* ---- Scrittura: aggiorna/crea tutte le righe attuali di una collezione (upsert) ---- */
@@ -3297,13 +3307,13 @@ function quickAddToWarehouse(){
 
   if(existing){
     existing.quantita = Number(existing.quantita||0) + qty;
-    existing.scortaMinima = minimoRichiestoMagazzino(existing);
+    existing.scortaMinima = Math.max(0, Number(existing.scortaMinima)||0);
   }else{
     const item = {
       id:uid(), codice, nome, categoria, colore, taglia:normalizedTaglia,
       unita:"pz", quantita:qty, scortaMinima:0, warehouseGroup:group
     };
-    item.scortaMinima = minimoRichiestoMagazzino(item);
+    item.scortaMinima = Math.max(0, Number(item.scortaMinima)||0);
     state.warehouse.push(item);
   }
   saveState('warehouse');
@@ -3385,7 +3395,10 @@ function magazzinoRowsHtml(list){
       <td><input id="wn-${w.id}" value="${w.nome||''}" style="min-width:160px;"></td>
       <td>${w.categoria||"—"}</td><td>${w.colore||"—"}</td><td>${w.taglia||"—"}</td>
       <td class="${low?'low-stock':''}"><input id="wq-${w.id}" type="number" min="0" value="${w.quantita}" style="width:70px;"> ${w.unita}</td>
-      <td><input id="wm-${w.id}" type="number" min="0" value="${minimo}" style="width:70px;background:var(--paper);" readonly> ${w.unita}</td>
+      <td>
+        <input id="wm-${w.id}" type="number" min="0" value="${minimo}" style="width:78px;">
+        ${w.unita}
+      </td>
       <td>${low?'<span class="pill pill-open">Sotto scorta</span>':'<span class="pill pill-done">OK</span>'}</td>
       <td style="min-width:230px;">${destHtml}</td>
       <td style="white-space:nowrap;">
@@ -3434,7 +3447,11 @@ function renderMagazzino(){
         <div class="field"><label>Colore</label><input id="if-colore" placeholder="Es. Bianco, NY, BK..."></div>
         <div class="field"><label>Taglia</label><input id="if-taglia" placeholder="Es. S, M, L, XL, UNICA..."></div>
         <div class="field"><label>Quantità attuale</label><input id="if-quantita" type="number" min="1" value="1"></div>
-        <div class="field"><label>Scorta minima</label><input id="if-scorta" type="text" value="Automatica" disabled></div>
+        <div class="field">
+          <label>Scorta minima</label>
+          <input id="if-scorta" type="number" min="0" value="0" placeholder="0">
+          <span class="helptext" style="margin:4px 0 0;">Inserisci 0 se non vuoi ricevere avvisi di scorta.</span>
+        </div>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" onclick="addItem()">Salva articolo</button>
@@ -3443,7 +3460,9 @@ function renderMagazzino(){
     </div>
     <div class="card" style="margin-bottom:14px;padding:13px 16px;">
       <strong>${warehouseGroupLabel(magazzinoGroupFilter)}</strong>
-      <div class="helptext" style="margin:4px 0 0;">Qui vedi solo le giacenze reali di questa sottocategoria. Gli articoli a quantità zero non vengono mostrati.</div>
+      <div class="helptext" style="margin:4px 0 0;">
+        Qui vedi solo le giacenze reali di questa sottocategoria. Nella colonna <strong>Scorta minima</strong> puoi impostare liberamente la soglia di avviso per ogni articolo e poi premere <strong>Aggiorna</strong>.
+      </div>
     </div>
     <div class="section-header">
       <div class="filters"><input id="magazzinoSearchInput" class="inline" style="min-width:220px;" placeholder="Cerca per codice, nome o colore…" value="${magazzinoSearch}" oninput="filterMagazzino(this)"></div>
@@ -3462,11 +3481,11 @@ function renderMagazzino(){
 function saveWarehouseRow(id){
   const w = findItem('warehouse', id);
   w.nome = document.getElementById(`wn-${id}`).value.trim();
-  w.quantita = Number(document.getElementById(`wq-${id}`).value)||0;
-  w.scortaMinima = minimoRichiestoMagazzino(w);
+  w.quantita = Math.max(0, Number(document.getElementById(`wq-${id}`).value)||0);
+  w.scortaMinima = Math.max(0, Number(document.getElementById(`wm-${id}`).value)||0);
   saveState('warehouse');
   renderMagazzino();
-  showToast("Articolo aggiornato");
+  showToast("Articolo e scorta minima aggiornati");
 }
 function addItem(){
   const nome = document.getElementById("if-nome").value.trim();
@@ -3480,10 +3499,9 @@ function addItem(){
     taglia: document.getElementById("if-taglia").value.trim(),
     unita: "pz",
     quantita,
-    scortaMinima:0,
+    scortaMinima: Math.max(0, Number(document.getElementById("if-scorta").value)||0),
     warehouseGroup: magazzinoGroupFilter
   });
-  state.warehouse[state.warehouse.length-1].scortaMinima = minimoRichiestoMagazzino(state.warehouse[state.warehouse.length-1]);
   saveState('warehouse'); toggleForm('itemForm'); renderMagazzino(); showToast("Articolo aggiunto");
 }
 function adjustStock(id, delta){ const w = findItem('warehouse',id); w.quantita = Math.max(0, Number(w.quantita)+delta); saveState('warehouse'); renderMagazzino(); }
@@ -3607,10 +3625,10 @@ function confirmPdfImport(){
       existing.nome = existing.nome || r.nome;
       if(!existing.categoria) existing.categoria = r.categoria;
       if(!existing.warehouseGroup) existing.warehouseGroup = "Tessile";
-      existing.scortaMinima = minimoRichiestoMagazzino(existing);
+      existing.scortaMinima = Math.max(0, Number(existing.scortaMinima)||0);
     } else {
       const nuovo={id:uid(), codice:r.codice, nome:r.nome, categoria:r.categoria, colore:r.colore, taglia:r.taglia, unita:"pz", quantita:r.quantita, scortaMinima:0, warehouseGroup:"Tessile"};
-      nuovo.scortaMinima = minimoRichiestoMagazzino(nuovo);
+      nuovo.scortaMinima = minimoDefaultMagazzino(nuovo);
       state.warehouse.push(nuovo);
     }
   });
