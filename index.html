@@ -1527,6 +1527,14 @@
     font-weight:900 !important;
   }
 
+
+  .mail-reader-actions .mail-action-done{
+    background:#F1F3F5 !important;
+    color:#34404D !important;
+    border-color:#D8DEE5 !important;
+    font-weight:900 !important;
+  }
+
 </style>
 </head>
 <body>
@@ -3897,7 +3905,6 @@ async function addOrder(){
   if(pendingGmailOrderMessageId){
     const msgId=pendingGmailOrderMessageId;
     pendingGmailOrderMessageId=null;
-    await setGmailActionFlag(msgId,"orderGenerated");
   }
 
   toggleForm('orderForm');
@@ -5516,6 +5523,60 @@ function sanitizeEmailHtml(raw){
     .replace(/\son\w+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi,"")
     .replace(/javascript:/gi,"");
 }
+
+function renderGmailActionButtons(messageId){
+  const f=getGmailActionFlags(messageId);
+  return `
+    <button id="gmail-btn-reply" class="btn ${f.replied?'btn-outline':'btn-primary'}"
+      onclick="gmailReplyAction('${messageId}')">
+      ${f.replied?'IN ATTESA':'↩ Rispondi'}
+    </button>
+
+    <button id="gmail-btn-lead" class="btn btn-outline"
+      onclick="gmailLeadAction('${messageId}')">
+      ${f.leadGenerated?'LEAD GENERATO':'+ Crea Lead'}
+    </button>
+
+    <button id="gmail-btn-order" class="btn btn-outline"
+      onclick="gmailOrderAction('${messageId}')">
+      ${f.orderGenerated?'ORDINE EFFETTUATO':'Crea Ordine'}
+    </button>
+  `;
+}
+
+function paintGmailActionButton(field){
+  if(field==="replied"){
+    const b=document.getElementById("gmail-btn-reply");
+    if(b){ b.textContent="IN ATTESA"; b.classList.remove("btn-primary"); b.classList.add("btn-outline","mail-action-done"); }
+  }
+  if(field==="leadGenerated"){
+    const b=document.getElementById("gmail-btn-lead");
+    if(b){ b.textContent="LEAD GENERATO"; b.classList.add("mail-action-done"); }
+  }
+  if(field==="orderGenerated"){
+    const b=document.getElementById("gmail-btn-order");
+    if(b){ b.textContent="ORDINE EFFETTUATO"; b.classList.add("mail-action-done"); }
+  }
+}
+
+async function gmailReplyAction(messageId){
+  paintGmailActionButton("replied");
+  await setGmailActionFlag(messageId,"replied");
+  toggleGmailReply();
+}
+
+async function gmailLeadAction(messageId){
+  paintGmailActionButton("leadGenerated");
+  await setGmailActionFlag(messageId,"leadGenerated");
+  openLeadFromGmail();
+}
+
+async function gmailOrderAction(messageId){
+  paintGmailActionButton("orderGenerated");
+  await setGmailActionFlag(messageId,"orderGenerated");
+  createOrderFromGmail();
+}
+
 function renderGmailReader(){
   if(gmailMessageLoading){
     return `<aside class="mail-reader"><div class="mail-reader-loading">Apro la mail completa…</div></aside>`;
@@ -5580,20 +5641,7 @@ function renderGmailReader(){
       </div>
       <div class="mail-reader-body">
         <div class="mail-reader-actions">
-          ${(()=>{
-            const f=getGmailActionFlags(m.id);
-            return `
-              <button class="btn ${f.replied?'btn-outline':'btn-primary'}" ${f.replied?'disabled':''} onclick="toggleGmailReply()">
-                ${f.replied?'IN ATTESA':'↩ Rispondi'}
-              </button>
-              <button class="btn btn-outline" ${f.leadGenerated?'disabled':''} onclick="openLeadFromGmail()">
-                ${f.leadGenerated?'LEAD GENERATO':'+ Crea Lead'}
-              </button>
-              <button class="btn btn-outline" ${f.orderGenerated?'disabled':''} onclick="createOrderFromGmail()">
-                ${f.orderGenerated?'ORDINE EFFETTUATO':'Crea Ordine'}
-              </button>
-            `;
-          })()}
+          ${renderGmailActionButtons(m.id)}
         </div>
         ${gmailReplyOpen ? renderGmailReplyComposer(m) : ""}
 
@@ -5789,7 +5837,6 @@ async function sendGmailReply(){
     }
 
     gmailReplyStatus="✓ Risposta inviata correttamente";
-    await setGmailActionFlag(m.id,"replied");
     showToast("Email inviata");
 
     gmailReplyText="";
@@ -6002,7 +6049,6 @@ async function saveLeadFromGmail(){
       state.leads = state.leads || [];
       state.leads.unshift(fromDbRow("leads",data));
     }
-    await setGmailActionFlag(m.id,"leadGenerated");
     closeLeadModal();
     showToast("Lead creato correttamente");
     if(currentView==="dashboard") renderDashboard();
