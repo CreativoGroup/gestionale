@@ -703,6 +703,30 @@
     #view-dashboard .grid-auto{grid-template-columns:1fr 1fr;}
   }
 
+
+  @media(max-width:760px){
+    .mobile-hide{display:none !important;}
+    .dashboard-compact-card table{min-width:0 !important;width:100%;}
+    .dashboard-compact-card td{
+      padding:10px 4px;
+      border-bottom:1px solid var(--border);
+    }
+    .dashboard-compact-card td:first-child{
+      width:100%;
+      font-weight:750;
+      font-size:14px;
+    }
+    .dashboard-compact-card td:last-child{
+      white-space:nowrap;
+      text-align:right;
+    }
+    .dashboard-compact-card .btn{
+      min-height:38px;
+      padding:7px 10px;
+      font-size:11.5px;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -749,6 +773,7 @@
     <section class="view" id="view-magazzino"></section>
     <section class="view" id="view-incassi"></section>
     <section class="view" id="view-spese"></section>
+    <section class="view" id="view-costiFissi"></section>
     <section class="view" id="view-entrate"></section>
   </main>
 </div>
@@ -861,9 +886,9 @@ function computeScorteMonitorate(){
 }
 
 /* ============ STATO ============ */
-let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], entrate:[], appuntamenti:[]};
+let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[]};
 let currentView = "dashboard";
-const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", entrate:"entrate", appuntamenti:"appuntamenti"};
+const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti"};
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -878,6 +903,7 @@ function toDbRow(collection, o){
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
     case "warehouse": return {id:o.id, codice:o.codice||null, nome:o.nome||null, categoria:o.categoria||null, colore:o.colore||null, taglia:o.taglia||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
     case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
+    case "fixedCosts": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null, file_path:o.filePath||null, file_name:o.fileName||null};
     case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, note:o.note||null};
   }
@@ -893,6 +919,7 @@ function fromDbRow(collection, r){
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:r.metodo};
     case "warehouse": return {id:r.id, codice:r.codice||"", nome:r.nome, categoria:r.categoria, colore:r.colore||"", taglia:r.taglia||"", quantita:Number(r.quantita)||0, scortaMinima:Number(r.scorta_minima)||0, unita:r.unita||"pz"};
     case "expenses": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
+    case "fixedCosts": return {id:r.id, descrizione:r.descrizione||"", importo:Number(r.importo)||0, metodo:r.metodo||"", data:r.data, filePath:r.file_path||"", fileName:r.file_name||"", createdAt:r.created_at};
     case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
     case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, note:r.note||""};
   }
@@ -1126,7 +1153,8 @@ const NAV = [
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili"},
   {id:"incassi", label:"Incassi", icon:"€", subtitle:"Report pagamenti e crediti aperti", adminOnly:true},
   {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine"},
-  {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti"}
+  {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti"},
+  {id:"costiFissi", label:"Costi fissi", icon:"▦", subtitle:"F24, bollette, abbonamenti e costi ricorrenti", adminOnly:true}
 ];
 function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && currentUser.role==="admin")); }
 function renderNav(){
@@ -1167,6 +1195,7 @@ function renderTopbarActions(){
     magazzino: `<button class="btn btn-primary" onclick="toggleForm('itemForm')">+ Nuovo articolo</button>`,
     incassi: `<button class="btn btn-primary" onclick="toggleForm('paymentForm')">+ Registra incasso</button>`,
     spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
+    costiFissi: currentUser&&currentUser.role==="admin" ? `<button class="btn btn-primary" onclick="toggleForm('fixedCostForm')">+ Nuovo costo fisso</button>` : ``,
     entrate: `<button class="btn btn-primary" onclick="toggleForm('incomeForm')">+ Nuova entrata</button>`,
     dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa l’app</button>`
   };
@@ -1175,7 +1204,7 @@ function renderTopbarActions(){
 function renderCurrentView(){
   ({dashboard:renderDashboard, clienti:renderClienti, preventivi:renderPreventivi,
     ordini:renderOrdini, flusso:renderFlusso,
-    magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, entrate:renderEntrate})[currentView]();
+    magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate})[currentView]();
 }
 function toggleForm(id){ const el = document.getElementById(id); if(el) el.classList.toggle("open"); }
 /* Ridisegna una vista preservando il focus e la posizione del cursore sul campo attivo (usato dalle ricerche, che altrimenti perdono il focus a ogni lettera) */
@@ -1278,13 +1307,13 @@ function renderDashboard(){
     </div>
 
     <div class="grid grid-2">
-      <div class="card">
+      <div class="card dashboard-compact-card">
         <h3 style="margin-top:0;">Completati da consegnare</h3>
         ${completatiDaConsegnare.length ? `<table><tbody>${completatiDaConsegnare.map(o=>`
           <tr>
             <td>${clientName(o.clientId)}</td>
-            <td>${orderCategorieLabel(o)}</td>
-            <td>${o.consegnaTipo}</td>
+            <td class="mobile-hide">${orderCategorieLabel(o)}</td>
+            <td class="mobile-hide">${o.consegnaTipo}</td>
             <td>
               <button class="btn btn-sm ${o.clienteAvvisato?'btn-outline':'btn-primary'}"
                 style="${o.clienteAvvisato?'border-color:var(--ok);color:var(--ok);':'background:var(--warn);color:#fff;'}"
@@ -1292,17 +1321,17 @@ function renderDashboard(){
                 ${o.clienteAvvisato?'AVVISATO':'DA AVVISARE'}
               </button>
             </td>
-            <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td>
+            <td class="mobile-hide"><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td>
           </tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`}
       </div>
-      <div class="card">
+      <div class="card dashboard-compact-card">
         <h3 style="margin-top:0;">Ordini da spedire</h3>
         ${daSpedire.length ? `<table><tbody>${daSpedire.map(o=>`
-          <tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
+          <tr><td>${clientName(o.clientId)}</td><td class="mobile-hide">${orderCategorieLabel(o)}</td><td class="mobile-hide"><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
           <td style="white-space:nowrap;">
-            <button class="btn btn-primary btn-sm" onclick="segnaComeSpedito('${o.id}')">Segna come spedito</button>
-            <button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button>
+            <button class="btn btn-primary btn-sm" onclick="segnaComeSpedito('${o.id}')">SEGNA COME SPEDITO</button>
+            <button class="btn btn-outline btn-sm mobile-hide" onclick="openJobCard('${o.id}')">Scheda</button>
           </td></tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessuna spedizione in sospeso.</p>`}
       </div>
@@ -3198,15 +3227,23 @@ function buildMonthlyRows(year){
     const soldiIncassati = contanti+carta+bonifico;
     const entrate = (state.entrate||[]).filter(e=>e.data && e.data.slice(0,7)===monthKey).reduce((s,e)=>s+Number(e.importo),0);
     const spese = state.expenses.filter(e=>e.data && e.data.slice(0,7)===monthKey).reduce((s,e)=>s+Number(e.importo),0);
+    const costiFissi = (state.fixedCosts||[]).filter(e=>e.data && e.data.slice(0,7)===monthKey).reduce((s,e)=>s+Number(e.importo),0);
+    // "Totale Ordini" = valore lordo delle schede create nel mese, NON soldi incassati.
     const totaleOrdini = ordersInMonth.reduce((s,o)=>s+orderTotale(o),0);
-    return {mese:nome, monthKey, nOrdini:ordersInMonth.length, totaleOrdini, nPagamenti:paymentsInMonth.length, contanti, carta, bonifico, soldiIncassati, entrate, spese, differenza:soldiIncassati+entrate-spese};
+    return {
+      mese:nome, monthKey, nOrdini:ordersInMonth.length, totaleOrdini,
+      nPagamenti:paymentsInMonth.length, contanti, carta, bonifico, soldiIncassati,
+      entrate, spese, costiFissi,
+      differenza:soldiIncassati+entrate-spese-costiFissi
+    };
   });
 }
 function openReportDetails(start, end, label){
   const pagamenti = state.payments.filter(p=>p.data>=start && p.data<=end).map(p=>({tipo:"Incasso", data:p.data, descrizione:`${clientName(p.clientId)} — ${p.tipo}`, importo:p.importo, metodo:p.metodo}));
   const entrate = (state.entrate||[]).filter(e=>e.data>=start && e.data<=end).map(e=>({tipo:"Entrata", data:e.data, descrizione:e.descrizione, importo:e.importo, metodo:e.metodo}));
   const spese = state.expenses.filter(e=>e.data>=start && e.data<=end).map(e=>({tipo:"Spesa", data:e.data, descrizione:e.descrizione, importo:-e.importo, metodo:e.metodo}));
-  const righe = [...pagamenti, ...entrate, ...spese].sort((a,b)=>a.data.localeCompare(b.data));
+  const costiFissi = (state.fixedCosts||[]).filter(e=>e.data>=start && e.data<=end).map(e=>({tipo:"Costo fisso", data:e.data, descrizione:e.descrizione, importo:-e.importo, metodo:e.metodo}));
+  const righe = [...pagamenti, ...entrate, ...spese, ...costiFissi].sort((a,b)=>a.data.localeCompare(b.data));
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>${label}</h2>
@@ -3284,17 +3321,24 @@ function renderIncassi(){
   } else {
     const year = new Date().getFullYear();
     const rows = buildMonthlyRows(year);
-    const tot = rows.reduce((a,r)=>({nOrdini:a.nOrdini+r.nOrdini, totaleOrdini:a.totaleOrdini+r.totaleOrdini, nPagamenti:a.nPagamenti+r.nPagamenti, contanti:a.contanti+r.contanti, carta:a.carta+r.carta, bonifico:a.bonifico+r.bonifico, soldiIncassati:a.soldiIncassati+r.soldiIncassati, entrate:a.entrate+r.entrate, spese:a.spese+r.spese, differenza:a.differenza+r.differenza}), {nOrdini:0,totaleOrdini:0,nPagamenti:0,contanti:0,carta:0,bonifico:0,soldiIncassati:0,entrate:0,spese:0,differenza:0});
+    const tot = rows.reduce((a,r)=>({nOrdini:a.nOrdini+r.nOrdini, totaleOrdini:a.totaleOrdini+r.totaleOrdini, nPagamenti:a.nPagamenti+r.nPagamenti, contanti:a.contanti+r.contanti, carta:a.carta+r.carta, bonifico:a.bonifico+r.bonifico, soldiIncassati:a.soldiIncassati+r.soldiIncassati, entrate:a.entrate+r.entrate, spese:a.spese+r.spese, costiFissi:a.costiFissi+r.costiFissi, differenza:a.differenza+r.differenza}), {nOrdini:0,totaleOrdini:0,nPagamenti:0,contanti:0,carta:0,bonifico:0,soldiIncassati:0,entrate:0,spese:0,costiFissi:0,differenza:0});
     reportHtml = `
       <div class="card" style="margin-bottom:18px;"><canvas id="monthlyChart" height="90"></canvas></div>
       <div class="table-wrap" style="margin-bottom:20px;overflow-x:auto;">
         <table>
-          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta</th><th>Bonifico</th><th>Soldi Incassati</th><th>Entrate</th><th>Spese</th><th>Differenza</th></tr></thead>
+          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta</th><th>Bonifico</th><th>Totale pagamenti</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Differenza</th></tr></thead>
           <tbody>
-            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td>${fmtMoney(r.totaleOrdini)}</td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td>${fmtMoney(r.soldiIncassati)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
-            <tr style="font-weight:700;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
+            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td>${fmtMoney(r.totaleOrdini)}</td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td style="font-weight:700;">${fmtMoney(r.soldiIncassati)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td>${fmtMoney(r.costiFissi)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
+            <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.costiFissi)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
           </tbody>
         </table>
+      </div>
+      <div class="card" style="margin-bottom:18px;">
+        <p style="margin:0;font-size:13px;line-height:1.5;color:var(--muted);">
+          <strong>Come viene calcolato “Totale Ordini”:</strong>
+          somma il valore totale di tutte le schede ordine create nel mese (quantità × prezzo, IVA/spedizione/sconti secondo la scheda).
+          Non rappresenta gli incassi effettivi. Gli incassi reali sono separati nelle colonne Contanti, Carta e Bonifico.
+        </p>
       </div>`;
   }
 
@@ -3437,6 +3481,134 @@ function deleteExpense(id){
     state.expenses = state.expenses.filter(e=>e.id!==id); dbDelete('expenses', id); renderSpese();
   });
 }
+
+
+/* ============ COSTI FISSI (SOLO AMMINISTRATORE) ============ */
+function fixedCostsTotaleMese(month){
+  return (state.fixedCosts||[]).filter(e=>e.data && e.data.slice(0,7)===month).reduce((s,e)=>s+Number(e.importo),0);
+}
+function safeStorageFileName(name){
+  return String(name||"documento.pdf")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-zA-Z0-9._-]+/g,"-")
+    .replace(/-+/g,"-");
+}
+async function fixedCostSignedUrl(path){
+  if(!path) return null;
+  const { data, error } = await sb.storage.from("fixed-costs").createSignedUrl(path, 120);
+  if(error){ console.error(error); showToast("Impossibile aprire il documento"); return null; }
+  return data?.signedUrl || null;
+}
+async function openFixedCostFile(id){
+  const item = findItem('fixedCosts', id);
+  if(!item || !item.filePath) return;
+  const url = await fixedCostSignedUrl(item.filePath);
+  if(url) window.open(url, "_blank", "noopener");
+}
+function renderCostiFissi(){
+  const el = document.getElementById("view-costiFissi");
+  if(!el) return;
+  if(!currentUser || currentUser.role!=="admin"){
+    el.innerHTML = `<div class="card"><p class="empty">Sezione riservata all'amministratore.</p></div>`;
+    return;
+  }
+
+  const totale = (state.fixedCosts||[]).reduce((s,e)=>s+Number(e.importo),0);
+  const mese = fixedCostsTotaleMese(currentMonth());
+  el.innerHTML = `
+    <div class="form-panel" id="fixedCostForm">
+      <h3>Nuovo costo fisso</h3>
+      <div class="form-grid">
+        <div class="field" style="grid-column:1/-1;"><label>Descrizione</label><input id="fc-descrizione" placeholder="Es. F24, energia elettrica, software, assicurazione..."></div>
+        <div class="field"><label>Importo (€)</label><input id="fc-importo" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Data</label><input id="fc-data" type="date" value="${today()}"></div>
+        <div class="field"><label>Modalità di pagamento</label><select id="fc-metodo">${PAY_METHODS.map(m=>`<option>${m}</option>`).join("")}</select></div>
+        <div class="field" style="grid-column:1/-1;">
+          <label>Documento PDF (facoltativo)</label>
+          <input id="fc-file" type="file" accept="application/pdf,.pdf">
+          <span class="helptext" style="margin:4px 0 0;">Puoi allegare F24, bollette, fatture di abbonamenti o altri PDF.</span>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addFixedCost()">Salva costo fisso</button>
+        <button class="btn btn-outline" onclick="toggleForm('fixedCostForm')">Annulla</button>
+      </div>
+    </div>
+
+    <div class="grid grid-auto" style="margin-bottom:18px;">
+      <div class="card stat"><p class="stat-label">Costi fissi (storico)</p><p class="stat-value">${fmtMoney(totale)}</p></div>
+      <div class="card stat"><p class="stat-label">Costi fissi mese corrente</p><p class="stat-value">${fmtMoney(mese)}</p></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Descrizione</th><th>Importo</th><th>Metodo</th><th>Documento</th><th></th></tr></thead>
+        <tbody>
+          ${(state.fixedCosts||[]).length ? [...state.fixedCosts].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(e=>`
+            <tr>
+              <td>${fmtDate(e.data)}</td>
+              <td>${e.descrizione}</td>
+              <td>${fmtMoney(e.importo)}</td>
+              <td>${e.metodo||"—"}</td>
+              <td>${e.filePath ? `<button class="btn btn-outline btn-sm" onclick="openFixedCostFile('${e.id}')">Apri PDF</button>` : "—"}</td>
+              <td><button class="btn btn-ghost btn-sm" onclick="deleteFixedCost('${e.id}')">Elimina</button></td>
+            </tr>
+          `).join("") : `<tr><td colspan="6" class="empty">Nessun costo fisso registrato.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+async function addFixedCost(){
+  if(!currentUser || currentUser.role!=="admin"){ showToast("Operazione riservata all'amministratore"); return; }
+  const descrizione = document.getElementById("fc-descrizione").value.trim();
+  const importo = Number(document.getElementById("fc-importo").value)||0;
+  const data = document.getElementById("fc-data").value || today();
+  const metodo = document.getElementById("fc-metodo").value;
+  const file = document.getElementById("fc-file").files[0] || null;
+  if(!descrizione){ showToast("Inserisci una descrizione"); return; }
+  if(importo<=0){ showToast("Inserisci un importo valido"); return; }
+  if(file && file.type!=="application/pdf" && !file.name.toLowerCase().endsWith(".pdf")){ showToast("Puoi caricare solo file PDF"); return; }
+
+  const id = uid();
+  const item = {id, descrizione, importo, metodo, data, filePath:"", fileName:""};
+  const ok = await upsertOne('fixedCosts', item);
+  if(!ok) return;
+
+  if(file){
+    const storagePath = `${currentUser.id}/${id}/${Date.now()}-${safeStorageFileName(file.name)}`;
+    const { error:uploadError } = await sb.storage.from("fixed-costs").upload(storagePath, file, {contentType:"application/pdf", upsert:false});
+    if(uploadError){
+      console.error(uploadError);
+      showToast(`Costo salvato, ma PDF non caricato: ${uploadError.message||"errore"}`);
+    }else{
+      item.filePath = storagePath;
+      item.fileName = file.name;
+      const okFile = await upsertOne('fixedCosts', item);
+      if(!okFile) return;
+    }
+  }
+
+  if(!state.fixedCosts.some(x=>x.id===id)) state.fixedCosts.push(item);
+  toggleForm('fixedCostForm');
+  renderCostiFissi();
+  showToast("Costo fisso registrato");
+}
+async function deleteFixedCost(id){
+  if(!currentUser || currentUser.role!=="admin") return;
+  const item = findItem('fixedCosts', id);
+  askConfirm("Eliminare questo costo fisso e l'eventuale documento allegato?", async ()=>{
+    if(item?.filePath){
+      const { error } = await sb.storage.from("fixed-costs").remove([item.filePath]);
+      if(error) console.error("Errore eliminazione file", error);
+    }
+    state.fixedCosts = (state.fixedCosts||[]).filter(e=>e.id!==id);
+    await dbDelete('fixedCosts', id);
+    renderCostiFissi();
+    showToast("Costo fisso eliminato");
+  });
+}
+
 
 /* ============ ENTRATE ============ */
 function renderEntrate(){
