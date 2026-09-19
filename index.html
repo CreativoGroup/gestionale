@@ -1746,7 +1746,7 @@ function toDbRow(collection, o){
     case "fixedCosts": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null, file_path:o.filePath||null, file_name:o.fileName||null};
     case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, note:o.note||null};
-    case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
+    case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, client_id:o.clientId||null, converted_order_id:o.convertedOrderId||null, converted_at:o.convertedAt||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
   }
 }
 function fromDbRow(collection, r){
@@ -1763,7 +1763,7 @@ function fromDbRow(collection, r){
     case "fixedCosts": return {id:r.id, descrizione:r.descrizione||"", importo:Number(r.importo)||0, metodo:r.metodo||"", data:r.data, filePath:r.file_path||"", fileName:r.file_name||"", createdAt:r.created_at};
     case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
     case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, note:r.note||""};
-    case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
+    case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
   }
 }
 
@@ -2118,7 +2118,7 @@ function renderTopbarActions(){
   const map = {
     clienti: `<button class="btn btn-primary" onclick="toggleForm('clientForm')">+ Nuovo cliente</button>`,
     preventivi: `<button class="btn btn-primary" onclick="toggleForm('quoteForm')">+ Nuovo preventivo</button>`,
-    ordini: `<button class="btn btn-primary" onclick="toggleForm('orderForm')">+ Nuovo ordine</button>`,
+    ordini: `<button class="btn btn-primary" onclick="pendingLeadOrderConversion=null;toggleForm('orderForm')">+ Nuovo ordine</button>`,
     magazzino: ``,
     incassi: `<button class="btn btn-primary" onclick="toggleForm('paymentForm')">+ Registra incasso</button>`,
     spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
@@ -2203,16 +2203,64 @@ function renderLeads(){
 
   const q=String(leadSearch||"").trim().toLowerCase();
   const all=[...(state.leads||[])].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
-  const filtered=all.filter(l=>{
-    const matchStatus=leadStatusFilter==="Tutti" || l.stato===leadStatusFilter;
+
+  const matchesFilters=(l)=>{
     const hay=[l.nome,l.azienda,l.email,l.telefono,l.oggettoRichiesta,l.richiesta].join(" ").toLowerCase();
-    return matchStatus && (!q || hay.includes(q));
-  });
+    return !q || hay.includes(q);
+  };
+
+  const attivi=all.filter(l=>!l.convertedOrderId && matchesFilters(l));
+  const archiviati=all.filter(l=>!!l.convertedOrderId && matchesFilters(l));
 
   const nuovi=all.filter(l=>l.stato==="Nuovo").length;
   const inAttesa=all.filter(l=>l.stato==="In attesa di conferma").length;
   const accettati=all.filter(l=>l.stato==="Accettato").length;
   const persi=all.filter(l=>l.stato==="Perso").length;
+
+  const rowsAttivi = attivi.length ? `
+    <table class="lead-table">
+      <thead><tr><th>Nome / Azienda</th><th>Email</th><th>Oggetto</th><th>Stato</th><th>Data</th><th>Azioni</th></tr></thead>
+      <tbody>${attivi.map(l=>`
+        <tr>
+          <td><strong>${escapeHtml(leadDisplayName(l))}</strong>${l.azienda&&l.nome?`<div style="font-size:11px;color:var(--muted);">${escapeHtml(l.nome)}</div>`:""}</td>
+          <td>${escapeHtml(l.email||"—")}</td>
+          <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
+          <td>
+            <select class="inline" style="min-width:165px;" onchange="changeLeadStatusFromSelect('${l.id}',this.value)">
+              ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
+            </select>
+          </td>
+          <td>${fmtLeadDate(l.creatoIl)}</td>
+          <td>
+            <div class="lead-actions">
+              <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button>
+              <button class="btn btn-ghost btn-sm" onclick="discardLead('${l.id}')">Scarta</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLead('${l.id}')">Elimina</button>
+            </div>
+          </td>
+        </tr>`).join("")}
+      </tbody>
+    </table>` : `<p class="empty">Nessun Lead attivo.</p>`;
+
+  const rowsArchiviati = archiviati.length ? `
+    <table class="lead-table">
+      <thead><tr><th>Nome / Azienda</th><th>Email</th><th>Oggetto</th><th>Stato</th><th>Data</th><th>Azioni</th></tr></thead>
+      <tbody>${archiviati.map(l=>`
+        <tr>
+          <td><strong>${escapeHtml(leadDisplayName(l))}</strong>${l.azienda&&l.nome?`<div style="font-size:11px;color:var(--muted);">${escapeHtml(l.nome)}</div>`:""}</td>
+          <td>${escapeHtml(l.email||"—")}</td>
+          <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
+          <td><span class="lead-status-pill lead-status-ok">${escapeHtml(l.stato)}</span></td>
+          <td>${fmtLeadDate(l.creatoIl)}</td>
+          <td>
+            <div class="lead-actions">
+              <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLead('${l.id}')">Elimina</button>
+            </div>
+          </td>
+        </tr>`).join("")}
+      </tbody>
+    </table>` : `<p class="empty">Nessun Lead archiviato.</p>`;
 
   root.innerHTML=`
     <div class="lead-stats">
@@ -2222,45 +2270,28 @@ function renderLeads(){
       <div class="lead-stat"><span>Persi / scartati</span><strong>${persi}</strong></div>
     </div>
 
-    <div class="card">
+    <div class="card" style="margin-bottom:16px;">
       <div class="lead-toolbar">
         <input id="lead-search" placeholder="🔎 Cerca nome, azienda, email, oggetto…" value="${escapeHtml(leadSearch)}"
           oninput="leadSearch=this.value;rerenderKeepingFocus(renderLeads)">
-        <select onchange="leadStatusFilter=this.value;renderLeads()">
-          ${["Tutti","Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${leadStatusFilter===s?"selected":""}>${s}</option>`).join("")}
-        </select>
       </div>
 
-      <div class="lead-table-wrap">
-        ${filtered.length ? `
-        <table class="lead-table">
-          <thead><tr><th>Nome / Azienda</th><th>Email</th><th>Oggetto</th><th>Stato</th><th>Data</th><th>Azioni</th></tr></thead>
-          <tbody>${filtered.map(l=>`
-            <tr>
-              <td><strong>${escapeHtml(leadDisplayName(l))}</strong>${l.azienda&&l.nome?`<div style="font-size:11px;color:var(--muted);">${escapeHtml(l.nome)}</div>`:""}</td>
-              <td>${escapeHtml(l.email||"—")}</td>
-              <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
-              <td>
-                <select class="inline" style="min-width:145px;" onchange="changeLeadStatusFromSelect('${l.id}',this.value)">
-                  ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
-                </select>
-              </td>
-              <td>${fmtLeadDate(l.creatoIl)}</td>
-              <td>
-                <div class="lead-actions">
-                  <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button>
-                  <button class="btn btn-ghost btn-sm" onclick="discardLead('${l.id}')">Scarta</button>
-                  <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLead('${l.id}')">Elimina</button>
-                </div>
-              </td>
-            </tr>`).join("")}
-          </tbody>
-        </table>` : `<p class="empty">Nessun Lead corrisponde ai filtri selezionati.</p>`}
+      <h3 style="margin:0 0 10px;">Lead attivi</h3>
+      <div class="lead-table-wrap">${rowsAttivi}</div>
+    </div>
+
+    <div class="card">
+      <div class="section-header" style="margin-bottom:10px;">
+        <h3 style="margin:0;">Archivio Lead accettati</h3>
+        <span style="font-size:12px;color:var(--muted);">${archiviati.length} archiviati</span>
       </div>
+      <p style="margin-top:0;color:var(--muted);font-size:12px;">
+        Lead per i quali è stato effettivamente creato un ordine. Lo stato è bloccato.
+      </p>
+      <div class="lead-table-wrap">${rowsArchiviati}</div>
     </div>
   `;
 }
-
 function openLeadDetail(id){
   const l=(state.leads||[]).find(x=>x.id===id);
   if(!l) return;
@@ -2269,9 +2300,11 @@ function openLeadDetail(id){
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>${escapeHtml(leadDisplayName(l))}</h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-      <select class="inline" onchange="changeLeadStatusFromSelect('${l.id}',this.value,true)">
-        ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
-      </select>
+      ${l.convertedOrderId
+        ? `<span class="lead-status-pill lead-status-ok">${escapeHtml(l.stato)}</span>`
+        : `<select class="inline" onchange="changeLeadStatusFromSelect('${l.id}',this.value,true)">
+            ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
+          </select>`}
       <span style="font-size:12px;color:var(--muted);">${fmtLeadDate(l.creatoIl)}</span>
     </div>
     <div class="lead-detail-grid">
@@ -2282,7 +2315,7 @@ function openLeadDetail(id){
       <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(l.richiesta||"—")}</div></div>
     </div>
     <div class="form-actions" style="margin-top:16px;">
-      ${l.stato==="Accettato" ? `
+      ${l.stato==="Accettato" && !l.convertedOrderId ? `
         <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">Trasforma in cliente ed effettua ordine</button>
         <button class="btn btn-primary" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente ed effettua ordine</button>
       ` : ""}
@@ -2359,7 +2392,7 @@ function transformLeadToClient(id, inserisciOrdine=false){
         await setLeadStatus(id,"Accettato");
         closeModal();
         showToast("Lead collegato al cliente");
-        if(inserisciOrdine) newOrderForClient(existing.id);
+        if(inserisciOrdine) newOrderForClient(existing.id, id);
       }
     );
     return;
@@ -2401,7 +2434,7 @@ async function saveLeadAsClient(leadId, inserisciOrdine=false){
   showToast("Lead trasformato in cliente");
 
   if(inserisciOrdine){
-    newOrderForClient(clientId);
+    newOrderForClient(clientId, leadId);
   }
 }
 
@@ -2468,7 +2501,7 @@ async function finishLinkLeadToClient(id, inserisciOrdine=false){
   showToast("Lead collegato al cliente");
 
   if(inserisciOrdine){
-    setTimeout(()=>newOrderForClient(clientId),120);
+    setTimeout(()=>newOrderForClient(clientId, id),120);
   }
 }
 
@@ -3040,7 +3073,10 @@ function openClientHistory(clientId){
   `;
   document.getElementById("modalBackdrop").classList.add("open");
 }
-function newOrderForClient(clientId){
+let pendingLeadOrderConversion = null;
+
+function newOrderForClient(clientId, leadId=null){
+  pendingLeadOrderConversion = leadId ? {leadId, clientId} : null;
   closeModal();
   goTo("ordini");
   const form = document.getElementById("orderForm");
@@ -3780,6 +3816,34 @@ function toggleImportante(orderId){
   const o = findItem('orders', orderId);
   o.importante = !o.importante; saveState('orders'); renderOrdini();
 }
+
+async function markLeadConvertedToOrder(leadId, clientId, orderId){
+  const l=(state.leads||[]).find(x=>x.id===leadId);
+  if(!l) return false;
+
+  const nowIso=new Date().toISOString();
+  const {error}=await sb.from("leads").update({
+    stato:"Accettato",
+    client_id:clientId,
+    converted_order_id:orderId,
+    converted_at:nowIso,
+    aggiornato_il:nowIso
+  }).eq("id",leadId);
+
+  if(error){
+    console.error("Errore archiviazione Lead dopo ordine",error);
+    showToast("Ordine creato, ma Lead non archiviato");
+    return false;
+  }
+
+  l.stato="Accettato";
+  l.clientId=clientId;
+  l.convertedOrderId=orderId;
+  l.convertedAt=nowIso;
+  l.aggiornatoIl=nowIso;
+  return true;
+}
+
 async function addOrder(){
   const clientId = await resolveClientId("of-cliente", "ofnc");
   if(!clientId) return;
@@ -3794,6 +3858,13 @@ async function addOrder(){
 
   const idx = state.orders.findIndex(o=>o.id===savedOrder.id);
   if(idx>=0) state.orders[idx] = savedOrder; else state.orders.push(savedOrder);
+
+  if(pendingLeadOrderConversion && pendingLeadOrderConversion.clientId===clientId){
+    const ctx=pendingLeadOrderConversion;
+    pendingLeadOrderConversion=null;
+    await markLeadConvertedToOrder(ctx.leadId, clientId, savedOrder.id);
+  }
+
   toggleForm('orderForm');
   renderOrdini();
   showToast(savedOrder.numero ? `Ordine #${savedOrder.numero} creato` : "Ordine creato");
@@ -5361,10 +5432,7 @@ function renderGmailReader(){
         <div class="mail-reader-actions">
           <button class="btn btn-primary" onclick="toggleGmailReply()">↩ Rispondi</button>
           <button class="btn btn-outline" onclick="openLeadFromGmail()">+ Crea Lead</button>
-          <button class="btn btn-outline" onclick="gmailActionPending('Collega a Cliente')">Collega a Cliente</button>
-          <button class="btn btn-outline" onclick="gmailActionPending('Crea Preventivo')">Crea Preventivo</button>
           <button class="btn btn-outline" onclick="createOrderFromGmail()">Crea Ordine</button>
-          <button class="btn btn-outline" onclick="gmailActionPending('Aggiungi Nota')">Aggiungi Nota</button>
         </div>
         ${gmailReplyOpen ? renderGmailReplyComposer(m) : ""}
 
