@@ -1256,6 +1256,16 @@
     .mail-reply-option.full{grid-column:auto;}
   }
 
+
+  #gmail-reply-file-input{
+    width:100%;
+    min-height:44px;
+    border:1px solid #DDE3EA;
+    border-radius:12px;
+    font:inherit;
+    font-size:12.5px;
+  }
+
 </style>
 </head>
 <body>
@@ -4521,6 +4531,7 @@ let gmailReplyBcc = "";
 let gmailReplySubject = "";
 let gmailReplySending = false;
 let gmailReplyStatus = "";
+let gmailReplyAttachments = [];
 
 function mailHasLabel(message, label){
   return Array.isArray(message?.labels) && message.labels.includes(label);
@@ -4651,6 +4662,7 @@ function closeGmailMessage(){
   gmailReplySubject="";
   gmailReplySending=false;
   gmailReplyStatus="";
+  gmailReplyAttachments=[];
   renderPosta();
 }
 function setGmailBodyMode(mode){
@@ -4785,7 +4797,7 @@ function renderGmailReplyComposer(m){
         </button>
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-ghost btn-sm" onclick="gmailReplyOpen=false;gmailReplyStatus='';renderPosta();" ${gmailReplySending?'disabled':''}>
+          <button class="btn btn-ghost btn-sm" onclick="gmailReplyOpen=false;gmailReplyStatus='';gmailReplyAttachments=[];renderPosta();" ${gmailReplySending?'disabled':''}>
             Annulla
           </button>
           <button class="btn btn-primary" onclick="sendGmailReply()" ${gmailReplySending?'disabled':''}>
@@ -4810,9 +4822,21 @@ function renderGmailReplyComposer(m){
           </div>
           <div class="mail-reply-option full">
             <label>Allegati</label>
-            <div style="font-size:12px;color:var(--muted);padding:8px 0;">
-              L'invio di nuovi allegati verrà attivato nel prossimo passaggio.
+            <input id="gmail-reply-file-input" type="file" multiple onchange="handleGmailReplyFiles(this.files)" style="padding:9px;background:#fff;">
+            <div style="font-size:11.5px;color:var(--muted);margin-top:5px;">
+              Puoi selezionare fino a 10 file.
             </div>
+            ${gmailReplyAttachments.length ? `
+              <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+                ${gmailReplyAttachments.map((a,i)=>`
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:8px 10px;">
+                    <div style="min-width:0;">
+                      <div style="font-size:12.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ${escapeHtml(a.filename)}</div>
+                      <div style="font-size:10.5px;color:var(--muted);">${mailFileSize(a.size)}</div>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" type="button" onclick="removeGmailReplyAttachment(${i})">Rimuovi</button>
+                  </div>`).join("")}
+              </div>` : ""}
           </div>
         </div>` : ""}
 
@@ -4823,6 +4847,53 @@ function renderGmailReplyComposer(m){
       ${gmailReplyStatus ? `<div class="mail-send-status">${escapeHtml(gmailReplyStatus)}</div>` : ""}
     </div>
   `;
+}
+
+
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const result=String(reader.result||"");
+      const base64=result.includes(",") ? result.split(",").pop() : result;
+      resolve(base64||"");
+    };
+    reader.onerror=()=>reject(reader.error||new Error("Errore lettura file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleGmailReplyFiles(fileList){
+  const files=Array.from(fileList||[]);
+  if(!files.length) return;
+
+  if(gmailReplyAttachments.length + files.length > 10){
+    showToast("Puoi allegare al massimo 10 file");
+    const input=document.getElementById("gmail-reply-file-input");
+    if(input) input.value="";
+    return;
+  }
+
+  try{
+    for(const file of files){
+      const dataBase64=await fileToBase64(file);
+      gmailReplyAttachments.push({
+        filename:file.name,
+        mimeType:file.type||"application/octet-stream",
+        size:file.size||0,
+        dataBase64
+      });
+    }
+    renderPosta();
+  }catch(err){
+    console.error("Allegato Gmail error",err);
+    showToast("Errore durante la lettura di un allegato");
+  }
+}
+
+function removeGmailReplyAttachment(index){
+  gmailReplyAttachments.splice(index,1);
+  renderPosta();
 }
 
 async function sendGmailReply(){
@@ -4860,7 +4931,8 @@ async function sendGmailReply(){
         bodyText,
         cc:String(gmailReplyCc||"").trim(),
         bcc:String(gmailReplyBcc||"").trim(),
-        subject:String(gmailReplySubject||normalizeReplySubjectClient(m.subject||"")).trim()
+        subject:String(gmailReplySubject||normalizeReplySubjectClient(m.subject||"")).trim(),
+        attachments:gmailReplyAttachments
       })
     });
 
@@ -4881,6 +4953,7 @@ async function sendGmailReply(){
     gmailReplyBcc="";
     gmailReplySubject="";
     gmailReplyOptionsOpen=false;
+    gmailReplyAttachments=[];
 
     setTimeout(async ()=>{
       gmailReplyOpen=false;
@@ -4918,6 +4991,7 @@ async function openGmailMessage(id){
   gmailReplySubject="";
   gmailReplySending=false;
   gmailReplyStatus="";
+  gmailReplyAttachments=[];
   renderPosta();
 
   try{
