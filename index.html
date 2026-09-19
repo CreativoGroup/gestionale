@@ -1413,6 +1413,17 @@
     border-top:1px solid var(--border);
   }
 
+
+  .desktop-nav-buttons .nav-group-operativa{
+    background:#F6F3EE;
+    border-radius:14px;
+    padding:8px 6px 10px;
+    margin:6px 0 12px;
+  }
+  .desktop-nav-buttons .nav-group-operativa .nav-group-title{
+    margin-top:4px;
+  }
+
 </style>
 </head>
 <body>
@@ -1932,7 +1943,7 @@ function renderNav(){
     const groupItems = items.filter(n=>n.group===group);
     if(!groupItems.length) return "";
     return `
-      <div class="nav-group">
+      <div class="nav-group nav-group-${group.toLowerCase()}">
         <div class="nav-group-title">${group}</div>
         ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${n.label}</button>`).join("")}
       </div>
@@ -2358,20 +2369,6 @@ function renderDashboard(){
       <div class="card stat clickable" onclick="goTo('leads')"><p class="stat-label">Lead da confermare</p><p class="stat-value" style="${leadDaConfermare.length?'color:var(--accent)':''}">${leadDaConfermare.length}</p><p class="stat-sub">nuove richieste da qualificare</p></div>
     </div>
 
-    <div class="card" style="margin-bottom:16px;">
-      <div class="section-header" style="margin-bottom:8px;">
-        <h3 style="margin:0;">Lead da confermare</h3>
-        <button class="btn btn-outline btn-sm" onclick="goTo('leads')">Apri Lead</button>
-      </div>
-      ${leadRecenti.length ? leadRecenti.map(l=>`
-        <div class="dashboard-lead-row">
-          <div style="min-width:0;">
-            <div style="font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(leadDisplayName(l))}</div>
-            <div style="font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(l.email||"")} · ${escapeHtml(l.oggettoRichiesta||"Senza oggetto")}</div>
-          </div>
-          <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button>
-        </div>`).join("") : `<p class="empty">Nessun nuovo Lead da confermare.</p>`}
-    </div>
 
     <div class="card" style="margin-bottom:16px;">
       <div class="section-header" style="margin-bottom:10px;">
