@@ -1367,6 +1367,16 @@
   .dashboard-lead-row:last-child{border-bottom:0;}
   @media(max-width:850px){.lead-stats{grid-template-columns:1fr 1fr;}.lead-detail-grid{grid-template-columns:1fr;}}
 
+
+  .lead-table select.inline{
+    min-height:36px;
+    padding:5px 8px;
+    border-radius:10px;
+    border:1px solid #DDE3EA;
+    background:#fff;
+    font-size:12px;
+  }
+
 </style>
 </head>
 <body>
@@ -2061,12 +2071,17 @@ function renderLeads(){
               <td><strong>${escapeHtml(leadDisplayName(l))}</strong>${l.azienda&&l.nome?`<div style="font-size:11px;color:var(--muted);">${escapeHtml(l.nome)}</div>`:""}</td>
               <td>${escapeHtml(l.email||"—")}</td>
               <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
-              <td><span class="lead-status-pill ${leadStatusClass(l.stato)}">${escapeHtml(l.stato==="Nuovo"?"Da confermare":l.stato)}</span></td>
+              <td>
+                <select class="inline" style="min-width:145px;" onchange="changeLeadStatusFromSelect('${l.id}',this.value)">
+                  ${["Nuovo","Da ricontattare","Preventivo inviato","In attesa","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s==="Nuovo"?"Da confermare":s}</option>`).join("")}
+                </select>
+              </td>
               <td>${fmtLeadDate(l.creatoIl)}</td>
               <td>
                 <div class="lead-actions">
                   <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button>
                   ${l.stato==="Nuovo"?`<button class="btn btn-primary btn-sm" onclick="confirmLead('${l.id}')">Conferma</button>`:""}
+                  ${l.stato!=="Accettato" ? `<button class="btn btn-outline btn-sm" onclick="transformLeadToClient('${l.id}')">Trasforma in cliente</button>` : ""}
                   <button class="btn btn-ghost btn-sm" onclick="linkLeadToExistingClient('${l.id}')">Collega cliente</button>
                   ${l.stato!=="Perso"?`<button class="btn btn-ghost btn-sm" onclick="discardLead('${l.id}')">Scarta</button>`:""}
                 </div>
@@ -2086,8 +2101,10 @@ function openLeadDetail(id){
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>${escapeHtml(leadDisplayName(l))}</h2>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-      <span class="lead-status-pill ${leadStatusClass(l.stato)}">${escapeHtml(l.stato==="Nuovo"?"Da confermare":l.stato)}</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <select class="inline" onchange="changeLeadStatusFromSelect('${l.id}',this.value,true)">
+        ${["Nuovo","Da ricontattare","Preventivo inviato","In attesa","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s==="Nuovo"?"Da confermare":s}</option>`).join("")}
+      </select>
       <span style="font-size:12px;color:var(--muted);">${fmtLeadDate(l.creatoIl)}</span>
     </div>
     <div class="lead-detail-grid">
@@ -2099,6 +2116,7 @@ function openLeadDetail(id){
     </div>
     <div class="form-actions" style="margin-top:16px;">
       ${l.stato==="Nuovo"?`<button class="btn btn-primary" onclick="confirmLead('${l.id}');closeModal();">Conferma Lead</button>`:""}
+      ${l.stato!=="Accettato" ? `<button class="btn btn-primary" onclick="transformLeadToClient('${l.id}')">Trasforma in cliente</button>` : ""}
       <button class="btn btn-outline" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente esistente</button>
       ${l.gmailMessageId?`<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri email</button>`:""}
       ${l.stato!=="Perso"?`<button class="btn btn-ghost" onclick="discardLead('${l.id}');closeModal();">Scarta</button>`:""}
@@ -2123,6 +2141,88 @@ async function setLeadStatus(id,status){
   showToast("Lead aggiornato");
   if(currentView==="leads") renderLeads();
   if(currentView==="dashboard") renderDashboard();
+}
+
+
+async function changeLeadStatusFromSelect(id,status,reopenDetail=false){
+  await setLeadStatus(id,status);
+  if(reopenDetail) openLeadDetail(id);
+}
+
+function leadClientPrefill(l){
+  const fullName=String(l?.nome||"").trim();
+  const parts=fullName.split(/\s+/).filter(Boolean);
+  const nome=parts.length ? parts[0] : "";
+  const cognome=parts.length>1 ? parts.slice(1).join(" ") : "";
+
+  if(String(l?.azienda||"").trim()){
+    return {
+      tipo:"Business",
+      ragioneSociale:String(l.azienda||"").trim(),
+      refNome:nome,
+      refCognome:cognome,
+      email:String(l.email||"").trim(),
+      telefono:String(l.telefono||"").trim()
+    };
+  }
+
+  return {
+    tipo:"Family",
+    nome:nome || fullName,
+    cognome,
+    email:String(l.email||"").trim(),
+    telefono:String(l.telefono||"").trim()
+  };
+}
+
+function transformLeadToClient(id){
+  const l=(state.leads||[]).find(x=>x.id===id);
+  if(!l) return;
+
+  const existing=findClientByEmail(l.email);
+  if(existing){
+    askConfirm(
+      `Esiste già un cliente con email ${l.email}. Vuoi collegare questo Lead al cliente esistente e inserire subito un ordine?`,
+      async ()=>{
+        await setLeadStatus(id,"Accettato");
+        closeModal();
+        newOrderForClient(existing.id);
+      }
+    );
+    return;
+  }
+
+  const prefill=leadClientPrefill(l);
+
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Trasforma Lead in cliente</h2>
+    <p style="color:var(--muted);margin-top:0;">
+      Controlla i dati anagrafici. Dopo il salvataggio si aprirà subito <strong>Nuovo ordine</strong> con il cliente già selezionato.
+    </p>
+
+    ${clientFieldsHTML('leadclient', prefill)}
+
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveLeadAsClientAndOrder('${id}')">Salva cliente e inserisci ordine</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+  toggleClientTypeFields('leadclient');
+}
+
+async function saveLeadAsClientAndOrder(leadId){
+  const l=(state.leads||[]).find(x=>x.id===leadId);
+  if(!l) return;
+
+  const clientId=await createClientFromPrefix('leadclient');
+  if(!clientId) return;
+
+  await setLeadStatus(leadId,"Accettato");
+  closeModal();
+  showToast("Lead trasformato in cliente");
+  newOrderForClient(clientId);
 }
 
 function confirmLead(id){ setLeadStatus(id,"Da ricontattare"); }
