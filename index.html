@@ -871,6 +871,49 @@
     }
   }
 
+
+  .warehouse-toolbar-main{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .warehouse-toolbar-select{
+    flex:1 1 320px;
+  }
+  .warehouse-group-select{
+    width:100%;
+    max-width:420px;
+    min-height:44px;
+    font-weight:800;
+  }
+  .warehouse-toolbar-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  @media(max-width:760px){
+    .warehouse-toolbar-main{
+      display:block;
+    }
+    .warehouse-group-select{
+      max-width:none;
+      width:100%;
+    }
+    .warehouse-toolbar-actions{
+      margin-top:10px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+    }
+    .warehouse-toolbar-actions .btn{
+      width:100%;
+      min-width:0;
+      white-space:normal;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -1361,7 +1404,7 @@ function renderTopbarActions(){
     clienti: `<button class="btn btn-primary" onclick="toggleForm('clientForm')">+ Nuovo cliente</button>`,
     preventivi: `<button class="btn btn-primary" onclick="toggleForm('quoteForm')">+ Nuovo preventivo</button>`,
     ordini: `<button class="btn btn-primary" onclick="toggleForm('orderForm')">+ Nuovo ordine</button>`,
-    magazzino: `<button class="btn btn-primary" onclick="toggleForm('itemForm')">+ Nuovo articolo</button>`,
+    magazzino: ``,
     incassi: `<button class="btn btn-primary" onclick="toggleForm('paymentForm')">+ Registra incasso</button>`,
     spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
     costiFissi: currentUser&&currentUser.role==="admin" ? `<button class="btn btn-primary" onclick="toggleForm('fixedCostForm')">+ Nuovo costo fisso</button>` : ``,
@@ -3060,10 +3103,11 @@ function warehouseGroupProducts(group){
   return [];
 }
 function warehouseGroupTabsHtml(){
-  return WAREHOUSE_GROUPS.map(g=>`
-    <button class="btn ${magazzinoGroupFilter===g?'btn-primary':'btn-outline'} btn-sm"
-      onclick="magazzinoGroupFilter='${g}'; renderMagazzino();">${warehouseGroupLabel(g)}</button>
-  `).join("");
+  return `
+    <select class="inline warehouse-group-select" onchange="magazzinoGroupFilter=this.value; renderMagazzino();">
+      ${WAREHOUSE_GROUPS.map(g=>`<option value="${g}" ${magazzinoGroupFilter===g?'selected':''}>${warehouseGroupLabel(g)}</option>`).join("")}
+    </select>
+  `;
 }
 function warehouseQuickProductField(){
   if(magazzinoGroupFilter==="Tessile"){
@@ -3106,8 +3150,28 @@ function quickWarehouseCatalogPick(value){
   const p = catalogProduct(code);
   const input = document.getElementById("quick-codice");
   if(input && code) input.value = code;
+
   const nameEl = document.getElementById("quick-product-name");
   if(nameEl) nameEl.textContent = p?.name || "";
+
+  const colorSel = document.getElementById("quick-colore");
+  const sizeSel = document.getElementById("quick-taglia");
+
+  if(colorSel && colorSel.tagName==="SELECT"){
+    const colors = catalogColorsForCode(code);
+    colorSel.innerHTML = colors.length
+      ? `<option value="">Seleziona colore…</option>${colors.map(c=>`<option value="${c}">${c}</option>`).join("")}`
+      : `<option value="">Nessun colore disponibile</option>`;
+    colorSel.disabled = !colors.length;
+  }
+
+  if(sizeSel && sizeSel.tagName==="SELECT"){
+    const sizes = catalogSizesForCode(code);
+    sizeSel.innerHTML = sizes.length
+      ? `<option value="">Seleziona taglia…</option>${sizes.map(s=>`<option value="${s}">${s}</option>`).join("")}`
+      : `<option value="">Nessuna taglia disponibile</option>`;
+    sizeSel.disabled = !sizes.length;
+  }
 }
 function quickWarehouseRowHtml(){
   const isTextile = magazzinoGroupFilter==="Tessile";
@@ -3126,8 +3190,12 @@ function quickWarehouseRowHtml(){
           </tr></thead>
           <tbody><tr>
             <td style="min-width:220px;">${warehouseQuickProductField()}</td>
-            <td style="min-width:150px;"><input id="quick-colore" class="inline" style="width:100%;" placeholder="${isTextile?'Colore':'Variante / colore'}"></td>
-            <td style="min-width:150px;"><input id="quick-taglia" class="inline" style="width:100%;" placeholder="${isTextile?'Taglia':'Formato / note'}"></td>
+            <td style="min-width:150px;">${isTextile
+              ? `<select id="quick-colore" class="inline" style="width:100%;" disabled><option value="">Seleziona prima il prodotto…</option></select>`
+              : `<input id="quick-colore" class="inline" style="width:100%;" placeholder="Variante / colore">`}</td>
+            <td style="min-width:150px;">${isTextile
+              ? `<select id="quick-taglia" class="inline" style="width:100%;" disabled><option value="">Seleziona prima il prodotto…</option></select>`
+              : `<input id="quick-taglia" class="inline" style="width:100%;" placeholder="Formato / note">`}</td>
             <td><input id="quick-quantita" class="num" type="number" min="1" value="1"></td>
             <td><button class="btn btn-primary btn-sm" onclick="quickAddToWarehouse()">AGGIUNGI NEL MAGAZZINO</button></td>
           </tr></tbody>
@@ -3142,6 +3210,8 @@ function quickAddToWarehouse(){
   const colore = document.getElementById("quick-colore")?.value.trim() || "";
   const taglia = document.getElementById("quick-taglia")?.value.trim() || "UNICA";
   if(qty<=0){ showToast("Inserisci una quantità maggiore di zero"); return; }
+  if(group==="Tessile" && !colore){ showToast("Seleziona il colore"); return; }
+  if(group==="Tessile" && !taglia){ showToast("Seleziona la taglia"); return; }
 
   let codice="", nome="", categoria="";
   if(group==="Tessile"){
@@ -3278,13 +3348,21 @@ function renderMagazzino(){
   const q = magazzinoSearch.toLowerCase();
   const list = filteredMagazzinoRows(q);
   document.getElementById("view-magazzino").innerHTML = `
-    <div class="card" style="margin-bottom:14px;padding:12px;">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">${warehouseGroupTabsHtml()}</div>
+    <div class="card warehouse-toolbar" style="margin-bottom:14px;padding:12px;">
+      <div class="warehouse-toolbar-main">
+        <div class="warehouse-toolbar-select">${warehouseGroupTabsHtml()}</div>
+        <div class="warehouse-toolbar-actions">
+          ${magazzinoGroupFilter==="Tessile"
+            ? `<button class="btn btn-outline" onclick="toggleForm('pdfImportForm')">📄 Importa DDT / PDF</button>`
+            : ``}
+          <button class="btn btn-primary" onclick="toggleForm('itemForm')">+ Nuovo articolo</button>
+        </div>
+      </div>
     </div>
     ${quickWarehouseRowHtml()}
     <div class="form-panel" id="pdfImportForm" style="${magazzinoGroupFilter==='Tessile'?'':'display:none !important;'}">
-      <h3>Importa DDT Action Wear (PDF)</h3>
-      <p class="helptext" style="margin-top:0;">Riconosce automaticamente codice, colore, taglia e quantità dal formato dei DDT Action Wear. Controlla sempre l'anteprima prima di confermare.</p>
+      <h3>Importa articoli da DDT / documento PDF</h3>
+      <p class="helptext" style="margin-top:0;">Per ora il riconoscimento automatico è ottimizzato per i DDT Action Wear del magazzino tessile. Controlla sempre l'anteprima prima di confermare.</p>
       <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfImport(event)">
       <p id="pdfImportStatus" class="helptext"></p>
       <div id="pdfImportPreview"></div>
@@ -3311,10 +3389,7 @@ function renderMagazzino(){
     </div>
     <div class="section-header">
       <div class="filters"><input id="magazzinoSearchInput" class="inline" style="min-width:220px;" placeholder="Cerca per codice, nome o colore…" value="${magazzinoSearch}" oninput="filterMagazzino(this)"></div>
-      <div class="filters">
-        ${magazzinoGroupFilter==="Tessile"?`<button class="btn btn-outline" onclick="toggleForm('pdfImportForm')">📄 Importa da DDT (PDF)</button>`:""}
-        <button class="btn btn-outline" onclick="toggleForm('itemForm')">+ Nuovo articolo</button>
-      </div>
+<div></div>
     </div>
     <div class="table-wrap">
       <table>
