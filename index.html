@@ -961,16 +961,7 @@
   }
 
 
-  function escapeHtml(value){
-  return String(value ?? "")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;")
-    .replace(/'/g,"&#039;");
-}
-
-/* ============ POSTA / GMAIL ============ */
+  /* ============ POSTA / GMAIL ============ */
   .mail-shell{
     display:grid;
     grid-template-columns:220px minmax(0,1fr);
@@ -4386,6 +4377,15 @@ function deleteEntrata(id){
 }
 
 
+function escapeHtml(value){
+  return String(value ?? "")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+}
+
 /* ============ POSTA / GMAIL ============ */
 let gmailMessages = [];
 let gmailLoaded = false;
@@ -4542,6 +4542,7 @@ async function loadGmailMessages(force=false){
     gmailMessages = Array.isArray(result.messages) ? result.messages : [];
     gmailLoaded = true;
     gmailError = "";
+    setTimeout(()=>{ if(gmailLoaded){ gmailLoading=false; renderPosta(); } },0);
   }catch(err){
     console.error("Gmail list error", err);
     gmailError = err?.message || "Errore durante la lettura Gmail";
