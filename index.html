@@ -1266,6 +1266,78 @@
     font-size:12.5px;
   }
 
+
+  /* ============ POSTA: CREA LEAD ============ */
+  .lead-modal-backdrop{
+    position:fixed; inset:0; z-index:9999;
+    background:rgba(18,24,32,.48);
+    display:flex; align-items:center; justify-content:center;
+    padding:20px;
+  }
+  .lead-modal{
+    width:min(760px,100%);
+    max-height:92vh;
+    overflow:auto;
+    background:#fff;
+    border-radius:20px;
+    box-shadow:0 24px 70px rgba(0,0,0,.22);
+    border:1px solid var(--border);
+  }
+  .lead-modal-head{
+    display:flex; justify-content:space-between; gap:14px; align-items:flex-start;
+    padding:18px 20px 14px;
+    border-bottom:1px solid var(--border);
+    position:sticky; top:0; background:#fff; z-index:2;
+  }
+  .lead-modal-title{font-size:20px;font-weight:900;}
+  .lead-modal-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+  .lead-modal-close{
+    border:0;background:#F2F4F7;border-radius:10px;
+    width:36px;height:36px;font-size:22px;cursor:pointer;
+  }
+  .lead-modal-body{padding:18px 20px 20px;}
+  .lead-form-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+  .lead-field{display:flex;flex-direction:column;gap:5px;}
+  .lead-field.full{grid-column:1 / -1;}
+  .lead-field label{
+    font-size:11.5px;color:var(--muted);font-weight:800;
+  }
+  .lead-field input,.lead-field select,.lead-field textarea{
+    width:100%;
+    border:1px solid #DDE3EA;
+    border-radius:12px;
+    padding:10px 11px;
+    font:inherit;
+    font-size:13px;
+    background:#fff;
+  }
+  .lead-field textarea{min-height:130px;resize:vertical;line-height:1.45;}
+  .lead-field input:focus,.lead-field select:focus,.lead-field textarea:focus{
+    outline:none;border-color:#F09B84;box-shadow:0 0 0 4px rgba(232,90,50,.10);
+  }
+  .lead-modal-actions{
+    display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;
+    margin-top:16px;padding-top:14px;border-top:1px solid var(--border);
+  }
+  .lead-client-warning{
+    margin-bottom:14px;
+    padding:10px 12px;
+    border-radius:12px;
+    background:#FFF7E8;
+    border:1px solid #F3D49A;
+    font-size:12.5px;
+  }
+  @media(max-width:700px){
+    .lead-modal-backdrop{padding:0;align-items:stretch;}
+    .lead-modal{width:100%;max-height:none;height:100%;border-radius:0;}
+    .lead-form-grid{grid-template-columns:1fr;}
+    .lead-field.full{grid-column:auto;}
+  }
+
 </style>
 </head>
 <body>
@@ -4746,7 +4818,7 @@ function renderGmailReader(){
       <div class="mail-reader-body">
         <div class="mail-reader-actions">
           <button class="btn btn-primary" onclick="toggleGmailReply()">↩ Rispondi</button>
-          <button class="btn btn-outline" onclick="gmailActionPending('Crea Lead')">+ Crea Lead</button>
+          <button class="btn btn-outline" onclick="openLeadFromGmail()">+ Crea Lead</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Collega a Cliente')">Collega a Cliente</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Crea Preventivo')">Crea Preventivo</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Crea Ordine')">Crea Ordine</button>
@@ -4967,6 +5039,198 @@ async function sendGmailReply(){
   }finally{
     gmailReplySending=false;
     renderPosta();
+  }
+}
+
+
+function gmailExtractAddress(value){
+  const raw=String(value||"").trim();
+  const m=raw.match(/<([^>]+)>/);
+  if(m) return m[1].trim().toLowerCase();
+  const simple=raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return simple ? simple[0].toLowerCase() : "";
+}
+
+function gmailExtractName(value){
+  const raw=String(value||"").trim();
+  let name=raw.replace(/<[^>]+>/g,"").replace(/^["']|["']$/g,"").trim();
+  if(!name){
+    const email=gmailExtractAddress(raw);
+    name=email ? email.split("@")[0].replace(/[._-]+/g," ") : "";
+  }
+  return name;
+}
+
+function gmailExtractPhone(text){
+  const raw=String(text||"").replace(/\s+/g," ");
+  const matches=raw.match(/(?:\+39[\s.-]?)?(?:\(?0\d{1,4}\)?[\s.-]?)?\d(?:[\s.-]?\d){7,10}/g)||[];
+  for(const item of matches){
+    const digits=item.replace(/\D/g,"");
+    if(digits.length>=9 && digits.length<=13) return item.trim();
+  }
+  return "";
+}
+
+function gmailLeadRequestText(m){
+  const text=String(m?.bodyText||"").trim();
+  if(text) return text.slice(0,6000);
+  return String(m?.snippet||"").trim().slice(0,6000);
+}
+
+function findClientByEmail(email){
+  const target=String(email||"").trim().toLowerCase();
+  if(!target) return null;
+  return state.clients.find(c=>String(c.email||"").trim().toLowerCase()===target)||null;
+}
+
+function closeLeadModal(){
+  const el=document.getElementById("gmail-lead-modal");
+  if(el) el.remove();
+}
+
+function openLeadFromGmail(){
+  const m=gmailSelectedMessage;
+  if(!m){
+    showToast("Apri prima una mail");
+    return;
+  }
+
+  const email=gmailExtractAddress(m.from||"");
+  const fullName=gmailExtractName(m.from||"");
+  const parts=fullName.split(/\s+/).filter(Boolean);
+  const nome=parts.length>1 ? parts.slice(0,-1).join(" ") : fullName;
+  const telefono=gmailExtractPhone(`${m.bodyText||""} ${m.bodyHtml||""}`);
+  const existing=findClientByEmail(email);
+
+  const wrap=document.createElement("div");
+  wrap.id="gmail-lead-modal";
+  wrap.className="lead-modal-backdrop";
+  wrap.onclick=(e)=>{ if(e.target===wrap) closeLeadModal(); };
+
+  wrap.innerHTML=`
+    <div class="lead-modal" role="dialog" aria-modal="true">
+      <div class="lead-modal-head">
+        <div>
+          <div class="lead-modal-title">Crea Lead</div>
+          <div class="lead-modal-sub">Dati estratti automaticamente dalla mail. Puoi modificarli prima di salvare.</div>
+        </div>
+        <button class="lead-modal-close" onclick="closeLeadModal()">×</button>
+      </div>
+
+      <div class="lead-modal-body">
+        ${existing ? `
+          <div class="lead-client-warning">
+            ⚠️ Questa email appartiene già al cliente <strong>${escapeHtml(clientDisplayName(existing))}</strong>.
+            Per evitare duplicati, in seguito useremo il comando “Collega a Cliente”.
+          </div>` : ""}
+
+        <div class="lead-form-grid">
+          <div class="lead-field">
+            <label>Nome / referente</label>
+            <input id="lead-nome" value="${escapeHtml(nome)}">
+          </div>
+
+          <div class="lead-field">
+            <label>Azienda</label>
+            <input id="lead-azienda" placeholder="Nome azienda">
+          </div>
+
+          <div class="lead-field">
+            <label>Email</label>
+            <input id="lead-email" type="email" value="${escapeHtml(email)}">
+          </div>
+
+          <div class="lead-field">
+            <label>Telefono</label>
+            <input id="lead-telefono" value="${escapeHtml(telefono)}">
+          </div>
+
+          <div class="lead-field full">
+            <label>Oggetto richiesta</label>
+            <input id="lead-oggetto" value="${escapeHtml(m.subject||"")}">
+          </div>
+
+          <div class="lead-field">
+            <label>Stato</label>
+            <select id="lead-stato">
+              <option value="Nuovo" selected>Nuovo</option>
+              <option value="Da ricontattare">Da ricontattare</option>
+              <option value="Preventivo inviato">Preventivo inviato</option>
+              <option value="In attesa">In attesa</option>
+              <option value="Accettato">Accettato</option>
+              <option value="Perso">Perso</option>
+            </select>
+          </div>
+
+          <div class="lead-field full">
+            <label>Richiesta / contenuto mail</label>
+            <textarea id="lead-richiesta">${escapeHtml(gmailLeadRequestText(m))}</textarea>
+          </div>
+        </div>
+
+        <div class="lead-modal-actions">
+          <button class="btn btn-ghost" onclick="closeLeadModal()">Annulla</button>
+          <button class="btn btn-primary" id="lead-save-btn" onclick="saveLeadFromGmail()">
+            Salva Lead
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrap);
+}
+
+async function saveLeadFromGmail(){
+  const m=gmailSelectedMessage;
+  if(!m) return;
+
+  const btn=document.getElementById("lead-save-btn");
+  if(btn){ btn.disabled=true; btn.textContent="Salvataggio…"; }
+
+  const payload={
+    nome:String(document.getElementById("lead-nome")?.value||"").trim()||null,
+    azienda:String(document.getElementById("lead-azienda")?.value||"").trim()||null,
+    email:String(document.getElementById("lead-email")?.value||"").trim().toLowerCase(),
+    telefono:String(document.getElementById("lead-telefono")?.value||"").trim()||null,
+    oggetto_richiesta:String(document.getElementById("lead-oggetto")?.value||"").trim()||null,
+    richiesta:String(document.getElementById("lead-richiesta")?.value||"").trim()||null,
+    stato:String(document.getElementById("lead-stato")?.value||"Nuovo"),
+    fonte:"gmail",
+    gmail_message_id:m.id||gmailSelectedId||null,
+    gmail_thread_id:m.threadId||null,
+    aggiornato_il:new Date().toISOString()
+  };
+
+  if(!payload.email){
+    showToast("Inserisci l'email del Lead");
+    if(btn){ btn.disabled=false; btn.textContent="Salva Lead"; }
+    return;
+  }
+
+  try{
+    const existingClient=findClientByEmail(payload.email);
+    if(existingClient){
+      const proceed=confirm(`Questa email appartiene già al cliente "${clientDisplayName(existingClient)}". Vuoi creare comunque un Lead duplicato?`);
+      if(!proceed){
+        if(btn){ btn.disabled=false; btn.textContent="Salva Lead"; }
+        return;
+      }
+    }
+
+    const {error}=await sb.from("leads").insert(payload);
+    if(error){
+      if(String(error.code||"")==="23505"){
+        throw new Error("Questa mail è già stata trasformata in Lead.");
+      }
+      throw error;
+    }
+
+    closeLeadModal();
+    showToast("Lead creato correttamente");
+  }catch(err){
+    console.error("Creazione Lead error",err);
+    showToast(err?.message||"Errore durante la creazione del Lead");
+    if(btn){ btn.disabled=false; btn.textContent="Salva Lead"; }
   }
 }
 
