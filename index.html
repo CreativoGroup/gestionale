@@ -1172,6 +1172,90 @@
     .mail-reader-body{padding-bottom:calc(24px + env(safe-area-inset-bottom));}
   }
 
+
+  /* ============ POSTA: RISPOSTA EMAIL ============ */
+  .mail-reply-box{
+    margin:14px 0 16px;
+    border:1px solid var(--border);
+    border-radius:16px;
+    background:#FAFBFC;
+    padding:14px;
+  }
+  .mail-reply-title{
+    font-weight:900;
+    font-size:14px;
+    margin-bottom:10px;
+  }
+  .mail-reply-textarea{
+    width:100%;
+    min-height:150px;
+    resize:vertical;
+    border:1px solid #DDE3EA;
+    border-radius:14px;
+    background:#fff;
+    padding:12px 14px;
+    font:inherit;
+    font-size:14px;
+    line-height:1.5;
+  }
+  .mail-reply-textarea:focus,
+  .mail-reply-option input:focus{
+    outline:none;
+    border-color:#F09B84;
+    box-shadow:0 0 0 4px rgba(232,90,50,.10);
+  }
+  .mail-reply-toolbar{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    margin-top:10px;
+  }
+  .mail-reply-options{
+    margin-top:12px;
+    padding-top:12px;
+    border-top:1px solid var(--border);
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .mail-reply-option{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+  }
+  .mail-reply-option.full{grid-column:1 / -1;}
+  .mail-reply-option label{
+    font-size:11.5px;
+    color:var(--muted);
+    font-weight:800;
+  }
+  .mail-reply-option input{
+    width:100%;
+    min-height:42px;
+    border:1px solid #DDE3EA;
+    border-radius:12px;
+    background:#fff;
+    padding:8px 10px;
+    font:inherit;
+    font-size:13px;
+  }
+  .mail-signature-note{
+    margin-top:10px;
+    font-size:11.5px;
+    color:var(--muted);
+  }
+  .mail-send-status{
+    margin-top:10px;
+    font-size:12px;
+    font-weight:750;
+  }
+  @media(max-width:760px){
+    .mail-reply-options{grid-template-columns:1fr;}
+    .mail-reply-option.full{grid-column:auto;}
+  }
+
 </style>
 </head>
 <body>
@@ -4429,6 +4513,14 @@ let gmailSelectedMessage = null;
 let gmailMessageLoading = false;
 let gmailMessageError = "";
 let gmailBodyMode = "html";
+let gmailReplyOpen = false;
+let gmailReplyOptionsOpen = false;
+let gmailReplyText = "";
+let gmailReplyCc = "";
+let gmailReplyBcc = "";
+let gmailReplySubject = "";
+let gmailReplySending = false;
+let gmailReplyStatus = "";
 
 function mailHasLabel(message, label){
   return Array.isArray(message?.labels) && message.labels.includes(label);
@@ -4551,6 +4643,14 @@ function closeGmailMessage(){
   gmailSelectedMessage=null;
   gmailMessageLoading=false;
   gmailMessageError="";
+  gmailReplyOpen=false;
+  gmailReplyOptionsOpen=false;
+  gmailReplyText="";
+  gmailReplyCc="";
+  gmailReplyBcc="";
+  gmailReplySubject="";
+  gmailReplySending=false;
+  gmailReplyStatus="";
   renderPosta();
 }
 function setGmailBodyMode(mode){
@@ -4633,13 +4733,15 @@ function renderGmailReader(){
       </div>
       <div class="mail-reader-body">
         <div class="mail-reader-actions">
-          <button class="btn btn-primary" onclick="gmailActionPending('Rispondi')">↩ Rispondi</button>
+          <button class="btn btn-primary" onclick="toggleGmailReply()">↩ Rispondi</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Crea Lead')">+ Crea Lead</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Collega a Cliente')">Collega a Cliente</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Crea Preventivo')">Crea Preventivo</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Crea Ordine')">Crea Ordine</button>
           <button class="btn btn-outline" onclick="gmailActionPending('Aggiungi Nota')">Aggiungi Nota</button>
         </div>
+        ${gmailReplyOpen ? renderGmailReplyComposer(m) : ""}
+
         ${(hasHtml&&hasText)?`
           <div class="mail-body-mode">
             <button class="btn btn-sm ${effectiveMode==="html"?'btn-primary':'btn-outline'}" onclick="setGmailBodyMode('html')">Originale</button>
@@ -4650,6 +4752,151 @@ function renderGmailReader(){
       </div>
     </aside>`;
 }
+
+function toggleGmailReply(){
+  gmailReplyOpen=!gmailReplyOpen;
+  gmailReplyStatus="";
+  if(gmailReplyOpen && gmailSelectedMessage){
+    gmailReplySubject = gmailReplySubject || normalizeReplySubjectClient(gmailSelectedMessage.subject||"");
+  }
+  renderPosta();
+}
+
+function normalizeReplySubjectClient(subject){
+  const s=String(subject||"").trim();
+  if(/^re:/i.test(s)) return s;
+  return `Re: ${s||"(Senza oggetto)"}`;
+}
+
+function renderGmailReplyComposer(m){
+  return `
+    <div class="mail-reply-box">
+      <div class="mail-reply-title">Rispondi a ${escapeHtml(mailDisplayName(m.from||""))}</div>
+
+      <textarea
+        class="mail-reply-textarea"
+        placeholder="Scrivi qui la risposta…"
+        oninput="gmailReplyText=this.value"
+      >${escapeHtml(gmailReplyText)}</textarea>
+
+      <div class="mail-reply-toolbar">
+        <button class="btn btn-outline btn-sm" onclick="gmailReplyOptionsOpen=!gmailReplyOptionsOpen;renderPosta();">
+          ${gmailReplyOptionsOpen?'Nascondi opzioni':'Mostra opzioni'}
+        </button>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" onclick="gmailReplyOpen=false;gmailReplyStatus='';renderPosta();" ${gmailReplySending?'disabled':''}>
+            Annulla
+          </button>
+          <button class="btn btn-primary" onclick="sendGmailReply()" ${gmailReplySending?'disabled':''}>
+            ${gmailReplySending?'Invio…':'Invia'}
+          </button>
+        </div>
+      </div>
+
+      ${gmailReplyOptionsOpen ? `
+        <div class="mail-reply-options">
+          <div class="mail-reply-option full">
+            <label>Oggetto</label>
+            <input value="${escapeHtml(gmailReplySubject||normalizeReplySubjectClient(m.subject||''))}" oninput="gmailReplySubject=this.value">
+          </div>
+          <div class="mail-reply-option">
+            <label>CC</label>
+            <input type="text" placeholder="email@example.com" value="${escapeHtml(gmailReplyCc)}" oninput="gmailReplyCc=this.value">
+          </div>
+          <div class="mail-reply-option">
+            <label>CCN</label>
+            <input type="text" placeholder="email@example.com" value="${escapeHtml(gmailReplyBcc)}" oninput="gmailReplyBcc=this.value">
+          </div>
+          <div class="mail-reply-option full">
+            <label>Allegati</label>
+            <div style="font-size:12px;color:var(--muted);padding:8px 0;">
+              L'invio di nuovi allegati verrà attivato nel prossimo passaggio.
+            </div>
+          </div>
+        </div>` : ""}
+
+      <div class="mail-signature-note">
+        La firma aziendale viene aggiunta automaticamente usando quella configurata su Gmail.
+      </div>
+
+      ${gmailReplyStatus ? `<div class="mail-send-status">${escapeHtml(gmailReplyStatus)}</div>` : ""}
+    </div>
+  `;
+}
+
+async function sendGmailReply(){
+  if(gmailReplySending) return;
+  const m=gmailSelectedMessage;
+  if(!m?.id){
+    showToast("Mail originale non disponibile");
+    return;
+  }
+
+  const bodyText=String(gmailReplyText||"").trim();
+  if(!bodyText){
+    showToast("Scrivi il testo della risposta");
+    return;
+  }
+
+  gmailReplySending=true;
+  gmailReplyStatus="Invio in corso…";
+  renderPosta();
+
+  try{
+    const {data:sessionData}=await sb.auth.getSession();
+    const session=sessionData?.session;
+    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "apikey":SUPABASE_KEY,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        messageId:m.id,
+        bodyText,
+        cc:String(gmailReplyCc||"").trim(),
+        bcc:String(gmailReplyBcc||"").trim(),
+        subject:String(gmailReplySubject||normalizeReplySubjectClient(m.subject||"")).trim()
+      })
+    });
+
+    const raw=await response.text();
+    let result={};
+    try{ result=JSON.parse(raw); }
+    catch(e){ throw new Error(raw||`Errore HTTP ${response.status}`); }
+
+    if(!response.ok){
+      throw new Error(result?.error||result?.message||`Errore HTTP ${response.status}`);
+    }
+
+    gmailReplyStatus="✓ Risposta inviata correttamente";
+    showToast("Email inviata");
+
+    gmailReplyText="";
+    gmailReplyCc="";
+    gmailReplyBcc="";
+    gmailReplySubject="";
+    gmailReplyOptionsOpen=false;
+
+    setTimeout(async ()=>{
+      gmailReplyOpen=false;
+      gmailReplyStatus="";
+      await loadGmailMessages(true);
+    },1200);
+
+  }catch(err){
+    console.error("Gmail send error",err);
+    gmailReplyStatus=`Errore: ${err?.message||"invio non riuscito"}`;
+  }finally{
+    gmailReplySending=false;
+    renderPosta();
+  }
+}
+
 function gmailActionPending(label){
   showToast(`${label}: lo attiviamo nel passaggio successivo`);
 }
@@ -4663,6 +4910,14 @@ async function openGmailMessage(id){
   gmailMessageError="";
   gmailMessageLoading=true;
   gmailBodyMode="html";
+  gmailReplyOpen=false;
+  gmailReplyOptionsOpen=false;
+  gmailReplyText="";
+  gmailReplyCc="";
+  gmailReplyBcc="";
+  gmailReplySubject="";
+  gmailReplySending=false;
+  gmailReplyStatus="";
   renderPosta();
 
   try{
