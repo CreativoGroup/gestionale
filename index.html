@@ -3069,17 +3069,40 @@ function warehouseQuickProductField(){
   if(magazzinoGroupFilter==="Tessile"){
     return `
       <input id="quick-codice" class="inline" style="width:100%;min-width:190px;" list="quickCatalogProducts"
-        placeholder="Codice o nome…" onfocus="prepareCatalogDatalistForOrder('')" onchange="quickWarehouseCatalogPick(this.value)">
-      <datalist id="quickCatalogProducts">${catalogProductDatalistOptions()}</datalist>
+        placeholder="Codice o nome…" onfocus="prepareQuickWarehouseDatalist()" onchange="quickWarehouseCatalogPick(this.value)">
+      <datalist id="quickCatalogProducts"></datalist>
       <div id="quick-product-name" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
     `;
   }
   const opts = warehouseGroupProducts(magazzinoGroupFilter).map(p=>`<option value="${p}">${p}</option>`).join("");
   return `<select id="quick-product" class="inline" style="width:100%;"><option value="">Seleziona prodotto…</option>${opts}</select>`;
 }
+async function prepareQuickWarehouseDatalist(){
+  const dl = document.getElementById("quickCatalogProducts");
+  if(!dl) return;
+  if(!catalogoProdotti){
+    dl.innerHTML = `<option value="Caricamento catalogo…"></option>`;
+    try{ await loadCatalogoProdotti(); }catch(e){ return; }
+  }
+  dl.innerHTML = "";
+  (catalogoProdotti||[]).forEach(p=>{
+    const opt = document.createElement("option");
+    opt.value = `${p.code} — ${p.name}`;
+    dl.appendChild(opt);
+  });
+  // include anche eventuali articoli già esistenti in magazzino
+  [...new Set(state.warehouse.filter(w=>(w.warehouseGroup||"Tessile")==="Tessile").map(w=>w.codice).filter(Boolean))].forEach(code=>{
+    if(catalogProduct(code)) return;
+    const w = state.warehouse.find(x=>x.codice===code);
+    const opt = document.createElement("option");
+    opt.value = `${code} — ${w?.nome||"Articolo magazzino"}`;
+    dl.appendChild(opt);
+  });
+}
+
 function quickWarehouseCatalogPick(value){
-  const resolved = resolveCatalogSelection(value);
-  const code = resolved?.code || String(value||"").trim();
+  const raw = String(value||"").trim();
+  const code = normalizeCatalogCode(raw);
   const p = catalogProduct(code);
   const input = document.getElementById("quick-codice");
   if(input && code) input.value = code;
@@ -3124,8 +3147,7 @@ function quickAddToWarehouse(){
   if(group==="Tessile"){
     const raw = document.getElementById("quick-codice")?.value.trim() || "";
     if(!raw){ showToast("Seleziona o inserisci un prodotto"); return; }
-    const resolved = resolveCatalogSelection(raw);
-    codice = resolved?.code || raw;
+    codice = normalizeCatalogCode(raw);
     const p = catalogProduct(codice);
     nome = p?.name || raw;
     categoria = p?.appCategory || "Tessile";
