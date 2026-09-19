@@ -1516,6 +1516,17 @@
     border-color:#DDE3EA;
   }
 
+
+  .mail-reader-actions .btn{
+    transition:all .18s ease;
+  }
+  .mail-reader-actions .btn:disabled{
+    background:#F1F3F5 !important;
+    color:#34404D !important;
+    border-color:#D8DEE5 !important;
+    font-weight:900 !important;
+  }
+
 </style>
 </head>
 <body>
@@ -5245,12 +5256,38 @@ let gmailReplyAttachments = [];
 
 let pendingGmailOrderMessageId = null;
 
+function readLocalMailActionFlags(messageId){
+  try{
+    const all=JSON.parse(localStorage.getItem("gmailActionFlags")||"{}");
+    return all[messageId]||null;
+  }catch(e){
+    return null;
+  }
+}
+
+function writeLocalMailActionFlags(messageId, flags){
+  try{
+    const all=JSON.parse(localStorage.getItem("gmailActionFlags")||"{}");
+    all[messageId]={
+      replied:!!flags.replied,
+      leadGenerated:!!flags.leadGenerated,
+      orderGenerated:!!flags.orderGenerated
+    };
+    localStorage.setItem("gmailActionFlags",JSON.stringify(all));
+  }catch(e){
+    console.warn("Salvataggio locale stato mail non disponibile",e);
+  }
+}
+
 function getGmailActionFlags(messageId){
-  return (state.gmailActionStatus||[]).find(x=>x.gmailMessageId===messageId) || {
+  const dbRow=(state.gmailActionStatus||[]).find(x=>x.gmailMessageId===messageId);
+  const local=readLocalMailActionFlags(messageId);
+
+  return {
     gmailMessageId:messageId,
-    replied:false,
-    leadGenerated:false,
-    orderGenerated:false
+    replied:!!(dbRow?.replied || local?.replied),
+    leadGenerated:!!(dbRow?.leadGenerated || local?.leadGenerated),
+    orderGenerated:!!(dbRow?.orderGenerated || local?.orderGenerated)
   };
 }
 
@@ -5266,40 +5303,67 @@ function gmailActionStatusBadge(messageId){
 async function setGmailActionFlag(messageId, field){
   if(!messageId) return;
 
-  const existing=getGmailActionFlags(messageId);
-  const nowIso=new Date().toISOString();
-
-  const payload={
-    gmail_message_id:messageId,
-    replied:!!existing.replied,
-    lead_generated:!!existing.leadGenerated,
-    order_generated:!!existing.orderGenerated,
-    updated_at:nowIso
+  // 1. Aggiorna SUBITO l'interfaccia, senza aspettare Supabase.
+  const current=getGmailActionFlags(messageId);
+  const updated={
+    ...current,
+    replied:!!current.replied,
+    leadGenerated:!!current.leadGenerated,
+    orderGenerated:!!current.orderGenerated
   };
 
-  if(field==="replied") payload.replied=true;
-  if(field==="leadGenerated") payload.lead_generated=true;
-  if(field==="orderGenerated") payload.order_generated=true;
+  if(field==="replied") updated.replied=true;
+  if(field==="leadGenerated") updated.leadGenerated=true;
+  if(field==="orderGenerated") updated.orderGenerated=true;
 
-  const {data,error}=await sb.from("gmail_action_status")
-    .upsert(payload,{onConflict:"gmail_message_id"})
-    .select("*")
-    .single();
+  let i=(state.gmailActionStatus||[]).findIndex(x=>x.gmailMessageId===messageId);
+  const immediateRow={
+    id:i>=0 ? state.gmailActionStatus[i].id : null,
+    gmailMessageId:messageId,
+    replied:updated.replied,
+    leadGenerated:updated.leadGenerated,
+    orderGenerated:updated.orderGenerated,
+    updatedAt:new Date().toISOString()
+  };
 
-  if(error){
-    console.error("Errore stato mail",error);
-    return;
-  }
-
-  const mapped=fromDbRow("gmailActionStatus",data);
-  const i=(state.gmailActionStatus||[]).findIndex(x=>x.gmailMessageId===messageId);
-  if(i>=0) state.gmailActionStatus[i]=mapped;
-  else {
+  if(i>=0) state.gmailActionStatus[i]=immediateRow;
+  else{
     state.gmailActionStatus=state.gmailActionStatus||[];
-    state.gmailActionStatus.push(mapped);
+    state.gmailActionStatus.push(immediateRow);
   }
+
+  writeLocalMailActionFlags(messageId,updated);
 
   if(currentView==="posta") renderPosta();
+
+  // 2. Poi prova a renderlo persistente su Supabase.
+  const payload={
+    gmail_message_id:messageId,
+    replied:updated.replied,
+    lead_generated:updated.leadGenerated,
+    order_generated:updated.orderGenerated,
+    updated_at:new Date().toISOString()
+  };
+
+  try{
+    const {data,error}=await sb.from("gmail_action_status")
+      .upsert(payload,{onConflict:"gmail_message_id"})
+      .select("*")
+      .single();
+
+    if(error){
+      console.error("Errore persistenza stato mail",error);
+      return;
+    }
+
+    const mapped=fromDbRow("gmailActionStatus",data);
+    i=(state.gmailActionStatus||[]).findIndex(x=>x.gmailMessageId===messageId);
+    if(i>=0) state.gmailActionStatus[i]=mapped;
+    else state.gmailActionStatus.push(mapped);
+
+  }catch(error){
+    console.error("Errore persistenza stato mail",error);
+  }
 }
 
 function mailHasLabel(message, label){
