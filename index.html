@@ -960,6 +960,187 @@
     }
   }
 
+
+  /* ============ POSTA / GMAIL ============ */
+  .mail-shell{
+    display:grid;
+    grid-template-columns:220px minmax(0,1fr);
+    gap:14px;
+  }
+  .mail-side{
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:12px;
+    box-shadow:var(--shadowTiny);
+    align-self:start;
+  }
+  .mail-side-title{
+    font-size:12px;
+    color:var(--muted);
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    padding:6px 8px 10px;
+  }
+  .mail-filter-btn{
+    width:100%;
+    border:0;
+    background:transparent;
+    color:var(--text);
+    font:inherit;
+    font-weight:750;
+    text-align:left;
+    padding:11px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+  }
+  .mail-filter-btn:hover{background:#F7F8FA;}
+  .mail-filter-btn.active{background:#FFF0EB;color:var(--accent);}
+  .mail-panel{
+    min-width:0;
+  }
+  .mail-account-card{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .mail-account-email{
+    font-weight:850;
+    font-size:15px;
+  }
+  .mail-account-sub{
+    color:var(--muted);
+    font-size:12.5px;
+    margin-top:3px;
+  }
+  .mail-list{
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:20px;
+    overflow:hidden;
+    box-shadow:var(--shadowTiny);
+  }
+  .mail-row{
+    display:grid;
+    grid-template-columns:minmax(170px, 240px) minmax(0,1fr) 150px;
+    gap:14px;
+    padding:14px 16px;
+    border-bottom:1px solid var(--border);
+    align-items:start;
+    cursor:pointer;
+  }
+  .mail-row:last-child{border-bottom:0;}
+  .mail-row:hover{background:#FAFBFC;}
+  .mail-row.mail-unread{background:#FFFDFC;}
+  .mail-from{
+    font-weight:800;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .mail-subject{
+    font-weight:800;
+    margin-bottom:4px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .mail-snippet{
+    color:var(--muted);
+    font-size:12.5px;
+    line-height:1.45;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  .mail-date{
+    color:var(--muted);
+    font-size:12px;
+    text-align:right;
+    white-space:nowrap;
+  }
+  .mail-status{
+    border-radius:999px;
+    padding:4px 8px;
+    font-size:10.5px;
+    font-weight:800;
+    display:inline-block;
+    margin-top:6px;
+  }
+  .mail-status-inbox{background:#E8F0FE;color:#315A9B;}
+  .mail-status-sent{background:#E8F5EC;color:#2E7D4F;}
+  .mail-loading,.mail-empty,.mail-error{
+    padding:34px 20px;
+    text-align:center;
+    color:var(--muted);
+  }
+  .mail-error{color:var(--danger);}
+  .mail-count-badge{
+    min-width:24px;
+    height:24px;
+    padding:0 7px;
+    border-radius:999px;
+    background:#F1F3F5;
+    color:var(--muted);
+    font-size:11px;
+    font-weight:850;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+  @media(max-width:760px){
+    .mail-shell{display:block;}
+    .mail-side{
+      display:flex;
+      gap:6px;
+      overflow-x:auto;
+      padding:8px;
+      margin-bottom:10px;
+      border-radius:16px;
+    }
+    .mail-side-title{display:none;}
+    .mail-filter-btn{
+      flex:0 0 auto;
+      width:auto;
+      white-space:nowrap;
+      padding:9px 12px;
+      min-height:40px;
+    }
+    .mail-account-card{padding:14px !important;}
+    .mail-row{
+      grid-template-columns:1fr auto;
+      gap:5px 10px;
+      padding:13px 12px;
+    }
+    .mail-from{
+      grid-column:1;
+      grid-row:1;
+      font-size:13px;
+    }
+    .mail-date{
+      grid-column:2;
+      grid-row:1;
+      font-size:10.5px;
+    }
+    .mail-main{
+      grid-column:1 / -1;
+      grid-row:2;
+    }
+    .mail-subject{font-size:14px;}
+    .mail-snippet{
+      font-size:12px;
+      -webkit-line-clamp:2;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -1014,6 +1195,7 @@
     <section class="view" id="view-spese"></section>
     <section class="view" id="view-costiFissi"></section>
     <section class="view" id="view-entrate"></section>
+    <section class="view" id="view-posta"></section>
   </main>
 </div>
 <div class="modal-backdrop" id="modalBackdrop"><div class="modal" id="modalBody"></div></div>
@@ -1457,7 +1639,8 @@ const NAV = [
   {id:"incassi", label:"Incassi", icon:"€", subtitle:"Report pagamenti e crediti aperti", adminOnly:true},
   {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine"},
   {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti"},
-  {id:"costiFissi", label:"Costi fissi", icon:"▦", subtitle:"F24, bollette, abbonamenti e costi ricorrenti", adminOnly:true}
+  {id:"costiFissi", label:"Costi fissi", icon:"▦", subtitle:"F24, bollette, abbonamenti e costi ricorrenti", adminOnly:true},
+  {id:"posta", label:"Posta", icon:"✉", subtitle:"Email aziendale collegata a Gmail"}
 ];
 function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && currentUser.role==="admin")); }
 function renderNav(){
@@ -1531,6 +1714,7 @@ function renderTopbarActions(){
     spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
     costiFissi: currentUser&&currentUser.role==="admin" ? `<button class="btn btn-primary" onclick="toggleForm('fixedCostForm')">+ Nuovo costo fisso</button>` : ``,
     entrate: `<button class="btn btn-primary" onclick="toggleForm('incomeForm')">+ Nuova entrata</button>`,
+    posta: `<button class="btn btn-primary" onclick="loadGmailMessages(true)">↻ Aggiorna posta</button>`,
     dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa l’app</button>`
   };
   document.getElementById("topbarActions").innerHTML = map[currentView] || "";
@@ -1538,7 +1722,8 @@ function renderTopbarActions(){
 function renderCurrentView(){
   ({dashboard:renderDashboard, clienti:renderClienti, preventivi:renderPreventivi,
     ordini:renderOrdini, flusso:renderFlusso,
-    magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate})[currentView]();
+    magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
+    posta:renderPosta})[currentView]();
 }
 function toggleForm(id){ const el = document.getElementById(id); if(el) el.classList.toggle("open"); }
 /* Ridisegna una vista preservando il focus e la posizione del cursore sul campo attivo (usato dalle ricerche, che altrimenti perdono il focus a ogni lettera) */
@@ -4190,6 +4375,174 @@ function deleteEntrata(id){
     state.entrate = state.entrate.filter(e=>e.id!==id); dbDelete('entrate', id); renderEntrate();
   });
 }
+
+
+/* ============ POSTA / GMAIL ============ */
+let gmailMessages = [];
+let gmailLoaded = false;
+let gmailLoading = false;
+let gmailError = "";
+let gmailFilter = "inbox";
+
+function mailHasLabel(message, label){
+  return Array.isArray(message?.labels) && message.labels.includes(label);
+}
+
+function mailDisplayName(raw){
+  const value = String(raw||"").trim();
+  if(!value) return "Mittente sconosciuto";
+  const match = value.match(/^"?([^"<]+)"?\s*<[^>]+>$/);
+  return (match ? match[1] : value).trim();
+}
+
+function formatMailDate(raw){
+  const d = new Date(raw);
+  if(Number.isNaN(d.getTime())) return raw || "";
+  const now = new Date();
+  const sameDay = d.toDateString()===now.toDateString();
+  if(sameDay) return d.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"});
+  return d.toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"});
+}
+
+function visibleGmailMessages(){
+  const list = [...gmailMessages].sort((a,b)=>{
+    const da = new Date(a.date||0).getTime()||0;
+    const db = new Date(b.date||0).getTime()||0;
+    return db-da;
+  });
+
+  if(gmailFilter==="sent") return list.filter(m=>mailHasLabel(m,"SENT"));
+  if(gmailFilter==="all") return list;
+  if(gmailFilter==="unread") return list.filter(m=>mailHasLabel(m,"UNREAD") && mailHasLabel(m,"INBOX"));
+  return list.filter(m=>mailHasLabel(m,"INBOX"));
+}
+
+function setGmailFilter(filter){
+  gmailFilter = filter;
+  renderPosta();
+}
+
+function renderPosta(){
+  const el = document.getElementById("view-posta");
+  if(!el) return;
+
+  const inboxCount = gmailMessages.filter(m=>mailHasLabel(m,"INBOX")).length;
+  const sentCount = gmailMessages.filter(m=>mailHasLabel(m,"SENT")).length;
+  const unreadCount = gmailMessages.filter(m=>mailHasLabel(m,"UNREAD") && mailHasLabel(m,"INBOX")).length;
+  const shown = visibleGmailMessages();
+
+  let body = "";
+  if(gmailLoading){
+    body = `<div class="mail-list"><div class="mail-loading">Sto leggendo la posta Gmail…</div></div>`;
+  }else if(gmailError){
+    body = `<div class="mail-list"><div class="mail-error"><strong>Non riesco a leggere la posta.</strong><br>${escapeHtml(gmailError)}</div></div>`;
+  }else if(!gmailLoaded){
+    body = `<div class="mail-list"><div class="mail-loading">Caricamento posta…</div></div>`;
+  }else if(!shown.length){
+    body = `<div class="mail-list"><div class="mail-empty">Nessuna email in questa sezione negli ultimi 30 giorni.</div></div>`;
+  }else{
+    body = `<div class="mail-list">${shown.map(m=>{
+      const inbox = mailHasLabel(m,"INBOX");
+      const sent = mailHasLabel(m,"SENT");
+      const unread = mailHasLabel(m,"UNREAD");
+      const party = sent && !inbox ? (m.to || "Destinatario sconosciuto") : (m.from || "Mittente sconosciuto");
+      return `
+        <div class="mail-row ${unread?'mail-unread':''}" title="La lettura completa della mail verrà aggiunta nel prossimo passaggio">
+          <div>
+            <div class="mail-from">${escapeHtml(mailDisplayName(party))}</div>
+            ${inbox?`<span class="mail-status mail-status-inbox">IN ARRIVO</span>`:""}
+            ${sent?`<span class="mail-status mail-status-sent">INVIATA</span>`:""}
+          </div>
+          <div class="mail-main">
+            <div class="mail-subject">${escapeHtml(m.subject || "(Senza oggetto)")}</div>
+            <div class="mail-snippet">${escapeHtml(m.snippet || "")}</div>
+          </div>
+          <div class="mail-date">${escapeHtml(formatMailDate(m.date))}</div>
+        </div>`;
+    }).join("")}</div>`;
+  }
+
+  el.innerHTML = `
+    <div class="mail-account-card card">
+      <div>
+        <div class="mail-account-email">✉ creativostudiografico@gmail.com</div>
+        <div class="mail-account-sub">Gmail collegata · visualizzazione ultimi 30 giorni</div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);">${gmailLoaded ? `${gmailMessages.length} messaggi caricati` : ""}</div>
+    </div>
+
+    <div class="mail-shell">
+      <aside class="mail-side">
+        <div class="mail-side-title">Posta</div>
+        <button class="mail-filter-btn ${gmailFilter==="inbox"?'active':''}" onclick="setGmailFilter('inbox')">
+          <span>In arrivo</span><span class="mail-count-badge">${inboxCount}</span>
+        </button>
+        <button class="mail-filter-btn ${gmailFilter==="sent"?'active':''}" onclick="setGmailFilter('sent')">
+          <span>Inviate</span><span class="mail-count-badge">${sentCount}</span>
+        </button>
+        <button class="mail-filter-btn ${gmailFilter==="unread"?'active':''}" onclick="setGmailFilter('unread')">
+          <span>Da leggere</span><span class="mail-count-badge">${unreadCount}</span>
+        </button>
+        <button class="mail-filter-btn ${gmailFilter==="all"?'active':''}" onclick="setGmailFilter('all')">
+          <span>Tutte</span><span class="mail-count-badge">${gmailMessages.length}</span>
+        </button>
+      </aside>
+      <div class="mail-panel">${body}</div>
+    </div>
+  `;
+
+  if(!gmailLoaded && !gmailLoading && !gmailError){
+    setTimeout(()=>loadGmailMessages(false),0);
+  }
+}
+
+async function loadGmailMessages(force=false){
+  if(gmailLoading) return;
+  if(gmailLoaded && !force){
+    renderPosta();
+    return;
+  }
+
+  gmailLoading = true;
+  gmailError = "";
+  renderPosta();
+
+  try{
+    const { data: sessionData } = await sb.auth.getSession();
+    const session = sessionData?.session;
+    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile. Accedi di nuovo.");
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/gmail-list`,{
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "apikey":SUPABASE_KEY,
+        "Content-Type":"application/json"
+      },
+      body:"{}"
+    });
+
+    const raw = await response.text();
+    let result = {};
+    try{ result = JSON.parse(raw); }catch(e){ throw new Error(raw || `Errore HTTP ${response.status}`); }
+
+    if(!response.ok){
+      throw new Error(result?.error || result?.message || `Errore HTTP ${response.status}`);
+    }
+
+    gmailMessages = Array.isArray(result.messages) ? result.messages : [];
+    gmailLoaded = true;
+    gmailError = "";
+  }catch(err){
+    console.error("Gmail list error", err);
+    gmailError = err?.message || "Errore durante la lettura Gmail";
+    gmailLoaded = false;
+  }finally{
+    gmailLoading = false;
+    renderPosta();
+  }
+}
+
 
 /* ============ AUTENTICAZIONE E AVVIO ============ */
 async function fetchUserProfile(userId, email){
