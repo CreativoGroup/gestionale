@@ -1489,6 +1489,17 @@
     }
   }
 
+
+  /* ============ POSTA: LETTE NORMALI, NON LETTE IN GRASSETTO ============ */
+  .mail-from,
+  .mail-subject{
+    font-weight:500 !important;
+  }
+  .mail-row.mail-unread .mail-from,
+  .mail-row.mail-unread .mail-subject{
+    font-weight:850 !important;
+  }
+
 </style>
 </head>
 <body>
@@ -2238,10 +2249,7 @@ function renderLeads(){
               <td>
                 <div class="lead-actions">
                   <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button>
-                  ${l.stato==="Nuovo"?`<button class="btn btn-primary btn-sm" onclick="confirmLead('${l.id}')">Conferma</button>`:""}
-                  ${l.stato!=="Accettato" ? `<button class="btn btn-outline btn-sm" onclick="transformLeadToClient('${l.id}')">Trasforma in cliente</button>` : ""}
-                  <button class="btn btn-ghost btn-sm" onclick="linkLeadToExistingClient('${l.id}')">Collega cliente</button>
-                  ${l.stato!=="Perso"?`<button class="btn btn-ghost btn-sm" onclick="discardLead('${l.id}')">Scarta</button>`:""}
+                  <button class="btn btn-ghost btn-sm" onclick="discardLead('${l.id}')">Scarta</button>
                 </div>
               </td>
             </tr>`).join("")}
@@ -2273,11 +2281,10 @@ function openLeadDetail(id){
       <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(l.richiesta||"—")}</div></div>
     </div>
     <div class="form-actions" style="margin-top:16px;">
-      ${l.stato==="Nuovo"?`<button class="btn btn-primary" onclick="confirmLead('${l.id}');closeModal();">Conferma Lead</button>`:""}
-      ${l.stato!=="Accettato" ? `<button class="btn btn-primary" onclick="transformLeadToClient('${l.id}')">Trasforma in cliente</button>` : ""}
-      <button class="btn btn-outline" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente esistente</button>
-      ${l.gmailMessageId?`<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri email</button>`:""}
-      ${l.stato!=="Perso"?`<button class="btn btn-ghost" onclick="discardLead('${l.id}');closeModal();">Scarta</button>`:""}
+      <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">Trasforma in cliente ed effettua ordine</button>
+      <button class="btn btn-primary" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente ed effettua ordine</button>
+      ${l.gmailMessageId?`<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>`:""}
+      <button class="btn btn-ghost" onclick="discardLead('${l.id}');closeModal();">Scarta</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
@@ -2333,18 +2340,23 @@ function leadClientPrefill(l){
   };
 }
 
-function transformLeadToClient(id){
+function transformLeadToClient(id, inserisciOrdine=false){
   const l=(state.leads||[]).find(x=>x.id===id);
   if(!l) return;
 
   const existing=findClientByEmail(l.email);
   if(existing){
+    const msg = inserisciOrdine
+      ? `Esiste già un cliente con email ${l.email}. Vuoi collegare questo Lead al cliente esistente e inserire subito un ordine?`
+      : `Esiste già un cliente con email ${l.email}. Vuoi collegare questo Lead al cliente esistente?`;
+
     askConfirm(
-      `Esiste già un cliente con email ${l.email}. Vuoi collegare questo Lead al cliente esistente e inserire subito un ordine?`,
+      msg,
       async ()=>{
         await setLeadStatus(id,"Accettato");
         closeModal();
-        newOrderForClient(existing.id);
+        showToast("Lead collegato al cliente");
+        if(inserisciOrdine) newOrderForClient(existing.id);
       }
     );
     return;
@@ -2354,15 +2366,19 @@ function transformLeadToClient(id){
 
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="closeModal()">×</button>
-    <h2>Trasforma Lead in cliente</h2>
+    <h2>${inserisciOrdine ? "Trasforma Lead in cliente e ordine" : "Trasforma Lead in cliente"}</h2>
     <p style="color:var(--muted);margin-top:0;">
-      Controlla i dati anagrafici. Dopo il salvataggio si aprirà subito <strong>Nuovo ordine</strong> con il cliente già selezionato.
+      ${inserisciOrdine
+        ? `Controlla i dati anagrafici. Dopo il salvataggio si aprirà subito <strong>Nuovo ordine</strong> con il cliente già selezionato.`
+        : `Controlla i dati anagrafici e salva il Lead come nuovo cliente.`}
     </p>
 
     ${clientFieldsHTML('leadclient', prefill)}
 
     <div class="form-actions">
-      <button class="btn btn-primary" onclick="saveLeadAsClientAndOrder('${id}')">Salva cliente e inserisci ordine</button>
+      <button class="btn btn-primary" onclick="saveLeadAsClient('${id}', ${inserisciOrdine ? "true" : "false"})">
+        ${inserisciOrdine ? "Salva cliente e inserisci ordine" : "Salva come cliente"}
+      </button>
       <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
     </div>
   `;
@@ -2370,7 +2386,7 @@ function transformLeadToClient(id){
   toggleClientTypeFields('leadclient');
 }
 
-async function saveLeadAsClientAndOrder(leadId){
+async function saveLeadAsClient(leadId, inserisciOrdine=false){
   const l=(state.leads||[]).find(x=>x.id===leadId);
   if(!l) return;
 
@@ -2380,7 +2396,14 @@ async function saveLeadAsClientAndOrder(leadId){
   await setLeadStatus(leadId,"Accettato");
   closeModal();
   showToast("Lead trasformato in cliente");
-  newOrderForClient(clientId);
+
+  if(inserisciOrdine){
+    newOrderForClient(clientId);
+  }
+}
+
+async function saveLeadAsClientAndOrder(leadId){
+  return saveLeadAsClient(leadId, true);
 }
 
 function confirmLead(id){ setLeadStatus(id,"Da ricontattare"); }
@@ -2402,24 +2425,27 @@ async function linkLeadToExistingClient(id){
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>Collega Lead a cliente</h2>
-    <p style="color:var(--muted);">Scegli il cliente esistente. Il Lead verrà segnato come Accettato.</p>
+    <p style="color:var(--muted);">Scegli il cliente esistente. Il Lead verrà segnato come Accettato e si aprirà subito un nuovo ordine con il cliente già selezionato.</p>
     <div class="field"><label>Cliente</label><select id="lead-client-link"><option value="">Seleziona cliente…</option>${options}</select></div>
     <div class="form-actions">
-      <button class="btn btn-primary" onclick="finishLinkLeadToClient('${id}')">Collega</button>
+      <button class="btn btn-primary" onclick="finishLinkLeadToClient('${id}', true)">Collega cliente ed effettua ordine</button>
       <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
 }
 
-async function finishLinkLeadToClient(id){
+async function finishLinkLeadToClient(id, inserisciOrdine=false){
   const clientId=document.getElementById("lead-client-link")?.value;
   if(!clientId){ showToast("Seleziona un cliente"); return; }
-  // La tabella attuale dei Lead non necessita ancora di una FK: conserviamo il Lead nello storico
-  // e lo marchiamo Accettato; il collegamento operativo è riconoscibile tramite email cliente.
+
   await setLeadStatus(id,"Accettato");
   closeModal();
   showToast("Lead collegato al cliente");
+
+  if(inserisciOrdine){
+    setTimeout(()=>newOrderForClient(clientId),120);
+  }
 }
 
 /* ============ DASHBOARD ============ */
