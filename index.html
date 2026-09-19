@@ -1500,6 +1500,22 @@
     font-weight:850 !important;
   }
 
+
+  .mail-action-status{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:10.5px;font-weight:900;margin-top:6px;margin-left:5px;letter-spacing:.02em;}
+  .mail-action-status.wait{background:#FFF4D9;color:#8A5A00;}
+  .mail-action-status.lead{background:#EAF3FF;color:#275FA8;}
+  .mail-action-status.order{background:#EAF8F0;color:#24764A;}
+
+
+  .mail-reader-actions .btn:disabled{
+    opacity:1;
+    cursor:default;
+    box-shadow:none;
+    background:#F3F5F7;
+    color:#46515E;
+    border-color:#DDE3EA;
+  }
+
 </style>
 </head>
 <body>
@@ -1726,9 +1742,9 @@ function computeScorteMonitorate(){
 }
 
 /* ============ STATO ============ */
-let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[], leads:[]};
+let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[], leads:[], gmailActionStatus:[]};
 let currentView = "dashboard";
-const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads"};
+const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads", gmailActionStatus:"gmail_action_status"};
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -1747,6 +1763,7 @@ function toDbRow(collection, o){
     case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, note:o.note||null};
     case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, client_id:o.clientId||null, converted_order_id:o.convertedOrderId||null, converted_at:o.convertedAt||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
+    case "gmailActionStatus": return {id:o.id, gmail_message_id:o.gmailMessageId, replied:!!o.replied, lead_generated:!!o.leadGenerated, order_generated:!!o.orderGenerated, updated_at:o.updatedAt||new Date().toISOString()};
   }
 }
 function fromDbRow(collection, r){
@@ -1764,6 +1781,7 @@ function fromDbRow(collection, r){
     case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
     case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, note:r.note||""};
     case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
+    case "gmailActionStatus": return {id:r.id, gmailMessageId:r.gmail_message_id||"", replied:!!r.replied, leadGenerated:!!r.lead_generated, orderGenerated:!!r.order_generated, updatedAt:r.updated_at||""};
   }
 }
 
@@ -3865,6 +3883,12 @@ async function addOrder(){
     await markLeadConvertedToOrder(ctx.leadId, clientId, savedOrder.id);
   }
 
+  if(pendingGmailOrderMessageId){
+    const msgId=pendingGmailOrderMessageId;
+    pendingGmailOrderMessageId=null;
+    await setGmailActionFlag(msgId,"orderGenerated");
+  }
+
   toggleForm('orderForm');
   renderOrdini();
   showToast(savedOrder.numero ? `Ordine #${savedOrder.numero} creato` : "Ordine creato");
@@ -5218,6 +5242,66 @@ let gmailReplySending = false;
 let gmailReplyStatus = "";
 let gmailReplyAttachments = [];
 
+
+let pendingGmailOrderMessageId = null;
+
+function getGmailActionFlags(messageId){
+  return (state.gmailActionStatus||[]).find(x=>x.gmailMessageId===messageId) || {
+    gmailMessageId:messageId,
+    replied:false,
+    leadGenerated:false,
+    orderGenerated:false
+  };
+}
+
+function gmailActionStatusBadge(messageId){
+  const flags=getGmailActionFlags(messageId);
+  const badges=[];
+  if(flags.replied) badges.push(`<span class="mail-action-status wait">IN ATTESA</span>`);
+  if(flags.leadGenerated) badges.push(`<span class="mail-action-status lead">LEAD GENERATO</span>`);
+  if(flags.orderGenerated) badges.push(`<span class="mail-action-status order">ORDINE EFFETTUATO</span>`);
+  return badges.join("");
+}
+
+async function setGmailActionFlag(messageId, field){
+  if(!messageId) return;
+
+  const existing=getGmailActionFlags(messageId);
+  const nowIso=new Date().toISOString();
+
+  const payload={
+    gmail_message_id:messageId,
+    replied:!!existing.replied,
+    lead_generated:!!existing.leadGenerated,
+    order_generated:!!existing.orderGenerated,
+    updated_at:nowIso
+  };
+
+  if(field==="replied") payload.replied=true;
+  if(field==="leadGenerated") payload.lead_generated=true;
+  if(field==="orderGenerated") payload.order_generated=true;
+
+  const {data,error}=await sb.from("gmail_action_status")
+    .upsert(payload,{onConflict:"gmail_message_id"})
+    .select("*")
+    .single();
+
+  if(error){
+    console.error("Errore stato mail",error);
+    return;
+  }
+
+  const mapped=fromDbRow("gmailActionStatus",data);
+  const i=(state.gmailActionStatus||[]).findIndex(x=>x.gmailMessageId===messageId);
+  if(i>=0) state.gmailActionStatus[i]=mapped;
+  else {
+    state.gmailActionStatus=state.gmailActionStatus||[];
+    state.gmailActionStatus.push(mapped);
+  }
+
+  if(currentView==="posta") renderPosta();
+}
+
 function mailHasLabel(message, label){
   return Array.isArray(message?.labels) && message.labels.includes(label);
 }
@@ -5286,6 +5370,7 @@ function renderPosta(){
             <div class="mail-from">${escapeHtml(mailDisplayName(party))}</div>
             ${inbox?`<span class="mail-status mail-status-inbox">IN ARRIVO</span>`:""}
             ${sent?`<span class="mail-status mail-status-sent">INVIATA</span>`:""}
+            ${gmailActionStatusBadge(m.id)}
           </div>
           <div class="mail-main">
             <div class="mail-subject">${escapeHtml(m.subject || "(Senza oggetto)")}</div>
@@ -5420,7 +5505,8 @@ function renderGmailReader(){
         <div style="min-width:0;">
           <div class="mail-reader-subject">${escapeHtml(m.subject||"(Senza oggetto)")}</div>
           <div class="mail-reader-meta">
-            <strong>Da:</strong> ${escapeHtml(m.from||"")}<br>
+            ${gmailActionStatusBadge(m.id)}
+            <br><strong>Da:</strong> ${escapeHtml(m.from||"")}<br>
             <strong>A:</strong> ${escapeHtml(m.to||"")}
             ${m.cc?`<br><strong>CC:</strong> ${escapeHtml(m.cc)}`:""}
             <br><strong>Data:</strong> ${escapeHtml(m.date||"")}
@@ -5430,9 +5516,20 @@ function renderGmailReader(){
       </div>
       <div class="mail-reader-body">
         <div class="mail-reader-actions">
-          <button class="btn btn-primary" onclick="toggleGmailReply()">↩ Rispondi</button>
-          <button class="btn btn-outline" onclick="openLeadFromGmail()">+ Crea Lead</button>
-          <button class="btn btn-outline" onclick="createOrderFromGmail()">Crea Ordine</button>
+          ${(()=>{
+            const f=getGmailActionFlags(m.id);
+            return `
+              <button class="btn ${f.replied?'btn-outline':'btn-primary'}" ${f.replied?'disabled':''} onclick="toggleGmailReply()">
+                ${f.replied?'IN ATTESA':'↩ Rispondi'}
+              </button>
+              <button class="btn btn-outline" ${f.leadGenerated?'disabled':''} onclick="openLeadFromGmail()">
+                ${f.leadGenerated?'LEAD GENERATO':'+ Crea Lead'}
+              </button>
+              <button class="btn btn-outline" ${f.orderGenerated?'disabled':''} onclick="createOrderFromGmail()">
+                ${f.orderGenerated?'ORDINE EFFETTUATO':'Crea Ordine'}
+              </button>
+            `;
+          })()}
         </div>
         ${gmailReplyOpen ? renderGmailReplyComposer(m) : ""}
 
@@ -5628,6 +5725,7 @@ async function sendGmailReply(){
     }
 
     gmailReplyStatus="✓ Risposta inviata correttamente";
+    await setGmailActionFlag(m.id,"replied");
     showToast("Email inviata");
 
     gmailReplyText="";
@@ -5704,6 +5802,8 @@ function openLeadFromGmail(){
     showToast("Apri prima una mail");
     return;
   }
+
+  pendingGmailOrderMessageId = m.id || null;
 
   const email=gmailExtractAddress(m.from||"");
   const fullName=gmailExtractName(m.from||"");
@@ -5838,6 +5938,7 @@ async function saveLeadFromGmail(){
       state.leads = state.leads || [];
       state.leads.unshift(fromDbRow("leads",data));
     }
+    await setGmailActionFlag(m.id,"leadGenerated");
     closeLeadModal();
     showToast("Lead creato correttamente");
     if(currentView==="dashboard") renderDashboard();
