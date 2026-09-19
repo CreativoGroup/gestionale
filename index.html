@@ -3,21 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<link rel="manifest" href="/manifest.webmanifest?v=4">
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4">
-<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=4">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=4">
-<link rel="shortcut icon" href="/favicon.ico?v=4">
-<meta name="theme-color" content="#FFFFFF">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Creativo">
-
+<link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#E8552F">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Gestionale">
-<title>Creativo Gestionale</title>
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>Gestionale — Agenzia Grafica &amp; Stampa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -546,6 +538,171 @@
     .stat-value{font-size:38px;}
   }
 
+
+  /* ============ MOBILE REFINEMENT / CONTAINED LAYOUT ============ */
+  .sidebar-tools{
+    margin-top:18px;
+    padding-top:16px;
+    border-top:1px solid var(--border);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .sidebar-tool-btn{
+    width:100%;
+    border:0;
+    background:transparent;
+    color:var(--muted);
+    font:inherit;
+    font-weight:750;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  .sidebar-tool-btn:hover{background:var(--sidebar-hover);color:var(--text);}
+  .mobile-more-wrap{display:none;}
+
+  @media(max-width:760px){
+    body{background:#EEF2F5;}
+    #app{
+      width:min(100%, 760px);
+      margin:0 auto;
+      padding:10px;
+      display:block;
+    }
+    aside.sidebar{
+      position:relative;
+      top:auto;
+      width:100%;
+      height:auto;
+      margin:0 0 12px 0;
+      border:1px solid var(--border);
+      border-radius:22px;
+      padding:10px;
+      background:#fff;
+      box-shadow:0 8px 24px rgba(20,29,43,.06);
+    }
+    nav.tabs{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:8px;
+      overflow:visible;
+      padding:0;
+    }
+    nav.tabs button{
+      min-width:0;
+      width:100%;
+      padding:11px 8px;
+      min-height:54px;
+      justify-content:center;
+      text-align:center;
+      font-size:12.5px;
+      line-height:1.15;
+      white-space:normal;
+    }
+    nav.tabs button .icon{display:block;margin:0 0 3px 0;}
+    nav.tabs button.mobile-secondary{display:none;}
+    .mobile-more-wrap{
+      display:block;
+      margin-top:8px;
+    }
+    .mobile-more-select{
+      width:100%;
+      min-height:48px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:#F8FAFB;
+      color:var(--text);
+      font:inherit;
+      font-weight:750;
+      padding:0 14px;
+    }
+    .sidebar-tools{
+      margin-top:10px;
+      padding-top:10px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+    .sidebar-tool-btn{
+      justify-content:center;
+      text-align:center;
+      background:#F8FAFB;
+      border:1px solid var(--border);
+      color:var(--text);
+      min-height:44px;
+      padding:9px 10px;
+      font-size:12.5px;
+    }
+    .sidebar-footer{display:none;}
+
+    main{
+      width:100%;
+      padding:0;
+    }
+    .topbar{
+      margin:0 0 12px 0;
+      border:1px solid var(--border);
+      border-radius:22px;
+      padding:18px;
+      background:#fff;
+      box-shadow:0 8px 24px rgba(20,29,43,.05);
+    }
+    .topbar h1{font-size:28px;}
+    .topbar p{font-size:14px;line-height:1.35;}
+    .global-search{width:100%;max-width:none;}
+    #topbarActions{width:100%;}
+    #topbarActions .btn{width:100%;justify-content:center;}
+
+    section.view.active{
+      display:block;
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:22px;
+      padding:14px;
+      box-shadow:0 8px 24px rgba(20,29,43,.05);
+      overflow:hidden;
+    }
+
+    /* Dashboard: compact cards, two per row where possible */
+    #view-dashboard .grid-auto{
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    #view-dashboard .stat{
+      min-height:138px;
+      padding:14px;
+      border-radius:18px;
+    }
+    #view-dashboard .stat .stat-value{font-size:34px;}
+    #view-dashboard .stat .stat-label{font-size:12px;}
+    #view-dashboard .stat .stat-sub{font-size:11.5px;line-height:1.3;}
+    #view-dashboard .card:not(.stat){border-radius:18px;}
+
+    .table-wrap{
+      border-radius:18px;
+      box-shadow:none;
+      border:1px solid var(--border);
+      overflow-x:auto;
+    }
+    table{min-width:680px;}
+    .modal-backdrop{padding:8px;}
+    .modal{border-radius:22px;padding:18px 14px 26px;}
+    .form-panel{border-radius:18px;padding:14px;}
+    .form-grid{grid-template-columns:1fr;}
+    .field input,.field select,.field textarea{min-height:48px;}
+    .kanban{grid-template-columns:repeat(5,86vw);}
+  }
+
+  @media(max-width:430px){
+    nav.tabs{grid-template-columns:repeat(2,1fr);}
+    #view-dashboard .grid-auto{grid-template-columns:1fr 1fr;}
+  }
+
 </style>
 </head>
 <body>
@@ -569,6 +726,10 @@
       <small>Gestionale — Grafica &amp; Stampa</small>
     </div>
     <nav class="tabs" id="nav"></nav>
+    <div class="sidebar-tools" id="sidebarTools">
+      <button class="sidebar-tool-btn" onclick="exportBackup()">↧ <span>Esporta backup</span></button>
+      <button class="sidebar-tool-btn" onclick="signOut()">↪ <span>Esci</span></button>
+    </div>
     <div class="sidebar-footer">Dati sincronizzati in tempo reale con tutto lo staff.</div>
   </aside>
   <main>
@@ -969,7 +1130,25 @@ const NAV = [
 ];
 function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && currentUser.role==="admin")); }
 function renderNav(){
-  document.getElementById("nav").innerHTML = visibleNav().map(n => `<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${n.label}</button>`).join("");
+  const items = visibleNav();
+  const primaryIds = new Set(["dashboard","clienti","preventivi","ordini"]);
+  document.getElementById("nav").innerHTML = items.map(n => {
+    const secondaryClass = primaryIds.has(n.id) ? "" : " mobile-secondary";
+    return `<button class="${n.id===currentView?'active':''}${secondaryClass}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${n.label}</button>`;
+  }).join("");
+
+  let more = document.getElementById("mobileMoreWrap");
+  if(!more){
+    more = document.createElement("div");
+    more.id = "mobileMoreWrap";
+    more.className = "mobile-more-wrap";
+    document.getElementById("nav").insertAdjacentElement("afterend", more);
+  }
+  const secondary = items.filter(n=>!primaryIds.has(n.id));
+  more.innerHTML = `<select class="mobile-more-select" onchange="if(this.value){goTo(this.value);this.value='';}">
+    <option value="">Altro: ${secondary.some(n=>n.id===currentView) ? (NAV.find(n=>n.id===currentView)?.label||"seleziona") : "seleziona sezione"}</option>
+    ${secondary.map(n=>`<option value="${n.id}">${n.label}</option>`).join("")}
+  </select>`;
 }
 function goTo(id){
   currentView = id;
@@ -989,7 +1168,7 @@ function renderTopbarActions(){
     incassi: `<button class="btn btn-primary" onclick="toggleForm('paymentForm')">+ Registra incasso</button>`,
     spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
     entrate: `<button class="btn btn-primary" onclick="toggleForm('incomeForm')">+ Nuova entrata</button>`,
-    dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa l’app</button> <button class="btn btn-outline" onclick="exportBackup()">Esporta backup</button> <button class="btn btn-outline" onclick="signOut()">Esci (${currentUser?currentUser.email:''})</button>`
+    dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa l’app</button>`
   };
   document.getElementById("topbarActions").innerHTML = map[currentView] || "";
 }
@@ -2037,7 +2216,13 @@ function renderPreventivi(){
     <div class="form-panel" id="quoteForm">
       <h3>Nuovo preventivo</h3>
       <div class="form-grid">
-        <div class="field"><label>Cliente</label><select id="qf-cliente" onchange="onClientSelectChange(this,'qf-newclient')">${clientOptions(null,true)}</select></div>
+        <div class="field"><label>Cliente <span style="font-weight:500;color:var(--muted);">(facoltativo)</span></label>
+          <select id="qf-cliente" onchange="onClientSelectChange(this,'qf-newclient')">
+            <option value="" selected>— Senza cliente —</option>
+            <option value="__new__">+ Nuovo cliente…</option>
+            ${clientOptions(null,false)}
+          </select>
+        </div>
         <div class="field"><label>Categoria lavoro</label><select id="qf-categoria">${categoryOptions()}</select></div>
       </div>
       <div id="qf-newclient" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
@@ -2056,7 +2241,7 @@ function renderPreventivi(){
         <tbody>
           ${state.quotes.length ? state.quotes.map(q=>`
             <tr>
-              <td>${clientName(q.clientId)}</td>
+              <td>${q.clientId ? clientName(q.clientId) : `<span style="color:var(--muted);font-style:italic;">Senza cliente</span>`}</td>
               <td>${q.categoria}</td>
               <td>${fmtMoney(quoteImponibile(q))}</td>
               <td>${fmtDate(q.data)}</td>
@@ -2073,16 +2258,34 @@ function renderPreventivi(){
   `;
 }
 async function addQuote(){
-  const clientId = await resolveClientId("qf-cliente", "qfnc");
-  if(!clientId) return;
+  const sel = document.getElementById("qf-cliente");
+  let clientId = null;
+
+  if(sel.value === "__new__"){
+    clientId = await createClientFromPrefix("qfnc");
+    if(!clientId) return;
+  } else if(sel.value){
+    clientId = sel.value;
+  }
 
   const id = uid();
-  const quote = {id, clientId, categoria:document.getElementById("qf-categoria").value, descrizione:"", righe:[], stato:"Bozza", data:today()};
+  const quote = {
+    id,
+    clientId: clientId || null,
+    categoria:document.getElementById("qf-categoria").value,
+    descrizione:"",
+    righe:[],
+    stato:"Bozza",
+    data:today()
+  };
   const ok = await upsertOne('quotes', quote);
   if(!ok) return;
 
   if(!state.quotes.some(q=>q.id===id)) state.quotes.push(quote);
-  toggleForm('quoteForm'); renderPreventivi(); showToast("Preventivo creato"); openQuoteDetail(id);
+  toggleForm('quoteForm');
+  renderPreventivi();
+  showToast(clientId ? "Preventivo creato" : "Preventivo creato senza cliente");
+  openQuoteDetail(id);
 }
 function setQuoteStatus(id, stato){ findItem('quotes',id).stato = stato; saveState('quotes'); renderPreventivi(); }
 function deleteQuote(id){
@@ -2090,12 +2293,93 @@ function deleteQuote(id){
     state.quotes = state.quotes.filter(q=>q.id!==id); dbDelete('quotes', id); renderPreventivi();
   });
 }
-function convertToOrder(quoteId){
+async function convertToOrder(quoteId){
   const q = findItem('quotes', quoteId);
-  const righe = q.righe.map(r=>({id:uid(), descrizione:r.descrizione, categoria:q.categoria, stato:"Da fare", quantita:r.quantita, prezzoUnitario:r.prezzoUnitario}));
-  const order = mkOrder(uid(), q.clientId, q.descrizione, "", "Da fare", "", righe);
-  state.orders.push(order); q.convertito = true;
-  saveState('orders'); saveState('quotes'); closeModal(); renderPreventivi(); showToast("Ordine creato dal preventivo");
+  if(!q) return;
+
+  if(!q.clientId){
+    openQuoteClientForConversion(quoteId);
+    return;
+  }
+  await finalizeQuoteToOrder(quoteId, q.clientId);
+}
+
+function openQuoteClientForConversion(quoteId){
+  const q = findItem('quotes', quoteId);
+  if(!q) return;
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="openQuoteDetail('${quoteId}')">×</button>
+    <h2>Cliente necessario</h2>
+    <p style="color:var(--muted);margin-top:0;">Per trasformare il preventivo in ordine devi associare un cliente.</p>
+    <div class="modal-section">
+      <div class="field">
+        <label>Cliente</label>
+        <select id="qc-cliente" onchange="onClientSelectChange(this,'qc-newclient')">
+          <option value="" selected disabled>— Seleziona cliente —</option>
+          <option value="__new__">+ Nuovo cliente…</option>
+          ${clientOptions(null,false)}
+        </select>
+      </div>
+      <div id="qc-newclient" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
+        <p class="helptext" style="margin-top:0;">Dati del nuovo cliente</p>
+        ${clientFieldsHTML('qcnc')}
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="confirmQuoteClientAndConvert('${quoteId}')">ASSOCIA E CREA ORDINE</button>
+      <button class="btn btn-outline" onclick="openQuoteDetail('${quoteId}')">Annulla</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function confirmQuoteClientAndConvert(quoteId){
+  const sel = document.getElementById("qc-cliente");
+  if(!sel || !sel.value){ showToast("Seleziona o crea un cliente"); return; }
+
+  let clientId = sel.value;
+  if(clientId === "__new__"){
+    clientId = await createClientFromPrefix("qcnc");
+    if(!clientId) return;
+  }
+
+  const q = findItem('quotes', quoteId);
+  if(!q) return;
+  q.clientId = clientId;
+  const okQuote = await upsertOne('quotes', q);
+  if(!okQuote) return;
+
+  await finalizeQuoteToOrder(quoteId, clientId);
+}
+
+async function finalizeQuoteToOrder(quoteId, clientId){
+  const q = findItem('quotes', quoteId);
+  if(!q || !clientId) return;
+
+  const righe = q.righe.map(r=>({
+    id:uid(),
+    descrizione:r.descrizione,
+    categoria:q.categoria,
+    prodotto:r.prodotto||"",
+    stato:"Da fare",
+    quantita:r.quantita,
+    prezzoUnitario:r.prezzoUnitario
+  }));
+
+  const order = mkOrder(uid(), clientId, q.descrizione, "", "Da fare", "", righe);
+  const okOrder = await upsertOne('orders', order);
+  if(!okOrder) return;
+
+  if(!state.orders.some(o=>o.id===order.id)) state.orders.push(order);
+
+  q.clientId = clientId;
+  q.convertito = true;
+  const okQuote = await upsertOne('quotes', q);
+  if(!okQuote) return;
+
+  closeModal();
+  renderPreventivi();
+  showToast("Ordine creato dal preventivo");
 }
 function openQuoteDetail(quoteId){
   const q = findItem('quotes', quoteId);
@@ -2105,7 +2389,7 @@ function openQuoteDetail(quoteId){
     <h2>Preventivo</h2>
     <p style="color:var(--muted);margin-top:0;">${q.categoria}</p>
     <div class="ticket-meta">
-      <div><span>Cliente</span>${c?clientDisplayName(c):"—"}</div>
+      <div><span>Cliente</span>${c?clientDisplayName(c):`<em style="color:var(--muted);">Senza cliente</em>`}</div>
       <div><span>Data</span>${fmtDate(q.data)}</div>
       <div><span>Categoria</span>
         <select class="inline" onchange="updateQuoteField('${q.id}','categoria',this.value)">${categoryOptions(q.categoria)}</select>
@@ -3277,7 +3561,7 @@ async function installPwa(){
 
 if("serviceWorker" in navigator){
   window.addEventListener("load", ()=>{
-    navigator.serviceWorker.register("/service-worker.js?v=4").catch(err=>{
+    navigator.serviceWorker.register("./service-worker.js").catch(err=>{
       console.error("Service Worker non registrato", err);
     });
   });
@@ -3286,55 +3570,3 @@ if("serviceWorker" in navigator){
 </script>
 </body>
 </html>
-
-{
-  "name": "Creativo Gestionale",
-  "short_name": "Creativo",
-  "description": "Gestionale clienti, ordini, lavorazioni, pagamenti e magazzino",
-  "start_url": "/",
-  "scope": "/",
-  "display": "standalone",
-  "background_color": "#FFFFFF",
-  "theme_color": "#FFFFFF",
-  "orientation": "any",
-  "icons": [
-    {"src":"/icon-192.png?v=4","sizes":"192x192","type":"image/png","purpose":"any"},
-    {"src":"/icon-512.png?v=4","sizes":"512x512","type":"image/png","purpose":"any"}
-  ]
-}
-
-const CACHE_NAME = "creativo-gestionale-v4";
-const STATIC_ASSETS = [
-  "/manifest.webmanifest?v=4",
-  "/apple-touch-icon.png?v=4",
-  "/icon-192.png?v=4",
-  "/icon-512.png?v=4",
-  "/favicon-32.png?v=4"
-];
-self.addEventListener("install", event => {
-  self.skipWaiting();
-  event.waitUntil(caches.open(CACHE_NAME).then(cache =>
-    Promise.all(STATIC_ASSETS.map(url => cache.add(url).catch(()=>null)))
-  ));
-});
-self.addEventListener("activate", event => {
-  event.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-  ).then(()=>self.clients.claim()));
-});
-self.addEventListener("fetch", event => {
-  const req = event.request;
-  if(req.method !== "GET") return;
-  if(req.mode === "navigate"){
-    event.respondWith(fetch(req).catch(() => caches.match("/")));
-    return;
-  }
-  const url = new URL(req.url);
-  if(url.origin === self.location.origin){
-    event.respondWith(fetch(req).then(resp=>{
-      const copy=resp.clone();
-      caches.open(CACHE_NAME).then(cache=>cache.put(req,copy));
-      return resp;
-    }).catch(()=>caches.match(req)));
-  }
-});
