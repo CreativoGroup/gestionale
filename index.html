@@ -727,6 +727,150 @@
     }
   }
 
+
+  .warehouse-quick-card{overflow:hidden;}
+  .warehouse-quick-table{min-width:850px;}
+  @media(max-width:760px){
+    #view-magazzino .card:first-child .btn{
+      flex:1 1 calc(50% - 8px);
+      white-space:normal;
+      line-height:1.15;
+    }
+    .warehouse-quick-card{
+      padding:14px;
+    }
+    .warehouse-quick-table{
+      min-width:760px;
+    }
+  }
+
+
+  /* ============ MOBILE MENU + DASHBOARD REFINEMENTS ============ */
+  .desktop-nav-buttons{display:flex;flex-direction:column;gap:6px;}
+  .mobile-nav-menu{display:none;}
+  .workload-simple-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:10px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .workload-simple-row:last-child{border-bottom:0;}
+  .workload-name{font-weight:800;}
+  .workload-count{font-weight:750;color:var(--accent);white-space:nowrap;}
+
+  @media(max-width:760px){
+    nav.tabs{display:block !important;overflow:visible !important;padding:0 !important;}
+    .desktop-nav-buttons{display:none !important;}
+    .mobile-more-wrap{display:none !important;}
+    .mobile-nav-menu{display:block;position:relative;}
+    .mobile-nav-trigger{
+      width:100%;
+      min-height:54px;
+      border:0;
+      border-radius:16px;
+      background:var(--accent);
+      color:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0 16px;
+      font:inherit;
+      font-weight:850;
+      font-size:16px;
+      cursor:pointer;
+      box-shadow:0 8px 18px rgba(232,85,47,.16);
+    }
+    .mobile-nav-trigger>span:first-child{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .mobile-nav-trigger .icon{margin:0;}
+    .mobile-nav-arrow{font-size:22px;line-height:1;}
+    .mobile-nav-dropdown{
+      display:none;
+      position:absolute;
+      left:0;
+      right:0;
+      top:calc(100% + 8px);
+      z-index:120;
+      padding:8px;
+      border:1px solid var(--border);
+      border-radius:18px;
+      background:#fff;
+      box-shadow:0 18px 45px rgba(20,29,43,.14);
+      max-height:62vh;
+      overflow-y:auto;
+    }
+    .mobile-nav-dropdown.open{display:block;}
+    .mobile-nav-dropdown button{
+      width:100%;
+      min-height:46px;
+      border:0;
+      border-radius:12px;
+      background:#fff;
+      color:var(--text);
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:10px 12px;
+      font:inherit;
+      font-weight:750;
+      text-align:left;
+      cursor:pointer;
+      box-shadow:none;
+    }
+    .mobile-nav-dropdown button.active{
+      background:#FFF0EB;
+      color:var(--accent);
+    }
+    .mobile-nav-dropdown button:hover{background:#F7F8FA;}
+
+    #topbarHeading{
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      min-height:58px;
+    }
+    #dashboardHeaderLogo{
+      max-width:255px !important;
+      width:min(68vw,255px) !important;
+    }
+
+    .workload-simple-row{
+      padding:11px 2px;
+      font-size:14px;
+    }
+
+    .credit-mobile-row td{
+      padding:10px 4px !important;
+      vertical-align:middle;
+    }
+    .credit-client-name{
+      width:100%;
+      font-weight:800;
+      font-size:13px;
+    }
+    .credit-residuo{
+      white-space:nowrap;
+      font-size:12.5px;
+      padding-left:8px !important;
+      padding-right:8px !important;
+    }
+    .credit-action{
+      text-align:right;
+      white-space:nowrap;
+    }
+    .credit-action .btn{
+      min-height:36px;
+      padding:6px 9px;
+      font-size:11.5px;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -758,7 +902,9 @@
   </aside>
   <main>
     <div class="topbar app-topbar">
-      <div><h1 id="viewTitle">Dashboard</h1><p id="viewSubtitle">Panoramica generale dell'attività</p></div>
+      <div id="topbarHeading">
+        <img id="dashboardHeaderLogo" alt="Creativo" style="display:block;max-width:250px;width:72%;height:auto;">
+      </div>
       <div class="global-search">
         <input type="text" id="globalClientSearch" placeholder="🔎 Cerca cliente…" oninput="updateGlobalClientSuggestions(this.value)" onkeydown="globalSearchKeydown(event,this)" onblur="setTimeout(()=>document.getElementById('globalSearchDropdown').style.display='none',150)" autocomplete="off">
         <div id="globalSearchDropdown" class="global-search-dropdown"></div>
@@ -789,6 +935,7 @@
 const SUPABASE_URL = "https://isvanzqcifypsejdlmjx.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Ln3Z6A31vG2VRumTfVQycA_FsA0X883";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+setTimeout(()=>{ const img=document.getElementById("dashboardHeaderLogo"); const src=document.querySelector(".brand-logo img")?.src; if(img&&src) img.src=src; },0);
 let currentUser = null; // {id, email, role}
 
 /* ============ CONFIGURAZIONE ============ */
@@ -901,7 +1048,7 @@ function toDbRow(collection, o){
     case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito};
     case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
-    case "warehouse": return {id:o.id, codice:o.codice||null, nome:o.nome||null, categoria:o.categoria||null, colore:o.colore||null, taglia:o.taglia||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
+    case "warehouse": return {id:o.id, codice:o.codice||null, nome:o.nome||null, categoria:o.categoria||null, colore:o.colore||null, taglia:o.taglia||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz", warehouse_group:o.warehouseGroup||"Tessile"};
     case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "fixedCosts": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null, file_path:o.filePath||null, file_name:o.fileName||null};
     case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
@@ -917,7 +1064,7 @@ function fromDbRow(collection, r){
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:r.metodo};
-    case "warehouse": return {id:r.id, codice:r.codice||"", nome:r.nome, categoria:r.categoria, colore:r.colore||"", taglia:r.taglia||"", quantita:Number(r.quantita)||0, scortaMinima:Number(r.scorta_minima)||0, unita:r.unita||"pz"};
+    case "warehouse": return {id:r.id, codice:r.codice||"", nome:r.nome, categoria:r.categoria, colore:r.colore||"", taglia:r.taglia||"", quantita:Number(r.quantita)||0, scortaMinima:Number(r.scorta_minima)||0, unita:r.unita||"pz", warehouseGroup:r.warehouse_group||"Tessile"};
     case "expenses": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
     case "fixedCosts": return {id:r.id, descrizione:r.descrizione||"", importo:Number(r.importo)||0, metodo:r.metodo||"", data:r.data, filePath:r.file_path||"", fileName:r.file_name||"", createdAt:r.created_at};
     case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
@@ -1159,33 +1306,55 @@ const NAV = [
 function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && currentUser.role==="admin")); }
 function renderNav(){
   const items = visibleNav();
-  const primaryIds = new Set(["dashboard","clienti","preventivi","ordini"]);
-  document.getElementById("nav").innerHTML = items.map(n => {
-    const secondaryClass = primaryIds.has(n.id) ? "" : " mobile-secondary";
-    return `<button class="${n.id===currentView?'active':''}${secondaryClass}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${n.label}</button>`;
-  }).join("");
+  const current = NAV.find(n=>n.id===currentView) || items[0];
 
-  let more = document.getElementById("mobileMoreWrap");
-  if(!more){
-    more = document.createElement("div");
-    more.id = "mobileMoreWrap";
-    more.className = "mobile-more-wrap";
-    document.getElementById("nav").insertAdjacentElement("afterend", more);
+  document.getElementById("nav").innerHTML = `
+    <div class="desktop-nav-buttons">
+      ${items.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${n.label}</button>`).join("")}
+    </div>
+
+    <div class="mobile-nav-menu">
+      <button class="mobile-nav-trigger" onclick="toggleMobileNavDropdown(event)">
+        <span><span class="icon">${current?.icon||"◆"}</span>${current?.label||"Dashboard"}</span>
+        <span class="mobile-nav-arrow">⌄</span>
+      </button>
+      <div class="mobile-nav-dropdown" id="mobileNavDropdown">
+        ${items.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span><span>${n.label}</span></button>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function toggleMobileNavDropdown(event){
+  if(event) event.stopPropagation();
+  const dd = document.getElementById("mobileNavDropdown");
+  if(dd) dd.classList.toggle("open");
+}
+document.addEventListener("click", ()=>{
+  const dd = document.getElementById("mobileNavDropdown");
+  if(dd) dd.classList.remove("open");
+});
+
+function renderViewHeading(){
+  const wrap = document.getElementById("topbarHeading");
+  if(!wrap) return;
+
+  if(currentView==="dashboard"){
+    const src = document.querySelector(".brand-logo img")?.src || "";
+    wrap.innerHTML = `<img id="dashboardHeaderLogo" src="${src}" alt="Creativo" style="display:block;max-width:280px;width:min(72vw,280px);height:auto;">`;
+  }else{
+    const meta = NAV.find(n=>n.id===currentView);
+    wrap.innerHTML = `<h1 id="viewTitle">${meta?.label||""}</h1><p id="viewSubtitle">${meta?.subtitle||""}</p>`;
   }
-  const secondary = items.filter(n=>!primaryIds.has(n.id));
-  more.innerHTML = `<select class="mobile-more-select" onchange="if(this.value){goTo(this.value);this.value='';}">
-    <option value="">Altro: ${secondary.some(n=>n.id===currentView) ? (NAV.find(n=>n.id===currentView)?.label||"seleziona") : "seleziona sezione"}</option>
-    ${secondary.map(n=>`<option value="${n.id}">${n.label}</option>`).join("")}
-  </select>`;
 }
 function goTo(id){
   currentView = id;
   document.querySelectorAll("section.view").forEach(s=>s.classList.remove("active"));
   document.getElementById("view-"+id).classList.add("active");
-  const meta = NAV.find(n=>n.id===id);
-  document.getElementById("viewTitle").textContent = meta.label;
-  document.getElementById("viewSubtitle").textContent = meta.subtitle;
-  renderNav(); renderTopbarActions(); renderCurrentView();
+  renderViewHeading();
+  renderNav();
+  renderTopbarActions();
+  renderCurrentView();
 }
 function renderTopbarActions(){
   const map = {
@@ -1340,10 +1509,9 @@ function renderDashboard(){
       <div class="card">
         <h3 style="margin-top:0;">Carico di lavoro per operatore</h3>
         ${workload.map(x=>`
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-            <div style="width:80px;font-size:13px;">${x.w}</div>
-            <div style="flex:1;background:var(--paper);border-radius:6px;height:10px;overflow:hidden;"><div style="width:${Math.min(x.n*22,100)}%;background:var(--accent);height:100%;"></div></div>
-            <div style="width:26px;text-align:right;font-size:12.5px;color:var(--muted);">${x.n}</div>
+          <div class="workload-simple-row">
+            <span class="workload-name">${x.w}</span>
+            <span class="workload-count">${x.n} ${x.n===1?'lavoro':'lavori'}</span>
           </div>`).join("") || `<p class="empty">Nessun ordine assegnato.</p>`}
       </div>
       <div class="card">
@@ -1353,18 +1521,18 @@ function renderDashboard(){
         `).join("")}</tbody></table>` : `<p class="empty">Nessuna consegna prevista per oggi.</p>`}
       </div>
     </div>
-    ${ordiniImportanti.length ? `<div class="card" style="margin-top:16px;border:1px solid var(--accent);"><h3 style="margin-top:0;">★ Ordini importanti</h3><table><tbody>${ordiniImportanti.map(o=>`<tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>`).join("")}</tbody></table></div>` : ""}
+    ${ordiniImportanti.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">★ Ordini importanti</h3><table><tbody>${ordiniImportanti.map(o=>`<tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>`).join("")}</tbody></table></div>` : ""}
     ${scorteBasse.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">Avvisi magazzino</h3><table><thead><tr><th>Codice</th><th>Colore</th><th>Taglia</th><th>Disponibili</th><th>Scorta minima</th></tr></thead><tbody>${scorteBasse.map(w=>`<tr><td style="font-weight:700;">${w.codice}</td><td>${w.colore}</td><td>${w.taglia}</td><td class="low-stock">${w.quantita} ${w.unita}</td><td>${w.scortaMinima} ${w.unita}</td></tr>`).join("")}</tbody></table></div>` : ""}
     ${currentUser.role==='admin' ? `
     <div class="card" style="margin-top:16px;">
       <h3 style="margin-top:0;">Crediti aperti (ordini consegnati non pagati)</h3>
       ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Ordini da saldare</th><th>Da saldare</th><th></th></tr></thead><tbody>${creditiApertiDash.map(g=>`
-        <tr>
-          <td>${clientName(g.clientId)}</td>
-          <td>${g.orders.length===1 ? orderCategorieLabel(g.orders[0].o) : `${g.orders.length} ordini — ${g.orders.map(x=>orderCategorieLabel(x.o)).join(", ")}`}</td>
-          <td style="color:var(--danger);font-weight:700;">${fmtMoney(g.totaleSaldo)}</td>
-          <td style="white-space:nowrap;">${g.orders.length===1
-            ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button> <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${g.orders[0].o.id}')">✕</button>`
+        <tr class="credit-mobile-row">
+          <td class="credit-client-name">${clientName(g.clientId)}</td>
+          <td class="mobile-hide">${g.orders.length===1 ? orderCategorieLabel(g.orders[0].o) : `${g.orders.length} ordini — ${g.orders.map(x=>orderCategorieLabel(x.o)).join(", ")}`}</td>
+          <td class="credit-residuo" style="color:var(--danger);font-weight:800;">${fmtMoney(g.totaleSaldo)}</td>
+          <td class="credit-action" style="white-space:nowrap;">${g.orders.length===1
+            ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button><button class="btn btn-ghost btn-sm mobile-hide" onclick="deleteOrder('${g.orders[0].o.id}')">✕</button>`
             : `<button class="btn btn-outline btn-sm" onclick="openCreditiCliente('${g.clientId}')">Dettaglio</button>`}</td>
         </tr>`).join("")}</tbody></table>` : `<p class="empty">Nessun credito aperto.</p>`}
     </div>` : ``}
@@ -2871,6 +3039,128 @@ function deletePaymentFromCard(paymentId, orderId){
 }
 
 /* ============ MAGAZZINO ============ */
+const WAREHOUSE_GROUPS = ["Tessile","Gadget","Materiali di stampa"];
+const WAREHOUSE_GADGET_PRODUCTS = ["Tazza","Penne","Matite","Borraccia","USB pendrive","Portachiavi","Mouse pad","Altro"];
+const WAREHOUSE_PRINT_PRODUCTS = [
+  "Bobina / rotolo","Carta risma","Inchiostri / kit pulizia Polyprint DTF",
+  "Inchiostri / kit pulizia Mimaki 3042","Inchiostri / kit pulizia Mimaki CJV300",
+  "Colla DTF","Inchiostri / kit pulizia Epson F2000","Inchiostri / kit pulizia Xerox",
+  "Inchiostri / kit pulizia Epson F14000 Subli","Altro"
+];
+let magazzinoGroupFilter = "Tessile";
+
+function warehouseGroupLabel(group){
+  if(group==="Gadget") return "MAGAZZINO GADGET";
+  if(group==="Materiali di stampa") return "MAGAZZINO MATERIALI DI STAMPA";
+  return "MAGAZZINO TESSILE";
+}
+function warehouseGroupProducts(group){
+  if(group==="Gadget") return WAREHOUSE_GADGET_PRODUCTS;
+  if(group==="Materiali di stampa") return WAREHOUSE_PRINT_PRODUCTS;
+  return [];
+}
+function warehouseGroupTabsHtml(){
+  return WAREHOUSE_GROUPS.map(g=>`
+    <button class="btn ${magazzinoGroupFilter===g?'btn-primary':'btn-outline'} btn-sm"
+      onclick="magazzinoGroupFilter='${g}'; renderMagazzino();">${warehouseGroupLabel(g)}</button>
+  `).join("");
+}
+function warehouseQuickProductField(){
+  if(magazzinoGroupFilter==="Tessile"){
+    return `
+      <input id="quick-codice" class="inline" style="width:100%;min-width:190px;" list="quickCatalogProducts"
+        placeholder="Codice o nome…" onfocus="prepareCatalogDatalistForOrder('')" onchange="quickWarehouseCatalogPick(this.value)">
+      <datalist id="quickCatalogProducts">${catalogProductDatalistOptions()}</datalist>
+      <div id="quick-product-name" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+    `;
+  }
+  const opts = warehouseGroupProducts(magazzinoGroupFilter).map(p=>`<option value="${p}">${p}</option>`).join("");
+  return `<select id="quick-product" class="inline" style="width:100%;"><option value="">Seleziona prodotto…</option>${opts}</select>`;
+}
+function quickWarehouseCatalogPick(value){
+  const resolved = resolveCatalogSelection(value);
+  const code = resolved?.code || String(value||"").trim();
+  const p = catalogProduct(code);
+  const input = document.getElementById("quick-codice");
+  if(input && code) input.value = code;
+  const nameEl = document.getElementById("quick-product-name");
+  if(nameEl) nameEl.textContent = p?.name || "";
+}
+function quickWarehouseRowHtml(){
+  const isTextile = magazzinoGroupFilter==="Tessile";
+  return `
+    <div class="card warehouse-quick-card" style="margin-bottom:16px;">
+      <h3 style="margin:0 0 6px;">Aggiungi manualmente — ${warehouseGroupLabel(magazzinoGroupFilter)}</h3>
+      <p class="helptext" style="margin:0 0 12px;">Inserisci il prodotto e la quantità: viene aggiunto direttamente al magazzino selezionato.</p>
+      <div style="overflow-x:auto;">
+        <table class="lines-table warehouse-quick-table">
+          <thead><tr>
+            <th>${isTextile?'Codice / prodotto':'Prodotto'}</th>
+            <th>Colore / variante</th>
+            <th>${isTextile?'Taglia':'Formato / note'}</th>
+            <th>Quantità</th>
+            <th></th>
+          </tr></thead>
+          <tbody><tr>
+            <td style="min-width:220px;">${warehouseQuickProductField()}</td>
+            <td style="min-width:150px;"><input id="quick-colore" class="inline" style="width:100%;" placeholder="${isTextile?'Colore':'Variante / colore'}"></td>
+            <td style="min-width:150px;"><input id="quick-taglia" class="inline" style="width:100%;" placeholder="${isTextile?'Taglia':'Formato / note'}"></td>
+            <td><input id="quick-quantita" class="num" type="number" min="1" value="1"></td>
+            <td><button class="btn btn-primary btn-sm" onclick="quickAddToWarehouse()">AGGIUNGI NEL MAGAZZINO</button></td>
+          </tr></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+function quickAddToWarehouse(){
+  const group = magazzinoGroupFilter;
+  const qty = Number(document.getElementById("quick-quantita")?.value)||0;
+  const colore = document.getElementById("quick-colore")?.value.trim() || "";
+  const taglia = document.getElementById("quick-taglia")?.value.trim() || "UNICA";
+  if(qty<=0){ showToast("Inserisci una quantità maggiore di zero"); return; }
+
+  let codice="", nome="", categoria="";
+  if(group==="Tessile"){
+    const raw = document.getElementById("quick-codice")?.value.trim() || "";
+    if(!raw){ showToast("Seleziona o inserisci un prodotto"); return; }
+    const resolved = resolveCatalogSelection(raw);
+    codice = resolved?.code || raw;
+    const p = catalogProduct(codice);
+    nome = p?.name || raw;
+    categoria = p?.appCategory || "Tessile";
+  }else{
+    nome = document.getElementById("quick-product")?.value || "";
+    if(!nome){ showToast("Seleziona un prodotto"); return; }
+    codice = "";
+    categoria = group==="Gadget" ? "Gadget" : "Materiali di stampa";
+  }
+
+  const normalizedTaglia = taglia || "UNICA";
+  const existing = state.warehouse.find(w =>
+    (w.warehouseGroup||"Tessile")===group &&
+    String(w.codice||"").trim().toUpperCase()===String(codice||"").trim().toUpperCase() &&
+    String(w.nome||"").trim().toLowerCase()===String(nome||"").trim().toLowerCase() &&
+    String(w.colore||"").trim().toLowerCase()===String(colore||"").trim().toLowerCase() &&
+    String(w.taglia||"UNICA").trim().toUpperCase()===String(normalizedTaglia).trim().toUpperCase()
+  );
+
+  if(existing){
+    existing.quantita = Number(existing.quantita||0) + qty;
+    existing.scortaMinima = minimoRichiestoMagazzino(existing);
+  }else{
+    const item = {
+      id:uid(), codice, nome, categoria, colore, taglia:normalizedTaglia,
+      unita:"pz", quantita:qty, scortaMinima:0, warehouseGroup:group
+    };
+    item.scortaMinima = minimoRichiestoMagazzino(item);
+    state.warehouse.push(item);
+  }
+  saveState('warehouse');
+  renderMagazzino();
+  showToast(`${qty} pz aggiunti a ${warehouseGroupLabel(group)}`);
+}
+
 function warehouseCategoryOptions(selected){
   const opts = [...new Set([...(PRODOTTI_PER_CATEGORIA["Stampa"]||[]), ...(PRODOTTI_PER_CATEGORIA["Ricamo"]||[])])];
   return opts.map(o=>`<option value="${o}" ${o===selected?'selected':''}>${o}</option>`).join("");
@@ -2879,7 +3169,9 @@ let magazzinoSearch = "";
 function filteredMagazzinoRows(q){
   q = (q||"").toLowerCase();
   return state.warehouse
-    .filter(w => Number(w.quantita)>0 && (!q || (w.codice||"").toLowerCase().includes(q) || (w.nome||"").toLowerCase().includes(q) || (w.colore||"").toLowerCase().includes(q)))
+    .filter(w => Number(w.quantita)>0
+      && (w.warehouseGroup||"Tessile")===magazzinoGroupFilter
+      && (!q || (w.codice||"").toLowerCase().includes(q) || (w.nome||"").toLowerCase().includes(q) || (w.colore||"").toLowerCase().includes(q) || (w.taglia||"").toLowerCase().includes(q)))
     .sort((a,b)=>{
       const qa=Number(a.quantita)||0, qb=Number(b.quantita)||0;
       if((qa>0)!==(qb>0)) return qb>0 ? 1 : -1;
@@ -2964,7 +3256,11 @@ function renderMagazzino(){
   const q = magazzinoSearch.toLowerCase();
   const list = filteredMagazzinoRows(q);
   document.getElementById("view-magazzino").innerHTML = `
-    <div class="form-panel" id="pdfImportForm">
+    <div class="card" style="margin-bottom:14px;padding:12px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">${warehouseGroupTabsHtml()}</div>
+    </div>
+    ${quickWarehouseRowHtml()}
+    <div class="form-panel" id="pdfImportForm" style="${magazzinoGroupFilter==='Tessile'?'':'display:none !important;'}">
       <h3>Importa DDT Action Wear (PDF)</h3>
       <p class="helptext" style="margin-top:0;">Riconosce automaticamente codice, colore, taglia e quantità dal formato dei DDT Action Wear. Controlla sempre l'anteprima prima di confermare.</p>
       <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfImport(event)">
@@ -2972,11 +3268,11 @@ function renderMagazzino(){
       <div id="pdfImportPreview"></div>
     </div>
     <div class="form-panel" id="itemForm">
-      <h3>Nuovo articolo disponibile</h3>
+      <h3>Nuovo articolo disponibile — ${warehouseGroupLabel(magazzinoGroupFilter)}</h3>
       <div class="form-grid">
         <div class="field"><label>Codice articolo</label><input id="if-codice" placeholder="Es. BS010"></div>
         <div class="field"><label>Nome articolo</label><input id="if-nome" placeholder="Es. Evolution T-shirt m/c"></div>
-        <div class="field"><label>Categoria (prodotto)</label><select id="if-categoria">${warehouseCategoryOptions()}</select></div>
+        <div class="field"><label>Categoria</label><input id="if-categoria" value="${magazzinoGroupFilter==='Tessile'?'Tessile':magazzinoGroupFilter}" readonly></div>
         <div class="field"><label>Colore</label><input id="if-colore" placeholder="Es. Bianco, NY, BK..."></div>
         <div class="field"><label>Taglia</label><input id="if-taglia" placeholder="Es. S, M, L, XL, UNICA..."></div>
         <div class="field"><label>Quantità attuale</label><input id="if-quantita" type="number" min="1" value="1"></div>
@@ -2988,13 +3284,13 @@ function renderMagazzino(){
       </div>
     </div>
     <div class="card" style="margin-bottom:14px;padding:13px 16px;">
-      <strong>Qui vedi solo ciò che è realmente disponibile.</strong>
-      <div class="helptext" style="margin:4px 0 0;">Il catalogo completo resta separato e viene caricato solo quando cerchi un prodotto dentro una scheda di lavorazione.</div>
+      <strong>${warehouseGroupLabel(magazzinoGroupFilter)}</strong>
+      <div class="helptext" style="margin:4px 0 0;">Qui vedi solo le giacenze reali di questa sottocategoria. Gli articoli a quantità zero non vengono mostrati.</div>
     </div>
     <div class="section-header">
       <div class="filters"><input id="magazzinoSearchInput" class="inline" style="min-width:220px;" placeholder="Cerca per codice, nome o colore…" value="${magazzinoSearch}" oninput="filterMagazzino(this)"></div>
       <div class="filters">
-        <button class="btn btn-outline" onclick="toggleForm('pdfImportForm')">📄 Importa da DDT (PDF)</button>
+        ${magazzinoGroupFilter==="Tessile"?`<button class="btn btn-outline" onclick="toggleForm('pdfImportForm')">📄 Importa da DDT (PDF)</button>`:""}
         <button class="btn btn-outline" onclick="toggleForm('itemForm')">+ Nuovo articolo</button>
       </div>
     </div>
@@ -3029,7 +3325,8 @@ function addItem(){
     taglia: document.getElementById("if-taglia").value.trim(),
     unita: "pz",
     quantita,
-    scortaMinima:0
+    scortaMinima:0,
+    warehouseGroup: magazzinoGroupFilter
   });
   state.warehouse[state.warehouse.length-1].scortaMinima = minimoRichiestoMagazzino(state.warehouse[state.warehouse.length-1]);
   saveState('warehouse'); toggleForm('itemForm'); renderMagazzino(); showToast("Articolo aggiunto");
@@ -3154,9 +3451,10 @@ function confirmPdfImport(){
       existing.quantita = Number(existing.quantita) + Number(r.quantita);
       existing.nome = existing.nome || r.nome;
       if(!existing.categoria) existing.categoria = r.categoria;
+      if(!existing.warehouseGroup) existing.warehouseGroup = "Tessile";
       existing.scortaMinima = minimoRichiestoMagazzino(existing);
     } else {
-      const nuovo={id:uid(), codice:r.codice, nome:r.nome, categoria:r.categoria, colore:r.colore, taglia:r.taglia, unita:"pz", quantita:r.quantita, scortaMinima:0};
+      const nuovo={id:uid(), codice:r.codice, nome:r.nome, categoria:r.categoria, colore:r.colore, taglia:r.taglia, unita:"pz", quantita:r.quantita, scortaMinima:0, warehouseGroup:"Tessile"};
       nuovo.scortaMinima = minimoRichiestoMagazzino(nuovo);
       state.warehouse.push(nuovo);
     }
