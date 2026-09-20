@@ -1535,6 +1535,19 @@
     font-weight:900 !important;
   }
 
+
+  #view-note .list-row,
+  #view-clienti .list-row{gap:14px;}
+  @media(max-width:760px){
+    #view-note .list-row{
+      align-items:flex-start;
+      flex-direction:column;
+    }
+    #view-note .list-row .btn{
+      width:100%;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -1581,6 +1594,7 @@
       <div id="topbarActions"></div>
     </div>
     <section class="view" id="view-dashboard"></section>
+    <section class="view" id="view-note"></section>
     <section class="view" id="view-clienti"></section>
     <section class="view" id="view-preventivi"></section>
     <section class="view" id="view-ordini"></section>
@@ -1621,6 +1635,8 @@ const PRODOTTI_PER_CATEGORIA = {
   "Lavorazioni Esterne": ["Tipografia","Serigrafia","Grande Formato","Piccolo Formato","Biglietti da visita","Volantini","Pieghevoli","Cartelline","Blocco appunti","Gadget","Altro"]
 };
 const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone","Misto"];
+const NOTE_OPERATORS = ["Mattia","Patrizio","Sara","Francess","Simone"];
+const FAMILY_RICHIESTE = ["Felpe per reparti","Tessuti","Allestimenti","Poster ospedali","Gadget"];
 const STATUSES = ["Da fare","In lavorazione","In produzione","Completato","Consegnato"];
 const KANBAN_STATUSES = STATUSES.filter(s=>s!=="Consegnato");
 const STATUS_CLASS = {"Da fare":"pill-todo","In lavorazione":"pill-lavorazione","In produzione":"pill-produzione","Completato":"pill-done","Consegnato":"pill-delivered"};
@@ -1761,9 +1777,9 @@ function computeScorteMonitorate(){
 }
 
 /* ============ STATO ============ */
-let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[], leads:[], gmailActionStatus:[]};
+let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[], leads:[], gmailActionStatus:[], noteComunicazioni:[]};
 let currentView = "dashboard";
-const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads", gmailActionStatus:"gmail_action_status"};
+const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads", gmailActionStatus:"gmail_action_status", noteComunicazioni:"note_comunicazioni"};
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -1772,9 +1788,9 @@ function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toIS
 /* ---- Mapping camelCase (app) <-> snake_case (database) ---- */
 function toDbRow(collection, o){
   switch(collection){
-    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, carattere:o.carattere||null, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null};
+    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, richiesta:o.richiesta||null, carattere:o.carattere||null, archiviato_recenti:!!o.archiviatoRecenti, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null};
     case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito};
-    case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
+    case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, avviso_metodo:o.avvisoMetodo||null, avvisato_il:o.avvisatoIl||null, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
     case "warehouse": return {id:o.id, codice:o.codice||null, nome:o.nome||null, categoria:o.categoria||null, colore:o.colore||null, taglia:o.taglia||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz", warehouse_group:o.warehouseGroup||"Tessile"};
     case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
@@ -1782,15 +1798,16 @@ function toDbRow(collection, o){
     case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, note:o.note||null};
     case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, client_id:o.clientId||null, converted_order_id:o.convertedOrderId||null, converted_at:o.convertedAt||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
+    case "noteComunicazioni": return {id:o.id, tipo:o.tipo||"Chiamata", nome_persona:o.nomePersona||null, testo:o.testo||null, operatore:o.operatore||null, fatto:!!o.fatto, creato_il:o.creatoIl||new Date().toISOString(), fatto_il:o.fattoIl||null};
     case "gmailActionStatus": return {id:o.id, gmail_message_id:o.gmailMessageId, replied:!!o.replied, lead_generated:!!o.leadGenerated, order_generated:!!o.orderGenerated, updated_at:o.updatedAt||new Date().toISOString()};
   }
 }
 function fromDbRow(collection, r){
   switch(collection){
-    case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", carattere:r.carattere||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||""};
+    case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", richiesta:r.richiesta||"", carattere:r.carattere||"", archiviatoRecenti:!!r.archiviato_recenti, creatoIl:r.creato_il||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||""};
     case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito};
     case "orders": {
-      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:r.worker||"", stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
+      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:r.worker||"", stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:r.metodo};
@@ -1800,6 +1817,7 @@ function fromDbRow(collection, r){
     case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
     case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, note:r.note||""};
     case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
+    case "noteComunicazioni": return {id:r.id, tipo:r.tipo||"Chiamata", nomePersona:r.nome_persona||"", testo:r.testo||"", operatore:r.operatore||"", fatto:!!r.fatto, creatoIl:r.creato_il||"", fattoIl:r.fatto_il||""};
     case "gmailActionStatus": return {id:r.id, gmailMessageId:r.gmail_message_id||"", replied:!!r.replied, leadGenerated:!!r.lead_generated, orderGenerated:!!r.order_generated, updatedAt:r.updated_at||""};
   }
 }
@@ -2023,7 +2041,7 @@ function orderWorkersLabel(o){ return o.worker || "non assegnato"; }
 function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, consegnaTipo){
   const order = {id, clientId, descrizione, worker, stato, dataConsegna,
     righe: (righe && righe.length) ? righe : [emptyRiga(true)],
-    ivaApplicata:false, daFatturare:false, importante:false, sconto:0, costoSpedizione:0, clienteAvvisato:false, fatturato:false,
+    ivaApplicata:false, daFatturare:false, importante:false, sconto:0, costoSpedizione:0, clienteAvvisato:false, avvisoMetodo:"", avvisatoIl:"", fatturato:false,
     consegnaTipo: consegnaTipo || "Ritiro in sede", spedito:false,
     fasi: [], magazzino: [], note:""};
   recalcFasi(order);
@@ -2032,6 +2050,7 @@ function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, 
 /* ============ NAVIGAZIONE ============ */
 const NAV = [
   {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Info"},
+  {id:"note", label:"Note", icon:"✎", subtitle:"Chiamate e comunicazioni interne da gestire", group:"Info"},
   {id:"posta", label:"Posta", icon:"✉", subtitle:"Email aziendale collegata a Gmail", group:"Info"},
   {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info"},
   {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi in corso e storico", group:"Info"},
@@ -2153,6 +2172,7 @@ function goTo(id){
 }
 function renderTopbarActions(){
   const map = {
+    note: `<button class="btn btn-primary" onclick="document.getElementById('nota-persona')?.focus()">+ Nuova nota</button>`,
     clienti: `<button class="btn btn-primary" onclick="toggleForm('clientForm')">+ Nuovo cliente</button>`,
     preventivi: `<button class="btn btn-primary" onclick="toggleForm('quoteForm')">+ Nuovo preventivo</button>`,
     ordini: `<button class="btn btn-primary" onclick="pendingLeadOrderConversion=null;toggleForm('orderForm')">+ Nuovo ordine</button>`,
@@ -2168,7 +2188,7 @@ function renderTopbarActions(){
   document.getElementById("topbarActions").innerHTML = map[currentView] || "";
 }
 function renderCurrentView(){
-  ({dashboard:renderDashboard, clienti:renderClienti, preventivi:renderPreventivi,
+  ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti, preventivi:renderPreventivi,
     ordini:renderOrdini, flusso:renderFlusso,
     magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
     posta:renderPosta, leads:renderLeads})[currentView]();
@@ -2572,6 +2592,139 @@ async function expireStaleWaitingLeads(){
   if(currentView==="dashboard") renderDashboard();
 }
 
+
+/* ============ NOTE: CHIAMATE E COMUNICAZIONI ============ */
+function noteTypePill(tipo){
+  return tipo==="Chiamata"
+    ? `<span class="pill pill-family">☎ Chiamata</span>`
+    : `<span class="pill pill-business">✉ Comunicazione</span>`;
+}
+function noteDateLabel(iso){
+  if(!iso) return "—";
+  try{
+    return new Intl.DateTimeFormat("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(iso));
+  }catch(e){ return "—"; }
+}
+function renderNote(){
+  const attive=[...(state.noteComunicazioni||[])].filter(n=>!n.fatto).sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
+  const archivio=[...(state.noteComunicazioni||[])].filter(n=>n.fatto).sort((a,b)=>String(b.fattoIl||"").localeCompare(String(a.fattoIl||"")));
+
+  document.getElementById("view-note").innerHTML=`
+    <div class="card" style="margin-bottom:18px;">
+      <h3 style="margin-top:0;">Nuova nota</h3>
+      <div class="form-grid">
+        <div class="field">
+          <label>Tipo</label>
+          <select id="nota-tipo">
+            <option value="Chiamata">Chiamata</option>
+            <option value="Comunicazione">Comunicazione</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Nome persona</label>
+          <input id="nota-persona" placeholder="Nome cliente / referente">
+        </div>
+        <div class="field">
+          <label>Operatore</label>
+          <select id="nota-operatore">
+            <option value="">Seleziona operatore…</option>
+            ${NOTE_OPERATORS.map(o=>`<option value="${o}">${o}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Testo</label>
+        <textarea id="nota-testo" rows="4" placeholder="Scrivi la chiamata, la richiesta o la comunicazione…"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addNotaComunicazione()">Salva nota</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px;">
+      <h3 style="margin-top:0;">Da gestire <span class="pill">${attive.length}</span></h3>
+      ${attive.length ? attive.map(n=>`
+        <div class="list-row" style="cursor:default;align-items:flex-start;">
+          <div style="min-width:0;flex:1;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              ${noteTypePill(n.tipo)}
+              <strong>${escapeHtml(n.nomePersona||"Senza nome")}</strong>
+              <span class="lr-sub">· ${escapeHtml(n.operatore||"—")}</span>
+            </div>
+            <div style="margin-top:8px;white-space:pre-wrap;">${escapeHtml(n.testo||"")}</div>
+            <div class="lr-sub" style="margin-top:7px;">${escapeHtml(noteDateLabel(n.creatoIl))}</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="markNotaFatta('${n.id}')">FATTO</button>
+        </div>`).join("") : `<p class="empty">Nessuna chiamata o comunicazione da gestire.</p>`}
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">Archivio note completate</h3>
+      <p class="helptext">Le note completate restano qui per 4 giorni, poi vengono eliminate definitivamente dal gestionale.</p>
+      ${archivio.length ? archivio.map(n=>`
+        <div class="list-row" style="cursor:default;opacity:.88;">
+          <div style="min-width:0;flex:1;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              ${noteTypePill(n.tipo)}
+              <strong>${escapeHtml(n.nomePersona||"Senza nome")}</strong>
+              <span class="lr-sub">· ${escapeHtml(n.operatore||"—")}</span>
+            </div>
+            <div style="margin-top:6px;white-space:pre-wrap;">${escapeHtml(n.testo||"")}</div>
+            <div class="lr-sub" style="margin-top:6px;">Fatto: ${escapeHtml(noteDateLabel(n.fattoIl))}</div>
+          </div>
+          <span class="pill pill-accepted">FATTO</span>
+        </div>`).join("") : `<p class="empty">Archivio vuoto.</p>`}
+    </div>
+  `;
+}
+async function addNotaComunicazione(){
+  const tipo=document.getElementById("nota-tipo")?.value||"Chiamata";
+  const nomePersona=String(document.getElementById("nota-persona")?.value||"").trim();
+  const testo=String(document.getElementById("nota-testo")?.value||"").trim();
+  const operatore=String(document.getElementById("nota-operatore")?.value||"").trim();
+
+  if(!nomePersona){ showToast("Inserisci il nome della persona"); return; }
+  if(!testo){ showToast("Inserisci il testo della nota"); return; }
+  if(!operatore){ showToast("Seleziona l'operatore"); return; }
+
+  const note={
+    id:uid(), tipo, nomePersona, testo, operatore,
+    fatto:false, creatoIl:new Date().toISOString(), fattoIl:""
+  };
+  const saved=await upsertOneReturning("noteComunicazioni",note);
+  if(!saved) return;
+  const i=state.noteComunicazioni.findIndex(x=>x.id===saved.id);
+  if(i>=0) state.noteComunicazioni[i]=saved; else state.noteComunicazioni.push(saved);
+  renderNote();
+  showToast("Nota salvata");
+}
+async function markNotaFatta(id){
+  const n=findItem("noteComunicazioni",id);
+  if(!n) return;
+  n.fatto=true;
+  n.fattoIl=new Date().toISOString();
+  const saved=await upsertOneReturning("noteComunicazioni",n);
+  if(!saved) return;
+  const i=state.noteComunicazioni.findIndex(x=>x.id===id);
+  if(i>=0) state.noteComunicazioni[i]=saved;
+  renderNote();
+  showToast("Nota archiviata");
+}
+async function cleanupOldNoteComunicazioni(){
+  const cutoff=Date.now()-(4*24*60*60*1000);
+  const old=(state.noteComunicazioni||[]).filter(n=>n.fatto && n.fattoIl && new Date(n.fattoIl).getTime()<=cutoff);
+  if(!old.length) return;
+
+  const ids=old.map(n=>n.id);
+  const {error}=await sb.from("note_comunicazioni").delete().in("id",ids);
+  if(error){
+    console.error("Errore pulizia note completate",error);
+    return;
+  }
+  state.noteComunicazioni=state.noteComunicazioni.filter(n=>!ids.includes(n.id));
+  if(currentView==="note") renderNote();
+}
+
 /* ============ DASHBOARD ============ */
 function renderDashboard(){
   const activeOrders = state.orders.filter(o=>o.stato!=="Consegnato");
@@ -2646,9 +2799,10 @@ function renderDashboard(){
             <td>
               <button class="btn btn-sm ${o.clienteAvvisato?'btn-outline':'btn-primary'}"
                 style="${o.clienteAvvisato?'border-color:var(--ok);color:var(--ok);':'background:var(--warn);color:#fff;'}"
-                onclick="toggleClienteAvvisatoDashboard('${o.id}')">
+                onclick="openAvvisaCliente('${o.id}')">
                 ${o.clienteAvvisato?'AVVISATO':'DA AVVISARE'}
               </button>
+              ${o.clienteAvvisato && o.avvisoMetodo ? `<div class="lr-sub" style="margin-top:4px;text-align:center;">${escapeHtml(o.avvisoMetodo)}</div>` : ``}
             </td>
             <td class="mobile-hide"><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td>
           </tr>
@@ -2742,14 +2896,203 @@ function openCreditiCliente(clientId){
   `;
   document.getElementById("modalBackdrop").classList.add("open");
 }
-function toggleClienteAvvisatoDashboard(orderId){
-  const o = findItem('orders', orderId);
-  if(!o) return;
-  o.clienteAvvisato = !o.clienteAvvisato;
-  saveState('orders');
-  renderDashboard();
-  showToast(o.clienteAvvisato ? "Cliente segnato come AVVISATO" : "Cliente segnato DA AVVISARE");
+function avvisoClienteDefaultText(orderId){
+  const o=findItem('orders',orderId);
+  const c=o ? state.clients.find(x=>x.id===o.clientId) : null;
+  const nome=clientDisplayName(c)||"";
+  const saluto=nome ? `Buongiorno ${nome},` : "Buongiorno,";
+  return `Gentile cliente,\n\nAbbiamo il piacere di comunicare che il lavoro è pronto per essere ritirato.\nPer qualsiasi necessità si può rispondere direttamente a questa mail.\n\nCordiali saluti\nTeam Creativò`;
 }
+
+function formatAvvisoDate(iso){
+  if(!iso) return "";
+  try{
+    return new Intl.DateTimeFormat("it-IT",{
+      day:"2-digit",month:"2-digit",year:"numeric",
+      hour:"2-digit",minute:"2-digit"
+    }).format(new Date(iso));
+  }catch(e){ return ""; }
+}
+
+function openAvvisaCliente(orderId){
+  const o=findItem('orders',orderId);
+  if(!o) return;
+  const c=state.clients.find(x=>x.id===o.clientId);
+  if(!c) return;
+
+  if(o.clienteAvvisato){
+    document.getElementById("modalBody").innerHTML=`
+      <button class="close-x" onclick="closeModal()">×</button>
+      <h2>Cliente avvisato</h2>
+      <p style="margin-top:0;color:var(--muted);">${escapeHtml(clientName(o.clientId))}</p>
+      <div class="card" style="box-shadow:none;margin-top:14px;">
+        <div><strong>Metodo:</strong> ${escapeHtml(o.avvisoMetodo||"Manuale")}</div>
+        ${o.avvisatoIl?`<div style="margin-top:6px;"><strong>Quando:</strong> ${escapeHtml(formatAvvisoDate(o.avvisatoIl))}</div>`:""}
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-outline" onclick="resetClienteDaAvvisare('${o.id}')">Rimetti DA AVVISARE</button>
+        <button class="btn btn-primary" onclick="closeModal()">Chiudi</button>
+      </div>
+    `;
+    document.getElementById("modalBackdrop").classList.add("open");
+    return;
+  }
+
+  const hasEmail=!!String(c.email||"").trim();
+
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Avvisa cliente</h2>
+    <p style="margin-top:0;color:var(--muted);">
+      ${escapeHtml(clientName(o.clientId))}${hasEmail?` · ${escapeHtml(c.email)}`:""}
+    </p>
+
+    <div class="card" style="box-shadow:none;margin-top:14px;">
+      <div style="font-weight:800;margin-bottom:6px;">Come vuoi avvisarlo?</div>
+      <p class="helptext" style="margin:0;">Con Mail il messaggio viene inviato tramite Gmail. Manuale va usato per WhatsApp, telefono o altro.</p>
+    </div>
+
+    <div class="form-actions" style="margin-top:16px;">
+      <button class="btn btn-primary" ${hasEmail?"":"disabled"} onclick="openAvvisoMail('${o.id}')">✉ MAIL</button>
+      <button class="btn btn-outline" onclick="segnaAvvisoManuale('${o.id}')">MANUALE</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+    </div>
+    ${hasEmail?"":`<p class="helptext" style="color:var(--danger);">Questo cliente non ha un indirizzo email salvato. Puoi usare Manuale.</p>`}
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+function openAvvisoMail(orderId){
+  const o=findItem('orders',orderId);
+  const c=o ? state.clients.find(x=>x.id===o.clientId) : null;
+  if(!o || !c) return;
+
+  const email=String(c.email||"").trim();
+  if(!email){
+    showToast("Il cliente non ha una email salvata");
+    return;
+  }
+
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Invia avviso via Mail</h2>
+    <div class="field">
+      <label>A</label>
+      <input id="avviso-mail-to" value="${escapeHtml(email)}" readonly>
+    </div>
+    <div class="field">
+      <label>Oggetto</label>
+      <input id="avviso-mail-subject" value="Lavoro pronto">
+    </div>
+    <div class="field">
+      <label>Messaggio</label>
+      <textarea id="avviso-mail-body" rows="8">${escapeHtml(avvisoClienteDefaultText(orderId))}</textarea>
+    </div>
+    <div id="avviso-mail-status" class="helptext"></div>
+    <div class="form-actions">
+      <button id="avviso-mail-send" class="btn btn-primary" onclick="sendAvvisoClienteMail('${o.id}')">Invia mail</button>
+      <button class="btn btn-outline" onclick="openAvvisaCliente('${o.id}')">Indietro</button>
+    </div>
+  `;
+}
+
+async function sendAvvisoClienteMail(orderId){
+  const o=findItem('orders',orderId);
+  const c=o ? state.clients.find(x=>x.id===o.clientId) : null;
+  if(!o || !c) return;
+
+  const to=String(document.getElementById("avviso-mail-to")?.value||c.email||"").trim();
+  const subject=String(document.getElementById("avviso-mail-subject")?.value||"Lavoro pronto").trim();
+  const bodyText=String(document.getElementById("avviso-mail-body")?.value||"").trim();
+  const status=document.getElementById("avviso-mail-status");
+  const btn=document.getElementById("avviso-mail-send");
+
+  if(!to || !bodyText){
+    showToast("Controlla email e messaggio");
+    return;
+  }
+
+  if(btn) btn.disabled=true;
+  if(status) status.textContent="Invio in corso…";
+
+  try{
+    const {data:sessionData}=await sb.auth.getSession();
+    const session=sessionData?.session;
+    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "apikey":SUPABASE_KEY,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        to,
+        subject,
+        bodyText,
+        attachments:[]
+      })
+    });
+
+    const raw=await response.text();
+    let result={};
+    try{ result=JSON.parse(raw); }catch(e){ result={}; }
+
+    if(!response.ok){
+      throw new Error(result?.error||result?.message||raw||`Errore HTTP ${response.status}`);
+    }
+
+    await markClienteAvvisato(orderId,"Mail");
+    closeModal();
+    showToast("Mail inviata · Cliente AVVISATO");
+  }catch(err){
+    console.error("Invio avviso cliente via Gmail",err);
+    if(status) status.textContent=`Errore: ${err?.message||"invio non riuscito"}`;
+    if(btn) btn.disabled=false;
+  }
+}
+
+async function segnaAvvisoManuale(orderId){
+  await markClienteAvvisato(orderId,"Manuale");
+  closeModal();
+  showToast("Cliente segnato AVVISATO · Manuale");
+}
+
+async function markClienteAvvisato(orderId, metodo){
+  const o=findItem('orders',orderId);
+  if(!o) return;
+
+  o.clienteAvvisato=true;
+  o.avvisoMetodo=metodo;
+  o.avvisatoIl=new Date().toISOString();
+
+  const saved=await upsertOneReturning('orders',o);
+  if(saved){
+    const i=state.orders.findIndex(x=>x.id===orderId);
+    if(i>=0) state.orders[i]=saved;
+  }
+  renderDashboard();
+}
+
+async function resetClienteDaAvvisare(orderId){
+  const o=findItem('orders',orderId);
+  if(!o) return;
+
+  o.clienteAvvisato=false;
+  o.avvisoMetodo="";
+  o.avvisatoIl="";
+
+  const saved=await upsertOneReturning('orders',o);
+  if(saved){
+    const i=state.orders.findIndex(x=>x.id===orderId);
+    if(i>=0) state.orders[i]=saved;
+  }
+  closeModal();
+  renderDashboard();
+  showToast("Cliente rimesso DA AVVISARE");
+}
+
 function addAppuntamento(){
   const titolo = document.getElementById("af-titolo").value.trim();
   if(!titolo){ showToast("Inserisci un titolo per l'appuntamento"); return; }
@@ -2850,6 +3193,7 @@ function exportBackup(){
 
 /* ============ CLIENTI ============ */
 function settoreOptions(sel){ return `<option value="">Seleziona settore…</option>` + SETTORI.map(s=>`<option ${s===sel?'selected':''}>${s}</option>`).join(""); }
+function familyRichiestaOptions(sel){ return `<option value="">Seleziona richiesta…</option>` + FAMILY_RICHIESTE.map(s=>`<option value="${s}" ${s===sel?'selected':''}>${s}</option>`).join(""); }
 
 /* Campi cliente riutilizzabili (usati sia nel form Clienti sia nei form rapidi di Preventivi/Ordini) */
 function clientFieldsHTML(prefix, existing){
@@ -2877,8 +3221,9 @@ function clientFieldsHTML(prefix, existing){
       <div class="field"><label>Telefono</label><input id="${prefix}-telefono" value="${e.telefono||''}"></div>
       <div class="field"><label>Email</label><input id="${prefix}-email" type="email" value="${e.email||''}"></div>
       <div class="field" id="${prefix}-settore-wrap"><label>Settore merceologico <span id="${prefix}-settore-req">*</span></label><select id="${prefix}-settore">${settoreOptions(e.settore)}</select></div>
+      <div class="field" id="${prefix}-richiesta-wrap" style="display:none;"><label>RICHIESTA</label><select id="${prefix}-richiesta">${familyRichiestaOptions(e.richiesta)}</select></div>
     </div>
-    <p class="helptext" style="margin-top:10px;margin-bottom:18px;">Compila almeno telefono o email. Per i clienti Business il settore è obbligatorio.</p>
+    <p class="helptext" style="margin-top:10px;margin-bottom:18px;">Compila almeno telefono o email. Business: settore obbligatorio. Family: seleziona la richiesta prima di archiviare la scheda tra i clienti completati.</p>
 
     <button type="button" class="btn btn-outline btn-sm" style="margin-bottom:14px;" onclick="toggleFatturazione('${prefix}')">Compila per fatturare</button>
     <div id="${prefix}-fatturazione" style="display:${hasFatturazione?'block':'none'};padding-top:4px;">
@@ -2944,7 +3289,12 @@ function toggleClientTypeFields(prefix){
   const tipo = document.getElementById(`${prefix}-tipo`).value;
   document.getElementById(`${prefix}-business`).style.display = tipo==="Business" ? "grid" : "none";
   document.getElementById(`${prefix}-family`).style.display = tipo==="Family" ? "grid" : "none";
-  document.getElementById(`${prefix}-settore-req`).style.display = tipo==="Business" ? "inline" : "none";
+  const settoreWrap=document.getElementById(`${prefix}-settore-wrap`);
+  const richiestaWrap=document.getElementById(`${prefix}-richiesta-wrap`);
+  const req=document.getElementById(`${prefix}-settore-req`);
+  if(settoreWrap) settoreWrap.style.display = tipo==="Business" ? "block" : "none";
+  if(richiestaWrap) richiestaWrap.style.display = tipo==="Family" ? "block" : "none";
+  if(req) req.style.display = tipo==="Business" ? "inline" : "none";
 }
 /* Legge i campi anagrafici comuni (indirizzo, città, piva, ecc.) da un dato prefisso */
 function readCommonClientFields(prefix){
@@ -2979,15 +3329,16 @@ async function createClientFromPrefix(prefix, existingId){
       tipo, ragioneSociale,
       refNome:document.getElementById(`${prefix}-refnome`).value.trim(),
       refCognome:document.getElementById(`${prefix}-refcognome`).value.trim(),
-      settore, telefono, email, ...comuni
+      settore, richiesta:"", telefono, email, ...comuni
     };
   } else {
     const nome = document.getElementById(`${prefix}-nome`).value.trim();
     if(!nome){ showToast("Inserisci il nome della persona"); return null; }
+    const richiesta = document.getElementById(`${prefix}-richiesta`)?.value || "";
     payload = {
       tipo, nome,
       cognome:document.getElementById(`${prefix}-cognome`).value.trim(),
-      telefono, email, ...comuni
+      settore:"", richiesta, telefono, email, ...comuni
     };
   }
 
@@ -3006,28 +3357,67 @@ async function createClientFromPrefix(prefix, existingId){
   }
 
   const id = uid();
-  const nuovo = {id, ...payload};
-  const ok = await upsertOne('clients', nuovo);
-  if(!ok) return null;
+  const nuovo = {id, ...payload, archiviatoRecenti:false};
+  const saved = await upsertOneReturning('clients', nuovo);
+  if(!saved) return null;
 
-  // Il realtime potrebbe averlo già inserito nello state mentre attendevamo.
-  if(!state.clients.some(c=>c.id===id)) state.clients.push(nuovo);
+  const existingIdx=state.clients.findIndex(c=>c.id===id);
+  if(existingIdx>=0) state.clients[existingIdx]=saved;
+  else state.clients.push(saved);
   return id;
 }
 function clientFatturato(clientId){ return state.orders.filter(o=>o.clientId===clientId).reduce((s,o)=>s+orderTotale(o),0); }
 let clientiFilters = {search:"", settore:"", tipo:"", fatturatoMin:""};
+
+function clientSpecLabel(c){
+  if(c.tipo==="Family") return c.richiesta || "Richiesta da inserire";
+  return c.settore || "Settore da inserire";
+}
+function clientReadyForArchive(c){
+  return c.tipo==="Family" ? !!String(c.richiesta||"").trim() : !!String(c.settore||"").trim();
+}
+function recentClientsList(){
+  return [...state.clients]
+    .filter(c=>!c.archiviatoRecenti)
+    .sort((a,b)=>{
+      const da=new Date(a.creatoIl||0).getTime()||0;
+      const db=new Date(b.creatoIl||0).getTime()||0;
+      if(db!==da) return db-da;
+      return Number(b.numero||0)-Number(a.numero||0);
+    })
+    .slice(0,30);
+}
+async function archiveRecentClient(clientId){
+  const c=findItem("clients",clientId);
+  if(!c) return;
+  if(!clientReadyForArchive(c)){
+    showToast(c.tipo==="Family" ? "Inserisci prima la RICHIESTA nella scheda cliente" : "Inserisci prima il SETTORE nella scheda cliente");
+    openEditClient(clientId);
+    return;
+  }
+  c.archiviatoRecenti=true;
+  const saved=await upsertOneReturning("clients",c);
+  if(!saved) return;
+  const i=state.clients.findIndex(x=>x.id===clientId);
+  if(i>=0) state.clients[i]=saved;
+  renderClienti();
+  showToast("Scheda cliente completata e archiviata");
+}
+
 function renderClienti(){
   const f = clientiFilters;
+  const recenti = recentClientsList();
   const list = state.clients.filter(c=>{
     if(f.tipo && c.tipo!==f.tipo) return false;
     if(f.settore && c.settore!==f.settore) return false;
     if(f.fatturatoMin && clientFatturato(c.id) < Number(f.fatturatoMin)) return false;
     if(f.search){
-      const haystack = (clientDisplayName(c)+" "+(c.citta||"")+" "+(c.partitaIva||"")).toLowerCase();
+      const haystack = (clientDisplayName(c)+" "+(c.citta||"")+" "+(c.partitaIva||"")+" "+(c.richiesta||"")+" "+(c.settore||"")).toLowerCase();
       if(!haystack.includes(f.search.toLowerCase())) return false;
     }
     return true;
   });
+
   document.getElementById("view-clienti").innerHTML = `
     <div class="form-panel" id="clientForm">
       <h3>Nuovo cliente</h3>
@@ -3037,34 +3427,66 @@ function renderClienti(){
         <button class="btn btn-outline" onclick="toggleForm('clientForm')">Annulla</button>
       </div>
     </div>
+
     <div class="form-panel" id="importForm">
       <h3>Importa clienti da CSV</h3>
-      <p class="helptext" style="margin-top:0;">Carica un export CSV (es. da Fattura SMART o simili). Riconosce le colonne: Ragione sociale, Nome, Cognome, Tipologia, Indirizzo, Comune, CAP, Provincia, Partita IVA, Codice Fiscale, Cellulare/Telefono, Email, PEC. Il settore non viene importato: lo assegnerai tu in seguito.</p>
+      <p class="helptext" style="margin-top:0;">Carica un export CSV. I clienti importati restano nell’anagrafica generale; la coda “Ultimi clienti aggiunti” è dedicata soprattutto alle nuove schede da completare.</p>
       <input type="file" id="csvFileInput" accept=".csv" onchange="handleClientCsvUpload(event)">
     </div>
-    <div class="section-header">
+
+    <div class="card" style="margin-bottom:18px;">
+      <div class="section-header" style="margin-bottom:10px;">
+        <div>
+          <h3 style="margin:0;">Ultimi 30 clienti aggiunti</h3>
+          <p class="helptext" style="margin:5px 0 0;">Apri la scheda, completa le specifiche e poi premi Archivia. Il cliente resterà nell’anagrafica generale.</p>
+        </div>
+      </div>
+      ${recenti.length ? `
+        <div class="table-wrap" style="box-shadow:none;">
+          <table>
+            <thead><tr><th>Cliente</th><th>Tipo</th><th>Settore / Richiesta</th><th>Aggiunto</th><th></th></tr></thead>
+            <tbody>
+              ${recenti.map(c=>`
+                <tr>
+                  <td><strong>${escapeHtml(clientDisplayName(c))}</strong></td>
+                  <td><span class="pill ${c.tipo==='Business'?'pill-business':'pill-family'}">${c.tipo}</span></td>
+                  <td>${clientReadyForArchive(c) ? escapeHtml(clientSpecLabel(c)) : `<span style="color:var(--warn);font-weight:800;">${escapeHtml(clientSpecLabel(c))}</span>`}</td>
+                  <td>${c.creatoIl ? escapeHtml(formatAvvisoDate(c.creatoIl)) : "—"}</td>
+                  <td style="white-space:nowrap;">
+                    <button class="btn btn-outline btn-sm" onclick="openClientHistory('${c.id}')">Apri scheda</button>
+                    <button class="btn btn-sm ${clientReadyForArchive(c)?'btn-primary':'btn-outline'}" onclick="archiveRecentClient('${c.id}')">${clientReadyForArchive(c)?'Archivia':'Completa'}</button>
+                  </td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>` : `<p class="empty">Nessuna nuova scheda cliente da completare.</p>`}
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <h3 style="margin-top:0;">Anagrafica clienti</h3>
       <div class="filters" style="flex:1;">
         <input id="clientiSearchInput" class="inline" style="min-width:220px;" list="clienti-suggerimenti" placeholder="Cerca cliente, città, P.IVA…" value="${f.search}" oninput="clientiFilters.search=this.value; rerenderKeepingFocus(renderClienti);">
-        <datalist id="clienti-suggerimenti">${state.clients.map(c=>`<option value="${clientDisplayName(c)}">`).join("")}</datalist>
+        <datalist id="clienti-suggerimenti">${state.clients.map(c=>`<option value="${escapeHtml(clientDisplayName(c))}">`).join("")}</datalist>
         <select class="inline" onchange="clientiFilters.tipo=this.value; renderClienti();"><option value="">Tutti i tipi</option>${CLIENT_TYPES.map(t=>`<option ${t===f.tipo?'selected':''}>${t}</option>`).join("")}</select>
-        <select class="inline" onchange="clientiFilters.settore=this.value; renderClienti();"><option value="">Tutti i settori</option>${SETTORI.map(s=>`<option ${s===f.settore?'selected':''}>${s}</option>`).join("")}</select>
+        <select class="inline" onchange="clientiFilters.settore=this.value; renderClienti();"><option value="">Tutti i settori Business</option>${SETTORI.map(s=>`<option ${s===f.settore?'selected':''}>${s}</option>`).join("")}</select>
         <input id="clientiFatturatoMinInput" class="inline" style="width:150px;" type="number" min="0" placeholder="Fatturato minimo €" value="${f.fatturatoMin}" oninput="clientiFilters.fatturatoMin=this.value; rerenderKeepingFocus(renderClienti);">
         <button class="btn btn-outline btn-sm" onclick="toggleForm('importForm')">Importa da CSV</button>
       </div>
+      <p class="helptext">${list.length} clienti su ${state.clients.length} totali.</p>
     </div>
-    <p class="helptext">${list.length} clienti su ${state.clients.length} totali.</p>
+
     <div class="table-wrap">
       <table>
-        <thead><tr><th>N°</th><th>Tipo</th><th>Nome</th><th>Telefono</th><th>Email</th><th>Settore</th><th>Carattere</th><th>Fatturato</th><th></th></tr></thead>
+        <thead><tr><th>N°</th><th>Tipo</th><th>Nome</th><th>Telefono</th><th>Email</th><th>Settore / Richiesta</th><th>Carattere</th><th>Fatturato</th><th></th></tr></thead>
         <tbody>
           ${list.length ? list.map(c=>`
             <tr class="clickable-row" onclick="openClientHistory('${c.id}')">
               <td style="color:var(--border);font-weight:400;font-size:10px;">${c.numero?('#'+c.numero):'—'}</td>
               <td><span class="pill ${c.tipo==='Business'?'pill-business':'pill-family'}">${c.tipo}</span></td>
-              <td><span class="status-dot client-dot-${c.tipo==='Business'?'business':'family'}"></span><span style="font-weight:600;color:${c.tipo==='Business'?'#1D5A9E':'#B9660C'}">${clientDisplayName(c)}</span></td>
-              <td>${c.telefono||"—"}</td>
-              <td>${c.email? `<a class="link" href="mailto:${c.email}" onclick="event.stopPropagation()">${c.email}</a>`:"—"}</td>
-              <td>${c.settore||`<span style="color:var(--warn);">da assegnare</span>`}</td>
+              <td><span class="status-dot client-dot-${c.tipo==='Business'?'business':'family'}"></span><span style="font-weight:600;color:${c.tipo==='Business'?'#1D5A9E':'#B9660C'}">${escapeHtml(clientDisplayName(c))}</span></td>
+              <td>${escapeHtml(c.telefono||"—")}</td>
+              <td>${c.email? `<a class="link" href="mailto:${escapeHtml(c.email)}" onclick="event.stopPropagation()">${escapeHtml(c.email)}</a>`:"—"}</td>
+              <td>${clientReadyForArchive(c) ? escapeHtml(clientSpecLabel(c)) : `<span style="color:var(--warn);">${escapeHtml(clientSpecLabel(c))}</span>`}</td>
               <td onclick="event.stopPropagation()"><select class="inline" onchange="updateClientCarattere('${c.id}',this.value)"><option value="">—</option>${CARATTERE_OPTIONS.map(op=>`<option value="${op}" ${c.carattere===op?'selected':''}>${op}</option>`).join("")}</select></td>
               <td>${fmtMoney(clientFatturato(c.id))}</td>
               <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteClient('${c.id}')">Elimina</button></td>
@@ -3074,6 +3496,7 @@ function renderClienti(){
     </div>
   `;
 }
+
 function openClientHistory(clientId){
   const c = state.clients.find(x=>x.id===clientId);
   const orders = state.orders.filter(o=>o.clientId===clientId).sort((a,b)=>(b.dataConsegna||"").localeCompare(a.dataConsegna||""));
@@ -3082,7 +3505,7 @@ function openClientHistory(clientId){
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>${clientDisplayName(c)}</h2>
-    <p style="color:var(--muted);margin-top:0;">${c.settore||(c.tipo==='Family'?'Cliente privato':'Settore da assegnare')} — Fatturato totale ${fmtMoney(totale)} <span style="font-size:9.5px;color:var(--border);">${c.numero?('#'+c.numero):''}</span></p>
+    <p style="color:var(--muted);margin-top:0;">${c.tipo==="Family" ? (c.richiesta||"Richiesta da inserire") : (c.settore||"Settore da assegnare")} — Fatturato totale ${fmtMoney(totale)} <span style="font-size:9.5px;color:var(--border);">${c.numero?('#'+c.numero):''}</span></p>
     <div class="ticket-meta">
       <div><span>Indirizzo</span>${indirizzoCompleto||"—"}</div>
       <div><span>Telefono</span>${c.telefono||"—"}</div>
@@ -3218,7 +3641,8 @@ function parseClientsCsv(text){
       telefono: get(r,cCell) || get(r,cTel), email: get(r,cEmail), settore:"",
       indirizzo: get(r,cIndirizzo), citta: get(r,cComune), cap: get(r,cCap), provincia: get(r,cProvincia),
       partitaIva: get(r,cPiva), codiceFiscale: get(r,cCf), pec: get(r,cPec),
-      _importBatch: "csv_" + today()
+      _importBatch: "csv_" + today(),
+      archiviatoRecenti: true
     };
     if(tipo==="Business"){
       clients.push({id:uid(), tipo, ragioneSociale: ragsoc || `${nome} ${cognome}`.trim(), refNome:nome, refCognome:cognome, ...common});
@@ -6265,11 +6689,15 @@ async function onSignedIn(session){
   document.getElementById("app").style.display = "flex";
   await loadAllFromSupabase();
   await expireStaleWaitingLeads();
+  await cleanupOldNoteComunicazioni();
   subscribeRealtime();
   renderNav();
   goTo("dashboard");
   if(!window._leadExpiryTimer){
     window._leadExpiryTimer=setInterval(expireStaleWaitingLeads,60*60*1000);
+  }
+  if(!window._noteCleanupTimer){
+    window._noteCleanupTimer=setInterval(cleanupOldNoteComunicazioni,60*60*1000);
   }
 }
 async function initAuth(){
