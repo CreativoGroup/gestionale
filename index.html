@@ -3574,9 +3574,9 @@ function openClientHistory(clientId){
           <span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span>
         </div>
       </div>`).join("") : `<p class="empty">Nessun ordine per questo cliente.</p>`}
-    <div class="form-actions">
-      <button class="btn btn-ghost" style="color:var(--danger);" onclick="deleteClient('${c.id}')">ELIMINA CLIENTE</button>
+    <div class="form-actions" style="justify-content:space-between;align-items:center;flex-wrap:wrap;">
       <button class="btn btn-outline" onclick="closeModal()">Chiudi</button>
+      <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteClient('${c.id}')">Elimina cliente</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
@@ -4242,10 +4242,12 @@ function openQuoteDetail(quoteId){
         <div class="trow grand"><span>Totale preventivo</span><span>${fmtMoney(quoteImponibile(q))}</span></div>
       </div>
     </div>
-    <div class="form-actions">
-      ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
-      <button class="btn btn-ghost" style="color:var(--danger);" onclick="deleteQuote('${q.id}')">ELIMINA PREVENTIVO</button>
-      <button class="btn btn-outline" onclick="closeModal()">Chiudi</button>
+    <div class="form-actions" style="justify-content:space-between;align-items:center;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
+        <button class="btn btn-primary" onclick="closeModal(); showToast('Preventivo salvato')">Salva</button>
+      </div>
+      <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteQuote('${q.id}')">Elimina preventivo</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
@@ -4578,12 +4580,14 @@ function openJobCard(orderId){
     </div>
 
 
-    <div class="form-actions">
-      <button class="btn btn-outline" onclick="window.print()">Stampa</button>
-      <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
-      <button class="btn btn-ghost" style="color:var(--danger);" onclick="deleteOrder('${o.id}')">ELIMINA ORDINE</button>
-      <button class="btn btn-primary" onclick="closeModal(); showToast('Scheda salvata')">SALVA</button>
-      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    <div class="form-actions" style="justify-content:space-between;align-items:center;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-outline" onclick="window.print()">Stampa</button>
+        <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
+        <button class="btn btn-primary" onclick="closeModal(); showToast('Scheda salvata')">Salva</button>
+        <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+      </div>
+      <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteOrder('${o.id}')">Elimina ordine</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
