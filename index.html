@@ -1834,7 +1834,7 @@ function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toIS
 /* ---- Mapping camelCase (app) <-> snake_case (database) ---- */
 function toDbRow(collection, o){
   switch(collection){
-    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, richiesta:o.richiesta||null, carattere:o.carattere||null, archiviato_recenti:!!o.archiviatoRecenti, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null};
+    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, richiesta:o.richiesta||null, carattere:o.carattere||null, archiviato_recenti:!!o.archiviatoRecenti, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null, dropbox_folder_url:o.dropboxFolderUrl||null};
     case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito};
     case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, avviso_metodo:o.avvisoMetodo||null, avvisato_il:o.avvisatoIl||null, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
@@ -1850,7 +1850,7 @@ function toDbRow(collection, o){
 }
 function fromDbRow(collection, r){
   switch(collection){
-    case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", richiesta:r.richiesta||"", carattere:r.carattere||"", archiviatoRecenti:!!r.archiviato_recenti, creatoIl:r.creato_il||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||""};
+    case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", richiesta:r.richiesta||"", carattere:r.carattere||"", archiviatoRecenti:!!r.archiviato_recenti, creatoIl:r.creato_il||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||"", dropboxFolderUrl:r.dropbox_folder_url||""};
     case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito};
     case "orders": {
       const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:r.worker||"", stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
@@ -3561,9 +3561,12 @@ function openClientHistory(clientId){
       <div><span>Codice Fiscale</span>${c.codiceFiscale||"—"}</div>
       <div><span>PEC</span>${c.pec||"—"}</div>
     </div>
-    <div class="form-actions" style="margin-bottom:18px;">
+    <div class="form-actions" style="margin-bottom:18px;flex-wrap:wrap;">
       <button class="btn btn-primary btn-sm" onclick="newOrderForClient('${c.id}')">+ NUOVO ORDINE</button>
       <button class="btn btn-outline btn-sm" onclick="openEditClient('${c.id}')">Modifica anagrafica</button>
+      ${c.dropboxFolderUrl
+        ? `<button class="btn btn-outline btn-sm" onclick="openClientDropbox('${c.id}')">APRI DROPBOX</button><button class="btn btn-outline btn-sm" onclick="setClientDropboxFolder('${c.id}')">Modifica Dropbox</button>`
+        : `<button class="btn btn-outline btn-sm" onclick="setClientDropboxFolder('${c.id}')">COLLEGA DROPBOX</button>`}
     </div>
     <h3>Storico ordini</h3>
     ${orders.length ? orders.map(o=>`
@@ -3597,6 +3600,36 @@ function newOrderForClient(clientId, leadId=null){
   }
   window.scrollTo({top:0,behavior:"smooth"});
 }
+function openClientDropbox(clientId){
+  const c = state.clients.find(x=>x.id===clientId);
+  const url = String(c?.dropboxFolderUrl||"").trim();
+  if(!url){ showToast("Nessuna cartella Dropbox collegata"); return; }
+  window.open(url, "_blank", "noopener");
+}
+async function setClientDropboxFolder(clientId){
+  const c = state.clients.find(x=>x.id===clientId);
+  if(!c) return;
+  const current = String(c.dropboxFolderUrl||"");
+  const value = window.prompt(
+    "Incolla il link Dropbox della cartella di questo cliente.\n\nPer rimuovere il collegamento lascia il campo vuoto e conferma.",
+    current
+  );
+  if(value===null) return;
+  const url = value.trim();
+  if(url && !/^https?:\/\//i.test(url)){
+    showToast("Incolla un link Dropbox completo che inizi con https://");
+    return;
+  }
+  if(url && !/dropbox\.com/i.test(url)){
+    const ok = window.confirm("Il link non sembra appartenere a Dropbox. Vuoi salvarlo comunque?");
+    if(!ok) return;
+  }
+  c.dropboxFolderUrl = url;
+  await saveState('clients');
+  showToast(url ? "Cartella Dropbox collegata" : "Collegamento Dropbox rimosso");
+  openClientHistory(clientId);
+}
+
 function openEditClient(clientId){
   const c = state.clients.find(x=>x.id===clientId);
   document.getElementById("modalBody").innerHTML = `
@@ -6117,8 +6150,7 @@ function renderGmailReader(){
             <div class="mail-attachment-meta">${escapeHtml(a.mimeType||"")}${a.size?` · ${mailFileSize(a.size)}`:""}</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); gmailAttachmentPending()">Apri</button>
-            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); gmailAttachmentPending()">Salva nel gestionale</button>
+            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); openGmailAttachment(${i})">Apri</button>
           </div>
         </div>`).join("")}
     </div>`:"";
@@ -6616,8 +6648,82 @@ async function saveMailClientAndOpenOrder(){
 function gmailActionPending(label){
   showToast(`${label}: lo attiviamo nel passaggio successivo`);
 }
-function gmailAttachmentPending(){
-  showToast("Allegato rilevato. Apertura e salvataggio saranno attivati nel prossimo passaggio.");
+function gmailBase64UrlToBlob(base64url, mimeType){
+  const base64=String(base64url||"").replace(/-/g,"+").replace(/_/g,"/");
+  const padded=base64 + "=".repeat((4-(base64.length%4))%4);
+  const binary=atob(padded);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+  return new Blob([bytes],{type:mimeType||"application/octet-stream"});
+}
+
+async function openGmailAttachment(index){
+  const m=gmailSelectedMessage;
+  const attachments=Array.isArray(m?.attachments)?m.attachments:[];
+  const a=attachments[index];
+  if(!m?.id || !a){ showToast("Allegato non disponibile"); return; }
+
+  const attachmentId=String(a.attachmentId||a.id||"").trim();
+  if(!attachmentId){ showToast("Identificativo allegato mancante"); return; }
+
+  // Apro subito una scheda vuota: su iPhone/Safari evita il blocco popup
+  // mentre attendiamo il download protetto da Gmail.
+  const previewWindow=window.open("","_blank");
+  if(previewWindow){
+    try{
+      previewWindow.document.write('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Apertura allegato…</title><body style="font-family:system-ui;padding:28px">Apertura allegato…</body>');
+    }catch(e){}
+  }
+
+  try{
+    const {data:sessionData}=await sb.auth.getSession();
+    const session=sessionData?.session;
+    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-attachment`,{
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "apikey":SUPABASE_KEY,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        messageId:m.id,
+        attachmentId,
+        filename:a.filename||"allegato",
+        mimeType:a.mimeType||"application/octet-stream"
+      })
+    });
+
+    const raw=await response.text();
+    let result={};
+    try{ result=JSON.parse(raw); }
+    catch(e){ throw new Error(raw||`Errore HTTP ${response.status}`); }
+    if(!response.ok) throw new Error(result?.error||result?.message||`Errore HTTP ${response.status}`);
+    if(!result?.data) throw new Error("Contenuto allegato mancante");
+
+    const blob=gmailBase64UrlToBlob(result.data,result.mimeType||a.mimeType);
+    const url=URL.createObjectURL(blob);
+
+    if(previewWindow){
+      previewWindow.location.href=url;
+    }else{
+      const link=document.createElement("a");
+      link.href=url;
+      link.target="_blank";
+      link.rel="noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    // Lascio tempo al browser/visualizzatore per caricare il blob.
+    setTimeout(()=>URL.revokeObjectURL(url),5*60*1000);
+  }catch(err){
+    console.error("Gmail attachment error",err);
+    if(previewWindow){ try{ previewWindow.close(); }catch(e){} }
+    showToast(err?.message||"Errore durante l'apertura dell'allegato");
+  }
 }
 async function openGmailMessage(id){
   if(!id) return;
