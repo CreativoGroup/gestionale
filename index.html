@@ -1548,6 +1548,52 @@
     }
   }
 
+
+  /* ============ POSTA: LETTO + SCHEDA GRANDE CENTRATA ============ */
+  @media(min-width:981px){
+    .mail-reader{
+      position:fixed !important;
+      left:50% !important;
+      top:50% !important;
+      transform:translate(-50%,-50%) !important;
+      width:min(1120px, calc(100vw - 100px)) !important;
+      height:min(840px, calc(100vh - 70px)) !important;
+      min-height:620px !important;
+      max-height:calc(100vh - 70px) !important;
+      z-index:220 !important;
+      border-radius:28px !important;
+      overflow:auto !important;
+      box-shadow:0 28px 90px rgba(20,29,43,.30), 0 0 0 9999px rgba(20,29,43,.34) !important;
+    }
+    .mail-reader-head{
+      padding:24px 28px !important;
+    }
+    .mail-reader-subject{
+      font-size:28px !important;
+    }
+    .mail-reader-meta{
+      font-size:14px !important;
+    }
+    .mail-reader-body{
+      padding:26px 28px 34px !important;
+    }
+    .mail-reader-actions .btn{
+      min-height:52px !important;
+      padding:12px 22px !important;
+      font-size:16px !important;
+    }
+    .mail-body-html{
+      min-height:470px !important;
+    }
+    .mail-body-text{
+      font-size:16px !important;
+    }
+    .mail-reply-textarea{
+      min-height:210px !important;
+      font-size:16px !important;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -3529,6 +3575,7 @@ function openClientHistory(clientId){
         </div>
       </div>`).join("") : `<p class="empty">Nessun ordine per questo cliente.</p>`}
     <div class="form-actions">
+      <button class="btn btn-ghost" style="color:var(--danger);" onclick="deleteClient('${c.id}')">ELIMINA CLIENTE</button>
       <button class="btn btn-outline" onclick="closeModal()">Chiudi</button>
     </div>
   `;
@@ -4197,6 +4244,7 @@ function openQuoteDetail(quoteId){
     </div>
     <div class="form-actions">
       ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
+      <button class="btn btn-ghost" style="color:var(--danger);" onclick="deleteQuote('${q.id}')">ELIMINA PREVENTIVO</button>
       <button class="btn btn-outline" onclick="closeModal()">Chiudi</button>
     </div>
   `;
@@ -4533,6 +4581,7 @@ function openJobCard(orderId){
     <div class="form-actions">
       <button class="btn btn-outline" onclick="window.print()">Stampa</button>
       <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
+      <button class="btn btn-ghost" style="color:var(--danger);" onclick="deleteOrder('${o.id}')">ELIMINA ORDINE</button>
       <button class="btn btn-primary" onclick="closeModal(); showToast('Scheda salvata')">SALVA</button>
       <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
     </div>
@@ -5685,6 +5734,27 @@ let gmailReplySending = false;
 let gmailReplyStatus = "";
 let gmailReplyAttachments = [];
 
+let gmailLocallyReadIds = new Set();
+try{
+  gmailLocallyReadIds = new Set(JSON.parse(localStorage.getItem("gmailLocallyReadIds")||"[]"));
+}catch(e){
+  gmailLocallyReadIds = new Set();
+}
+
+function markGmailLocallyRead(id){
+  if(!id) return;
+  gmailLocallyReadIds.add(id);
+  try{
+    localStorage.setItem("gmailLocallyReadIds", JSON.stringify([...gmailLocallyReadIds]));
+  }catch(e){
+    console.warn("Impossibile salvare lo stato letto della mail",e);
+  }
+}
+
+function isGmailLocallyRead(id){
+  return gmailLocallyReadIds.has(id);
+}
+
 
 let pendingGmailOrderMessageId = null;
 
@@ -5827,7 +5897,7 @@ function visibleGmailMessages(){
 
   if(gmailFilter==="sent") return list.filter(m=>mailHasLabel(m,"SENT"));
   if(gmailFilter==="all") return list;
-  if(gmailFilter==="unread") return list.filter(m=>mailHasLabel(m,"UNREAD") && mailHasLabel(m,"INBOX"));
+  if(gmailFilter==="unread") return list.filter(m=>mailHasLabel(m,"UNREAD") && !isGmailLocallyRead(m.id) && mailHasLabel(m,"INBOX"));
   return list.filter(m=>mailHasLabel(m,"INBOX"));
 }
 
@@ -5842,7 +5912,7 @@ function renderPosta(){
 
   const inboxCount = gmailMessages.filter(m=>mailHasLabel(m,"INBOX")).length;
   const sentCount = gmailMessages.filter(m=>mailHasLabel(m,"SENT")).length;
-  const unreadCount = gmailMessages.filter(m=>mailHasLabel(m,"UNREAD") && mailHasLabel(m,"INBOX")).length;
+  const unreadCount = gmailMessages.filter(m=>mailHasLabel(m,"UNREAD") && !isGmailLocallyRead(m.id) && mailHasLabel(m,"INBOX")).length;
   const shown = visibleGmailMessages();
 
   let body = "";
@@ -5858,7 +5928,7 @@ function renderPosta(){
     body = `<div class="mail-list">${shown.map(m=>{
       const inbox = mailHasLabel(m,"INBOX");
       const sent = mailHasLabel(m,"SENT");
-      const unread = mailHasLabel(m,"UNREAD");
+      const unread = mailHasLabel(m,"UNREAD") && !isGmailLocallyRead(m.id);
       const party = sent && !inbox ? (m.to || "Destinatario sconosciuto") : (m.from || "Mittente sconosciuto");
       return `
         <div class="mail-row ${unread?'mail-unread':''} ${gmailSelectedId===m.id?'selected':''}" onclick="openGmailMessage('${m.id}')">
@@ -6547,6 +6617,7 @@ function gmailAttachmentPending(){
 }
 async function openGmailMessage(id){
   if(!id) return;
+  markGmailLocallyRead(id);
   gmailSelectedId=id;
   gmailSelectedMessage=null;
   gmailMessageError="";
