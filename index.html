@@ -3028,6 +3028,7 @@ async function sendAvvisoClienteMail(orderId){
         "Content-Type":"application/json"
       },
       body:JSON.stringify({
+        mode:"new",
         to,
         subject,
         bodyText,
