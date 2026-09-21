@@ -2071,18 +2071,71 @@ function emptyRiga(isOrder){
 }
 /* Ricalcola le fasi di lavorazione in base alle categorie presenti nelle righe, preservando lo stato delle spunte già fatte */
 function recalcFasi(order){
-  const cats = [...new Set((order.righe||[]).map(r=>r.categoria).filter(Boolean))];
-  const existing = order.fasi || [];
-  const fasi = [];
-  cats.forEach(cat=>{
-    (STEP_TEMPLATES[cat]||[]).forEach(nome=>{
-      const key = cat+"__"+nome;
-      const prev = existing.find(f=>f.key===key);
-      fasi.push({key, categoria:cat, nome, completata: prev ? prev.completata : false});
-    });
-  });
-  order.fasi = fasi;
+  // Le vecchie checklist "Fasi di lavorazione" non vengono più generate.
+  // Manteniamo solo l'eventuale stato della gestione bozza salvato nello stesso campo JSON.
+  const marker = (order.fasi||[]).find(f=>f && f.key==="__bozza__");
+  order.fasi = marker ? [marker] : [];
 }
+function getBozzaMeta(order){
+  return (order.fasi||[]).find(f=>f && f.key==="__bozza__") || {key:"__bozza__", scelta:"", stato:""};
+}
+function setBozzaScelta(orderId, scelta){
+  const o=findItem('orders',orderId); if(!o) return;
+  o.fasi=[{key:"__bozza__", scelta, stato:""}];
+  saveState('orders');
+  openJobCard(orderId);
+}
+function setBozzaInAttesa(orderId){
+  const o=findItem('orders',orderId); if(!o) return;
+  const m=getBozzaMeta(o);
+  if(!m.scelta) return;
+  o.fasi=[{key:"__bozza__", scelta:m.scelta, stato:"IN ATTESA DI CONFERMA BOZZA"}];
+  saveState('orders');
+  openJobCard(orderId);
+  showToast("Bozza in attesa di conferma");
+}
+function inviaBozzaMail(orderId){
+  const o=findItem('orders',orderId); if(!o) return;
+  const c=state.clients.find(x=>x.id===o.clientId);
+  if(!c || !c.email){ showToast("Il cliente non ha un indirizzo email"); return; }
+  const subject=encodeURIComponent(`Bozza - ${clientDisplayName(c)}`);
+  const body=encodeURIComponent(`Gentile cliente,\n\nle inviamo la bozza relativa al lavoro in corso.\n\nCordiali saluti\nTeam Creativò`);
+  window.location.href=`mailto:${c.email}?subject=${subject}&body=${body}`;
+  setBozzaInAttesa(orderId);
+}
+function inviaBozzaMattia(orderId){
+  setBozzaInAttesa(orderId);
+}
+function renderBozzaSection(o){
+  const m=getBozzaMeta(o);
+  const choices=["BOZZA DA INVIARE PER MAIL","BOZZA DA INVIA A MATTIA","NON SERVE BOZZA"];
+  if(o.stato==="Da fare"){
+    return `<div class="modal-section">
+      <h3>Gestione bozza</h3>
+      <div class="field" style="max-width:520px;">
+        <label>Seleziona</label>
+        <select class="inline inline-big" onchange="setBozzaScelta('${o.id}',this.value)">
+          <option value="">— Seleziona —</option>
+          ${choices.map(x=>`<option value="${x}" ${m.scelta===x?'selected':''}>${x}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  }
+  if(!m.scelta){
+    return `<div class="modal-section"><h3>Gestione bozza</h3><p class="empty" style="padding:6px 0;">Nessuna scelta bozza impostata quando l'ordine era nello stato Da fare.</p></div>`;
+  }
+  if(m.scelta==="NON SERVE BOZZA"){
+    return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-done">NON SERVE BOZZA</span></div>`;
+  }
+  if(m.stato==="IN ATTESA DI CONFERMA BOZZA"){
+    return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-produzione">IN ATTESA DI CONFERMA BOZZA</span></div>`;
+  }
+  if(m.scelta==="BOZZA DA INVIARE PER MAIL"){
+    return `<div class="modal-section"><h3>Gestione bozza</h3><button class="btn btn-primary" onclick="inviaBozzaMail('${o.id}')">INVIA MAIL</button></div>`;
+  }
+  return `<div class="modal-section"><h3>Gestione bozza</h3><button class="btn btn-primary" onclick="inviaBozzaMattia('${o.id}')">INVIA A MATTIA</button></div>`;
+}
+
 function orderCategorie(o){ return [...new Set((o.righe||[]).map(r=>r.categoria).filter(Boolean))]; }
 function orderCategorieLabel(o){ const c = orderCategorie(o); return c.length ? c.join(", ") : "—"; }
 function orderWorkersList(o){
@@ -4697,13 +4750,7 @@ function openJobCard(orderId){
       <textarea class="desc-lavoro" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
     </div>
 
-    <div class="modal-section">
-      <h3 style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="toggleFasiSection('${o.id}')">
-        <span>${fasiSectionLabel(o)} ${o.fasi.length ? `<span style="color:var(--muted);font-weight:500;font-size:14px;">(${o.fasi.filter(f=>f.completata).length}/${o.fasi.length} completate)</span>` : ''}</span>
-        <span style="font-size:13px;color:var(--muted);">${fasiSectionOpen[o.id] ? '▾ chiudi' : '▸ apri'}</span>
-      </h3>
-      ${fasiSectionOpen[o.id] ? (o.fasi.length ? renderFasiGrouped(o) : `<p class="empty" style="padding:6px 0;">Assegna una categoria a una riga per generare la checklist delle fasi.</p>`) : ``}
-    </div>
+    ${renderBozzaSection(o)}
 
     <div class="modal-section">
       <h3>Fatturazione e pagamento</h3>
