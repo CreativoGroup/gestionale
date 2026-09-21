@@ -2094,21 +2094,144 @@ function setBozzaInAttesa(orderId){
   openJobCard(orderId);
   showToast("Bozza in attesa di conferma");
 }
-function inviaBozzaMail(orderId){
+let bozzaMailAttachments=[];
+
+function openBozzaMail(orderId){
   const o=findItem('orders',orderId); if(!o) return;
   const c=state.clients.find(x=>x.id===o.clientId);
-  if(!c || !c.email){ showToast("Il cliente non ha un indirizzo email"); return; }
-  const subject=encodeURIComponent(`Bozza - ${clientDisplayName(c)}`);
-  const body=encodeURIComponent(`Gentile cliente,\n\nle inviamo la bozza relativa al lavoro in corso.\n\nCordiali saluti\nTeam Creativò`);
-  window.location.href=`mailto:${c.email}?subject=${subject}&body=${body}`;
-  setBozzaInAttesa(orderId);
+  if(!c || !String(c.email||'').trim()){
+    showToast("Il cliente non ha un indirizzo email");
+    return;
+  }
+  bozzaMailAttachments=[];
+  const email=String(c.email||'').trim();
+  const subject=`Bozza - ${clientDisplayName(c)}`;
+  const body=`Gentile cliente,
+
+le inviamo la bozza relativa al lavoro in corso.
+
+Cordiali saluti
+Team Creativò`;
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Invia bozza via Mail</h2>
+    <p style="margin-top:0;color:var(--muted);">La mail verrà inviata dal gestionale tramite Gmail.</p>
+    <div class="field">
+      <label>A</label>
+      <input id="bozza-mail-to" value="${escapeHtml(email)}" readonly>
+    </div>
+    <div class="field">
+      <label>Oggetto</label>
+      <input id="bozza-mail-subject" value="${escapeHtml(subject)}">
+    </div>
+    <div class="field">
+      <label>Messaggio</label>
+      <textarea id="bozza-mail-body" rows="8">${escapeHtml(body)}</textarea>
+    </div>
+    <div class="field">
+      <label>Allegati</label>
+      <input id="bozza-mail-files" type="file" multiple onchange="handleBozzaMailFiles(this.files)" style="padding:9px;background:#fff;">
+      <div class="helptext">I file vengono usati solo per l'invio e non vengono salvati nel gestionale.</div>
+      <div id="bozza-mail-attachments"></div>
+    </div>
+    <div id="bozza-mail-status" class="helptext"></div>
+    <div class="form-actions">
+      <button id="bozza-mail-send" class="btn btn-primary" onclick="sendBozzaMail('${o.id}')">Invia mail</button>
+      <button class="btn btn-outline" onclick="openJobCard('${o.id}')">Indietro</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function handleBozzaMailFiles(fileList){
+  const files=Array.from(fileList||[]);
+  if(!files.length) return;
+  if(bozzaMailAttachments.length + files.length > 10){
+    showToast("Puoi allegare al massimo 10 file");
+    const input=document.getElementById("bozza-mail-files"); if(input) input.value="";
+    return;
+  }
+  try{
+    for(const file of files){
+      const dataBase64=await fileToBase64(file);
+      bozzaMailAttachments.push({
+        filename:file.name,
+        mimeType:file.type||"application/octet-stream",
+        size:file.size||0,
+        dataBase64
+      });
+    }
+    renderBozzaMailAttachments();
+  }catch(err){
+    console.error("Allegato bozza Gmail error",err);
+    showToast("Errore durante la lettura di un allegato");
+  }
+}
+
+function renderBozzaMailAttachments(){
+  const box=document.getElementById("bozza-mail-attachments");
+  if(!box) return;
+  box.innerHTML=bozzaMailAttachments.length ? `
+    <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+      ${bozzaMailAttachments.map((a,i)=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:8px 10px;">
+          <div style="min-width:0;">
+            <div style="font-size:12.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ${escapeHtml(a.filename)}</div>
+            <div style="font-size:10.5px;color:var(--muted);">${mailFileSize(a.size)}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="removeBozzaMailAttachment(${i})">Rimuovi</button>
+        </div>`).join("")}
+    </div>` : "";
+}
+
+function removeBozzaMailAttachment(index){
+  bozzaMailAttachments.splice(index,1);
+  renderBozzaMailAttachments();
+}
+
+async function sendBozzaMail(orderId){
+  const o=findItem('orders',orderId); if(!o) return;
+  const c=state.clients.find(x=>x.id===o.clientId);
+  if(!c) return;
+  const to=String(document.getElementById("bozza-mail-to")?.value||c.email||"").trim();
+  const subject=String(document.getElementById("bozza-mail-subject")?.value||"").trim();
+  const bodyText=String(document.getElementById("bozza-mail-body")?.value||"").trim();
+  const status=document.getElementById("bozza-mail-status");
+  const btn=document.getElementById("bozza-mail-send");
+  if(!to || !bodyText){ showToast("Controlla email e messaggio"); return; }
+  if(btn) btn.disabled=true;
+  if(status) status.textContent="Invio in corso…";
+  try{
+    const {data:sessionData}=await sb.auth.getSession();
+    const session=sessionData?.session;
+    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "apikey":SUPABASE_KEY,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({mode:"new",to,subject,bodyText,attachments:bozzaMailAttachments})
+    });
+    const raw=await response.text();
+    let result={}; try{result=JSON.parse(raw)}catch(e){}
+    if(!response.ok) throw new Error(result?.error||result?.message||raw||`Errore HTTP ${response.status}`);
+    bozzaMailAttachments=[];
+    setBozzaInAttesa(orderId);
+    showToast("Bozza inviata via Gmail");
+  }catch(err){
+    console.error("Invio bozza Gmail",err);
+    if(status) status.textContent=`Errore: ${err?.message||"invio non riuscito"}`;
+    if(btn) btn.disabled=false;
+  }
 }
 function inviaBozzaMattia(orderId){
   setBozzaInAttesa(orderId);
 }
 function renderBozzaSection(o){
   const m=getBozzaMeta(o);
-  const choices=["BOZZA DA INVIARE PER MAIL","BOZZA DA INVIA A MATTIA","NON SERVE BOZZA"];
+  const choices=["BOZZA DA INVIARE PER MAIL","BOZZA DA INVIARE A MATTIA","NON SERVE BOZZA"];
   if(o.stato==="Da fare"){
     return `<div class="modal-section">
       <h3>Gestione bozza</h3>
@@ -2131,7 +2254,7 @@ function renderBozzaSection(o){
     return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-produzione">IN ATTESA DI CONFERMA BOZZA</span></div>`;
   }
   if(m.scelta==="BOZZA DA INVIARE PER MAIL"){
-    return `<div class="modal-section"><h3>Gestione bozza</h3><button class="btn btn-primary" onclick="inviaBozzaMail('${o.id}')">INVIA MAIL</button></div>`;
+    return `<div class="modal-section"><h3>Gestione bozza</h3><button class="btn btn-primary" onclick="openBozzaMail('${o.id}')">APRI MAIL</button></div>`;
   }
   return `<div class="modal-section"><h3>Gestione bozza</h3><button class="btn btn-primary" onclick="inviaBozzaMattia('${o.id}')">INVIA A MATTIA</button></div>`;
 }
