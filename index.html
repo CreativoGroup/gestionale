@@ -3092,7 +3092,7 @@ async function segnaRitiroCompletato(orderId){
 }
 function completedOrderStageButton(o){
   const stage=orderCustomerStage(o);
-  if(stage==="DA RITIRARE") return `<button class="btn btn-primary btn-sm" style="background:var(--warn);color:#fff;" onclick="segnaRitiroCompletato('${o.id}')">DA RITIRARE</button>`;
+  if(stage==="DA RITIRARE") return `<button class="btn btn-primary btn-sm" style="background:var(--teal);color:#fff;" onclick="segnaRitiroCompletato('${o.id}')">DA RITIRARE</button>`;
   if(stage==="DA AVVISARE") return `<button class="btn btn-primary btn-sm" style="background:var(--warn);color:#fff;" onclick="openAvvisaCliente('${o.id}')">DA AVVISARE</button>`;
   return `<button class="btn btn-outline btn-sm" style="border-color:var(--ok);color:var(--ok);" onclick="openAvvisaCliente('${o.id}')">AVVISATO</button>${o.avvisoMetodo ? `<div class="lr-sub" style="margin-top:4px;text-align:center;">${escapeHtml(o.avvisoMetodo)}</div>` : ``}`;
 }
@@ -4842,7 +4842,7 @@ function renderFlusso(){
   const f = flussoFilters;
   const list = state.orders.filter(o => o.stato!=="Consegnato" && (!f.categoria || orderCategorie(o).includes(f.categoria)) && (!f.worker || orderWorkersList(o).includes(f.worker)))
     .sort((a,b)=> (a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
-  const produzioneEsterna = list.filter(o => (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne"));
+  const produzioneEsterna = list.filter(o => o.stato==="In produzione" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne"));
   const externalSuppliers = o => {
     const names=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne").map(r=>String(r.fornitore||"").trim()).filter(Boolean);
     return [...new Set(names)];
