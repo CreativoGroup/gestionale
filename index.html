@@ -1831,6 +1831,21 @@ let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expens
 let currentView = "dashboard";
 const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads", gmailActionStatus:"gmail_action_status", noteComunicazioni:"note_comunicazioni"};
 
+/* Sincronizzazione multi-dispositivo: salva solo le righe davvero cambiate e rilegge periodicamente Supabase. */
+const syncSnapshots = {};
+let dataSyncTimer = null;
+let dataSyncBusy = false;
+let activeDbWrites = 0;
+let dataSyncListenersInstalled = false;
+function rowFingerprint(collection, obj){
+  try { return JSON.stringify(toDbRow(collection, obj)); }
+  catch(e){ return ""; }
+}
+function snapshotCollection(collection){
+  syncSnapshots[collection] = new Map((state[collection]||[]).map(o=>[o.id, rowFingerprint(collection,o)]));
+}
+function snapshotAllCollections(){ Object.keys(TABLES).forEach(snapshotCollection); }
+
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function today(){ return new Date().toISOString().slice(0,10); }
 function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
@@ -1892,52 +1907,82 @@ async function loadAllFromSupabase(){
       w.scortaMinima = Math.max(0, Number(w.scortaMinima)||0);
     }
   });
+  snapshotAllCollections();
 }
 
-/* ---- Scrittura: aggiorna/crea tutte le righe attuali di una collezione (upsert) ---- */
+/* ---- Scrittura sicura: salva SOLO le righe cambiate su questo dispositivo.
+   In questo modo un computer con dati vecchi non può riscrivere tutti gli ordini degli altri. ---- */
 async function syncCollection(name){
-  const rows = state[name].map(o => toDbRow(name, o));
-  if(!rows.length) return true;
-  const { error } = await sb.from(TABLES[name]).upsert(rows);
-  if(error){
-    console.error("Errore salvataggio", name, error);
-    showToast(`Errore salvataggio ${name}: ${error.message || "riprova"}`);
-    return false;
+  const previous = syncSnapshots[name] || new Map();
+  const changedObjects = (state[name]||[]).filter(o => previous.get(o.id) !== rowFingerprint(name,o));
+  if(!changedObjects.length) return true;
+  const rows = changedObjects.map(o => toDbRow(name, o));
+  activeDbWrites++;
+  try{
+    const { error } = await sb.from(TABLES[name]).upsert(rows);
+    if(error){
+      console.error("Errore salvataggio", name, error);
+      showToast(`Errore salvataggio ${name}: ${error.message || "riprova"}`);
+      return false;
+    }
+    if(!syncSnapshots[name]) syncSnapshots[name]=new Map();
+    changedObjects.forEach(o=>syncSnapshots[name].set(o.id,rowFingerprint(name,o)));
+    return true;
+  } finally {
+    activeDbWrites=Math.max(0,activeDbWrites-1);
   }
-  return true;
 }
 
 /* Salvataggio mirato di una sola riga: usato nei flussi nuovo cliente -> nuovo ordine,
    così l'ordine non può essere creato prima che il cliente esista davvero su Supabase. */
 async function upsertOne(collection, obj){
   const row = toDbRow(collection, obj);
-  const { error } = await sb.from(TABLES[collection]).upsert(row);
-  if(error){
-    console.error("Errore salvataggio", collection, error);
-    showToast(`Errore salvataggio ${collection}: ${error.message || "riprova"}`);
-    return false;
-  }
-  return true;
+  activeDbWrites++;
+  try{
+    const { error } = await sb.from(TABLES[collection]).upsert(row);
+    if(error){
+      console.error("Errore salvataggio", collection, error);
+      showToast(`Errore salvataggio ${collection}: ${error.message || "riprova"}`);
+      return false;
+    }
+    if(!syncSnapshots[collection]) syncSnapshots[collection]=new Map();
+    syncSnapshots[collection].set(obj.id,rowFingerprint(collection,obj));
+    return true;
+  } finally { activeDbWrites=Math.max(0,activeDbWrites-1); }
 }
 async function upsertOneReturning(collection, obj){
   const row = toDbRow(collection, obj);
-  const { data, error } = await sb.from(TABLES[collection]).upsert(row).select("*").single();
-  if(error){
-    console.error("Errore salvataggio", collection, error);
-    showToast(`Errore salvataggio ${collection}: ${error.message || "riprova"}`);
-    return null;
-  }
-  return data ? fromDbRow(collection, data) : obj;
+  activeDbWrites++;
+  try{
+    const { data, error } = await sb.from(TABLES[collection]).upsert(row).select("*").single();
+    if(error){
+      console.error("Errore salvataggio", collection, error);
+      showToast(`Errore salvataggio ${collection}: ${error.message || "riprova"}`);
+      return null;
+    }
+    const saved = data ? fromDbRow(collection, data) : obj;
+    if(!syncSnapshots[collection]) syncSnapshots[collection]=new Map();
+    syncSnapshots[collection].set(saved.id,rowFingerprint(collection,saved));
+    return saved;
+  } finally { activeDbWrites=Math.max(0,activeDbWrites-1); }
 }
 /* ---- Cancellazione mirata ---- */
 async function dbDelete(name, id){
-  const { error } = await sb.from(TABLES[name]).delete().eq("id", id);
-  if(error){ console.error("Errore eliminazione", name, error); showToast("Errore nell'eliminazione: riprova"); }
+  activeDbWrites++;
+  try{
+    const { error } = await sb.from(TABLES[name]).delete().eq("id", id);
+    if(error){ console.error("Errore eliminazione", name, error); showToast("Errore nell'eliminazione: riprova"); return; }
+    syncSnapshots[name]?.delete(id);
+  } finally { activeDbWrites=Math.max(0,activeDbWrites-1); }
 }
 async function dbDeleteMany(name, ids){
   if(!ids.length) return;
-  const { error } = await sb.from(TABLES[name]).delete().in("id", ids);
-  if(error){ console.error("Errore eliminazione multipla", name, error); showToast("Errore nell'eliminazione: riprova"); }
+  activeDbWrites++;
+  try{
+    const { error } = await sb.from(TABLES[name]).delete().in("id", ids);
+    if(error){ console.error("Errore eliminazione multipla", name, error); showToast("Errore nell'eliminazione: riprova"); return; }
+    ids.forEach(id=>syncSnapshots[name]?.delete(id));
+  } finally { activeDbWrites=Math.max(0,activeDbWrites-1); }
 }
 /* Compatibilità: chiamate rimaste generiche vengono instradate sulla collezione giusta quando possibile */
 function saveState(name){
@@ -1961,12 +2006,51 @@ function subscribeRealtime(){
             if(idx>=0) state[name][idx] = row; else state[name].push(row);
           }
           if(name==="orders") recalcFasi(state[name].find(x=>x.id===row.id));
+          if(!syncSnapshots[name]) syncSnapshots[name]=new Map();
+          const actual=state[name].find(x=>x.id===row.id);
+          if(actual) syncSnapshots[name].set(row.id,rowFingerprint(name,actual));
         }
+        if(payload.eventType === "DELETE") syncSnapshots[name]?.delete(payload.old.id);
         renderCurrentView();
       })
       .subscribe();
   });
 }
+
+/* Sincronizzazione di sicurezza: funziona anche se Realtime non è abilitato nel progetto Supabase. */
+async function refreshSharedDataFromSupabase(render=true){
+  if(!currentUser || dataSyncBusy || activeDbWrites>0) return;
+  dataSyncBusy=true;
+  try{
+    const collections = currentUser.role==="admin"
+      ? Object.keys(TABLES)
+      : Object.keys(TABLES).filter(c=>!["expenses","fixedCosts","entrate"].includes(c));
+    const results = await Promise.all(collections.map(c => c==="warehouse" ? sb.from(TABLES[c]).select("*").gt("quantita",0) : sb.from(TABLES[c]).select("*")));
+    collections.forEach((c,i)=>{
+      const {data,error}=results[i];
+      if(error){ console.warn("Sync lettura",c,error); return; }
+      state[c]=(data||[]).map(r=>fromDbRow(c,r));
+      if(c==="orders") state[c].forEach(o=>recalcFasi(o));
+      snapshotCollection(c);
+    });
+    if(render){
+      const modalOpen=document.getElementById("modalBackdrop")?.classList.contains("open");
+      if(!modalOpen) renderCurrentView();
+    }
+  } finally { dataSyncBusy=false; }
+}
+function startDataAutoRefresh(){
+  if(dataSyncTimer) clearInterval(dataSyncTimer);
+  dataSyncTimer=setInterval(()=>{
+    if(document.visibilityState==="visible") refreshSharedDataFromSupabase(true);
+  },5000);
+  if(!dataSyncListenersInstalled){
+    dataSyncListenersInstalled=true;
+    window.addEventListener("focus",()=>refreshSharedDataFromSupabase(true));
+    document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") refreshSharedDataFromSupabase(true); });
+  }
+}
+function stopDataAutoRefresh(){ if(dataSyncTimer){ clearInterval(dataSyncTimer); dataSyncTimer=null; } }
 
 function currentMonth(){ return today().slice(0,7); }
 function fmtDate(iso){ if(!iso) return "—"; const [y,m,d]=iso.split("-"); return `${d}/${m}/${y}`; }
@@ -3117,7 +3201,6 @@ function renderDashboard(){
     </div>
     ${ordiniImportanti.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">★ Ordini importanti</h3><table><tbody>${ordiniImportanti.map(o=>`<tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>`).join("")}</tbody></table></div>` : ""}
     ${scorteBasse.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">Avvisi magazzino</h3><table><thead><tr><th>Codice</th><th>Colore</th><th>Taglia</th><th>Disponibili</th><th>Scorta minima</th></tr></thead><tbody>${scorteBasse.map(w=>`<tr><td style="font-weight:700;">${w.codice}</td><td>${w.colore}</td><td>${w.taglia}</td><td class="low-stock">${w.quantita} ${w.unita}</td><td>${w.scortaMinima} ${w.unita}</td></tr>`).join("")}</tbody></table></div>` : ""}
-    ${currentUser.role==='admin' ? `
     <div class="card dashboard-crediti-aperti" style="margin-top:16px;">
       <h3 style="margin-top:0;">Crediti aperti (ultimi inseriti)</h3>
       ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Ordini da saldare</th><th>Da saldare</th><th></th></tr></thead><tbody>${creditiApertiDash.map(g=>`
@@ -3126,10 +3209,10 @@ function renderDashboard(){
           <td class="mobile-hide">${g.orders.length===1 ? orderCategorieLabel(g.orders[0].o) : `${g.orders.length} ordini — ${g.orders.map(x=>orderCategorieLabel(x.o)).join(", ")}`}</td>
           <td class="credit-residuo" style="color:var(--danger);font-weight:800;">${fmtMoney(g.totaleSaldo)}</td>
           <td class="credit-action" style="white-space:nowrap;">${g.orders.length===1
-            ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button><button class="btn btn-ghost btn-sm mobile-hide" onclick="deleteOrder('${g.orders[0].o.id}')">✕</button>`
+            ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button>`
             : `<button class="btn btn-outline btn-sm" onclick="openCreditiCliente('${g.clientId}')">Dettaglio</button>`}</td>
         </tr>`).join("")}</tbody></table>` : `<p class="empty">Nessun credito aperto.</p>`}
-    </div>` : ``}
+    </div>
   `;
 }
 function segnaComeSpedito(orderId){
@@ -7227,6 +7310,7 @@ async function doSignIn(){
   await onSignedIn(data.session);
 }
 async function signOut(){
+  stopDataAutoRefresh();
   await sb.auth.signOut();
   currentUser = null;
   document.getElementById("app").style.display = "none";
@@ -7240,6 +7324,7 @@ async function onSignedIn(session){
   await expireStaleWaitingLeads();
   await cleanupOldNoteComunicazioni();
   subscribeRealtime();
+  startDataAutoRefresh();
   renderNav();
   goTo("dashboard");
   if(!window._leadExpiryTimer){
