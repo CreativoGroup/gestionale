@@ -49,10 +49,10 @@
   nav.tabs .icon{width:18px;text-align:center;}
   .sidebar-footer{margin-top:auto;padding:10px 8px;font-size:11px;color:var(--muted);line-height:1.5;}
   main{flex:1;min-width:0;padding:26px 30px 60px;}
-  .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap;}
-  .global-search{flex:1;max-width:320px;position:relative;}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap;position:relative;z-index:100;}
+  .global-search{flex:1;max-width:320px;position:relative;z-index:110;}
   .global-search input{width:100%;padding:10px 14px;font-size:14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;}
-  .global-search-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:280px;overflow-y:auto;z-index:50;}
+  .global-search-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:280px;overflow-y:auto;z-index:120;}
   .gsd-item{padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--border);}
   .gsd-item:last-child{border-bottom:none;}
   .gsd-item:hover{background:var(--paper);color:var(--accent);}
@@ -2898,7 +2898,7 @@ function renderDashboard(){
     ${scorteBasse.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">Avvisi magazzino</h3><table><thead><tr><th>Codice</th><th>Colore</th><th>Taglia</th><th>Disponibili</th><th>Scorta minima</th></tr></thead><tbody>${scorteBasse.map(w=>`<tr><td style="font-weight:700;">${w.codice}</td><td>${w.colore}</td><td>${w.taglia}</td><td class="low-stock">${w.quantita} ${w.unita}</td><td>${w.scortaMinima} ${w.unita}</td></tr>`).join("")}</tbody></table></div>` : ""}
     ${currentUser.role==='admin' ? `
     <div class="card dashboard-crediti-aperti" style="margin-top:16px;">
-      <h3 style="margin-top:0;">Crediti aperti (ordini consegnati non pagati)</h3>
+      <h3 style="margin-top:0;">Crediti aperti (ultimi inseriti)</h3>
       ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Ordini da saldare</th><th>Da saldare</th><th></th></tr></thead><tbody>${creditiApertiDash.map(g=>`
         <tr class="credit-mobile-row">
           <td class="credit-client-name">${clientName(g.clientId)}</td>
@@ -2929,11 +2929,23 @@ function creditiApertiRaggruppati(){
     map.get(o.clientId).push({o, saldo});
   });
   return [...map.entries()]
-    .map(([clientId, orders])=>({clientId, orders, totaleSaldo: orders.reduce((s,x)=>s+x.saldo,0)}))
-    .sort((a,b)=>b.totaleSaldo-a.totaleSaldo);
+    .map(([clientId, orders])=>{
+      const ordinati = [...orders].sort((a,b)=>String(b.o.createdAt||"").localeCompare(String(a.o.createdAt||"")));
+      return {
+        clientId,
+        orders: ordinati,
+        totaleSaldo: ordinati.reduce((s,x)=>s+x.saldo,0),
+        ultimoInserimento: ordinati[0]?.o?.createdAt || ""
+      };
+    })
+    .sort((a,b)=>String(b.ultimoInserimento||"").localeCompare(String(a.ultimoInserimento||"")));
 }
 function openCreditiCliente(clientId){
-  const orders = state.orders.filter(o=>o.clientId===clientId && o.stato==="Consegnato").map(o=>({o, saldo:orderSaldo(o)})).filter(x=>x.saldo>0.001);
+  const orders = state.orders
+    .filter(o=>o.clientId===clientId && o.stato==="Consegnato")
+    .map(o=>({o, saldo:orderSaldo(o)}))
+    .filter(x=>x.saldo>0.001)
+    .sort((a,b)=>String(b.o.createdAt||"").localeCompare(String(a.o.createdAt||"")));
   const totale = orders.reduce((s,x)=>s+x.saldo,0);
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
@@ -3320,16 +3332,33 @@ let globalSearchMap = {};
 function updateGlobalClientSuggestions(value){
   const dd = document.getElementById('globalSearchDropdown');
   const v = value.trim();
-  if(v.length < 3){ dd.style.display = "none"; dd.innerHTML = ""; globalSearchMap = {}; return; }
+  if(v.length < 2){ dd.style.display = "none"; dd.innerHTML = ""; globalSearchMap = {}; return; }
   const q = v.toLowerCase();
+  const qCompact = q.replace(/[^a-z0-9àèéìòù]/gi, "");
+  const qDigits = q.replace(/\D/g, "");
   const matches = state.clients.filter(c=>{
-    const name = clientDisplayName(c).toLowerCase();
-    return name.includes(q) || (c.partitaIva||"").toLowerCase().includes(q) || (c.telefono||"").includes(q);
+    const display = clientDisplayName(c).toLowerCase();
+    const nome = (c.nome||c.refNome||"").toLowerCase();
+    const cognome = (c.cognome||c.refCognome||"").toLowerCase();
+    const ragione = (c.ragioneSociale||"").toLowerCase();
+    const email = (c.email||"").toLowerCase();
+    const piva = (c.partitaIva||"").toLowerCase();
+    const telefono = (c.telefono||"");
+    const telefonoDigits = telefono.replace(/\D/g, "");
+    const nameForward = `${nome} ${cognome}`.trim();
+    const nameReverse = `${cognome} ${nome}`.trim();
+    const searchable = [display,nome,cognome,ragione,email,piva,nameForward,nameReverse].join(" ");
+    return searchable.includes(q) ||
+      searchable.replace(/[^a-z0-9àèéìòù]/gi, "").includes(qCompact) ||
+      (qDigits.length >= 2 && telefonoDigits.includes(qDigits));
   }).slice(0,10);
   globalSearchMap = {};
   matches.forEach(c => { globalSearchMap[c.id] = c; });
   dd.innerHTML = matches.length
-    ? matches.map(c=>`<div class="gsd-item" onmousedown="goToClientById('${c.id}')">${clientDisplayName(c)}</div>`).join("")
+    ? matches.map(c=>`<div class="gsd-item" onmousedown="goToClientById('${c.id}')">
+        <div>${clientDisplayName(c)}</div>
+        ${(c.telefono||c.email) ? `<div style="font-size:11.5px;font-weight:500;color:var(--muted);margin-top:2px;">${[c.telefono,c.email].filter(Boolean).join(' · ')}</div>` : ''}
+      </div>`).join("")
     : `<div class="gsd-empty">Nessun cliente trovato</div>`;
   dd.style.display = "block";
 }
@@ -4560,11 +4589,14 @@ function openJobCard(orderId){
         <p class="jobcard-eyebrow">Scheda di lavorazione${o.createdAt?` — creata il ${fmtDate(o.createdAt.slice(0,10))}`:''} <span style="font-size:8px;opacity:.5;text-transform:none;letter-spacing:0;">${o.numero?('#'+o.numero):''}</span></p>
         <h2 style="margin-bottom:2px;">${c?clientDisplayName(c):"—"}</h2>
       </div>
-      <div class="jobcard-flags">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+        ${c ? `<button class="btn btn-outline btn-sm" onclick="openClientHistory('${c.id}')">ANAGRAFICA CLIENTE</button>` : ''}
+        <div class="jobcard-flags">
         <label class="checkfield"><input type="checkbox" ${o.importante?'checked':''} onchange="updateOrderCheck('${o.id}','importante',this.checked)"> <span class="star ${o.importante?'active':''}" style="font-size:18px;">★</span> Importante</label>
         ${o.consegnaTipo==="Spedizione" ? `<label class="checkfield"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Spedito</label>` : ``}
         ${o.daFatturare ? `<label class="checkfield"><input type="checkbox" ${o.fatturato?'checked':''} onchange="updateOrderCheck('${o.id}','fatturato',this.checked)"> Fatturato</label>` : ``}
         ${o.stato==="Completato" ? `<label class="checkfield"><input type="checkbox" ${o.clienteAvvisato?'checked':''} onchange="updateOrderCheck('${o.id}','clienteAvvisato',this.checked)"> Cliente avvisato</label>` : ``}
+        </div>
       </div>
     </div>
     <div class="ticket-meta ticket-meta-big">
@@ -5379,7 +5411,11 @@ function renderIncassi(){
   const totaleSpeseStorico = state.expenses.reduce((s,e)=>s+Number(e.importo),0);
   const guadagnoStorico = totaleIncassato + totaleEntrateStorico - totaleSpeseStorico;
   const incassatoMeseCorrente = paymentsTotaleMese(currentMonth()) + entrateTotaleMese(currentMonth());
-  const creditiAperti = state.orders.filter(o=>o.stato==="Consegnato").map(o=>({o, saldo:orderSaldo(o)})).filter(x=>x.saldo>0.001);
+  const creditiAperti = state.orders
+    .filter(o=>o.stato==="Consegnato")
+    .map(o=>({o, saldo:orderSaldo(o)}))
+    .filter(x=>x.saldo>0.001)
+    .sort((a,b)=>String(b.o.createdAt||"").localeCompare(String(a.o.createdAt||"")));
   const totaleCrediti = creditiAperti.reduce((s,x)=>s+x.saldo,0);
   const guadagno = (paymentsTotaleMese(f.mese) + entrateTotaleMese(f.mese)) - speseTotaleMese(f.mese);
   const filtered = state.payments.filter(p => (!f.metodo||p.metodo===f.metodo) && paymentMatchesCategoria(p,f.categoria) && (!f.mese||p.data.slice(0,7)===f.mese));
@@ -5492,7 +5528,7 @@ function renderIncassi(){
         </tbody>
       </table>
     </div>
-    <h3 style="margin:0 0 10px;">Crediti aperti per ordine (consegnati, non pagati)</h3>
+    <h3 style="margin:0 0 10px;">Crediti aperti per ordine (ultimo inserimento)</h3>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Cliente</th><th>Categoria</th><th>Totale ordine</th><th>Saldo da incassare</th></tr></thead>
