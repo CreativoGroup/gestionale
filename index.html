@@ -759,6 +759,10 @@
   .workload-simple-row:last-child{border-bottom:0;}
   .workload-name{font-weight:800;}
   .workload-count{font-weight:750;color:var(--accent);white-space:nowrap;}
+  .workload-bar-row{display:block;}
+  .workload-topline{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;}
+  .workload-track{height:9px;background:#eef1f5;border-radius:999px;overflow:hidden;margin-top:8px;width:100%;}
+  .workload-fill{height:100%;background:var(--accent);border-radius:999px;transition:width .25s ease;}
 
   @media(max-width:760px){
     nav.tabs{display:block !important;overflow:visible !important;padding:0 !important;}
@@ -1842,7 +1846,7 @@ function toDbRow(collection, o){
     case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "fixedCosts": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null, file_path:o.filePath||null, file_name:o.fileName||null};
     case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
-    case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, note:o.note||null};
+    case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, luogo:o.luogo||null, note:o.note||null};
     case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, client_id:o.clientId||null, converted_order_id:o.convertedOrderId||null, converted_at:o.convertedAt||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
     case "noteComunicazioni": return {id:o.id, tipo:o.tipo||"Chiamata", nome_persona:o.nomePersona||null, testo:o.testo||null, operatore:o.operatore||null, fatto:!!o.fatto, creato_il:o.creatoIl||new Date().toISOString(), fatto_il:o.fattoIl||null};
     case "gmailActionStatus": return {id:o.id, gmail_message_id:o.gmailMessageId, replied:!!o.replied, lead_generated:!!o.leadGenerated, order_generated:!!o.orderGenerated, updated_at:o.updatedAt||new Date().toISOString()};
@@ -1861,7 +1865,7 @@ function fromDbRow(collection, r){
     case "expenses": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
     case "fixedCosts": return {id:r.id, descrizione:r.descrizione||"", importo:Number(r.importo)||0, metodo:r.metodo||"", data:r.data, filePath:r.file_path||"", fileName:r.file_name||"", createdAt:r.created_at};
     case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
-    case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, note:r.note||""};
+    case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, luogo:r.luogo||"", note:r.note||""};
     case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
     case "noteComunicazioni": return {id:r.id, tipo:r.tipo||"Chiamata", nomePersona:r.nome_persona||"", testo:r.testo||"", operatore:r.operatore||"", fatto:!!r.fatto, creatoIl:r.creato_il||"", fattoIl:r.fatto_il||""};
     case "gmailActionStatus": return {id:r.id, gmailMessageId:r.gmail_message_id||"", replied:!!r.replied, leadGenerated:!!r.lead_generated, orderGenerated:!!r.order_generated, updatedAt:r.updated_at||""};
@@ -2785,6 +2789,7 @@ function renderDashboard(){
   const magazzinoDaOrdinare = computeMagazzinoDaOrdinare();
   const pezziDaOrdinare = magazzinoDaOrdinare.reduce((s,x)=>s + Number(x.entry.daOrdinareQty||0), 0);
   const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>o.worker===w && o.stato!=="Consegnato").length}));
+  const workloadMax = Math.max(1, ...workload.map(x=>x.n));
   const oggi = today();
   const consegneGiornaliere = activeOrders.filter(o=>o.dataConsegna===oggi).sort((a,b)=>{
     const sa=STATUSES.indexOf(a.stato), sb=STATUSES.indexOf(b.stato);
@@ -2814,10 +2819,11 @@ function renderDashboard(){
       </div>
       <div class="form-panel" id="apptForm" style="margin-bottom:14px;">
         <div class="form-grid">
-          <div class="field"><label>Titolo</label><input id="af-titolo" placeholder="Es. Consegna, sopralluogo..."></div>
-          <div class="field"><label>Cliente (opzionale)</label><select id="af-cliente"><option value="">Nessuno</option>${clientOptions()}</select></div>
+          <div class="field"><label>Nome</label><input id="af-titolo" placeholder="Nome persona / appuntamento"></div>
           <div class="field"><label>Data</label><input id="af-data" type="date" value="${today()}"></div>
-          <div class="field"><label>Ora</label><input id="af-ora" type="time" value="09:00"></div>
+          <div class="field"><label>Orario</label><input id="af-ora" type="time" value="09:00"></div>
+          <div class="field"><label>Luogo</label><input id="af-luogo" placeholder="Es. Studio, cliente, indirizzo..."></div>
+          <div class="field" style="grid-column:1/-1;"><label>Descrizione</label><textarea id="af-descrizione" rows="3" placeholder="Descrizione dell'appuntamento..."></textarea></div>
         </div>
         <div class="form-actions">
           <button class="btn btn-primary" onclick="addAppuntamento()">Salva appuntamento</button>
@@ -2825,9 +2831,13 @@ function renderDashboard(){
         </div>
       </div>
       ${prossimiAppuntamenti.length ? prossimiAppuntamenti.map(a=>`
-        <div class="list-row" style="cursor:default;">
-          <div><div class="lr-main">${a.titolo}</div><div class="lr-sub">${a.clientId ? clientName(a.clientId) : ""}</div></div>
-          <div style="display:flex;align-items:center;gap:14px;">
+        <div class="list-row" style="cursor:default;align-items:flex-start;">
+          <div style="min-width:0;">
+            <div class="lr-main">${escapeHtml(a.titolo||"")}</div>
+            <div class="lr-sub" style="margin-top:4px;">${a.luogo ? `📍 ${escapeHtml(a.luogo)}` : ""}</div>
+            ${a.note ? `<div class="lr-sub" style="margin-top:5px;white-space:normal;">${escapeHtml(a.note)}</div>` : ""}
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
             <div style="text-align:right;"><div class="lr-main">${fmtDate(a.data)}</div><div class="lr-sub">${a.ora}</div></div>
             <button class="btn btn-ghost btn-sm" onclick="deleteAppuntamento('${a.id}')">✕</button>
           </div>
@@ -2869,9 +2879,12 @@ function renderDashboard(){
       <div class="card dashboard-workload-section">
         <h3 style="margin-top:0;">Carico di lavoro per operatore</h3>
         ${workload.map(x=>`
-          <div class="workload-simple-row">
-            <span class="workload-name">${x.w}</span>
-            <span class="workload-count workload-count-mobile">${x.n} ${x.n===1?'lavoro':'lavori'}</span>
+          <div class="workload-simple-row workload-bar-row">
+            <div class="workload-topline">
+              <span class="workload-name">${x.w}</span>
+              <span class="workload-count">${x.n} ${x.n===1?'lavoro':'lavori'}</span>
+            </div>
+            <div class="workload-track"><div class="workload-fill" style="width:${x.n ? Math.max(8,(x.n/workloadMax)*100) : 0}%"></div></div>
           </div>`).join("") || `<p class="empty">Nessun ordine assegnato.</p>`}
       </div>
       <div class="card">
@@ -3142,13 +3155,14 @@ async function resetClienteDaAvvisare(orderId){
 
 function addAppuntamento(){
   const titolo = document.getElementById("af-titolo").value.trim();
-  if(!titolo){ showToast("Inserisci un titolo per l'appuntamento"); return; }
+  if(!titolo){ showToast("Inserisci il nome dell'appuntamento"); return; }
   state.appuntamenti.push({
     id:uid(), titolo,
-    clientId: document.getElementById("af-cliente").value || null,
+    clientId: null,
     data: document.getElementById("af-data").value || today(),
     ora: document.getElementById("af-ora").value || "09:00",
-    note:""
+    luogo: document.getElementById("af-luogo").value.trim(),
+    note: document.getElementById("af-descrizione").value.trim()
   });
   saveState('appuntamenti'); toggleForm('apptForm'); renderDashboard(); showToast("Appuntamento salvato");
 }
