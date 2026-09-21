@@ -1686,7 +1686,7 @@ const PRODOTTI_PER_CATEGORIA = {
 };
 const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone","Misto"];
 const NOTE_OPERATORS = ["Mattia","Patrizio","Sara","Francess","Simone"];
-const FAMILY_RICHIESTE = ["Felpe per reparti","Tessuti","Allestimenti","Poster ospedali","Gadget"];
+const FAMILY_RICHIESTE = ["Felpe per reparti","Tessuti","Allestimenti","Poster ospedali","Gadget","Altro"];
 const STATUSES = ["Da fare","In lavorazione","In produzione","Completato","Consegnato"];
 const KANBAN_STATUSES = STATUSES.filter(s=>s!=="Consegnato");
 const STATUS_CLASS = {"Da fare":"pill-todo","In lavorazione":"pill-lavorazione","In produzione":"pill-produzione","Completato":"pill-done","Consegnato":"pill-delivered"};
@@ -5770,6 +5770,7 @@ let gmailLoaded = false;
 let gmailLoading = false;
 let gmailError = "";
 let gmailFilter = "inbox";
+let gmailSearch = "";
 let gmailSelectedId = null;
 let gmailSelectedMessage = null;
 let gmailMessageLoading = false;
@@ -5940,20 +5941,33 @@ function formatMailDate(raw){
 }
 
 function visibleGmailMessages(){
-  const list = [...gmailMessages].sort((a,b)=>{
+  let list = [...gmailMessages].sort((a,b)=>{
     const da = new Date(a.date||0).getTime()||0;
     const db = new Date(b.date||0).getTime()||0;
     return db-da;
   });
 
-  if(gmailFilter==="sent") return list.filter(m=>mailHasLabel(m,"SENT"));
-  if(gmailFilter==="all") return list;
-  if(gmailFilter==="unread") return list.filter(m=>mailHasLabel(m,"UNREAD") && !isGmailLocallyRead(m.id) && mailHasLabel(m,"INBOX"));
-  return list.filter(m=>mailHasLabel(m,"INBOX"));
+  if(gmailFilter==="sent") list = list.filter(m=>mailHasLabel(m,"SENT"));
+  else if(gmailFilter==="unread") list = list.filter(m=>mailHasLabel(m,"UNREAD") && !isGmailLocallyRead(m.id) && mailHasLabel(m,"INBOX"));
+  else if(gmailFilter!=="all") list = list.filter(m=>mailHasLabel(m,"INBOX"));
+
+  const q=String(gmailSearch||"").trim().toLowerCase();
+  if(q){
+    list = list.filter(m=>[m.from,m.to,m.subject,m.snippet,m.date].join(" ").toLowerCase().includes(q));
+  }
+  return list;
 }
 
 function setGmailFilter(filter){
   gmailFilter = filter;
+  renderPosta();
+}
+function setGmailSearch(value){
+  gmailSearch = String(value||"");
+  renderPosta();
+}
+function clearGmailSearch(){
+  gmailSearch = "";
   renderPosta();
 }
 
@@ -5999,12 +6013,17 @@ function renderPosta(){
   }
 
   el.innerHTML = `
-    <div class="mail-account-card card">
+    <div class="mail-account-card card" style="gap:12px;flex-wrap:wrap;">
       <div>
         <div class="mail-account-email">✉ creativostudiografico@gmail.com</div>
         <div class="mail-account-sub">Gmail collegata · visualizzazione ultimi 30 giorni</div>
       </div>
-      <div style="font-size:12px;color:var(--muted);">${gmailLoaded ? `${gmailMessages.length} messaggi caricati` : ""}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto;">
+        <input id="gmailSearchInput" class="inline" style="min-width:260px;max-width:360px;" placeholder="Cerca mittente, destinatario, oggetto…" value="${escapeHtml(gmailSearch)}" onkeydown="if(event.key==='Enter') setGmailSearch(this.value)">
+        <button class="btn btn-primary btn-sm" onclick="setGmailSearch(document.getElementById('gmailSearchInput')?.value||'')">Cerca</button>
+        ${gmailSearch ? `<button class="btn btn-outline btn-sm" onclick="clearGmailSearch()">Azzera</button>` : ""}
+      </div>
+      <div style="width:100%;font-size:12px;color:var(--muted);">${gmailLoaded ? `${shown.length} visualizzate su ${gmailMessages.length} messaggi caricati` : ""}</div>
     </div>
 
     <div class="mail-shell">
