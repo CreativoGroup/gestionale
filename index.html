@@ -52,7 +52,7 @@
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap;position:relative;z-index:100;}
   .global-search{flex:1;max-width:320px;position:relative;z-index:110;}
   .global-search input{width:100%;padding:10px 14px;font-size:14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;}
-  .global-search-dropdown{display:none;position:fixed;right:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 18px 45px rgba(20,29,43,.22);max-height:320px;overflow-y:auto;z-index:99999;}
+  .global-search-dropdown{display:none;position:fixed;right:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 18px 45px rgba(20,29,43,.22);max-height:320px;overflow-y:auto;z-index:9999;}
   .gsd-item{padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--border);}
   .gsd-item:last-child{border-bottom:none;}
   .gsd-item:hover{background:var(--paper);color:var(--accent);}
@@ -147,7 +147,7 @@
   .job-card .jc-line{color:var(--teal);font-size:12.5px;font-weight:600;line-height:1.6;}
   .job-card .jc-desc{font-size:13px;color:var(--text);margin-bottom:8px;}
   .job-card .jc-meta{color:var(--muted);font-size:12.5px;display:flex;justify-content:space-between;margin-top:8px;font-weight:600;}
-  .modal-backdrop{position:fixed;inset:0;background:rgba(10,14,22,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 20px;z-index:50;overflow-y:auto;}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(10,14,22,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 20px;z-index:100000;overflow-y:auto;}
   .modal-backdrop.open{display:flex;}
   .modal{background:var(--card);border-radius:12px;max-width:1080px;width:100%;padding:32px;position:relative;margin-bottom:40px;}
   .modal h2{margin:0 0 4px;font-size:26px;font-weight:800;}
@@ -1684,7 +1684,7 @@ const PRODOTTI_PER_CATEGORIA = {
   "Piccolo Formato": ["Biglietti da visita","A4","A3","Carta adesiva","Altro"],
   "Lavorazioni Esterne": ["Tipografia","Serigrafia","Grande Formato","Piccolo Formato","Biglietti da visita","Volantini","Pieghevoli","Cartelline","Blocco appunti","Gadget","Altro"]
 };
-const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone","Misto"];
+const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone"];
 const NOTE_OPERATORS = ["Mattia","Patrizio","Sara","Francess","Simone"];
 const FAMILY_RICHIESTE = ["Felpe per reparti","Tessuti","Allestimenti","Poster ospedali","Gadget","Altro"];
 const STATUSES = ["Da fare","In lavorazione","In produzione","Completato","Consegnato"];
@@ -1857,7 +1857,7 @@ function fromDbRow(collection, r){
     case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", richiesta:r.richiesta||"", carattere:r.carattere||"", archiviatoRecenti:!!r.archiviato_recenti, creatoIl:r.creato_il||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||"", dropboxFolderUrl:r.dropbox_folder_url||""};
     case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito};
     case "orders": {
-      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:r.worker||"", stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
+      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:r.metodo};
@@ -2085,8 +2085,29 @@ function recalcFasi(order){
 }
 function orderCategorie(o){ return [...new Set((o.righe||[]).map(r=>r.categoria).filter(Boolean))]; }
 function orderCategorieLabel(o){ const c = orderCategorie(o); return c.length ? c.join(", ") : "—"; }
-function orderWorkersList(o){ return o.worker ? [o.worker] : []; }
-function orderWorkersLabel(o){ return o.worker || "non assegnato"; }
+function orderWorkersList(o){
+  const raw=String(o?.worker||"").trim();
+  if(!raw || raw==="Misto") return [];
+  return raw.split(/\s*\|\s*/).map(x=>x.trim()).filter(x=>WORKERS.includes(x));
+}
+function orderWorkersLabel(o){
+  const list=orderWorkersList(o);
+  return list.length ? list.join(", ") : "non assegnato";
+}
+function toggleOrderWorker(orderId, worker, checked){
+  const o=findItem('orders',orderId);
+  if(!o) return;
+  let list=orderWorkersList(o);
+  if(checked && !list.includes(worker)) list.push(worker);
+  if(!checked) list=list.filter(w=>w!==worker);
+  o.worker=list.join(" | ");
+  saveState('orders');
+  openJobCard(orderId);
+}
+function workerMultiSelector(o){
+  const selected=orderWorkersList(o);
+  return `<div style="display:flex;gap:10px 14px;flex-wrap:wrap;padding-top:5px;">${WORKERS.map(w=>`<label class="checkfield" style="margin:0;"><input type="checkbox" ${selected.includes(w)?'checked':''} onchange="toggleOrderWorker('${o.id}','${w}',this.checked)"> ${w}</label>`).join("")}</div>`;
+}
 
 function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, consegnaTipo){
   const order = {id, clientId, descrizione, worker, stato, dataConsegna,
@@ -2776,19 +2797,45 @@ async function cleanupOldNoteComunicazioni(){
 }
 
 /* ============ DASHBOARD ============ */
+function orderPendingPickupRows(o){
+  return (o?.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE");
+}
+function orderPendingPickupSuppliers(o){
+  return [...new Set(orderPendingPickupRows(o).map(r=>String(r.fornitore||"").trim()).filter(Boolean))];
+}
+function orderCustomerStage(o){
+  if(orderPendingPickupRows(o).length) return "DA RITIRARE";
+  return o?.clienteAvvisato ? "AVVISATO" : "DA AVVISARE";
+}
+async function segnaRitiroCompletato(orderId){
+  const o=findItem('orders',orderId);
+  if(!o) return;
+  const pending=orderPendingPickupRows(o);
+  if(!pending.length) return;
+  pending.forEach(r=>r.ritiroEsterno="RITIRATO");
+  await saveState('orders');
+  renderDashboard();
+  showToast("Ritiro completato: ora il cliente è da avvisare");
+}
+function completedOrderStageButton(o){
+  const stage=orderCustomerStage(o);
+  if(stage==="DA RITIRARE") return `<button class="btn btn-primary btn-sm" style="background:var(--warn);color:#fff;" onclick="segnaRitiroCompletato('${o.id}')">DA RITIRARE</button>`;
+  if(stage==="DA AVVISARE") return `<button class="btn btn-primary btn-sm" style="background:var(--warn);color:#fff;" onclick="openAvvisaCliente('${o.id}')">DA AVVISARE</button>`;
+  return `<button class="btn btn-outline btn-sm" style="border-color:var(--ok);color:var(--ok);" onclick="openAvvisaCliente('${o.id}')">AVVISATO</button>${o.avvisoMetodo ? `<div class="lr-sub" style="margin-top:4px;text-align:center;">${escapeHtml(o.avvisoMetodo)}</div>` : ``}`;
+}
 function renderDashboard(){
   const activeOrders = state.orders.filter(o=>o.stato!=="Consegnato");
   const ordiniInLavorazione = state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato");
   const creditiApertiDash = creditiApertiRaggruppati();
   const preventiviAperti = state.quotes.filter(q=>q.stato==="Inviato"||q.stato==="Bozza").length;
   const scorteBasse = computeScorteMonitorate();
-  const completatiDaConsegnare = state.orders.filter(o=>o.stato==="Completato");
+  const completatiDaConsegnare = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato==="Completato"));
   const daSpedire = state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato");
   const daFatturare = state.orders.filter(o=>o.daFatturare && !o.fatturato);
   const ordiniImportanti = state.orders.filter(o=>o.importante && o.stato!=="Consegnato");
   const magazzinoDaOrdinare = computeMagazzinoDaOrdinare();
   const pezziDaOrdinare = magazzinoDaOrdinare.reduce((s,x)=>s + Number(x.entry.daOrdinareQty||0), 0);
-  const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>o.worker===w && o.stato!=="Consegnato").length}));
+  const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>orderWorkersList(o).includes(w) && o.stato!=="Consegnato").length}));
   const workloadMax = Math.max(1, ...workload.map(x=>x.n));
   const oggi = today();
   const consegneGiornaliere = activeOrders.filter(o=>o.dataConsegna===oggi).sort((a,b)=>{
@@ -2851,15 +2898,8 @@ function renderDashboard(){
           <tr>
             <td>${clientName(o.clientId)}</td>
             <td class="mobile-hide">${orderCategorieLabel(o)}</td>
-            <td class="mobile-hide">${o.consegnaTipo}</td>
-            <td>
-              <button class="btn btn-sm ${o.clienteAvvisato?'btn-outline':'btn-primary'}"
-                style="${o.clienteAvvisato?'border-color:var(--ok);color:var(--ok);':'background:var(--warn);color:#fff;'}"
-                onclick="openAvvisaCliente('${o.id}')">
-                ${o.clienteAvvisato?'AVVISATO':'DA AVVISARE'}
-              </button>
-              ${o.clienteAvvisato && o.avvisoMetodo ? `<div class="lr-sub" style="margin-top:4px;text-align:center;">${escapeHtml(o.avvisoMetodo)}</div>` : ``}
-            </td>
+            <td class="mobile-hide">${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : ""}</td>
+            <td>${completedOrderStageButton(o)}</td>
             <td class="mobile-hide"><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td>
           </tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`}
@@ -3204,7 +3244,7 @@ function openDashboardList(type){
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
     materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
     ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato!=="Consegnato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"))},
-    avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato)},
+    avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato && orderPendingPickupRows(o).length===0)},
     preventivi: {title:"Preventivi in attesa", items: state.quotes.filter(q=>q.stato==="Bozza"||q.stato==="Inviato"), isQuote:true},
     scorte: {title:"Articoli sotto scorta", items: computeScorteMonitorate(), isStock:true}
   };
@@ -3644,7 +3684,7 @@ function openClientHistory(clientId){
     <h3>Storico ordini</h3>
     ${orders.length ? orders.map(o=>`
       <div class="list-row" onclick="openJobCard('${o.id}')">
-        <div><div class="lr-main">${o.importante?'★ ':''}${orderCategorieLabel(o)}</div><div class="lr-sub">${fmtDate(o.dataConsegna)} — ${o.worker||"non assegnato"}</div></div>
+        <div><div class="lr-main">${o.importante?'★ ':''}${orderCategorieLabel(o)}</div><div class="lr-sub">${fmtDate(o.dataConsegna)} — ${orderWorkersLabel(o)}</div></div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span>${fmtMoney(orderTotale(o))}</span>
           <span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span>
@@ -4362,6 +4402,15 @@ function updateQuoteField(id, field, value){ findItem('quotes',id)[field] = valu
 
 /* ============ ORDINI ============ */
 let orderFilters = {categoria:"", worker:"", search:""};
+function orderInsertionSortValue(o){
+  const t=Date.parse(o?.createdAt||"");
+  if(Number.isFinite(t)) return t;
+  const n=Number(o?.numero);
+  return Number.isFinite(n) ? n : 0;
+}
+function sortOrdersByInsertionDesc(list){
+  return [...list].sort((a,b)=>orderInsertionSortValue(b)-orderInsertionSortValue(a));
+}
 function ordiniTableHtml(list){
   return `
     <div class="table-wrap">
@@ -4397,10 +4446,8 @@ function renderOrdini(){
     (!f.categoria || orderCategorie(o).includes(f.categoria)) &&
     (!f.worker || orderWorkersList(o).includes(f.worker)) &&
     (!f.search || (clientName(o.clientId)+" "+(o.descrizione||"")+" "+orderCategorieLabel(o)).toLowerCase().includes(f.search.toLowerCase()));
-  const attivi = state.orders.filter(o=>o.stato!=="Consegnato" && matches(o))
-    .sort((a,b)=> (a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
-  const archiviati = state.orders.filter(o=>o.stato==="Consegnato" && matches(o))
-    .sort((a,b)=> (b.dataConsegna||"").localeCompare(a.dataConsegna||""));
+  const attivi = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato!=="Consegnato" && matches(o)));
+  const archiviati = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato==="Consegnato" && matches(o)));
   document.getElementById("view-ordini").innerHTML = `
     <div class="form-panel" id="orderForm">
       <h3>Nuovo ordine</h3>
@@ -4546,7 +4593,7 @@ function renderFlusso(){
               <div class="jc-lines">
                 ${o.righe.filter(r=>r.categoria).map(r=>`<div class="jc-line">${r.categoria}${r.prodotto?' — '+r.prodotto:''} <span style="color:var(--muted);font-weight:500;">×${r.quantita}</span></div>`).join("") || `<div class="jc-line" style="color:var(--muted)">Nessuna categoria assegnata</div>`}
               </div>
-              <div class="jc-meta"><span>${o.worker||"n.a."}</span><span>${fmtDate(o.dataConsegna)}</span></div>
+              <div class="jc-meta"><span>${orderWorkersLabel(o)}</span><span>${fmtDate(o.dataConsegna)}</span></div>
               ${o.createdAt ? `<div style="font-size:9px;color:var(--border);margin-top:2px;">Creato il ${fmtDate(o.createdAt.slice(0,10))}</div>` : ``}
             </div>`;
           }).join("") || `<p class="empty" style="padding:14px 4px;">Vuoto</p>`}
@@ -4630,7 +4677,7 @@ function openJobCard(orderId){
       </div>
     </div>
     <div class="ticket-meta ticket-meta-big">
-      <div><span>Operatore</span><select class="inline inline-big" onchange="updateOrderField('${o.id}','worker',this.value)">${workerOptions(o.worker)}</select></div>
+      <div><span>Operatori</span>${workerMultiSelector(o)}</div>
       <div><span>Data consegna</span><input class="inline inline-big" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value)"></div>
       <div><span>Stato</span><select class="inline inline-big status-select-big" style="background:${STATUS_DOT[o.stato]};color:${statusTextColor(o.stato)}" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${s}</option>`).join("")}</select></div>
     </div>
@@ -6250,6 +6297,7 @@ function renderGmailReader(){
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); openGmailAttachment(${i})">Apri</button>
+            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); downloadGmailAttachment(${i})">Scarica</button>
           </div>
         </div>`).join("")}
     </div>`:"";
@@ -6756,176 +6804,82 @@ function gmailBase64UrlToBlob(base64url, mimeType){
   return new Blob([bytes],{type:mimeType||"application/octet-stream"});
 }
 
-async function openGmailAttachment(index){
+async function fetchGmailAttachmentBlob(index){
   const m=gmailSelectedMessage;
   const attachments=Array.isArray(m?.attachments)?m.attachments:[];
   const a=attachments[index];
-  if(!m?.id || !a){ showToast("Allegato non disponibile"); return; }
-
+  if(!m?.id || !a) throw new Error("Allegato non disponibile");
   const attachmentId=String(a.attachmentId||a.id||"").trim();
-  if(!attachmentId){ showToast("Identificativo allegato mancante"); return; }
+  if(!attachmentId) throw new Error("Identificativo allegato mancante");
 
-  // Apro subito una scheda vuota: su iPhone/Safari evita il blocco popup
-  // mentre attendiamo il download protetto da Gmail.
+  const {data:sessionData}=await sb.auth.getSession();
+  const session=sessionData?.session;
+  if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+
+  const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-attachment`,{
+    method:"POST",
+    headers:{
+      "Authorization":`Bearer ${session.access_token}`,
+      "apikey":SUPABASE_KEY,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      messageId:m.id,
+      attachmentId,
+      filename:a.filename||"allegato",
+      mimeType:a.mimeType||"application/octet-stream"
+    })
+  });
+  const raw=await response.text();
+  let result={};
+  try{ result=JSON.parse(raw); }
+  catch(e){ throw new Error(raw||`Errore HTTP ${response.status}`); }
+  if(!response.ok) throw new Error(result?.error||result?.message||`Errore HTTP ${response.status}`);
+  if(!result?.data) throw new Error("Contenuto allegato mancante");
+  return {
+    blob:gmailBase64UrlToBlob(result.data,result.mimeType||a.mimeType),
+    filename:result.filename||a.filename||"allegato"
+  };
+}
+
+async function openGmailAttachment(index){
   const previewWindow=window.open("","_blank");
   if(previewWindow){
-    try{
-      previewWindow.document.write('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Apertura allegato…</title><body style="font-family:system-ui;padding:28px">Apertura allegato…</body>');
-    }catch(e){}
+    try{ previewWindow.document.write('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Apertura allegato…</title><body style="font-family:system-ui;padding:28px">Apertura allegato…</body>'); }catch(e){}
   }
-
   try{
-    const {data:sessionData}=await sb.auth.getSession();
-    const session=sessionData?.session;
-    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
-
-    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-attachment`,{
-      method:"POST",
-      headers:{
-        "Authorization":`Bearer ${session.access_token}`,
-        "apikey":SUPABASE_KEY,
-        "Content-Type":"application/json"
-      },
-      body:JSON.stringify({
-        messageId:m.id,
-        attachmentId,
-        filename:a.filename||"allegato",
-        mimeType:a.mimeType||"application/octet-stream"
-      })
-    });
-
-    const raw=await response.text();
-    let result={};
-    try{ result=JSON.parse(raw); }
-    catch(e){ throw new Error(raw||`Errore HTTP ${response.status}`); }
-    if(!response.ok) throw new Error(result?.error||result?.message||`Errore HTTP ${response.status}`);
-    if(!result?.data) throw new Error("Contenuto allegato mancante");
-
-    const blob=gmailBase64UrlToBlob(result.data,result.mimeType||a.mimeType);
-    const url=URL.createObjectURL(blob);
-
-    if(previewWindow){
-      previewWindow.location.href=url;
-    }else{
+    const file=await fetchGmailAttachmentBlob(index);
+    const url=URL.createObjectURL(file.blob);
+    if(previewWindow) previewWindow.location.href=url;
+    else{
       const link=document.createElement("a");
-      link.href=url;
-      link.target="_blank";
-      link.rel="noopener";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      link.href=url; link.target="_blank"; link.rel="noopener";
+      document.body.appendChild(link); link.click(); link.remove();
     }
-
-    // Lascio tempo al browser/visualizzatore per caricare il blob.
     setTimeout(()=>URL.revokeObjectURL(url),5*60*1000);
   }catch(err){
-    console.error("Gmail attachment error",err);
+    console.error("Gmail attachment open error",err);
     if(previewWindow){ try{ previewWindow.close(); }catch(e){} }
     showToast(err?.message||"Errore durante l'apertura dell'allegato");
   }
 }
-async function openGmailMessage(id){
-  if(!id) return;
-  markGmailLocallyRead(id);
-  gmailSelectedId=id;
-  gmailSelectedMessage=null;
-  gmailMessageError="";
-  gmailMessageLoading=true;
-  gmailBodyMode="html";
-  gmailReplyOpen=false;
-  gmailReplyOptionsOpen=false;
-  gmailReplyText="";
-  gmailReplyCc="";
-  gmailReplyBcc="";
-  gmailReplySubject="";
-  gmailReplySending=false;
-  gmailReplyStatus="";
-  gmailReplyAttachments=[];
-  renderPosta();
 
+async function downloadGmailAttachment(index){
   try{
-    const {data:sessionData}=await sb.auth.getSession();
-    const session=sessionData?.session;
-    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
-
-    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-message`,{
-      method:"POST",
-      headers:{
-        "Authorization":`Bearer ${session.access_token}`,
-        "apikey":SUPABASE_KEY,
-        "Content-Type":"application/json"
-      },
-      body:JSON.stringify({id})
-    });
-
-    const raw=await response.text();
-    let result={};
-    try{ result=JSON.parse(raw); }
-    catch(e){ throw new Error(raw||`Errore HTTP ${response.status}`); }
-
-    if(!response.ok){
-      throw new Error(result?.error||result?.message||`Errore HTTP ${response.status}`);
-    }
-
-    gmailSelectedMessage=result;
+    const file=await fetchGmailAttachmentBlob(index);
+    const url=URL.createObjectURL(file.blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download=file.filename||"allegato";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60*1000);
   }catch(err){
-    console.error("Gmail message error",err);
-    gmailMessageError=err?.message||"Errore durante l'apertura della mail";
-  }finally{
-    gmailMessageLoading=false;
-    renderPosta();
+    console.error("Gmail attachment download error",err);
+    showToast(err?.message||"Errore durante il download dell'allegato");
   }
 }
-
-async function loadGmailMessages(force=false){
-  if(gmailLoading) return;
-  if(gmailLoaded && !force){
-    renderPosta();
-    return;
-  }
-
-  gmailLoading = true;
-  gmailError = "";
-  renderPosta();
-
-  try{
-    const { data: sessionData } = await sb.auth.getSession();
-    const session = sessionData?.session;
-    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile. Accedi di nuovo.");
-
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/gmail-list`,{
-      method:"POST",
-      headers:{
-        "Authorization":`Bearer ${session.access_token}`,
-        "apikey":SUPABASE_KEY,
-        "Content-Type":"application/json"
-      },
-      body:"{}"
-    });
-
-    const raw = await response.text();
-    let result = {};
-    try{ result = JSON.parse(raw); }catch(e){ throw new Error(raw || `Errore HTTP ${response.status}`); }
-
-    if(!response.ok){
-      throw new Error(result?.error || result?.message || `Errore HTTP ${response.status}`);
-    }
-
-    gmailMessages = Array.isArray(result.messages) ? result.messages : [];
-    gmailLoaded = true;
-    gmailError = "";
-    setTimeout(()=>{ if(gmailLoaded){ gmailLoading=false; renderPosta(); } },0);
-  }catch(err){
-    console.error("Gmail list error", err);
-    gmailError = err?.message || "Errore durante la lettura Gmail";
-    gmailLoaded = false;
-  }finally{
-    gmailLoading = false;
-    renderPosta();
-  }
-}
-
-
 
 function startGmailAutoRefresh(){
   if(gmailAutoRefreshTimer) clearInterval(gmailAutoRefreshTimer);
