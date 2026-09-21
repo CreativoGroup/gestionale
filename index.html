@@ -1655,6 +1655,8 @@
     <section class="view" id="view-costiFissi"></section>
     <section class="view" id="view-entrate"></section>
     <section class="view" id="view-posta"></section>
+    <section class="view" id="view-whatsapp"></section>
+    <section class="view" id="view-instagram"></section>
     <section class="view" id="view-leads"></section>
   </main>
 </div>
@@ -2391,10 +2393,12 @@ const NAV = [
   {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Info"},
   {id:"note", label:"Note", icon:"✎", subtitle:"Chiamate e comunicazioni interne da gestire", group:"Info"},
   {id:"posta", label:"Posta", icon:"✉", subtitle:"Email aziendale collegata a Gmail", group:"Info"},
+  {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Info"},
+  {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Info"},
   {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info"},
   {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi in corso e storico", group:"Info"},
-  {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Info"},
 
+  {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Operativa"},
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
@@ -2521,6 +2525,8 @@ function renderTopbarActions(){
     costiFissi: currentUser&&currentUser.role==="admin" ? `<button class="btn btn-primary" onclick="toggleForm('fixedCostForm')">+ Nuovo costo fisso</button>` : ``,
     entrate: `<button class="btn btn-primary" onclick="toggleForm('incomeForm')">+ Nuova entrata</button>`,
     posta: `<button class="btn btn-primary" onclick="loadGmailMessages(true)">↻ Aggiorna posta</button>`,
+    whatsapp: ``,
+    instagram: ``,
     leads: `<button class="btn btn-primary" onclick="goTo(\'posta\')">✉ Apri Posta</button>`,
     dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa l’app</button>`
   };
@@ -2530,7 +2536,7 @@ function renderCurrentView(){
   ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti, preventivi:renderPreventivi,
     ordini:renderOrdini, flusso:renderFlusso,
     magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
-    posta:renderPosta, leads:renderLeads})[currentView]();
+    posta:renderPosta, whatsapp:()=>renderMetaChannel("whatsapp"), instagram:()=>renderMetaChannel("instagram"), leads:renderLeads})[currentView]();
 }
 let clientFormOpen = false;
 function toggleForm(id){
@@ -2937,6 +2943,28 @@ async function expireStaleWaitingLeads(){
 }
 
 
+/* ============ META: WHATSAPP / INSTAGRAM (struttura pronta, connessione da attivare) ============ */
+function renderMetaChannel(channel){
+  const isWa=channel==="whatsapp";
+  const root=document.getElementById("view-"+channel);
+  if(!root) return;
+  const label=isWa?"WhatsApp":"Instagram";
+  root.innerHTML=`
+    <div class="card" style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+          <h3 style="margin:0 0 6px;">${label}</h3>
+          <p class="helptext" style="margin:0;">Area predisposta per il traffico Meta. La connessione verrà attivata quando saranno disponibili account/numero Business.</p>
+        </div>
+        <span class="pill">NON COLLEGATO</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Conversazioni</h3>
+      <p class="empty">Nessun canale ${label} collegato. Questa sezione è già pronta nel menu e non salva messaggi o allegati finché non configuriamo la connessione Meta.</p>
+    </div>`;
+}
+
 /* ============ NOTE: CHIAMATE E COMUNICAZIONI ============ */
 function noteTypePill(tipo){
   return tipo==="Chiamata"
@@ -2949,6 +2977,8 @@ function noteDateLabel(iso){
     return new Intl.DateTimeFormat("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(iso));
   }catch(e){ return "—"; }
 }
+let noteDraft = {tipo:"Chiamata", nomePersona:"", testo:"", operatore:""};
+function updateNoteDraft(field,value){ noteDraft[field]=value; }
 function renderNote(){
   const attive=[...(state.noteComunicazioni||[])].filter(n=>!n.fatto).sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
   const archivio=[...(state.noteComunicazioni||[])].filter(n=>n.fatto).sort((a,b)=>String(b.fattoIl||"").localeCompare(String(a.fattoIl||"")));
@@ -2959,26 +2989,26 @@ function renderNote(){
       <div class="form-grid">
         <div class="field">
           <label>Tipo</label>
-          <select id="nota-tipo">
-            <option value="Chiamata">Chiamata</option>
-            <option value="Comunicazione">Comunicazione</option>
+          <select id="nota-tipo" onchange="updateNoteDraft('tipo',this.value)">
+            <option value="Chiamata" ${noteDraft.tipo==="Chiamata"?'selected':''}>Chiamata</option>
+            <option value="Comunicazione" ${noteDraft.tipo==="Comunicazione"?'selected':''}>Comunicazione</option>
           </select>
         </div>
         <div class="field">
           <label>Nome persona</label>
-          <input id="nota-persona" placeholder="Nome cliente / referente">
+          <input id="nota-persona" placeholder="Nome cliente / referente" value="${escapeHtml(noteDraft.nomePersona)}" oninput="updateNoteDraft('nomePersona',this.value)">
         </div>
         <div class="field">
           <label>Operatore</label>
-          <select id="nota-operatore">
+          <select id="nota-operatore" onchange="updateNoteDraft('operatore',this.value)">
             <option value="">Seleziona operatore…</option>
-            ${NOTE_OPERATORS.map(o=>`<option value="${o}">${o}</option>`).join("")}
+            ${NOTE_OPERATORS.map(o=>`<option value="${o}" ${noteDraft.operatore===o?'selected':''}>${o}</option>`).join("")}
           </select>
         </div>
       </div>
       <div class="field" style="margin-top:12px;">
         <label>Testo</label>
-        <textarea id="nota-testo" rows="4" placeholder="Scrivi la chiamata, la richiesta o la comunicazione…"></textarea>
+        <textarea id="nota-testo" rows="4" placeholder="Scrivi la chiamata, la richiesta o la comunicazione…" oninput="updateNoteDraft('testo',this.value)">${escapeHtml(noteDraft.testo)}</textarea>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" onclick="addNotaComunicazione()">Salva nota</button>
@@ -3022,10 +3052,10 @@ function renderNote(){
   `;
 }
 async function addNotaComunicazione(){
-  const tipo=document.getElementById("nota-tipo")?.value||"Chiamata";
-  const nomePersona=String(document.getElementById("nota-persona")?.value||"").trim();
-  const testo=String(document.getElementById("nota-testo")?.value||"").trim();
-  const operatore=String(document.getElementById("nota-operatore")?.value||"").trim();
+  const tipo=String(noteDraft.tipo||document.getElementById("nota-tipo")?.value||"Chiamata");
+  const nomePersona=String(noteDraft.nomePersona||document.getElementById("nota-persona")?.value||"").trim();
+  const testo=String(noteDraft.testo||document.getElementById("nota-testo")?.value||"").trim();
+  const operatore=String(noteDraft.operatore||document.getElementById("nota-operatore")?.value||"").trim();
 
   if(!nomePersona){ showToast("Inserisci il nome della persona"); return; }
   if(!testo){ showToast("Inserisci il testo della nota"); return; }
@@ -3039,6 +3069,7 @@ async function addNotaComunicazione(){
   if(!saved) return;
   const i=state.noteComunicazioni.findIndex(x=>x.id===saved.id);
   if(i>=0) state.noteComunicazioni[i]=saved; else state.noteComunicazioni.push(saved);
+  noteDraft={tipo:"Chiamata",nomePersona:"",testo:"",operatore:""};
   renderNote();
   showToast("Nota salvata");
 }
