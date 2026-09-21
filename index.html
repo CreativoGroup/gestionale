@@ -1467,7 +1467,7 @@
     }
 
     /* Evidenzia la macro area OPERATIVA anche nel menu mobile */
-    .mobile-nav-group-title:nth-of-type(2){
+    .mobile-nav-group-operativa{
       background:#FFF0E8;
       border-radius:12px 12px 0 0;
       margin-top:8px !important;
@@ -1475,13 +1475,14 @@
       border-top:0 !important;
     }
 
-    .mobile-nav-group-title:nth-of-type(2) + button,
-    .mobile-nav-group-title:nth-of-type(2) + button + button,
-    .mobile-nav-group-title:nth-of-type(2) + button + button + button{
+    .mobile-nav-group-operativa + button,
+    .mobile-nav-group-operativa + button + button,
+    .mobile-nav-group-operativa + button + button + button,
+    .mobile-nav-group-operativa + button + button + button + button{
       background:#FFF0E8;
     }
 
-    .mobile-nav-group-title:nth-of-type(2) + button + button + button{
+    .mobile-nav-group-operativa + button + button + button + button{
       border-radius:0 0 12px 12px;
       margin-bottom:8px;
     }
@@ -2390,13 +2391,15 @@ function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, 
 }
 /* ============ NAVIGAZIONE ============ */
 const NAV = [
-  {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Info"},
-  {id:"note", label:"Note", icon:"✎", subtitle:"Chiamate e comunicazioni interne da gestire", group:"Info"},
-  {id:"posta", label:"Posta", icon:"✉", subtitle:"Email aziendale collegata a Gmail", group:"Info"},
-  {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Info"},
-  {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Info"},
-  {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info"},
-  {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi in corso e storico", group:"Info"},
+  {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard"},
+
+  {id:"posta", label:"Posta", icon:"✉", subtitle:"Email aziendale collegata a Gmail", group:"Traffico"},
+  {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico"},
+  {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico"},
+
+  {id:"note", label:"Note", icon:"✎", subtitle:"Chiamate e comunicazioni interne da gestire", group:"Info e richieste"},
+  {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi in corso e storico", group:"Info e richieste"},
+  {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info e richieste"},
 
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Operativa"},
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
@@ -2412,14 +2415,14 @@ function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && cu
 function renderNav(){
   const items = visibleNav();
   const current = NAV.find(n=>n.id===currentView) || items[0];
-  const groups = ["Info","Operativa","Amministrazione"];
+  const groups = ["Dashboard","Traffico","Info e richieste","Operativa","Amministrazione"];
 
   const groupedButtons = groups.map(group=>{
     const groupItems = items.filter(n=>n.group===group);
     if(!groupItems.length) return "";
     return `
-      <div class="nav-group nav-group-${group.toLowerCase()}">
-        <div class="nav-group-title">${group}</div>
+      <div class="nav-group nav-group-${group.toLowerCase().replace(/\s+/g,"-")}">
+        ${group==="Dashboard" ? "" : `<div class="nav-group-title">${group}</div>`}
         ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${n.label}</button>`).join("")}
       </div>
     `;
@@ -2429,7 +2432,7 @@ function renderNav(){
     const groupItems = items.filter(n=>n.group===group);
     if(!groupItems.length) return "";
     return `
-      <div class="mobile-nav-group-title">${group}</div>
+      ${group==="Dashboard" ? "" : `<div class="mobile-nav-group-title mobile-nav-group-${group.toLowerCase().replace(/\s+/g,"-")}">${group}</div>`}
       ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span><span>${n.label}</span></button>`).join("")}
     `;
   }).join("");
