@@ -52,7 +52,7 @@
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap;position:relative;z-index:100;}
   .global-search{flex:1;max-width:320px;position:relative;z-index:110;}
   .global-search input{width:100%;padding:10px 14px;font-size:14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;}
-  .global-search-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:280px;overflow-y:auto;z-index:120;}
+  .global-search-dropdown{display:none;position:fixed;right:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 18px 45px rgba(20,29,43,.22);max-height:320px;overflow-y:auto;z-index:99999;}
   .gsd-item{padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--border);}
   .gsd-item:last-child{border-bottom:none;}
   .gsd-item:hover{background:var(--paper);color:var(--accent);}
@@ -2920,6 +2920,18 @@ function segnaComeSpedito(orderId){
   renderDashboard();
   showToast("Ordine segnato come spedito e archiviato");
 }
+function orderInsertionSortValue(o){
+  const ts=o?.createdAt ? Date.parse(o.createdAt) : NaN;
+  if(Number.isFinite(ts)) return {hasDate:1, date:ts, numero:Number(o?.numero)||0};
+  return {hasDate:0, date:0, numero:Number(o?.numero)||0};
+}
+function compareOrdersNewestFirst(a,b){
+  const A=orderInsertionSortValue(a), B=orderInsertionSortValue(b);
+  if(A.hasDate && B.hasDate && A.date!==B.date) return B.date-A.date;
+  if(A.numero!==B.numero) return B.numero-A.numero;
+  if(A.date!==B.date) return B.date-A.date;
+  return String(b?.id||"").localeCompare(String(a?.id||""));
+}
 function creditiApertiRaggruppati(){
   const map = new Map();
   state.orders.filter(o=>o.stato==="Consegnato").forEach(o=>{
@@ -2930,22 +2942,22 @@ function creditiApertiRaggruppati(){
   });
   return [...map.entries()]
     .map(([clientId, orders])=>{
-      const ordinati = [...orders].sort((a,b)=>String(b.o.createdAt||"").localeCompare(String(a.o.createdAt||"")));
+      const ordinati = [...orders].sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
       return {
         clientId,
         orders: ordinati,
         totaleSaldo: ordinati.reduce((s,x)=>s+x.saldo,0),
-        ultimoInserimento: ordinati[0]?.o?.createdAt || ""
+        ultimoInserimentoOrdine: ordinati[0]?.o || null
       };
     })
-    .sort((a,b)=>String(b.ultimoInserimento||"").localeCompare(String(a.ultimoInserimento||"")));
+    .sort((a,b)=>compareOrdersNewestFirst(a.ultimoInserimentoOrdine,b.ultimoInserimentoOrdine));
 }
 function openCreditiCliente(clientId){
   const orders = state.orders
     .filter(o=>o.clientId===clientId && o.stato==="Consegnato")
     .map(o=>({o, saldo:orderSaldo(o)}))
     .filter(x=>x.saldo>0.001)
-    .sort((a,b)=>String(b.o.createdAt||"").localeCompare(String(a.o.createdAt||"")));
+    .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
   const totale = orders.reduce((s,x)=>s+x.saldo,0);
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
@@ -3329,6 +3341,15 @@ function clientCognomiOptions(){
   return [...new Set(state.clients.map(c=>c.tipo==='Business' ? c.refCognome : c.cognome).filter(Boolean))].sort((a,b)=>a.localeCompare(b)).map(n=>`<option value="${n}">`).join("");
 }
 let globalSearchMap = {};
+function positionGlobalSearchDropdown(){
+  const input=document.getElementById('globalClientSearch');
+  const dd=document.getElementById('globalSearchDropdown');
+  if(!input||!dd) return;
+  const r=input.getBoundingClientRect();
+  dd.style.left=`${Math.round(r.left)}px`;
+  dd.style.top=`${Math.round(r.bottom+6)}px`;
+  dd.style.width=`${Math.round(r.width)}px`;
+}
 function updateGlobalClientSuggestions(value){
   const dd = document.getElementById('globalSearchDropdown');
   const v = value.trim();
@@ -3360,8 +3381,17 @@ function updateGlobalClientSuggestions(value){
         ${(c.telefono||c.email) ? `<div style="font-size:11.5px;font-weight:500;color:var(--muted);margin-top:2px;">${[c.telefono,c.email].filter(Boolean).join(' · ')}</div>` : ''}
       </div>`).join("")
     : `<div class="gsd-empty">Nessun cliente trovato</div>`;
+  positionGlobalSearchDropdown();
   dd.style.display = "block";
 }
+window.addEventListener('resize', ()=>{
+  const dd=document.getElementById('globalSearchDropdown');
+  if(dd && dd.style.display==='block') positionGlobalSearchDropdown();
+});
+window.addEventListener('scroll', ()=>{
+  const dd=document.getElementById('globalSearchDropdown');
+  if(dd && dd.style.display==='block') positionGlobalSearchDropdown();
+}, true);
 function globalSearchKeydown(evt, input){
   if(evt.key !== "Enter") return;
   const keys = Object.keys(globalSearchMap);
@@ -5415,7 +5445,7 @@ function renderIncassi(){
     .filter(o=>o.stato==="Consegnato")
     .map(o=>({o, saldo:orderSaldo(o)}))
     .filter(x=>x.saldo>0.001)
-    .sort((a,b)=>String(b.o.createdAt||"").localeCompare(String(a.o.createdAt||"")));
+    .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
   const totaleCrediti = creditiAperti.reduce((s,x)=>s+x.saldo,0);
   const guadagno = (paymentsTotaleMese(f.mese) + entrateTotaleMese(f.mese)) - speseTotaleMese(f.mese);
   const filtered = state.payments.filter(p => (!f.metodo||p.metodo===f.metodo) && paymentMatchesCategoria(p,f.categoria) && (!f.mese||p.data.slice(0,7)===f.mese));
