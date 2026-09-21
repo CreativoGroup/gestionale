@@ -2343,6 +2343,9 @@ function renderBozzaSection(o){
     return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-produzione">IN ATTESA DI CONFERMA BOZZA</span></div>`;
   }
   if(m.scelta==="BOZZA DA INVIARE PER MAIL"){
+    if(o.stato==="In produzione"){
+      return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-produzione">BOZZA DA INVIARE PER MAIL</span></div>`;
+    }
     return `<div class="modal-section"><h3>Gestione bozza</h3><button class="btn btn-primary" onclick="openBozzaMail('${o.id}')">APRI MAIL</button></div>`;
   }
   return `<div class="modal-section"><h3>Gestione bozza</h3><button class="btn btn-primary" onclick="inviaBozzaMattia('${o.id}')">INVIA A MATTIA</button></div>`;
@@ -2529,7 +2532,12 @@ function renderCurrentView(){
     magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
     posta:renderPosta, leads:renderLeads})[currentView]();
 }
-function toggleForm(id){ const el = document.getElementById(id); if(el) el.classList.toggle("open"); }
+let clientFormOpen = false;
+function toggleForm(id){
+  if(id==="clientForm") clientFormOpen = !clientFormOpen;
+  const el = document.getElementById(id);
+  if(el) el.classList.toggle("open");
+}
 /* Ridisegna una vista preservando il focus e la posizione del cursore sul campo attivo (usato dalle ricerche, che altrimenti perdono il focus a ogni lettera) */
 function rerenderKeepingFocus(renderFn){
   const active = document.activeElement;
@@ -3843,7 +3851,7 @@ function renderClienti(){
   });
 
   document.getElementById("view-clienti").innerHTML = `
-    <div class="form-panel" id="clientForm">
+    <div class="form-panel ${clientFormOpen?'open':''}" id="clientForm">
       <h3>Nuovo cliente</h3>
       ${clientFieldsHTML('cf')}
       <div class="form-actions">
@@ -4834,6 +4842,15 @@ function renderFlusso(){
   const f = flussoFilters;
   const list = state.orders.filter(o => o.stato!=="Consegnato" && (!f.categoria || orderCategorie(o).includes(f.categoria)) && (!f.worker || orderWorkersList(o).includes(f.worker)))
     .sort((a,b)=> (a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
+  const produzioneEsterna = list.filter(o => (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne"));
+  const externalSuppliers = o => {
+    const names=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne").map(r=>String(r.fornitore||"").trim()).filter(Boolean);
+    return [...new Set(names)];
+  };
+  const externalProducts = o => {
+    const names=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne").map(r=>r.prodotto||r.descrizione||"Lavorazione esterna").filter(Boolean);
+    return [...new Set(names)];
+  };
   document.getElementById("view-flusso").innerHTML = `
     <div class="section-header">
       <div class="filters">
@@ -4861,6 +4878,24 @@ function renderFlusso(){
               ${o.createdAt ? `<div style="font-size:9px;color:var(--border);margin-top:2px;">Creato il ${fmtDate(o.createdAt.slice(0,10))}</div>` : ``}
             </div>`;
           }).join("") || `<p class="empty" style="padding:14px 4px;">Vuoto</p>`}
+          ${st==="In produzione" ? `
+            <div style="margin-top:22px;padding-top:16px;border-top:2px solid var(--accent);">
+              <h4 style="margin-bottom:10px;">PRODUZIONE ESTERNA <span>${produzioneEsterna.length}</span></h4>
+              ${produzioneEsterna.map(o=>{
+                const cl=findItem('clients',o.clientId);
+                const tipoClass=cl && cl.tipo==="Family" ? "job-card-family" : "job-card-business";
+                const fornitori=externalSuppliers(o);
+                const prodotti=externalProducts(o);
+                return `<div class="job-card ${tipoClass} ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
+                  <div class="jc-client">${clientName(o.clientId)} <span style="font-size:9px;font-weight:400;color:var(--border);">${o.numero?('#'+o.numero):''}</span></div>
+                  <div class="jc-lines">
+                    <div class="jc-line"><strong>${prodotti.join(', ')||'Lavorazione esterna'}</strong></div>
+                    <div class="jc-line" style="color:var(--muted);">Fornitore: <strong style="color:var(--text);">${fornitori.length?fornitori.join(', '):'da indicare'}</strong></div>
+                  </div>
+                  <div class="jc-meta"><span>${orderWorkersLabel(o)}</span><span>${o.stato}</span></div>
+                </div>`;
+              }).join("") || `<p class="empty" style="padding:14px 4px;">Nessuna produzione esterna.</p>`}
+            </div>` : ``}
         </div>`;
       }).join("")}
     </div>
