@@ -2015,8 +2015,13 @@ function catalogColorsForCode(code){
   const p = catalogProduct(code);
   return p && Array.isArray(p.colors) ? p.colors : [];
 }
-function catalogSizesForCode(code){
+function catalogSizesForCode(code, colore=""){
   const p = catalogProduct(code);
+  if(p && colore && p.colorSizes && typeof p.colorSizes==="object"){
+    const target = warehouseColorKey(colore);
+    const matchedKey = Object.keys(p.colorSizes).find(k=>warehouseColorKey(k)===target);
+    if(matchedKey && Array.isArray(p.colorSizes[matchedKey]) && p.colorSizes[matchedKey].length) return p.colorSizes[matchedKey];
+  }
   if(p && Array.isArray(p.sizes) && p.sizes.length) return p.sizes;
   return p ? ["UNICA"] : [];
 }
@@ -4124,7 +4129,7 @@ function magazzinoColoreDatalistOptions(codice){
 function magazzinoTagliaDatalistOptions(codice,colore){
   if(!codice || !colore) return "";
   const disponibili = magazzinoTaglieDisponibili(codice,colore);
-  const catalogo = catalogSizesForCode(codice);
+  const catalogo = catalogSizesForCode(codice,colore);
   const vals = [...new Set([...disponibili.keys(), ...catalogo])];
   vals.sort((a,b)=>{
     const qa=disponibili.get(a)||0, qb=disponibili.get(b)||0;
@@ -5072,7 +5077,7 @@ function warehouseGroupProducts(group){
 }
 function warehouseGroupTabsHtml(){
   return `
-    <select class="inline warehouse-group-select" onchange="magazzinoGroupFilter=this.value; renderMagazzino();">
+    <select class="inline warehouse-group-select" onchange="magazzinoGroupFilter=this.value; magazzinoColorFilter=''; magazzinoTagliaFilter=''; renderMagazzino();">
       ${WAREHOUSE_GROUPS.map(g=>`<option value="${g}" ${magazzinoGroupFilter===g?'selected':''}>${warehouseGroupLabel(g)}</option>`).join("")}
     </select>
   `;
@@ -5141,6 +5146,17 @@ function quickWarehouseCatalogPick(value){
     sizeSel.disabled = !sizes.length;
   }
 }
+function quickWarehouseColorPick(colore){
+  const code = normalizeCatalogCode(document.getElementById("quick-codice")?.value || "");
+  const sizeSel = document.getElementById("quick-taglia");
+  if(!sizeSel) return;
+  const sizes = catalogSizesForCode(code,colore);
+  sizeSel.innerHTML = sizes.length
+    ? `<option value="">Seleziona taglia…</option>${sizes.map(s=>`<option value="${s}">${s}</option>`).join("")}`
+    : `<option value="">Nessuna taglia disponibile</option>`;
+  sizeSel.disabled = !sizes.length;
+}
+
 function quickWarehouseRowHtml(){
   const isTextile = magazzinoGroupFilter==="Tessile";
   return `
@@ -5159,7 +5175,7 @@ function quickWarehouseRowHtml(){
           <tbody><tr>
             <td style="min-width:220px;">${warehouseQuickProductField()}</td>
             <td style="min-width:150px;">${isTextile
-              ? `<select id="quick-colore" class="inline" style="width:100%;" disabled><option value="">Seleziona prima il prodotto…</option></select>`
+              ? `<select id="quick-colore" class="inline" style="width:100%;" disabled onchange="quickWarehouseColorPick(this.value)"><option value="">Seleziona prima il prodotto…</option></select>`
               : `<input id="quick-colore" class="inline" style="width:100%;" placeholder="Variante / colore">`}</td>
             <td style="min-width:150px;">${isTextile
               ? `<select id="quick-taglia" class="inline" style="width:100%;" disabled><option value="">Seleziona prima il prodotto…</option></select>`
@@ -5226,11 +5242,27 @@ function warehouseCategoryOptions(selected){
   return opts.map(o=>`<option value="${o}" ${o===selected?'selected':''}>${o}</option>`).join("");
 }
 let magazzinoSearch = "";
+let magazzinoColorFilter = "";
+let magazzinoTagliaFilter = "";
+function magazzinoFilterValues(){
+  const base = state.warehouse.filter(w=>Number(w.quantita)>0 && (w.warehouseGroup||"Tessile")===magazzinoGroupFilter);
+  const colori = [...new Set(base.map(w=>canonicalWarehouseColor(w.colore)).filter(Boolean))].sort(compareWarehouseColors);
+  const taglie = [...new Set(base.map(w=>String(w.taglia||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"it",{numeric:true,sensitivity:"base"}));
+  return {colori,taglie};
+}
+function applyMagazzinoFilters(){
+  const tbody = document.getElementById("warehouseTableBody");
+  if(tbody) tbody.innerHTML = magazzinoRowsHtml(filteredMagazzinoRows(magazzinoSearch));
+}
+function setMagazzinoColorFilter(v){ magazzinoColorFilter=v||""; applyMagazzinoFilters(); }
+function setMagazzinoTagliaFilter(v){ magazzinoTagliaFilter=v||""; applyMagazzinoFilters(); }
 function filteredMagazzinoRows(q){
   q = (q||"").toLowerCase();
   return state.warehouse
     .filter(w => Number(w.quantita)>0
       && (w.warehouseGroup||"Tessile")===magazzinoGroupFilter
+      && (!magazzinoColorFilter || warehouseColorKey(w.colore)===warehouseColorKey(magazzinoColorFilter))
+      && (!magazzinoTagliaFilter || String(w.taglia||"").trim().toUpperCase()===String(magazzinoTagliaFilter).trim().toUpperCase())
       && (!q || (w.codice||"").toLowerCase().includes(q) || (w.nome||"").toLowerCase().includes(q) || ((w.colore||"").toLowerCase().includes(q) || canonicalWarehouseColor(w.colore).toLowerCase().includes(q)) || (w.taglia||"").toLowerCase().includes(q)))
     .sort((a,b)=>{
       const codeCmp = String(a.codice||a.nome||"").localeCompare(String(b.codice||b.nome||""),"it",{numeric:true,sensitivity:"base"});
@@ -5313,11 +5345,11 @@ function magazzinoRowsHtml(list){
 }
 function filterMagazzino(input){
   magazzinoSearch = input.value;
-  const tbody = document.getElementById("warehouseTableBody");
-  if(tbody) tbody.innerHTML = magazzinoRowsHtml(filteredMagazzinoRows(magazzinoSearch));
+  applyMagazzinoFilters();
 }
 function renderMagazzino(){
   const q = magazzinoSearch.toLowerCase();
+  const filterValues = magazzinoFilterValues();
   const list = filteredMagazzinoRows(q);
   document.getElementById("view-magazzino").innerHTML = `
     <div class="card warehouse-toolbar" style="margin-bottom:14px;padding:12px;">
@@ -5366,8 +5398,18 @@ function renderMagazzino(){
       </div>
     </div>
     <div class="section-header">
-      <div class="filters"><input id="magazzinoSearchInput" class="inline" style="min-width:220px;" placeholder="Cerca per codice, nome o colore…" value="${magazzinoSearch}" oninput="filterMagazzino(this)"></div>
-<div></div>
+      <div class="filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input id="magazzinoSearchInput" class="inline" style="min-width:220px;" placeholder="Cerca per codice o nome…" value="${magazzinoSearch}" oninput="filterMagazzino(this)">
+        <select class="inline" onchange="setMagazzinoTagliaFilter(this.value)">
+          <option value="">Tutte le taglie</option>
+          ${filterValues.taglie.map(v=>`<option value="${v}" ${magazzinoTagliaFilter===v?'selected':''}>${v}</option>`).join("")}
+        </select>
+        <select class="inline" onchange="setMagazzinoColorFilter(this.value)">
+          <option value="">Tutti i colori</option>
+          ${filterValues.colori.map(v=>`<option value="${v}" ${warehouseColorKey(magazzinoColorFilter)===warehouseColorKey(v)?'selected':''}>${v}</option>`).join("")}
+        </select>
+      </div>
+      <div></div>
     </div>
     <div class="table-wrap">
       <table>
