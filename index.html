@@ -3251,7 +3251,7 @@ function renderDashboard(){
   const ordiniImportanti = state.orders.filter(o=>o.importante && o.stato!=="Consegnato");
   const magazzinoDaOrdinare = computeMagazzinoDaOrdinare();
   const pezziDaOrdinare = magazzinoDaOrdinare.reduce((s,x)=>s + Number(x.entry.daOrdinareQty||0), 0);
-  const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>orderWorkersList(o).includes(w) && o.stato!=="Consegnato").length}));
+  const workload = WORKERS.map(w=>({w, n: state.orders.filter(o=>orderWorkersList(o).includes(w) && o.stato!=="Consegnato" && o.stato!=="Completato").length}));
   const workloadMax = Math.max(1, ...workload.map(x=>x.n));
   const oggi = today();
   const consegneGiornaliere = activeOrders.filter(o=>o.dataConsegna===oggi).sort((a,b)=>{
