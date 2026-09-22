@@ -5079,7 +5079,13 @@ function renderFlusso(){
     <p class="helptext">Gli ordini consegnati non compaiono più qui: restano visibili nell'elenco Ordini.</p>
     <div class="kanban">
       ${KANBAN_STATUSES.map(st=>{
-        const items = list.filter(o=>o.stato===st);
+        const items = list.filter(o=>{
+          if(o.stato!==st) return false;
+          // Gli ordini in produzione con almeno una lavorazione esterna
+          // compaiono esclusivamente nella sezione PRODUZIONE ESTERNA.
+          if(st==="In produzione" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne")) return false;
+          return true;
+        });
         return `<div class="kanban-col">
           <h4>${statusDot(st)}${st}<span>${items.length}</span></h4>
           ${items.map(o=>{
