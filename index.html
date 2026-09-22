@@ -131,20 +131,19 @@
   .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
   .filters{display:flex;gap:8px;flex-wrap:wrap;}
   .empty{padding:30px 10px;text-align:center;color:var(--muted);font-size:13.5px;}
-  .kanban{display:grid;grid-template-columns:repeat(5,minmax(280px,1fr));gap:18px;overflow-x:auto;padding:6px 2px 18px;}
-  @media(max-width:1100px){.kanban{grid-template-columns:repeat(5,320px);}}
+  .kanban{display:grid;grid-template-columns:repeat(4,minmax(300px,1fr));gap:18px;overflow-x:auto;padding:6px 2px 18px;}
+  @media(max-width:1100px){.kanban{grid-template-columns:repeat(4,340px);}}
   .kanban-col{background:#EEF2F6;border:1px solid #DDE4EC;border-radius:18px;padding:14px;min-width:280px;box-shadow:0 8px 24px rgba(31,41,55,.05);}
   .kanban-col h4{margin:2px 2px 14px;padding:10px 12px;border-radius:12px;font-size:14px;color:#243142;display:flex;justify-content:space-between;align-items:center;font-weight:800;letter-spacing:.15px;background:#fff;border:1px solid #E2E8F0;}
   .kanban-col h4 span{background:#F1F5F9;color:#475569;border-radius:999px;padding:2px 8px;font-size:12px;}
   .kanban-col[data-stage="todo"] h4{border-left:5px solid #64748B;}
   .kanban-col[data-stage="grafica"] h4{border-left:5px solid #3B82F6;}
-  .kanban-col[data-stage="ready"] h4{border-left:5px solid #8B5CF6;}
   .kanban-col[data-stage="production"] h4{border-left:5px solid #F59E0B;}
   .kanban-col[data-stage="external"] h4{border-left:5px solid #10B981;}
   .job-card{background:#FFFFFF;border:1px solid #D9E1EA;border-radius:14px;padding:17px 16px;margin-bottom:14px;font-size:15px;cursor:pointer;box-shadow:0 4px 14px rgba(15,23,42,.07);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
   .job-card.job-card-business,.job-card.job-card-family{border-top:1px solid #D9E1EA;}
   .job-card:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(15,23,42,.11);border-color:#B8C5D4;}
-  .job-card.job-card-importante{border:2px solid #F2B705;background:#FFF9DF;box-shadow:0 6px 18px rgba(242,183,5,.18);}
+  .job-card.job-card-importante{border:2px solid #F2B705;background:#FFFFFF;box-shadow:0 6px 18px rgba(242,183,5,.16);}
   .job-card .jc-star{color:#9A6700;font-size:12px;font-weight:800;letter-spacing:.4px;margin-bottom:8px;}
   .job-card .jc-client{font-weight:800;font-size:17px;line-height:1.25;margin-bottom:8px;color:#172033;}
   .job-card .jc-cat{color:#0F766E;font-size:13.5px;font-weight:700;margin-bottom:7px;}
@@ -152,6 +151,16 @@
   .job-card .jc-line{color:#0F6F7A;font-size:14px;font-weight:700;line-height:1.55;}
   .job-card .jc-desc{font-size:14px;color:var(--text);margin-bottom:9px;}
   .job-card .jc-meta{color:#64748B;font-size:13px;display:flex;justify-content:space-between;gap:12px;margin-top:10px;font-weight:700;}
+  .job-card .jc-bozza-wrap{margin:11px 0 4px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .job-card .jc-bozza-title{font-size:10px;font-weight:900;letter-spacing:.55px;color:#64748B;}
+  .job-card .jc-bozza-badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:10.5px;font-weight:900;letter-spacing:.15px;border:1px solid transparent;}
+  .jc-bozza-none{background:#F1F5F9;color:#64748B;border-color:#CBD5E1!important;}
+  .jc-bozza-mail{background:#E8F2FF;color:#1D4ED8;border-color:#BFDBFE!important;}
+  .jc-bozza-mattia{background:#F3E8FF;color:#7E22CE;border-color:#D8B4FE!important;}
+  .jc-bozza-wait{background:#FFF3D6;color:#9A6700;border-color:#F5D77A!important;}
+  .jc-bozza-ok{background:#EAF8EF;color:#187A44;border-color:#B7E4C7!important;}
+  .embedded-warehouse{margin:18px 0;padding:16px;border:1px solid #DDE5EE;border-radius:14px;background:#F8FAFC;}
+  .additional-work-lines{margin-top:18px;padding-top:16px;border-top:1px solid #E2E8F0;}
   .modal-backdrop{position:fixed;inset:0;background:rgba(10,14,22,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 20px;z-index:100000;overflow-y:auto;}
   .modal-backdrop.open{display:flex;}
   .modal{background:var(--card);border-radius:12px;max-width:1080px;width:100%;padding:32px;position:relative;margin-bottom:40px;}
@@ -242,7 +251,7 @@
     .field input,.field select,.field textarea{font-size:16px;}
     input.inline,select.inline{font-size:16px;}
     .btn{min-height:42px;}
-    .kanban{grid-template-columns:repeat(5,82vw);}
+    .kanban{grid-template-columns:repeat(4,84vw);}
     .toast{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));text-align:center;}
   }
 
@@ -700,7 +709,7 @@
     .form-panel{border-radius:18px;padding:14px;}
     .form-grid{grid-template-columns:1fr;}
     .field input,.field select,.field textarea{min-height:48px;}
-    .kanban{grid-template-columns:repeat(5,86vw);}
+    .kanban{grid-template-columns:repeat(4,86vw);}
   }
 
   @media(max-width:430px){
@@ -1695,11 +1704,11 @@ const PRODOTTI_PER_CATEGORIA = {
 const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone"];
 const NOTE_OPERATORS = ["Mattia","Patrizio","Sara","Francess","Simone"];
 const FAMILY_RICHIESTE = ["Felpe per reparti","Tessuti","Allestimenti","Poster ospedali","Gadget","Altro"];
-const STATUSES = ["Da fare","In preparazione grafica","Pronto per la produzione","In produzione","Completato","Consegnato"];
+const STATUSES = ["Da fare","In preparazione grafica","In produzione","Completato","Consegnato"];
 const KANBAN_STATUSES = STATUSES.filter(s=>s!=="Consegnato");
-const WORKFLOW_VISIBLE_STAGES = ["Da fare","In preparazione grafica","Pronto per la produzione","In produzione","Produzione esterna"];
-const STATUS_CLASS = {"Da fare":"pill-todo","In preparazione grafica":"pill-lavorazione","Pronto per la produzione":"pill-produzione","In produzione":"pill-produzione","Completato":"pill-done","Consegnato":"pill-delivered"};
-const STATUS_DOT = {"Da fare":"#64748B","In preparazione grafica":"#3B82F6","Pronto per la produzione":"#8B5CF6","In produzione":"#F59E0B","Completato":"#2ECC71","Consegnato":"#3D4A78"};
+const WORKFLOW_VISIBLE_STAGES = ["Da fare","In preparazione grafica","In produzione","Produzione esterna"];
+const STATUS_CLASS = {"Da fare":"pill-todo","In preparazione grafica":"pill-lavorazione","In produzione":"pill-produzione","Completato":"pill-done","Consegnato":"pill-delivered"};
+const STATUS_DOT = {"Da fare":"#64748B","In preparazione grafica":"#3B82F6","In produzione":"#F59E0B","Completato":"#2ECC71","Consegnato":"#3D4A78"};
 function statusDot(stato){ return `<span class="status-dot" style="background:${STATUS_DOT[stato]||'#ccc'}"></span>`; }
 function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#4A4A4A" : "#fff"; }
 const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
@@ -4554,9 +4563,37 @@ function renderMagazzinoSection(o){
 function workerOptions(selected){ return `<option value="">Non assegnato</option>` + WORKERS.map(w=>`<option value="${w}" ${w===selected?'selected':''}>${w}</option>`).join(""); }
 
 /* ============ EDITOR RIGHE (usato da preventivi e ordini) ============ */
-function linesEditor(collection, id, righe){
+function orderProductOptions(category, selected){
+  if(category!=="Stampa" && category!=="Ricamo") return prodottoOptions(category, selected);
+  const allowed=["Articolo","Altro tessuto"];
+  let html='';
+  if(selected && !allowed.includes(selected)){
+    html += `<option value="${selected}" selected disabled>${selected} (esistente)</option>`;
+  }
+  html += `<option value="">Seleziona…</option>` + allowed.map(x=>`<option value="${x}" ${x===selected?'selected':''}>${x}</option>`).join('');
+  return html;
+}
+function renderMagazzinoInline(o){
+  const html=renderMagazzinoSection(o);
+  if(!html) return "";
+  return html.replace(/^\s*<div class="modal-section">\s*/,"").replace(/\s*<\/div>\s*$/,"");
+}
+function orderLinesWithWarehouse(o){
+  const rows=o.righe||[];
+  const first=rows.slice(0,1);
+  const rest=rows.slice(1);
+  const hasTextile=rows.some(r=>r.categoria==="Stampa" || r.categoria==="Ricamo");
+  return `
+    ${linesEditor('orders',o.id,first,{showAdd:false,forceShowDots:rows.length>1})}
+    ${hasTextile ? `<div class="embedded-warehouse">${renderMagazzinoInline(o)}</div>` : ''}
+    ${rest.length ? `<div class="additional-work-lines"><h4 style="margin:0 0 10px;">Altre righe di lavorazione</h4>${linesEditor('orders',o.id,rest,{showAdd:false,forceShowDots:true})}</div>` : ''}
+    <div style="margin-top:14px;"><button class="btn btn-outline btn-sm" onclick="addRiga('orders','${o.id}')">+ Aggiungi altra riga</button></div>
+  `;
+}
+function linesEditor(collection, id, righe, options={}){
   const isOrder = collection === 'orders';
-  const showDots = isOrder && righe.length > 1;
+  const showDots = isOrder && (options.forceShowDots ?? (righe.length > 1));
+  const showAdd = options.showAdd !== false;
   return `
     <div style="overflow-x:auto;">
     <table class="lines-table">
@@ -4570,7 +4607,7 @@ function linesEditor(collection, id, righe){
         ${righe.map(r=>`
           <tr>
             ${isOrder ? `<td><select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">${categoryOptions(r.categoria, true)}</select></td>
-            <td>${PRODOTTI_PER_CATEGORIA[r.categoria] ? `<select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">${prodottoOptions(r.categoria, r.prodotto)}</select>` : `<span style="color:var(--muted);">—</span>`}</td>` : `<td><input class="desc-input" value="${r.descrizione||''}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>`}
+            <td>${PRODOTTI_PER_CATEGORIA[r.categoria] ? `<select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">${orderProductOptions(r.categoria, r.prodotto)}</select>` : `<span style="color:var(--muted);">—</span>`}</td>` : `<td><input class="desc-input" value="${r.descrizione||''}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>`}
             <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
             <td class="num"><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)"></td>
             <td class="num" style="padding-top:8px;">${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</td>
@@ -4580,7 +4617,7 @@ function linesEditor(collection, id, righe){
       </tbody>
     </table>
     </div>
-    <button class="btn btn-outline btn-sm" onclick="addRiga('${collection}','${id}')">+ Aggiungi riga</button>
+    ${showAdd ? `<button class="btn btn-outline btn-sm" onclick="addRiga('${collection}','${id}')">+ Aggiungi riga</button>` : ''}
   `;
 }
 function findItem(collection, id){ return state[collection].find(x=>x.id===id); }
@@ -5063,6 +5100,14 @@ function deleteOrder(id){
 
 /* ============ FLUSSO DI LAVORO (Kanban) ============ */
 let flussoFilters = {categoria:"", worker:""};
+function bozzaCardMeta(o){
+  const m=getBozzaMeta(o);
+  if(m.stato==="IN ATTESA DI CONFERMA BOZZA") return {label:"IN ATTESA DI CONFERMA",cls:"jc-bozza-wait"};
+  if(m.scelta==="NON SERVE BOZZA") return {label:"NON SERVE BOZZA",cls:"jc-bozza-ok"};
+  if(m.scelta==="BOZZA DA INVIARE PER MAIL") return {label:"DA INVIARE PER MAIL",cls:"jc-bozza-mail"};
+  if(m.scelta==="BOZZA DA INVIARE A MATTIA") return {label:"DA INVIARE A MATTIA",cls:"jc-bozza-mattia"};
+  return {label:"DA IMPOSTARE",cls:"jc-bozza-none"};
+}
 function renderFlusso(){
   const f = flussoFilters;
   const list = state.orders.filter(o => o.stato!=="Consegnato" && o.stato!=="Completato" && (!f.categoria || orderCategorie(o).includes(f.categoria)) && (!f.worker || orderWorkersList(o).includes(f.worker)))
@@ -5076,7 +5121,6 @@ function renderFlusso(){
   const stageMeta = {
     "Da fare":{key:"todo",label:"DA FARE"},
     "In preparazione grafica":{key:"grafica",label:"IN PREPARAZIONE GRAFICA"},
-    "Pronto per la produzione":{key:"ready",label:"PRONTO PER LA PRODUZIONE"},
     "In produzione":{key:"production",label:"IN PRODUZIONE"},
     "Produzione esterna":{key:"external",label:"PRODUZIONE ESTERNA"}
   };
@@ -5091,6 +5135,7 @@ function renderFlusso(){
         ${(o.righe||[]).filter(r=>r.categoria).map(r=>`<div class="jc-line">${r.categoria}${r.prodotto?' — '+r.prodotto:''} <span style="color:#64748B;font-weight:600;">×${r.quantita}</span></div>`).join("") || `<div class="jc-line" style="color:#64748B">Nessuna categoria assegnata</div>`}
         ${external ? `<div class="jc-line" style="margin-top:6px;color:#475569;font-weight:600;">Fornitore: <strong style="color:#172033;">${suppliers.length?suppliers.join(', '):'da indicare'}</strong></div>` : ``}
       </div>
+      ${(()=>{const b=bozzaCardMeta(o);return `<div class="jc-bozza-wrap"><span class="jc-bozza-title">GESTIONE BOZZA</span><span class="jc-bozza-badge ${b.cls}">${b.label}</span></div>`;})()}
       <div class="jc-meta"><span>${orderWorkersLabel(o)||'non assegnato'}</span><span>${fmtDate(o.dataConsegna)}</span></div>
     </div>`;
   };
@@ -5200,12 +5245,11 @@ function openJobCard(orderId){
     <div class="modal-section">
       <h3>Righe di lavorazione</h3>
       <p class="helptext" style="margin-top:-4px;">Ogni riga ha una propria categoria di lavoro.${o.righe.length>1 ? ' Scegli lo stato di ciascuna riga dal menu colorato.' : ''}</p>
-      ${linesEditor('orders', o.id, o.righe)}
+      ${orderLinesWithWarehouse(o)}
     </div>
 
     ${renderRitiroEsternoSection(o)}
 
-    ${renderMagazzinoSection(o)}
 
     <div class="modal-section">
       <h3>Descrizione generale del lavoro</h3>
@@ -6763,7 +6807,7 @@ function renderGmailActionButtons(messageId){
 
     <button id="gmail-btn-order" class="btn btn-outline"
       onclick="gmailOrderAction('${messageId}')">
-      ${f.orderGenerated?'ORDINE EFFETTUATO':'Crea Ordine'}
+      ${f.orderGenerated?'ORDINE EFFETTUATO':'Rispondi e crea ordine'}
     </button>
   `;
 }
@@ -6796,9 +6840,50 @@ async function gmailLeadAction(messageId){
 }
 
 async function gmailOrderAction(messageId){
-  paintGmailActionButton("orderGenerated");
-  await setGmailActionFlag(messageId,"orderGenerated");
-  createOrderFromGmail();
+  const m=gmailSelectedMessage;
+  if(!m?.id){ showToast("Apri prima una mail"); return; }
+  const bodyText=`Gentile cliente,
+
+abbiamo preso in carico il tuo ordine.
+Avviseremo appena il lavoro sarà pronto per essere ritirato.
+
+Cordiali saluti
+Team Creativò`;
+  const btn=document.getElementById("gmail-btn-order");
+  if(btn){ btn.disabled=true; btn.textContent="Invio risposta…"; }
+  try{
+    const {data:sessionData}=await sb.auth.getSession();
+    const session=sessionData?.session;
+    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "apikey":SUPABASE_KEY,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        messageId:m.id,
+        bodyText,
+        subject:normalizeReplySubjectClient(m.subject||""),
+        attachments:[]
+      })
+    });
+    const raw=await response.text();
+    let result={};
+    try{ result=JSON.parse(raw); }catch(e){}
+    if(!response.ok) throw new Error(result?.error||result?.message||raw||`Errore HTTP ${response.status}`);
+    await setGmailActionFlag(messageId,"replied");
+    await setGmailActionFlag(messageId,"orderGenerated");
+    paintGmailActionButton("replied");
+    paintGmailActionButton("orderGenerated");
+    showToast("Risposta inviata. Creo l'ordine…");
+    createOrderFromGmail();
+  }catch(err){
+    console.error("Rispondi e crea ordine",err);
+    showToast(err?.message||"Invio risposta non riuscito");
+    if(btn){ btn.disabled=false; btn.textContent="Rispondi e crea ordine"; }
+  }
 }
 
 function renderGmailReader(){
