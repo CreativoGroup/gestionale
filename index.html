@@ -1850,6 +1850,13 @@ function snapshotCollection(collection){
 function snapshotAllCollections(){ Object.keys(TABLES).forEach(snapshotCollection); }
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function uuid(){
+  if(window.crypto && typeof window.crypto.randomUUID==='function') return window.crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+    const r=Math.random()*16|0, v=c==='x'?r:(r&0x3|0x8);
+    return v.toString(16);
+  });
+}
 function today(){ return new Date().toISOString().slice(0,10); }
 function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
 
@@ -2745,7 +2752,7 @@ async function saveManualLead(fonte='manuale'){
   const btn=document.getElementById('manual-lead-save');
   if(btn){btn.disabled=true;btn.textContent='Salvataggio…';}
   const lead={
-    id:uid(),
+    id:uuid(),
     nome:String(document.getElementById('manual-lead-nome')?.value||'').trim(),
     azienda:String(document.getElementById('manual-lead-azienda')?.value||'').trim(),
     email:String(document.getElementById('manual-lead-email')?.value||'').trim().toLowerCase(),
@@ -4800,7 +4807,7 @@ async function transformQuoteToLead(quoteId){
   if(existing){showToast('Questo preventivo è già stato trasformato in Lead');return;}
   const c=state.clients.find(x=>x.id===q.clientId);
   const righe=(q.righe||[]).map(r=>`${r.descrizione||r.prodotto||q.categoria}: ${r.quantita||0} x ${fmtMoney(r.prezzoUnitario||0)}`).join('\n');
-  const lead={id:uid(),nome:c?.nome||'',azienda:c?.ragioneSociale||c?.azienda||'',email:c?.email||'',telefono:c?.telefono||'',oggettoRichiesta:`Preventivo - ${q.categoria||''}`.trim(),richiesta:`${q.descrizione||''}${q.descrizione&&righe?'\n':''}${righe}${righe?'\n':''}Totale: ${fmtMoney(quoteImponibile(q))}`.trim(),stato:'In attesa di conferma',fonte:`preventivo:${q.id}`,creatoIl:new Date().toISOString(),aggiornatoIl:new Date().toISOString()};
+  const lead={id:uuid(),nome:c?.nome||'',azienda:c?.ragioneSociale||c?.azienda||'',email:c?.email||'',telefono:c?.telefono||'',oggettoRichiesta:`Preventivo - ${q.categoria||''}`.trim(),richiesta:`${q.descrizione||''}${q.descrizione&&righe?'\n':''}${righe}${righe?'\n':''}Totale: ${fmtMoney(quoteImponibile(q))}`.trim(),stato:'In attesa di conferma',fonte:`preventivo:${q.id}`,creatoIl:new Date().toISOString(),aggiornatoIl:new Date().toISOString()};
   const ok=await upsertOne('leads',lead); if(!ok)return;
   if(!state.leads.some(x=>x.id===lead.id)) state.leads.unshift(lead);
   showToast('Lead creato: In attesa di conferma');
