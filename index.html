@@ -2542,14 +2542,17 @@ function renderCurrentView(){
     posta:renderPosta, whatsapp:()=>renderMetaChannel("whatsapp"), instagram:()=>renderMetaChannel("instagram"), leads:renderLeads})[currentView]();
 }
 let clientFormOpen = false;
+let quoteFormOpen = false;
 /* Evita che la sincronizzazione multi-PC ridisegni il modulo Nuovo cliente mentre l'operatore sta scrivendo.
    I dati remoti vengono comunque aggiornati nello state; la vista verrà ridisegnata dopo Salva/Annulla. */
 function shouldDeferCurrentViewRender(){
   if(currentView === "clienti" && clientFormOpen) return true;
+  if(currentView === "preventivi" && quoteFormOpen) return true;
   return false;
 }
 function toggleForm(id){
   if(id==="clientForm") clientFormOpen = !clientFormOpen;
+  if(id==="quoteForm") quoteFormOpen = !quoteFormOpen;
   const el = document.getElementById(id);
   if(el) el.classList.toggle("open");
 }
@@ -4566,7 +4569,7 @@ function updateRigaField(collection, id, rigaId, field, value){
 /* ============ PREVENTIVI ============ */
 function renderPreventivi(){
   document.getElementById("view-preventivi").innerHTML = `
-    <div class="form-panel" id="quoteForm">
+    <div class="form-panel ${quoteFormOpen?'open':''}" id="quoteForm">
       <h3>Nuovo preventivo</h3>
       <div class="form-grid">
         <div class="field"><label>Cliente <span style="font-weight:500;color:var(--muted);">(facoltativo)</span></label>
@@ -4797,10 +4800,10 @@ async function transformQuoteToLead(quoteId){
   if(existing){showToast('Questo preventivo è già stato trasformato in Lead');return;}
   const c=state.clients.find(x=>x.id===q.clientId);
   const righe=(q.righe||[]).map(r=>`${r.descrizione||r.prodotto||q.categoria}: ${r.quantita||0} x ${fmtMoney(r.prezzoUnitario||0)}`).join('\n');
-  const lead={id:uid(),nome:c?.nome||'',azienda:c?.ragioneSociale||c?.azienda||'',email:c?.email||'',telefono:c?.telefono||'',oggettoRichiesta:`Preventivo - ${q.categoria||''}`.trim(),richiesta:`${q.descrizione||''}${q.descrizione&&righe?'\n':''}${righe}${righe?'\n':''}Totale: ${fmtMoney(quoteImponibile(q))}`.trim(),stato:'Nuovo',fonte:`preventivo:${q.id}`,creatoIl:new Date().toISOString(),aggiornatoIl:new Date().toISOString()};
+  const lead={id:uid(),nome:c?.nome||'',azienda:c?.ragioneSociale||c?.azienda||'',email:c?.email||'',telefono:c?.telefono||'',oggettoRichiesta:`Preventivo - ${q.categoria||''}`.trim(),richiesta:`${q.descrizione||''}${q.descrizione&&righe?'\n':''}${righe}${righe?'\n':''}Totale: ${fmtMoney(quoteImponibile(q))}`.trim(),stato:'In attesa di conferma',fonte:`preventivo:${q.id}`,creatoIl:new Date().toISOString(),aggiornatoIl:new Date().toISOString()};
   const ok=await upsertOne('leads',lead); if(!ok)return;
   if(!state.leads.some(x=>x.id===lead.id)) state.leads.unshift(lead);
-  showToast('Lead creato dal preventivo');
+  showToast('Lead creato: In attesa di conferma');
   openQuoteDetail(quoteId);
 }
 
