@@ -1712,15 +1712,6 @@ const STATUS_CLASS = {"Da fare":"pill-todo","In preparazione grafica":"pill-lavo
 const STATUS_DOT = {"Da fare":"#FFFFFF","In preparazione grafica":"#E4573D","In produzione":"#F4C430","Completato":"#2E9D57","Consegnato":"#3D4A78"};
 function statusDot(stato){ return `<span class="status-dot" style="background:${STATUS_DOT[stato]||'#ccc'}"></span>`; }
 function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#28323F" : "#fff"; }
-function orderStatusVisual(o){
-  const external = !!(o && o.stato==="In produzione" && typeof hasExternal==="function" && hasExternal(o));
-  if(external) return {bg:"#2E9D57", color:"#FFFFFF", label:"IN PRODUZIONE ESTERNA"};
-  if(o?.stato==="Da fare") return {bg:"#FFFFFF", color:"#28323F", label:"DA FARE"};
-  if(o?.stato==="In preparazione grafica") return {bg:"#E4573D", color:"#FFFFFF", label:"IN PREPARAZIONE GRAFICA"};
-  if(o?.stato==="In produzione") return {bg:"#F4C430", color:"#28323F", label:"IN PRODUZIONE"};
-  if(o?.stato==="Completato") return {bg:"#2E9D57", color:"#FFFFFF", label:"COMPLETATO"};
-  return {bg:STATUS_DOT[o?.stato]||"#FFFFFF", color:statusTextColor(o?.stato), label:(o?.stato||"").toUpperCase()};
-}
 
 const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
 const QUOTE_CLASS = {"Bozza":"pill-draft","Inviato":"pill-sent","Accettato":"pill-accepted","Rifiutato":"pill-refused"};
@@ -5425,10 +5416,7 @@ function openJobCard(orderId){
     <div class="ticket-meta ticket-meta-big">
       <div><span>Operatori</span>${workerMultiSelector(o)}</div>
       <div><span>Data consegna</span><input class="inline inline-big" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value)"></div>
-      <div><span>Stato</span>${(()=>{
-        const sv=orderStatusVisual(o);
-        return `<select class="inline inline-big status-select-big" style="background:${sv.bg};color:${sv.color};border:1px solid ${o.stato==="Da fare"?"#DDE2E5":"transparent"}" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${(s==="In produzione" && hasExternal(o))?"IN PRODUZIONE ESTERNA":s.toUpperCase()}</option>`).join("")}</select>`;
-      })()}</div>
+      <div><span>Stato</span><select class="inline inline-big status-select-big" style="background:${(o.stato==="In produzione" && hasExternal(o))?"#2E9D57":STATUS_DOT[o.stato]};color:${(o.stato==="In produzione" && hasExternal(o))?"#FFFFFF":statusTextColor(o.stato)};border:1px solid ${o.stato==="Da fare"?"#DDE2E5":"transparent"}" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${(s==="In produzione" && hasExternal(o))?"IN PRODUZIONE ESTERNA":s.toUpperCase()}</option>`).join("")}</select></div>
     </div>
 
     <div class="modal-section">
@@ -6633,13 +6621,29 @@ function renderEntrate(){
     </div>
   `;
 }
-function addEntrata(){
+async function addEntrata(){
+  if(!currentUser || currentUser.role!=="admin"){
+    showToast("Operazione riservata all'amministratore");
+    return;
+  }
   const descrizione = document.getElementById("if2-descrizione").value.trim();
   const importo = Number(document.getElementById("if2-importo").value)||0;
+  const metodo = document.getElementById("if2-metodo").value;
+  const data = document.getElementById("if2-data").value || today();
+
   if(!descrizione){ showToast("Inserisci una descrizione"); return; }
   if(importo<=0){ showToast("Inserisci un importo valido"); return; }
-  state.entrate.push({id:uid(), descrizione, importo, metodo:document.getElementById("if2-metodo").value, data:document.getElementById("if2-data").value||today()});
-  saveState('entrate'); toggleForm('incomeForm'); renderEntrate(); showToast("Entrata registrata");
+
+  const item = {id:uuid(), descrizione, importo, metodo, data};
+
+  const ok = await upsertOne('entrate', item);
+  if(!ok) return;
+
+  if(!state.entrate.some(x=>x.id===item.id)) state.entrate.push(item);
+
+  toggleForm('incomeForm');
+  renderEntrate();
+  showToast("Entrata registrata");
 }
 function deleteEntrata(id){
   askConfirm("Eliminare questa entrata?", ()=>{
