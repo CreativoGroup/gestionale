@@ -95,7 +95,7 @@
   .pill-delivered{background:#E3E7F0;color:#3D4A78;}
   .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,.15);}
   .riga-status-select{border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px;font-weight:600;cursor:pointer;min-width:130px;}
-  .desc-lavoro{width:100%;min-height:110px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;font-size:16px;font-family:inherit;resize:vertical;}
+  .desc-lavoro{width:100%;min-height:280px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;font-size:16px;font-family:inherit;resize:vertical;}
   .desc-lavoro:focus{outline:2px solid var(--accent);outline-offset:1px;}
   .pill-open{background:#FBE1DA;color:var(--danger);}
   .pill-accepted{background:#DFF0E4;color:var(--ok);}
@@ -172,7 +172,7 @@
   .inline-big{font-size:19px !important;padding:13px 14px !important;font-weight:700;}
   input[type="date"].inline-big{font-size:22px !important;padding:16px 16px !important;}
   input[type="date"].inline-big::-webkit-calendar-picker-indicator{transform:scale(1.5);margin-left:8px;cursor:pointer;}
-  .status-select-big{border:1px solid var(--border);border-radius:7px;}
+  .status-select-big{border:none;border-radius:7px;}
   @media(max-width:700px){.ticket-meta-big{grid-template-columns:1fr;}}
   .modal h3{font-size:18.5px;font-weight:800;margin:22px 0 12px;}
   .modal .close-x{position:absolute;top:16px;right:18px;cursor:pointer;color:var(--muted);font-size:24px;background:none;border:none;}
@@ -1665,6 +1665,7 @@
     <section class="view" id="view-ordini"></section>
     <section class="view" id="view-flusso"></section>
     <section class="view" id="view-magazzino"></section>
+    <section class="view" id="view-lavoriCompletati"></section>
     <section class="view" id="view-incassi"></section>
     <section class="view" id="view-spese"></section>
     <section class="view" id="view-costiFissi"></section>
@@ -1693,8 +1694,8 @@ let gmailAutoRefreshTimer = null; // {id, email, role}
 /* ============ CONFIGURAZIONE ============ */
 const CATEGORIES = ["Stampa","Ricamo","Servizio","Gadget","Allestimenti","Piccolo Formato","Lavorazioni Esterne"];
 const PRODOTTI_PER_CATEGORIA = {
-  "Stampa": ["T-shirt","Polo","Felpa","Shopper","Cappello","Altro tessuto"],
-  "Ricamo": ["T-shirt","Polo","Felpa","Patch","Cappello","Altro tessuto"],
+  "Stampa": ["Tessuto del cliente","T-shirt","Polo","Felpa","Shopper","Cappello","Altro"],
+  "Ricamo": ["Tessuto del cliente","T-shirt","Polo","Felpa","Shopper","Cappello","Patch","Altro"],
   "Servizio": ["Logo","Sito","Grafica pubblicitaria","Altro"],
   "Gadget": ["Penna","USB","Tessera","Tazza","Borraccia","Tela canvas","Altro"],
   "Allestimenti": ["Sticker","Prespaziato","Poster","Banner","Velcro","Altro"],
@@ -1708,9 +1709,9 @@ const STATUSES = ["Da fare","In preparazione grafica","In produzione","Completat
 const KANBAN_STATUSES = STATUSES.filter(s=>s!=="Consegnato");
 const WORKFLOW_VISIBLE_STAGES = ["Da fare","In preparazione grafica","In produzione","Produzione esterna"];
 const STATUS_CLASS = {"Da fare":"pill-todo","In preparazione grafica":"pill-lavorazione","In produzione":"pill-produzione","Completato":"pill-done","Consegnato":"pill-delivered"};
-const STATUS_DOT = {"Da fare":"#FFFFFF","In preparazione grafica":"#E74C3C","In produzione":"#F4C542","Completato":"#2ECC71","Consegnato":"#3D4A78"};
+const STATUS_DOT = {"Da fare":"#64748B","In preparazione grafica":"#3B82F6","In produzione":"#F59E0B","Completato":"#2ECC71","Consegnato":"#3D4A78"};
 function statusDot(stato){ return `<span class="status-dot" style="background:${STATUS_DOT[stato]||'#ccc'}"></span>`; }
-function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#252B36" : "#fff"; }
+function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#4A4A4A" : "#fff"; }
 const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
 const QUOTE_CLASS = {"Bozza":"pill-draft","Inviato":"pill-sent","Accettato":"pill-accepted","Rifiutato":"pill-refused"};
 const STEP_TEMPLATES = {
@@ -2225,6 +2226,8 @@ function openBozzaMail(orderId){
 
 le inviamo la bozza relativa al lavoro in corso.
 
+Attendiamo conferma prima di poter procedere con la stampa.
+
 Cordiali saluti
 Team Creativò`;
   document.getElementById("modalBody").innerHTML=`
@@ -2428,6 +2431,7 @@ const NAV = [
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
+  {id:"lavoriCompletati", label:"Lavori completati", icon:"✓", subtitle:"Da consegnare e completati recenti", group:"Operativa"},
 
   {id:"incassi", label:"Incassi", icon:"€", subtitle:"Report pagamenti e crediti aperti", adminOnly:true, group:"Amministrazione"},
   {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine", group:"Amministrazione"},
@@ -2546,6 +2550,7 @@ function renderTopbarActions(){
     preventivi: `<button class="btn btn-primary" onclick="toggleForm('quoteForm')">+ Nuovo preventivo</button>`,
     ordini: `<button class="btn btn-primary" onclick="pendingLeadOrderConversion=null;toggleForm('orderForm')">+ Nuovo ordine</button>`,
     magazzino: ``,
+    lavoriCompletati: ``,
     incassi: `<button class="btn btn-primary" onclick="toggleForm('paymentForm')">+ Registra incasso</button>`,
     spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
     costiFissi: currentUser&&currentUser.role==="admin" ? `<button class="btn btn-primary" onclick="toggleForm('fixedCostForm')">+ Nuovo costo fisso</button>` : ``,
@@ -2561,7 +2566,7 @@ function renderTopbarActions(){
 function renderCurrentView(){
   ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti, preventivi:renderPreventivi,
     ordini:renderOrdini, flusso:renderFlusso,
-    magazzino:renderMagazzino, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
+    magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
     posta:renderPosta, whatsapp:()=>renderMetaChannel("whatsapp"), instagram:()=>renderMetaChannel("instagram"), leads:renderLeads})[currentView]();
 }
 let clientFormOpen = false;
@@ -4316,9 +4321,11 @@ function prodottoOptions(categoria, selected){
 }
 function magazzinoAllowedCategorie(o){
   const set = new Set();
+  const warehouseProducts = new Set(["T-shirt","Polo","Felpa","Shopper","Cappello"]);
   o.righe.forEach(r=>{
-    if(r.categoria==='Stampa' && r.prodotto) set.add(r.prodotto);
-    if(r.categoria==='Ricamo' && r.prodotto && r.prodotto!=='Patch') set.add(r.prodotto);
+    if((r.categoria==='Stampa' || r.categoria==='Ricamo') && warehouseProducts.has(r.prodotto)){
+      set.add(r.prodotto);
+    }
   });
   return set;
 }
@@ -4565,12 +4572,33 @@ function workerOptions(selected){ return `<option value="">Non assegnato</option
 /* ============ EDITOR RIGHE (usato da preventivi e ordini) ============ */
 function orderProductOptions(category, selected){
   if(category!=="Stampa" && category!=="Ricamo") return prodottoOptions(category, selected);
-  const allowed=["Articolo","Altro tessuto"];
+  const choices = category==="Stampa"
+    ? [
+        ["Tessuto del cliente","TESSUTO DEL CLIENTE"],
+        ["T-shirt","TSHIRT"],
+        ["Polo","POLO"],
+        ["Felpa","FELPA"],
+        ["Shopper","SHOPPER"],
+        ["Cappello","CAPPELLO"],
+        ["Altro","ALTRO"]
+      ]
+    : [
+        ["Tessuto del cliente","TESSUTO DEL CLIENTE"],
+        ["T-shirt","TSHIRT"],
+        ["Polo","POLO"],
+        ["Felpa","FELPA"],
+        ["Shopper","SHOPPER"],
+        ["Cappello","CAPPELLO"],
+        ["Patch","PATCH"],
+        ["Altro","ALTRO"]
+      ];
+  const allowedValues = choices.map(x=>x[0]);
   let html='';
-  if(selected && !allowed.includes(selected)){
+  if(selected && !allowedValues.includes(selected)){
     html += `<option value="${selected}" selected disabled>${selected} (esistente)</option>`;
   }
-  html += `<option value="">Seleziona…</option>` + allowed.map(x=>`<option value="${x}" ${x===selected?'selected':''}>${x}</option>`).join('');
+  html += `<option value="">Seleziona prodotto…</option>` +
+    choices.map(([value,label])=>`<option value="${value}" ${value===selected?'selected':''}>${label}</option>`).join('');
   return html;
 }
 function renderMagazzinoInline(o){
@@ -4932,6 +4960,80 @@ function openQuoteDetail(quoteId){
 }
 function updateQuoteField(id, field, value){ findItem('quotes',id)[field] = value; saveState('quotes'); }
 
+
+/* ============ LAVORI COMPLETATI ============ */
+function orderRecentArchiveTime(o){
+  // Per gli ordini già consegnati usiamo il dato temporale più vicino alla chiusura
+  // disponibile nel gestionale, senza aggiungere nuovi campi al database.
+  const candidates = [o?.avvisatoIl, o?.dataConsegna, o?.createdAt].filter(Boolean);
+  for(const raw of candidates){
+    const t = Date.parse(raw);
+    if(Number.isFinite(t)) return t;
+  }
+  return 0;
+}
+function renderCompletedDeliveryRows(list){
+  return list.length ? `
+    <div class="table-wrap" style="box-shadow:none;">
+      <table>
+        <thead><tr><th>Cliente</th><th>Lavorazione</th><th>Fornitore</th><th>Stato cliente</th><th></th></tr></thead>
+        <tbody>${list.map(o=>`
+          <tr>
+            <td><strong>${clientName(o.clientId)}</strong></td>
+            <td>${orderCategorieLabel(o)}</td>
+            <td>${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : "—"}</td>
+            <td>${completedOrderStageButton(o)}</td>
+            <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td>
+          </tr>`).join("")}</tbody>
+      </table>
+    </div>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`;
+}
+function renderLavoriCompletati(){
+  const daConsegnare = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato==="Completato"));
+  const cutoff = Date.now() - (15 * 24 * 60 * 60 * 1000);
+  const recenti = state.orders
+    .filter(o=>o.stato==="Consegnato" && orderRecentArchiveTime(o)>=cutoff)
+    .sort((a,b)=>orderRecentArchiveTime(b)-orderRecentArchiveTime(a));
+
+  document.getElementById("view-lavoriCompletati").innerHTML = `
+    <div class="card" style="margin-bottom:18px;">
+      <div class="section-header">
+        <div>
+          <h3 style="margin:0;">Completati da consegnare</h3>
+          <p class="helptext" style="margin:5px 0 0;">Stessi stati operativi della Dashboard: DA RITIRARE → DA AVVISARE → AVVISATO.</p>
+        </div>
+      </div>
+      ${renderCompletedDeliveryRows(daConsegnare)}
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <div>
+          <h3 style="margin:0;">Lavori completati negli ultimi 15 giorni</h3>
+          <p class="helptext" style="margin:5px 0 0;">Dopo 15 giorni spariscono automaticamente da questa sezione e restano archiviati definitivamente in Ordini → Archiviati.</p>
+        </div>
+      </div>
+      ${recenti.length ? `
+        <div class="table-wrap" style="box-shadow:none;">
+          <table>
+            <thead><tr><th>Cliente</th><th>Lavorazione</th><th>Data</th><th>Stato</th><th></th></tr></thead>
+            <tbody>${recenti.map(o=>{
+              const t=orderRecentArchiveTime(o);
+              const d=t ? new Date(t).toLocaleDateString("it-IT") : "—";
+              return `<tr>
+                <td><strong>${clientName(o.clientId)}</strong></td>
+                <td>${orderCategorieLabel(o)}</td>
+                <td>${d}</td>
+                <td><span class="pill pill-delivered">CONSEGNATO</span></td>
+                <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td>
+              </tr>`;
+            }).join("")}</tbody>
+          </table>
+        </div>` : `<p class="empty">Nessun lavoro consegnato negli ultimi 15 giorni.</p>`}
+    </div>
+  `;
+}
+
 /* ============ ORDINI ============ */
 let orderFilters = {categoria:"", worker:"", search:""};
 function orderInsertionSortValue(o){
@@ -5253,7 +5355,7 @@ function openJobCard(orderId){
 
     <div class="modal-section">
       <h3>Descrizione generale del lavoro</h3>
-      <textarea class="desc-lavoro" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
+      <textarea class="desc-lavoro" rows="12" placeholder="Descrivi in modo dettagliato il lavoro, materiali, misure, colori, note operative e indicazioni per la produzione…" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
     </div>
 
     ${renderBozzaSection(o)}
