@@ -2692,9 +2692,10 @@ function renderLeads(){
     </div>
 
     <div class="card" style="margin-bottom:16px;">
-      <div class="lead-toolbar">
-        <input id="lead-search" placeholder="🔎 Cerca nome, azienda, email, oggetto…" value="${escapeHtml(leadSearch)}"
+      <div class="lead-toolbar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;">
+        <input id="lead-search" style="flex:1;min-width:240px;" placeholder="🔎 Cerca nome, azienda, email, oggetto…" value="${escapeHtml(leadSearch)}"
           oninput="leadSearch=this.value;rerenderKeepingFocus(renderLeads)">
+        <button class="btn btn-primary" onclick="openManualLeadForm()">+ CREA LEAD</button>
       </div>
 
       <h3 style="margin:0 0 10px;">Lead attivi</h3>
@@ -2713,6 +2714,59 @@ function renderLeads(){
     </div>
   `;
 }
+
+function openManualLeadForm(prefill={}){
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Crea Lead</h2>
+    <p style="color:var(--muted);margin-top:0;">Inserisci i dati della richiesta.</p>
+    <div class="lead-form-grid">
+      <div class="lead-field"><label>Nome / referente</label><input id="manual-lead-nome" value="${escapeHtml(prefill.nome||'')}"></div>
+      <div class="lead-field"><label>Azienda</label><input id="manual-lead-azienda" value="${escapeHtml(prefill.azienda||'')}"></div>
+      <div class="lead-field"><label>Email</label><input id="manual-lead-email" type="email" value="${escapeHtml(prefill.email||'')}"></div>
+      <div class="lead-field"><label>Telefono</label><input id="manual-lead-telefono" value="${escapeHtml(prefill.telefono||'')}"></div>
+      <div class="lead-field full"><label>Oggetto richiesta</label><input id="manual-lead-oggetto" value="${escapeHtml(prefill.oggettoRichiesta||'')}"></div>
+      <div class="lead-field"><label>Stato</label><select id="manual-lead-stato">
+        ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(x=>`<option value="${x}" ${x===(prefill.stato||'Nuovo')?'selected':''}>${x}</option>`).join('')}
+      </select></div>
+      <div class="lead-field full"><label>Richiesta</label><textarea id="manual-lead-richiesta">${escapeHtml(prefill.richiesta||'')}</textarea></div>
+    </div>
+    <div class="form-actions" style="margin-top:16px;">
+      <button class="btn btn-primary" id="manual-lead-save" onclick="saveManualLead('${escapeHtml(prefill.fonte||'manuale')}')">Salva Lead</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    </div>`;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function saveManualLead(fonte='manuale'){
+  const btn=document.getElementById('manual-lead-save');
+  if(btn){btn.disabled=true;btn.textContent='Salvataggio…';}
+  const lead={
+    id:uid(),
+    nome:String(document.getElementById('manual-lead-nome')?.value||'').trim(),
+    azienda:String(document.getElementById('manual-lead-azienda')?.value||'').trim(),
+    email:String(document.getElementById('manual-lead-email')?.value||'').trim().toLowerCase(),
+    telefono:String(document.getElementById('manual-lead-telefono')?.value||'').trim(),
+    oggettoRichiesta:String(document.getElementById('manual-lead-oggetto')?.value||'').trim(),
+    richiesta:String(document.getElementById('manual-lead-richiesta')?.value||'').trim(),
+    stato:String(document.getElementById('manual-lead-stato')?.value||'Nuovo'),
+    fonte:fonte||'manuale',
+    creatoIl:new Date().toISOString(),
+    aggiornatoIl:new Date().toISOString()
+  };
+  if(!lead.nome && !lead.azienda && !lead.email && !lead.telefono){
+    showToast('Inserisci almeno nome, azienda, email o telefono');
+    if(btn){btn.disabled=false;btn.textContent='Salva Lead';}
+    return;
+  }
+  const ok=await upsertOne('leads',lead);
+  if(!ok){if(btn){btn.disabled=false;btn.textContent='Salva Lead';}return;}
+  if(!state.leads.some(x=>x.id===lead.id)) state.leads.unshift(lead);
+  closeModal();
+  renderLeads();
+  showToast('Lead creato');
+}
+
 function openLeadDetail(id){
   const l=(state.leads||[]).find(x=>x.id===id);
   if(!l) return;
@@ -4680,6 +4734,76 @@ async function finalizeQuoteToOrder(quoteId, clientId){
   renderPreventivi();
   showToast("Ordine creato dal preventivo");
 }
+
+let quoteMailAttachments=[];
+function quoteMailText(q,c){
+  const righe=(q.righe||[]).map(r=>{
+    const desc=r.descrizione||r.prodotto||q.categoria||'Voce';
+    return `- ${desc} — ${Number(r.quantita||0)} x ${fmtMoney(Number(r.prezzoUnitario||0))}`;
+  }).join('\n');
+  return `Gentile ${c?clientDisplayName(c):'cliente'},\n\nle inviamo il preventivo relativo a ${q.categoria||'quanto richiesto'}.\n\n${q.descrizione?q.descrizione+'\n\n':''}${righe?righe+'\n\n':''}Totale preventivo: ${fmtMoney(quoteImponibile(q))}\n\nPer qualsiasi necessità può rispondere direttamente a questa mail.\n\nCordiali saluti\nTeam Creativò`;
+}
+function openQuoteMail(quoteId){
+  const q=findItem('quotes',quoteId); if(!q) return;
+  const c=state.clients.find(x=>x.id===q.clientId);
+  if(!c || !String(c.email||'').trim()){
+    showToast('Associa al preventivo un cliente con email');
+    return;
+  }
+  quoteMailAttachments=[];
+  document.getElementById('modalBody').innerHTML=`
+    <button class="close-x" onclick="openQuoteDetail('${q.id}')">×</button>
+    <h2>Invia preventivo via Mail</h2>
+    <p style="margin-top:0;color:var(--muted);">La mail parte direttamente dal Gmail collegato al gestionale. Gli allegati non vengono salvati nel gestionale.</p>
+    <div class="field"><label>A</label><input id="quote-mail-to" value="${escapeHtml(c.email||'')}" readonly></div>
+    <div class="field"><label>Oggetto</label><input id="quote-mail-subject" value="${escapeHtml('Preventivo - '+clientDisplayName(c))}"></div>
+    <div class="field"><label>Messaggio</label><textarea id="quote-mail-body" rows="12">${escapeHtml(quoteMailText(q,c))}</textarea></div>
+    <div class="field"><label>Allegati</label><input id="quote-mail-files" type="file" multiple onchange="handleQuoteMailFiles(this.files)" style="padding:9px;background:#fff;"><div class="helptext">I file vengono usati solo per l'invio.</div><div id="quote-mail-attachments"></div></div>
+    <div id="quote-mail-status" class="helptext"></div>
+    <div class="form-actions"><button id="quote-mail-send" class="btn btn-primary" onclick="sendQuoteMail('${q.id}')">Invia mail</button><button class="btn btn-outline" onclick="openQuoteDetail('${q.id}')">Indietro</button></div>`;
+}
+async function handleQuoteMailFiles(fileList){
+  const files=Array.from(fileList||[]);
+  if(quoteMailAttachments.length+files.length>10){showToast('Puoi allegare al massimo 10 file');return;}
+  try{
+    for(const file of files){quoteMailAttachments.push({filename:file.name,mimeType:file.type||'application/octet-stream',size:file.size||0,dataBase64:await fileToBase64(file)});}
+    renderQuoteMailAttachments();
+  }catch(e){console.error(e);showToast('Errore lettura allegato');}
+}
+function renderQuoteMailAttachments(){
+  const box=document.getElementById('quote-mail-attachments'); if(!box) return;
+  box.innerHTML=quoteMailAttachments.length?`<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">${quoteMailAttachments.map((a,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:8px 10px;"><div><strong>📎 ${escapeHtml(a.filename)}</strong><div style="font-size:10.5px;color:var(--muted);">${mailFileSize(a.size)}</div></div><button class="btn btn-ghost btn-sm" onclick="quoteMailAttachments.splice(${i},1);renderQuoteMailAttachments()">Rimuovi</button></div>`).join('')}</div>`:'';
+}
+async function sendQuoteMail(quoteId){
+  const q=findItem('quotes',quoteId); if(!q) return;
+  const to=String(document.getElementById('quote-mail-to')?.value||'').trim();
+  const subject=String(document.getElementById('quote-mail-subject')?.value||'').trim();
+  const bodyText=String(document.getElementById('quote-mail-body')?.value||'').trim();
+  const status=document.getElementById('quote-mail-status'); const btn=document.getElementById('quote-mail-send');
+  if(!to||!bodyText){showToast('Controlla email e messaggio');return;}
+  if(btn)btn.disabled=true; if(status)status.textContent='Invio in corso…';
+  try{
+    const {data:sessionData}=await sb.auth.getSession(); const session=sessionData?.session;
+    if(!session?.access_token) throw new Error('Sessione del gestionale non disponibile.');
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({mode:'new',to,subject,bodyText,attachments:quoteMailAttachments})});
+    const raw=await response.text(); let result={}; try{result=JSON.parse(raw)}catch(e){}
+    if(!response.ok) throw new Error(result?.error||result?.message||raw||`Errore HTTP ${response.status}`);
+    quoteMailAttachments=[]; openQuoteDetail(quoteId); showToast('Preventivo inviato via Gmail');
+  }catch(err){console.error('Invio preventivo Gmail',err); if(status)status.textContent=`Errore: ${err?.message||'invio non riuscito'}`; if(btn)btn.disabled=false;}
+}
+async function transformQuoteToLead(quoteId){
+  const q=findItem('quotes',quoteId); if(!q) return;
+  const existing=(state.leads||[]).find(l=>l.fonte===`preventivo:${quoteId}`);
+  if(existing){showToast('Questo preventivo è già stato trasformato in Lead');return;}
+  const c=state.clients.find(x=>x.id===q.clientId);
+  const righe=(q.righe||[]).map(r=>`${r.descrizione||r.prodotto||q.categoria}: ${r.quantita||0} x ${fmtMoney(r.prezzoUnitario||0)}`).join('\n');
+  const lead={id:uid(),nome:c?.nome||'',azienda:c?.ragioneSociale||c?.azienda||'',email:c?.email||'',telefono:c?.telefono||'',oggettoRichiesta:`Preventivo - ${q.categoria||''}`.trim(),richiesta:`${q.descrizione||''}${q.descrizione&&righe?'\n':''}${righe}${righe?'\n':''}Totale: ${fmtMoney(quoteImponibile(q))}`.trim(),stato:'Nuovo',fonte:`preventivo:${q.id}`,creatoIl:new Date().toISOString(),aggiornatoIl:new Date().toISOString()};
+  const ok=await upsertOne('leads',lead); if(!ok)return;
+  if(!state.leads.some(x=>x.id===lead.id)) state.leads.unshift(lead);
+  showToast('Lead creato dal preventivo');
+  openQuoteDetail(quoteId);
+}
+
 function openQuoteDetail(quoteId){
   const q = findItem('quotes', quoteId);
   const c = state.clients.find(x=>x.id===q.clientId);
@@ -4708,6 +4832,8 @@ function openQuoteDetail(quoteId){
     <div class="form-actions" style="justify-content:space-between;align-items:center;flex-wrap:wrap;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
+        <button class="btn btn-outline" onclick="openQuoteMail('${q.id}')">Invia per mail</button>
+        <button class="btn btn-outline" onclick="transformQuoteToLead('${q.id}')">Trasforma in Lead</button>
         <button class="btn btn-primary" onclick="closeModal(); showToast('Preventivo salvato')">Salva</button>
       </div>
       <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteQuote('${q.id}')">Elimina preventivo</button>
