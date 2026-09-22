@@ -2550,16 +2550,19 @@ function renderCurrentView(){
 }
 let clientFormOpen = false;
 let quoteFormOpen = false;
+let orderFormOpen = false;
 /* Evita che la sincronizzazione multi-PC ridisegni il modulo Nuovo cliente mentre l'operatore sta scrivendo.
    I dati remoti vengono comunque aggiornati nello state; la vista verrà ridisegnata dopo Salva/Annulla. */
 function shouldDeferCurrentViewRender(){
   if(currentView === "clienti" && clientFormOpen) return true;
   if(currentView === "preventivi" && quoteFormOpen) return true;
+  if(currentView === "ordini" && orderFormOpen) return true;
   return false;
 }
 function toggleForm(id){
   if(id==="clientForm") clientFormOpen = !clientFormOpen;
   if(id==="quoteForm") quoteFormOpen = !quoteFormOpen;
+  if(id==="orderForm") orderFormOpen = !orderFormOpen;
   const el = document.getElementById(id);
   if(el) el.classList.toggle("open");
 }
@@ -4084,6 +4087,7 @@ function newOrderForClient(clientId, leadId=null){
   pendingLeadOrderConversion = leadId ? {leadId, clientId} : null;
   closeModal();
   goTo("ordini");
+  orderFormOpen = true;
   const form = document.getElementById("orderForm");
   if(form) form.classList.add("open");
   const sel = document.getElementById("of-cliente");
@@ -4902,7 +4906,7 @@ function renderOrdini(){
   const attivi = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato!=="Consegnato" && matches(o)));
   const archiviati = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato==="Consegnato" && matches(o)));
   document.getElementById("view-ordini").innerHTML = `
-    <div class="form-panel" id="orderForm">
+    <div class="form-panel ${orderFormOpen ? 'open' : ''}" id="orderForm">
       <h3>Nuovo ordine</h3>
       <div class="form-grid">
         <div class="field"><label>Cliente</label><select id="of-cliente" onchange="onClientSelectChange(this,'of-newclient')">${clientOptions(null,true)}</select></div>
@@ -4988,7 +4992,9 @@ async function addOrder(){
     pendingGmailOrderMessageId=null;
   }
 
-  toggleForm('orderForm');
+  orderFormOpen = false;
+  const orderFormEl=document.getElementById('orderForm');
+  if(orderFormEl) orderFormEl.classList.remove('open');
   renderOrdini();
   showToast(savedOrder.numero ? `Ordine #${savedOrder.numero} creato` : "Ordine creato");
   openJobCard(savedOrder.id);
