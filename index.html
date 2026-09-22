@@ -6621,29 +6621,13 @@ function renderEntrate(){
     </div>
   `;
 }
-async function addEntrata(){
-  if(!currentUser || currentUser.role!=="admin"){
-    showToast("Operazione riservata all'amministratore");
-    return;
-  }
+function addEntrata(){
   const descrizione = document.getElementById("if2-descrizione").value.trim();
   const importo = Number(document.getElementById("if2-importo").value)||0;
-  const metodo = document.getElementById("if2-metodo").value;
-  const data = document.getElementById("if2-data").value || today();
-
   if(!descrizione){ showToast("Inserisci una descrizione"); return; }
   if(importo<=0){ showToast("Inserisci un importo valido"); return; }
-
-  const item = {id:uuid(), descrizione, importo, metodo, data};
-
-  const ok = await upsertOne('entrate', item);
-  if(!ok) return;
-
-  if(!state.entrate.some(x=>x.id===item.id)) state.entrate.push(item);
-
-  toggleForm('incomeForm');
-  renderEntrate();
-  showToast("Entrata registrata");
+  state.entrate.push({id:uid(), descrizione, importo, metodo:document.getElementById("if2-metodo").value, data:document.getElementById("if2-data").value||today()});
+  saveState('entrate'); toggleForm('incomeForm'); renderEntrate(); showToast("Entrata registrata");
 }
 function deleteEntrata(id){
   askConfirm("Eliminare questa entrata?", ()=>{
