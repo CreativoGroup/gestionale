@@ -1613,6 +1613,39 @@
     }
   }
 
+
+/* ===== Schede ordine Standard / Tessile ===== */
+.order-type-chooser{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:12px 0 18px;}
+.order-type-card{display:flex;gap:12px;align-items:flex-start;padding:16px 18px;border:1.5px solid var(--border);border-radius:16px;background:#fff;cursor:pointer;transition:.18s ease;}
+.order-type-card:hover{border-color:#F05A3A;box-shadow:0 8px 24px rgba(15,23,42,.08);transform:translateY(-1px);}
+.order-type-card input{margin-top:3px;accent-color:#F05A3A;}
+.order-type-card strong{display:block;font-size:15px;margin-bottom:4px;}
+.order-type-card span{display:block;color:var(--muted);font-size:12px;line-height:1.4;}
+.sheet-type-badge{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;margin-top:7px;}
+.sheet-type-standard{background:#F1F5F9;color:#334155;}
+.sheet-type-textile{background:#FFF0EB;color:#C5482E;}
+.textile-block{border:1px solid #E4E8EE;border-radius:18px;background:#fff;margin:0 0 18px;overflow:hidden;box-shadow:0 7px 22px rgba(15,23,42,.05);}
+.textile-block-head{padding:16px 18px;background:#F8FAFC;border-bottom:1px solid #E4E8EE;display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.textile-block-body{padding:18px;}
+.textile-top-grid{display:grid;grid-template-columns:1.15fr 1.4fr .65fr .75fr;gap:12px;align-items:end;}
+.textile-mockups{display:grid;grid-template-columns:repeat(2,minmax(250px,1fr));gap:18px;margin-top:18px;}
+.garment-card{border:1px solid #E3E7ED;border-radius:16px;padding:14px;background:#FBFCFE;}
+.garment-card h5{margin:0 0 10px;font-size:13px;color:#475569;text-transform:uppercase;letter-spacing:.05em;}
+.garment-svg{width:100%;max-width:330px;height:auto;display:block;margin:0 auto;}
+.mock-zone{cursor:pointer;transition:.15s ease;}
+.mock-zone circle,.mock-zone rect,.mock-zone ellipse{fill:rgba(255,255,255,.9);stroke:#94A3B8;stroke-width:2;}
+.mock-zone text{font-size:8.5px;font-weight:800;fill:#475569;text-anchor:middle;pointer-events:none;}
+.mock-zone.selected circle,.mock-zone.selected rect,.mock-zone.selected ellipse{fill:rgba(240,90,58,.18);stroke:#F05A3A;stroke-width:3;}
+.mock-zone.selected text{fill:#B93D25;}
+.position-specs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px;}
+.position-spec{border:1px solid #E3E7ED;border-radius:14px;padding:12px;background:#fff;}
+.position-spec strong{display:block;font-size:12px;margin-bottom:8px;color:#1F2937;}
+.position-spec textarea{min-height:78px;width:100%;resize:vertical;}
+.technique-row{margin-top:14px;max-width:340px;}
+.textile-warehouse{margin-top:16px;padding-top:16px;border-top:1px solid #E7EAF0;}
+.textile-warehouse h4{margin:0 0 8px;font-size:14px;}
+@media(max-width:900px){.order-type-chooser,.textile-mockups,.position-specs{grid-template-columns:1fr}.textile-top-grid{grid-template-columns:1fr 1fr}.textile-top-grid .field:nth-child(2){grid-column:1/-1}}
+
 </style>
 </head>
 <body>
@@ -1692,6 +1725,9 @@ let gmailAutoRefreshTimer = null; // {id, email, role}
 
 /* ============ CONFIGURAZIONE ============ */
 const CATEGORIES = ["Stampa","Ricamo","Servizio","Gadget","Allestimenti","Piccolo Formato","Lavorazioni Esterne"];
+const STANDARD_ORDER_CATEGORIES = CATEGORIES.filter(c=>c!=="Stampa" && c!=="Ricamo");
+const TEXTILE_CATEGORIES = ["Stampa","Ricamo"];
+const TEXTILE_PRINT_TECHNIQUES = ["DTF","Digitale diretta","Intaglio","Sublimatica"];
 const PRODOTTI_PER_CATEGORIA = {
   "Stampa": ["T-shirt","Polo","Felpa","Shopper","Cappello","Altro tessuto"],
   "Ricamo": ["T-shirt","Polo","Felpa","Patch","Cappello","Altro tessuto"],
@@ -2183,6 +2219,26 @@ function speseTotaleMese(mese){ return state.expenses.filter(e=>e.data.slice(0,7
 function emptyRiga(isOrder){
   return isOrder ? {id:uid(), descrizione:"", categoria:"", prodotto:"", articoloId:"", stato:"Da fare", quantita:1, prezzoUnitario:0}
                  : {id:uid(), descrizione:"", quantita:1, prezzoUnitario:0};
+}
+function emptyTextileRiga(){
+  return {id:uid(), descrizione:"", categoria:"Stampa", prodotto:"Articolo", articoloId:"", stato:"Da fare", quantita:1, prezzoUnitario:0,
+    _schedaTipo:"tessile", textile:{tecnica:"DTF", positions:{}}};
+}
+function orderSheetType(o){
+  const first=(o?.righe||[])[0];
+  if(first?._schedaTipo==="tessile") return "tessile";
+  if(first?._schedaTipo==="standard") return "standard";
+  const cats=(o?.righe||[]).map(r=>r.categoria).filter(Boolean);
+  if(cats.length && cats.every(c=>TEXTILE_CATEGORIES.includes(c))) return "tessile";
+  return "standard";
+}
+function ensureOrderSheetMarker(o,type){
+  if(!o.righe || !o.righe.length) o.righe=[type==="tessile"?emptyTextileRiga():emptyRiga(true)];
+  o.righe[0]._schedaTipo=type;
+  if(type==="tessile"){
+    o.righe.forEach(r=>{ r._schedaTipo="tessile"; if(!r.categoria) r.categoria="Stampa"; r.prodotto=r.prodotto||"Articolo"; r.textile=r.textile||{tecnica:"DTF",positions:{}}; r.textile.positions=r.textile.positions||{}; });
+  }
+  return o;
 }
 /* Ricalcola le fasi di lavorazione in base alle categorie presenti nelle righe, preservando lo stato delle spunte già fatte */
 function recalcFasi(order){
@@ -4310,6 +4366,11 @@ async function resolveClientId(selectId, newClientPrefix){
   return val;
 }
 function categoryOptions(selected, includeBlank){ return (includeBlank?`<option value="">Seleziona categoria…</option>`:'') + CATEGORIES.map(c=>`<option value="${c}" ${c===selected?'selected':''}>${c}</option>`).join(""); }
+function categoryOptionsStandard(selected, includeBlank){
+  let html=(includeBlank?`<option value="">Seleziona categoria…</option>`:'');
+  if(selected && !STANDARD_ORDER_CATEGORIES.includes(selected)) html+=`<option value="${selected}" selected disabled>${selected} (ordine tessile)</option>`;
+  return html + STANDARD_ORDER_CATEGORIES.map(c=>`<option value="${c}" ${c===selected?'selected':''}>${c}</option>`).join("");
+}
 function prodottoOptions(categoria, selected){
   const opts = PRODOTTI_PER_CATEGORIA[categoria] || [];
   return `<option value="">Seleziona…</option>` + opts.map(p=>`<option value="${p}" ${p===selected?'selected':''}>${p}</option>`).join("");
@@ -4578,17 +4639,109 @@ function renderMagazzinoInline(o){
   if(!html) return "";
   return html.replace(/^\s*<div class="modal-section">\s*/,"").replace(/\s*<\/div>\s*$/,"");
 }
+function textilePositionsForType(garmentType){
+  const base=[
+    {id:"front_heart",label:"Fronte · lato cuore",side:"front",x:92,y:76},
+    {id:"front_right",label:"Fronte · lato destro",side:"front",x:148,y:76},
+    {id:"front_center",label:"Fronte · centrale",side:"front",x:120,y:108},
+    {id:"front_large",label:"Fronte · centrale grande",side:"front",x:120,y:145},
+    {id:"back_shoulders",label:"Retro · altezza scapole",side:"back",x:120,y:78},
+    {id:"back_large",label:"Retro · grande",side:"back",x:120,y:135},
+    {id:"sleeve_right",label:"Manica destra · bicipite",side:"front",x:185,y:92},
+    {id:"sleeve_left",label:"Manica sinistra · bicipite",side:"front",x:55,y:92}
+  ];
+  if(garmentType==="Felpa"){
+    base.push({id:"sleeve_full_right",label:"Manica destra · intera",side:"front",x:202,y:132});
+    base.push({id:"sleeve_full_left",label:"Manica sinistra · intera",side:"front",x:38,y:132});
+  }
+  return base;
+}
+function detectGarmentTypeForRow(o,r){
+  const linked=(o.magazzino||[]).filter(m=>m.rigaId===r.id || (!(m.rigaId) && (o.righe||[]).length===1));
+  const s=linked.map(m=>`${m.nome||''} ${m.codice||''}`).join(' ').toLowerCase();
+  if(/polo/.test(s)) return "Polo";
+  if(/felpa|hood|sweat/.test(s)) return "Felpa";
+  if(/t[- ]?shirt|tee|shirt/.test(s)) return "T-shirt";
+  return "";
+}
+function garmentSvg(kind,side,o,r){
+  const hood=kind==="Felpa";
+  const polo=kind==="Polo";
+  const body=hood
+    ? `<path d="M88 42 Q120 18 152 42 L178 55 L205 88 L188 105 L169 83 L164 195 L76 195 L71 83 L52 105 L35 88 L62 55 Z" fill="#fff" stroke="#94A3B8" stroke-width="2"/><path d="M94 42 Q120 4 146 42 Q136 55 120 57 Q104 55 94 42Z" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>`
+    : `<path d="M86 42 Q120 27 154 42 L180 55 L202 94 L184 105 L165 77 L161 194 L79 194 L75 77 L56 105 L38 94 L60 55 Z" fill="#fff" stroke="#94A3B8" stroke-width="2"/>${polo?`<path d="M104 40 L120 58 L136 40 L133 62 L107 62 Z" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>`:``}`;
+  const positions=textilePositionsForType(kind).filter(p=>p.side===side);
+  const selected=(r.textile&&r.textile.positions)||{};
+  return `<svg class="garment-svg" viewBox="0 0 240 220" role="img" aria-label="Mockup ${kind} ${side==='front'?'fronte':'retro'}">${body}${positions.map(p=>`<g class="mock-zone ${selected[p.id]?'selected':''}" onclick="toggleTextilePosition('${o.id}','${r.id}','${p.id}')"><circle cx="${p.x}" cy="${p.y}" r="13"></circle><text x="${p.x}" y="${p.y+3}">+</text></g>`).join('')}</svg>`;
+}
+function updateTextileField(orderId,rigaId,field,value){
+  const o=findItem('orders',orderId); const r=(o.righe||[]).find(x=>x.id===rigaId); if(!r) return;
+  r.textile=r.textile||{tecnica:"DTF",positions:{}}; r.textile.positions=r.textile.positions||{};
+  if(field==="categoria"){ r.categoria=value; if(value!=="Stampa") r.textile.tecnica=""; else if(!r.textile.tecnica) r.textile.tecnica="DTF"; }
+  else if(field==="tecnica") r.textile.tecnica=value;
+  else if(field==="descrizione") r.descrizione=value;
+  else if(field==="quantita"||field==="prezzoUnitario") r[field]=Number(value)||0;
+  saveState('orders'); openJobCard(orderId);
+}
+function toggleTextilePosition(orderId,rigaId,posId){
+  const o=findItem('orders',orderId); const r=(o.righe||[]).find(x=>x.id===rigaId); if(!r) return;
+  r.textile=r.textile||{tecnica:"DTF",positions:{}}; r.textile.positions=r.textile.positions||{};
+  if(r.textile.positions[posId]) delete r.textile.positions[posId];
+  else r.textile.positions[posId]={descrizione:""};
+  saveState('orders'); openJobCard(orderId);
+}
+function updateTextilePositionDescription(orderId,rigaId,posId,value){
+  const o=findItem('orders',orderId); const r=(o.righe||[]).find(x=>x.id===rigaId); if(!r) return;
+  r.textile=r.textile||{tecnica:"DTF",positions:{}}; r.textile.positions=r.textile.positions||{};
+  r.textile.positions[posId]=r.textile.positions[posId]||{}; r.textile.positions[posId].descrizione=value;
+  saveState('orders');
+}
+function addTextileProduct(orderId){
+  const o=findItem('orders',orderId); if(!o) return;
+  const r=emptyTextileRiga(); r._schedaTipo="tessile"; o.righe.push(r); saveState('orders'); openJobCard(orderId);
+}
+function addMagazzinoRigaForTextile(orderId,rigaId){
+  const o=findItem('orders',orderId); if(!o.magazzino) o.magazzino=[];
+  o.magazzino.push({id:uid(), rigaId, codice:"", nome:"", colore:"", taglia:"", quantita:1, stornato:false, _reservedQty:0, articoloId:"", daOrdinareQty:0, ordineConfermato:false, inCarrello:false, inCarrelloAt:null});
+  saveState('orders'); openJobCard(orderId);
+}
+function renderTextileWarehouseForRow(o,r){
+  const entries=(o.magazzino||[]).filter(m=>m.rigaId===r.id || (!(m.rigaId) && (o.righe||[]).length===1));
+  return `<div class="textile-warehouse"><h4>Prodotto / Magazzino</h4><datalist id="catalogProductList"></datalist>
+    <p class="helptext" style="margin-top:-4px;">Seleziona uno o più articoli. Il mockup appare automaticamente per T-shirt, Polo e Felpa.</p>
+    ${entries.length?`<div style="overflow-x:auto;"><table class="lines-table"><thead><tr><th>Codice</th><th>Colore</th><th>Taglia</th><th>Quantità</th><th>Disponibilità</th><th></th></tr></thead><tbody>${entries.map(m=>{
+      const mancano=Number(m.daOrdinareQty)||0, usati=Number(m._reservedQty)||0;
+      const status=!m.codice||!m.colore||!m.taglia?`<span style="color:var(--muted);">—</span>`:mancano===0?`<span class="pill pill-done">Disponibile</span>${usati?` <span style="font-size:12px;color:var(--muted);">${usati} pz stornati</span>`:''}`:`${usati?`<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">${usati} pz presi dal magazzino</div>`:''}${m.inCarrello?`<span class="pill pill-sent">NEL CARRELLO · ${mancano} pz</span>`:m.ordineConfermato?`<span class="pill pill-open">ORDINE CONFERMATO · ${mancano} pz</span>`:`<button class="btn btn-outline btn-sm" style="border-color:var(--danger);color:var(--danger);" onclick="confermaOrdineMagazzino('${o.id}','${m.id}')">ORDINA ${mancano} pz</button>`}`;
+      return `<tr><td style="min-width:210px;"><input class="inline" style="width:100%;min-width:190px;" list="catalogProductList" value="${m.codice||''}" placeholder="Codice o nome…" onfocus="prepareCatalogDatalistForOrder('${o.id}')" onchange="updateMagazzinoField('${o.id}','${m.id}','codice',this.value)"><div style="font-size:11px;color:var(--muted);margin-top:3px;">${m.nome||catalogNameForCode(m.codice)||''}</div></td><td><input class="inline" list="colorList-${m.id}" value="${m.colore||''}" placeholder="Colore" onchange="updateMagazzinoField('${o.id}','${m.id}','colore',this.value)"><datalist id="colorList-${m.id}">${magazzinoColoreDatalistOptions(m.codice)}</datalist></td><td><input class="inline" list="sizeList-${m.id}" value="${m.taglia||''}" placeholder="Taglia" onchange="updateMagazzinoField('${o.id}','${m.id}','taglia',this.value)"><datalist id="sizeList-${m.id}">${magazzinoTagliaDatalistOptions(m.codice,m.colore)}</datalist></td><td><input class="num" type="number" min="1" value="${m.quantita}" onchange="updateMagazzinoField('${o.id}','${m.id}','quantita',this.value)"></td><td>${status}</td><td><button class="btn btn-ghost btn-sm" onclick="removeMagazzinoRiga('${o.id}','${m.id}')">✕</button></td></tr>`;
+    }).join('')}</tbody></table></div>`:`<p class="empty" style="padding:4px 0;">Nessun prodotto selezionato.</p>`}
+    <button class="btn btn-outline btn-sm" onclick="addMagazzinoRigaForTextile('${o.id}','${r.id}')">+ Seleziona prodotto</button></div>`;
+}
+function renderTextileRow(o,r,index){
+  r.textile=r.textile||{tecnica:"DTF",positions:{}}; r.textile.positions=r.textile.positions||{};
+  const garment=detectGarmentTypeForRow(o,r);
+  const positions=garment?textilePositionsForType(garment):[];
+  const selectedIds=positions.filter(p=>r.textile.positions[p.id]);
+  return `<div class="textile-block"><div class="textile-block-head"><div><strong>Prodotto tessile ${index+1}</strong><div class="helptext" style="margin-top:2px;">Stampa o Ricamo · una configurazione per prodotto</div></div>${o.righe.length>1?`<button class="btn btn-ghost btn-sm" onclick="removeRiga('orders','${o.id}','${r.id}')">Elimina prodotto</button>`:''}</div><div class="textile-block-body">
+    <div class="textile-top-grid">
+      <div class="field"><label>Lavorazione</label><select class="inline" onchange="updateTextileField('${o.id}','${r.id}','categoria',this.value)">${TEXTILE_CATEGORIES.map(c=>`<option ${r.categoria===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Specifiche generali</label><input class="inline" style="width:100%;" value="${(r.descrizione||'').replace(/"/g,'&quot;')}" placeholder="Es. logo aziendale, colori, note…" onchange="updateTextileField('${o.id}','${r.id}','descrizione',this.value)"></div>
+      <div class="field"><label>Quantità</label><input class="num" type="number" min="0" value="${r.quantita||0}" onchange="updateTextileField('${o.id}','${r.id}','quantita',this.value)"></div>
+      <div class="field"><label>Prezzo unit. €</label><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario||0}" onchange="updateTextileField('${o.id}','${r.id}','prezzoUnitario',this.value)"></div>
+    </div>
+    ${r.categoria==='Stampa'?`<div class="technique-row field"><label>Tipologia di stampa</label><select class="inline" onchange="updateTextileField('${o.id}','${r.id}','tecnica',this.value)">${TEXTILE_PRINT_TECHNIQUES.map(t=>`<option ${r.textile.tecnica===t?'selected':''}>${t}</option>`).join('')}</select></div>`:''}
+    ${renderTextileWarehouseForRow(o,r)}
+    ${garment?`<div style="margin-top:18px;"><h4 style="margin:0 0 4px;">Mockup ${garment}</h4><p class="helptext" style="margin:0 0 10px;">Clicca sui cerchi per selezionare le posizioni di ${r.categoria.toLowerCase()}.</p><div class="textile-mockups"><div class="garment-card"><h5>Fronte</h5>${garmentSvg(garment,'front',o,r)}</div><div class="garment-card"><h5>Retro</h5>${garmentSvg(garment,'back',o,r)}</div></div>${selectedIds.length?`<div class="position-specs">${selectedIds.map(p=>`<div class="position-spec"><strong>${p.label}</strong><textarea placeholder="Es. immagine/logo, colore di stampa/filo, dimensione in cm…" onchange="updateTextilePositionDescription('${o.id}','${r.id}','${p.id}',this.value)">${r.textile.positions[p.id]?.descrizione||''}</textarea></div>`).join('')}</div>`:`<p class="helptext" style="margin-top:12px;">Nessuna posizione selezionata.</p>`}</div>`:`<div style="margin-top:16px;padding:14px;border-radius:12px;background:#F8FAFC;color:var(--muted);font-size:13px;">Per questo prodotto non è previsto il mockup. I mockup vengono mostrati solo per T-shirt, Polo e Felpa.</div>`}
+    <div style="margin-top:14px;text-align:right;font-weight:800;">Totale prodotto: ${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</div>
+  </div></div>`;
+}
+function renderTextileOrderEditor(o){
+  ensureOrderSheetMarker(o,"tessile");
+  return `${(o.righe||[]).map((r,i)=>renderTextileRow(o,r,i)).join('')}<button class="btn btn-outline" onclick="addTextileProduct('${o.id}')">+ Aggiungi altro prodotto tessile</button>`;
+}
 function orderLinesWithWarehouse(o){
-  const rows=o.righe||[];
-  const first=rows.slice(0,1);
-  const rest=rows.slice(1);
-  const hasTextile=rows.some(r=>r.categoria==="Stampa" || r.categoria==="Ricamo");
-  return `
-    ${linesEditor('orders',o.id,first,{showAdd:false,forceShowDots:rows.length>1})}
-    ${hasTextile ? `<div class="embedded-warehouse">${renderMagazzinoInline(o)}</div>` : ''}
-    ${rest.length ? `<div class="additional-work-lines"><h4 style="margin:0 0 10px;">Altre righe di lavorazione</h4>${linesEditor('orders',o.id,rest,{showAdd:false,forceShowDots:true})}</div>` : ''}
-    <div style="margin-top:14px;"><button class="btn btn-outline btn-sm" onclick="addRiga('orders','${o.id}')">+ Aggiungi altra riga</button></div>
-  `;
+  if(orderSheetType(o)==="tessile") return renderTextileOrderEditor(o);
+  ensureOrderSheetMarker(o,"standard");
+  return `${linesEditor('orders',o.id,o.righe||[],{showAdd:false,forceShowDots:(o.righe||[]).length>1})}<div style="margin-top:14px;"><button class="btn btn-outline btn-sm" onclick="addRiga('orders','${o.id}')">+ Aggiungi altra riga</button></div>`;
 }
 function linesEditor(collection, id, righe, options={}){
   const isOrder = collection === 'orders';
@@ -4606,7 +4759,7 @@ function linesEditor(collection, id, righe, options={}){
       <tbody>
         ${righe.map(r=>`
           <tr>
-            ${isOrder ? `<td><select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">${categoryOptions(r.categoria, true)}</select></td>
+            ${isOrder ? `<td><select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">${categoryOptionsStandard(r.categoria, true)}</select></td>
             <td>${PRODOTTI_PER_CATEGORIA[r.categoria] ? `<select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">${orderProductOptions(r.categoria, r.prodotto)}</select>` : `<span style="color:var(--muted);">—</span>`}</td>` : `<td><input class="desc-input" value="${r.descrizione||''}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>`}
             <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
             <td class="num"><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)"></td>
@@ -4623,15 +4776,18 @@ function linesEditor(collection, id, righe, options={}){
 function findItem(collection, id){ return state[collection].find(x=>x.id===id); }
 function addRiga(collection, id){
   const item = findItem(collection, id);
-  item.righe.push(emptyRiga(collection==='orders'));
+  if(collection==='orders' && orderSheetType(item)==="tessile") item.righe.push(emptyTextileRiga());
+  else item.righe.push(emptyRiga(collection==='orders'));
   if(collection==='orders') recalcFasi(item);
   saveState(collection);
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
 }
 function removeRiga(collection, id, rigaId){
   const item = findItem(collection, id);
+  const prevType = collection==='orders' ? orderSheetType(item) : null;
   item.righe = item.righe.filter(r=>r.id!==rigaId);
-  if(collection==='orders') recalcFasi(item);
+  if(collection==='orders' && !item.righe.length) item.righe=[prevType==="tessile"?emptyTextileRiga():emptyRiga(true)];
+  if(collection==='orders') { ensureOrderSheetMarker(item,prevType||"standard"); recalcFasi(item); }
   saveState(collection);
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
 }
@@ -4645,7 +4801,10 @@ function updateRigaField(collection, id, rigaId, field, value){
   const item = findItem(collection, id);
   const riga = item.righe.find(r=>r.id===rigaId);
   riga[field] = (field==='quantita'||field==='prezzoUnitario') ? Number(value)||0 : value;
-  if(collection==='orders' && field==='categoria'){ recalcFasi(item); riga.prodotto = ""; if(value!=="Lavorazioni Esterne"){ delete riga.ritiroEsterno; delete riga.fornitore; } }
+  if(collection==='orders' && field==='categoria'){
+    if(orderSheetType(item)==="standard" && (value==="Stampa"||value==="Ricamo")){ showToast("Per Stampa e Ricamo usa una Scheda Tessile"); riga.categoria=""; }
+    recalcFasi(item); riga.prodotto = ""; if(value!=="Lavorazioni Esterne"){ delete riga.ritiroEsterno; delete riga.fornitore; }
+  }
   if(collection==='orders' && field==='prodotto'){ riga.fornitore = ""; }
   saveState(collection);
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
@@ -4983,6 +5142,10 @@ function renderOrdini(){
   document.getElementById("view-ordini").innerHTML = `
     <div class="form-panel ${orderFormOpen ? 'open' : ''}" id="orderForm">
       <h3>Nuovo ordine</h3>
+      <div class="order-type-chooser">
+        <label class="order-type-card"><input type="radio" name="of-sheet-type" value="standard" checked><span><strong>Scheda di lavorazione</strong><span>Ordine standard: Servizio, Gadget, Allestimenti, Piccolo Formato o Lavorazioni Esterne. Stampa e Ricamo non sono disponibili.</span></span></label>
+        <label class="order-type-card"><input type="radio" name="of-sheet-type" value="tessile"><span><strong>Scheda di lavorazione Tessile</strong><span>Ordine dedicato esclusivamente a Stampa e Ricamo, con prodotti, mockup e posizioni di personalizzazione.</span></span></label>
+      </div>
       <div class="form-grid">
         <div class="field"><label>Cliente</label><select id="of-cliente" onchange="onClientSelectChange(this,'of-newclient')">${clientOptions(null,true)}</select></div>
       </div>
@@ -5046,7 +5209,9 @@ async function addOrder(){
   if(!clientId) return;
 
   const id = uid();
-  const order = mkOrder(id, clientId, "", "", "Da fare", "", undefined, undefined);
+  const chosenType = document.querySelector('input[name="of-sheet-type"]:checked')?.value || "standard";
+  const initialRows = chosenType==="tessile" ? [emptyTextileRiga()] : [emptyRiga(true)];
+  const order = ensureOrderSheetMarker(mkOrder(id, clientId, "", "", "Da fare", "", initialRows, undefined), chosenType);
 
   // Salva prima su Supabase e usa la riga restituita dal database.
   // In questo modo recuperiamo subito anche il numero ordine assegnato dal database.
@@ -5225,6 +5390,7 @@ function openJobCard(orderId){
       <div>
         <p class="jobcard-eyebrow">Scheda di lavorazione${o.createdAt?` — creata il ${fmtDate(o.createdAt.slice(0,10))}`:''} <span style="font-size:8px;opacity:.5;text-transform:none;letter-spacing:0;">${o.numero?('#'+o.numero):''}</span></p>
         <h2 style="margin-bottom:2px;">${c?clientDisplayName(c):"—"}</h2>
+        <span class="sheet-type-badge ${orderSheetType(o)==='tessile'?'sheet-type-textile':'sheet-type-standard'}">${orderSheetType(o)==='tessile'?'Scheda Tessile':'Scheda Standard'}</span>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
         ${c ? `<button class="btn btn-outline btn-sm" onclick="openClientHistory('${c.id}')">ANAGRAFICA CLIENTE</button>` : ''}
@@ -5243,8 +5409,8 @@ function openJobCard(orderId){
     </div>
 
     <div class="modal-section">
-      <h3>Righe di lavorazione</h3>
-      <p class="helptext" style="margin-top:-4px;">Ogni riga ha una propria categoria di lavoro.${o.righe.length>1 ? ' Scegli lo stato di ciascuna riga dal menu colorato.' : ''}</p>
+      <h3>${orderSheetType(o)==='tessile'?'Lavorazione Tessile':'Righe di lavorazione'}</h3>
+      <p class="helptext" style="margin-top:-4px;">${orderSheetType(o)==='tessile'?'Questa scheda contiene esclusivamente lavorazioni di Stampa o Ricamo. Puoi aggiungere più prodotti tessili nello stesso ordine.':'Questa scheda non consente Stampa o Ricamo: per quelle lavorazioni crea una Scheda Tessile.'}</p>
       ${orderLinesWithWarehouse(o)}
     </div>
 
@@ -5314,6 +5480,7 @@ function duplicateOrder(orderId){
     note: o.note
   };
   clone.righe.forEach(r=>{ r.stato = "Da fare"; });
+  ensureOrderSheetMarker(clone, orderSheetType(o));
   clone.fasi = [];
   recalcFasi(clone);
   state.orders.push(clone);
