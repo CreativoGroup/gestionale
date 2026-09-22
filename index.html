@@ -131,22 +131,27 @@
   .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
   .filters{display:flex;gap:8px;flex-wrap:wrap;}
   .empty{padding:30px 10px;text-align:center;color:var(--muted);font-size:13.5px;}
-  .kanban{display:grid;grid-template-columns:repeat(5,minmax(250px,1fr));gap:14px;overflow-x:auto;}
-  @media(max-width:1100px){.kanban{grid-template-columns:repeat(5,300px);}}
-  .kanban-col{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card);padding:12px;min-width:250px;}
-  .kanban-col h4{margin:2px 8px 12px;font-size:13.5px;color:var(--muted);display:flex;justify-content:space-between;font-weight:600;}
-  .job-card{background:var(--paper);border:1px solid var(--border);border-radius:9px;padding:14px;margin-bottom:12px;border-top:4px dashed var(--accent);font-size:14px;cursor:pointer;}
-  .job-card.job-card-business{border-top-color:#1D5A9E;}
-  .job-card.job-card-family{border-top-color:#B9660C;}
-  .job-card:hover{border-color:var(--accent);}
-  .job-card.job-card-importante{border:2px solid #F1C40F;border-top:4px solid #F1C40F;background:#FFFBEB;box-shadow:0 2px 8px rgba(241,196,15,.25);}
-  .job-card .jc-star{color:#B8860B;font-size:11.5px;font-weight:800;letter-spacing:.4px;margin-bottom:6px;}
-  .job-card .jc-client{font-weight:700;font-size:15px;margin-bottom:4px;}
-  .job-card .jc-cat{color:var(--teal);font-size:12.5px;font-weight:600;margin-bottom:6px;}
-  .job-card .jc-lines{margin-bottom:8px;}
-  .job-card .jc-line{color:var(--teal);font-size:12.5px;font-weight:600;line-height:1.6;}
-  .job-card .jc-desc{font-size:13px;color:var(--text);margin-bottom:8px;}
-  .job-card .jc-meta{color:var(--muted);font-size:12.5px;display:flex;justify-content:space-between;margin-top:8px;font-weight:600;}
+  .kanban{display:grid;grid-template-columns:repeat(5,minmax(280px,1fr));gap:18px;overflow-x:auto;padding:6px 2px 18px;}
+  @media(max-width:1100px){.kanban{grid-template-columns:repeat(5,320px);}}
+  .kanban-col{background:#EEF2F6;border:1px solid #DDE4EC;border-radius:18px;padding:14px;min-width:280px;box-shadow:0 8px 24px rgba(31,41,55,.05);}
+  .kanban-col h4{margin:2px 2px 14px;padding:10px 12px;border-radius:12px;font-size:14px;color:#243142;display:flex;justify-content:space-between;align-items:center;font-weight:800;letter-spacing:.15px;background:#fff;border:1px solid #E2E8F0;}
+  .kanban-col h4 span{background:#F1F5F9;color:#475569;border-radius:999px;padding:2px 8px;font-size:12px;}
+  .kanban-col[data-stage="todo"] h4{border-left:5px solid #64748B;}
+  .kanban-col[data-stage="grafica"] h4{border-left:5px solid #3B82F6;}
+  .kanban-col[data-stage="ready"] h4{border-left:5px solid #8B5CF6;}
+  .kanban-col[data-stage="production"] h4{border-left:5px solid #F59E0B;}
+  .kanban-col[data-stage="external"] h4{border-left:5px solid #10B981;}
+  .job-card{background:#FFFFFF;border:1px solid #D9E1EA;border-radius:14px;padding:17px 16px;margin-bottom:14px;font-size:15px;cursor:pointer;box-shadow:0 4px 14px rgba(15,23,42,.07);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
+  .job-card.job-card-business,.job-card.job-card-family{border-top:1px solid #D9E1EA;}
+  .job-card:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(15,23,42,.11);border-color:#B8C5D4;}
+  .job-card.job-card-importante{border:2px solid #F2B705;background:#FFF9DF;box-shadow:0 6px 18px rgba(242,183,5,.18);}
+  .job-card .jc-star{color:#9A6700;font-size:12px;font-weight:800;letter-spacing:.4px;margin-bottom:8px;}
+  .job-card .jc-client{font-weight:800;font-size:17px;line-height:1.25;margin-bottom:8px;color:#172033;}
+  .job-card .jc-cat{color:#0F766E;font-size:13.5px;font-weight:700;margin-bottom:7px;}
+  .job-card .jc-lines{margin-bottom:10px;}
+  .job-card .jc-line{color:#0F6F7A;font-size:14px;font-weight:700;line-height:1.55;}
+  .job-card .jc-desc{font-size:14px;color:var(--text);margin-bottom:9px;}
+  .job-card .jc-meta{color:#64748B;font-size:13px;display:flex;justify-content:space-between;gap:12px;margin-top:10px;font-weight:700;}
   .modal-backdrop{position:fixed;inset:0;background:rgba(10,14,22,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 20px;z-index:100000;overflow-y:auto;}
   .modal-backdrop.open{display:flex;}
   .modal{background:var(--card);border-radius:12px;max-width:1080px;width:100%;padding:32px;position:relative;margin-bottom:40px;}
@@ -1690,10 +1695,11 @@ const PRODOTTI_PER_CATEGORIA = {
 const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone"];
 const NOTE_OPERATORS = ["Mattia","Patrizio","Sara","Francess","Simone"];
 const FAMILY_RICHIESTE = ["Felpe per reparti","Tessuti","Allestimenti","Poster ospedali","Gadget","Altro"];
-const STATUSES = ["Da fare","In lavorazione","In produzione","Completato","Consegnato"];
+const STATUSES = ["Da fare","In preparazione grafica","Pronto per la produzione","In produzione","Completato","Consegnato"];
 const KANBAN_STATUSES = STATUSES.filter(s=>s!=="Consegnato");
-const STATUS_CLASS = {"Da fare":"pill-todo","In lavorazione":"pill-lavorazione","In produzione":"pill-produzione","Completato":"pill-done","Consegnato":"pill-delivered"};
-const STATUS_DOT = {"Da fare":"#FFFFFF","In lavorazione":"#E74C3C","In produzione":"#F1C40F","Completato":"#2ECC71","Consegnato":"#3D4A78"};
+const WORKFLOW_VISIBLE_STAGES = ["Da fare","In preparazione grafica","Pronto per la produzione","In produzione","Produzione esterna"];
+const STATUS_CLASS = {"Da fare":"pill-todo","In preparazione grafica":"pill-lavorazione","Pronto per la produzione":"pill-produzione","In produzione":"pill-produzione","Completato":"pill-done","Consegnato":"pill-delivered"};
+const STATUS_DOT = {"Da fare":"#64748B","In preparazione grafica":"#3B82F6","Pronto per la produzione":"#8B5CF6","In produzione":"#F59E0B","Completato":"#2ECC71","Consegnato":"#3D4A78"};
 function statusDot(stato){ return `<span class="status-dot" style="background:${STATUS_DOT[stato]||'#ccc'}"></span>`; }
 function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#4A4A4A" : "#fff"; }
 const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
@@ -1882,7 +1888,8 @@ function fromDbRow(collection, r){
     case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", richiesta:r.richiesta||"", carattere:r.carattere||"", archiviatoRecenti:!!r.archiviato_recenti, creatoIl:r.creato_il||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||"", dropboxFolderUrl:r.dropbox_folder_url||""};
     case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito};
     case "orders": {
-      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:r.stato, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
+      const normalizedStatus = r.stato==="In lavorazione" ? "In preparazione grafica" : r.stato;
+      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:r.metodo};
@@ -5058,16 +5065,34 @@ function deleteOrder(id){
 let flussoFilters = {categoria:"", worker:""};
 function renderFlusso(){
   const f = flussoFilters;
-  const list = state.orders.filter(o => o.stato!=="Consegnato" && (!f.categoria || orderCategorie(o).includes(f.categoria)) && (!f.worker || orderWorkersList(o).includes(f.worker)))
+  const list = state.orders.filter(o => o.stato!=="Consegnato" && o.stato!=="Completato" && (!f.categoria || orderCategorie(o).includes(f.categoria)) && (!f.worker || orderWorkersList(o).includes(f.worker)))
     .sort((a,b)=> (a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
-  const produzioneEsterna = list.filter(o => o.stato==="In produzione" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne"));
+  const hasExternal = o => (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne");
+  const produzioneEsterna = list.filter(o => o.stato==="In produzione" && hasExternal(o));
   const externalSuppliers = o => {
     const names=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne").map(r=>String(r.fornitore||"").trim()).filter(Boolean);
     return [...new Set(names)];
   };
-  const externalProducts = o => {
-    const names=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne").map(r=>r.prodotto||r.descrizione||"Lavorazione esterna").filter(Boolean);
-    return [...new Set(names)];
+  const stageMeta = {
+    "Da fare":{key:"todo",label:"DA FARE"},
+    "In preparazione grafica":{key:"grafica",label:"IN PREPARAZIONE GRAFICA"},
+    "Pronto per la produzione":{key:"ready",label:"PRONTO PER LA PRODUZIONE"},
+    "In produzione":{key:"production",label:"IN PRODUZIONE"},
+    "Produzione esterna":{key:"external",label:"PRODUZIONE ESTERNA"}
+  };
+  const renderCard = (o, external=false) => {
+    const cl = findItem('clients', o.clientId);
+    const tipoClass = cl && cl.tipo==="Family" ? "job-card-family" : "job-card-business";
+    const suppliers = external ? externalSuppliers(o) : [];
+    return `<div class="job-card ${tipoClass} ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
+      ${o.importante ? `<div class="jc-star">★ IMPORTANTE</div>` : ``}
+      <div class="jc-client">${clientName(o.clientId)} <span style="font-size:10px;font-weight:600;color:#94A3B8;">${o.numero?('#'+o.numero):''}</span></div>
+      <div class="jc-lines">
+        ${(o.righe||[]).filter(r=>r.categoria).map(r=>`<div class="jc-line">${r.categoria}${r.prodotto?' — '+r.prodotto:''} <span style="color:#64748B;font-weight:600;">×${r.quantita}</span></div>`).join("") || `<div class="jc-line" style="color:#64748B">Nessuna categoria assegnata</div>`}
+        ${external ? `<div class="jc-line" style="margin-top:6px;color:#475569;font-weight:600;">Fornitore: <strong style="color:#172033;">${suppliers.length?suppliers.join(', '):'da indicare'}</strong></div>` : ``}
+      </div>
+      <div class="jc-meta"><span>${orderWorkersLabel(o)||'non assegnato'}</span><span>${fmtDate(o.dataConsegna)}</span></div>
+    </div>`;
   };
   document.getElementById("view-flusso").innerHTML = `
     <div class="section-header">
@@ -5076,50 +5101,17 @@ function renderFlusso(){
         <select class="inline" onchange="flussoFilters.worker=this.value; renderFlusso();"><option value="">Tutti gli operatori</option>${WORKERS.map(w=>`<option ${w===f.worker?'selected':''}>${w}</option>`).join("")}</select>
       </div>
     </div>
-    <p class="helptext">Gli ordini consegnati non compaiono più qui: restano visibili nell'elenco Ordini.</p>
+    <p class="helptext">Il flusso mostra solo i lavori ancora operativi. I lavori completati restano disponibili nella Dashboard e nell'elenco Ordini.</p>
     <div class="kanban">
-      ${KANBAN_STATUSES.map(st=>{
-        const items = list.filter(o=>{
-          if(o.stato!==st) return false;
-          // Gli ordini in produzione con almeno una lavorazione esterna
-          // compaiono esclusivamente nella sezione PRODUZIONE ESTERNA.
-          if(st==="In produzione" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne")) return false;
-          return true;
-        });
-        return `<div class="kanban-col">
-          <h4>${statusDot(st)}${st}<span>${items.length}</span></h4>
-          ${items.map(o=>{
-            const cl = findItem('clients', o.clientId);
-            const tipoClass = cl && cl.tipo==="Family" ? "job-card-family" : "job-card-business";
-            return `
-            <div class="job-card ${tipoClass} ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
-              ${o.importante ? `<div class="jc-star">★ IMPORTANTE</div>` : ``}
-              <div class="jc-client">${clientName(o.clientId)} <span style="font-size:9px;font-weight:400;color:var(--border);">${o.numero?('#'+o.numero):''}</span></div>
-              <div class="jc-lines">
-                ${o.righe.filter(r=>r.categoria).map(r=>`<div class="jc-line">${r.categoria}${r.prodotto?' — '+r.prodotto:''} <span style="color:var(--muted);font-weight:500;">×${r.quantita}</span></div>`).join("") || `<div class="jc-line" style="color:var(--muted)">Nessuna categoria assegnata</div>`}
-              </div>
-              <div class="jc-meta"><span>${orderWorkersLabel(o)}</span><span>${fmtDate(o.dataConsegna)}</span></div>
-              ${o.createdAt ? `<div style="font-size:9px;color:var(--border);margin-top:2px;">Creato il ${fmtDate(o.createdAt.slice(0,10))}</div>` : ``}
-            </div>`;
-          }).join("") || `<p class="empty" style="padding:14px 4px;">Vuoto</p>`}
-          ${st==="In produzione" ? `
-            <div style="margin-top:22px;padding-top:16px;border-top:2px solid var(--accent);">
-              <h4 style="margin-bottom:10px;">PRODUZIONE ESTERNA <span>${produzioneEsterna.length}</span></h4>
-              ${produzioneEsterna.map(o=>{
-                const cl=findItem('clients',o.clientId);
-                const tipoClass=cl && cl.tipo==="Family" ? "job-card-family" : "job-card-business";
-                const fornitori=externalSuppliers(o);
-                const prodotti=externalProducts(o);
-                return `<div class="job-card ${tipoClass} ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
-                  <div class="jc-client">${clientName(o.clientId)} <span style="font-size:9px;font-weight:400;color:var(--border);">${o.numero?('#'+o.numero):''}</span></div>
-                  <div class="jc-lines">
-                    <div class="jc-line"><strong>${prodotti.join(', ')||'Lavorazione esterna'}</strong></div>
-                    <div class="jc-line" style="color:var(--muted);">Fornitore: <strong style="color:var(--text);">${fornitori.length?fornitori.join(', '):'da indicare'}</strong></div>
-                  </div>
-                  <div class="jc-meta"><span>${orderWorkersLabel(o)}</span><span>${o.stato}</span></div>
-                </div>`;
-              }).join("") || `<p class="empty" style="padding:14px 4px;">Nessuna produzione esterna.</p>`}
-            </div>` : ``}
+      ${WORKFLOW_VISIBLE_STAGES.map(stage=>{
+        const meta=stageMeta[stage];
+        let items=[];
+        if(stage==="Produzione esterna") items=produzioneEsterna;
+        else if(stage==="In produzione") items=list.filter(o=>o.stato==="In produzione" && !hasExternal(o));
+        else items=list.filter(o=>o.stato===stage);
+        return `<div class="kanban-col" data-stage="${meta.key}">
+          <h4><span style="background:transparent;padding:0;font-size:14px;color:#243142;">${meta.label}</span><span>${items.length}</span></h4>
+          ${items.map(o=>renderCard(o, stage==="Produzione esterna")).join("") || `<p class="empty" style="padding:18px 6px;">Nessun lavoro</p>`}
         </div>`;
       }).join("")}
     </div>
