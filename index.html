@@ -2014,7 +2014,7 @@ function subscribeRealtime(){
           if(actual) syncSnapshots[name].set(row.id,rowFingerprint(name,actual));
         }
         if(payload.eventType === "DELETE") syncSnapshots[name]?.delete(payload.old.id);
-        renderCurrentView();
+        if(!shouldDeferCurrentViewRender()) renderCurrentView();
       })
       .subscribe();
   });
@@ -2038,7 +2038,7 @@ async function refreshSharedDataFromSupabase(render=true){
     });
     if(render){
       const modalOpen=document.getElementById("modalBackdrop")?.classList.contains("open");
-      if(!modalOpen) renderCurrentView();
+      if(!modalOpen && !shouldDeferCurrentViewRender()) renderCurrentView();
     }
   } finally { dataSyncBusy=false; }
 }
@@ -2542,10 +2542,21 @@ function renderCurrentView(){
     posta:renderPosta, whatsapp:()=>renderMetaChannel("whatsapp"), instagram:()=>renderMetaChannel("instagram"), leads:renderLeads})[currentView]();
 }
 let clientFormOpen = false;
+/* Evita che la sincronizzazione multi-PC ridisegni il modulo Nuovo cliente mentre l'operatore sta scrivendo.
+   I dati remoti vengono comunque aggiornati nello state; la vista verrà ridisegnata dopo Salva/Annulla. */
+function shouldDeferCurrentViewRender(){
+  if(currentView === "clienti" && clientFormOpen) return true;
+  return false;
+}
 function toggleForm(id){
   if(id==="clientForm") clientFormOpen = !clientFormOpen;
   const el = document.getElementById(id);
   if(el) el.classList.toggle("open");
+}
+function closeClientForm(){
+  clientFormOpen = false;
+  const el=document.getElementById("clientForm");
+  if(el) el.classList.remove("open");
 }
 /* Ridisegna una vista preservando il focus e la posizione del cursore sul campo attivo (usato dalle ricerche, che altrimenti perdono il focus a ogni lettera) */
 function rerenderKeepingFocus(renderFn){
@@ -3890,7 +3901,7 @@ function renderClienti(){
       ${clientFieldsHTML('cf')}
       <div class="form-actions">
         <button class="btn btn-primary" onclick="addClient()">Salva cliente</button>
-        <button class="btn btn-outline" onclick="toggleForm('clientForm')">Annulla</button>
+        <button class="btn btn-outline" onclick="closeClientForm(); renderClienti();">Annulla</button>
       </div>
     </div>
 
@@ -4072,7 +4083,7 @@ async function saveEditClient(clientId){
 async function addClient(){
   const id = await createClientFromPrefix('cf');
   if(!id) return;
-  toggleForm('clientForm'); renderClienti(); showToast("Cliente aggiunto");
+  closeClientForm(); renderClienti(); showToast("Cliente aggiunto");
 }
 function updateClientCarattere(clientId, value){
   const c = findItem('clients', clientId);
