@@ -1712,7 +1712,9 @@ const STATUS_CLASS = {"Da fare":"pill-todo","In preparazione grafica":"pill-lavo
 const STATUS_DOT = {"Da fare":"#FFFFFF","In preparazione grafica":"#E4573D","In produzione":"#F4C430","Completato":"#2E9D57","Consegnato":"#3D4A78"};
 function statusDot(stato){ return `<span class="status-dot" style="background:${STATUS_DOT[stato]||'#ccc'}"></span>`; }
 function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#28323F" : "#fff"; }
-
+function orderHasExternal(o){
+  return !!(o && (o.righe||[]).some(r=>r && r.categoria==="Lavorazioni Esterne"));
+}
 const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
 const QUOTE_CLASS = {"Bozza":"pill-draft","Inviato":"pill-sent","Accettato":"pill-accepted","Rifiutato":"pill-refused"};
 const STEP_TEMPLATES = {
@@ -2188,7 +2190,8 @@ function emptyRiga(isOrder){
 }
 /* Ricalcola le fasi di lavorazione in base alle categorie presenti nelle righe, preservando lo stato delle spunte già fatte */
 function recalcFasi(order){
-  // Manteniamo gestione bozza e collegamenti a file esterni nel campo JSON fasi.
+  // Manteniamo gestione bozza e collegamenti esterni ai file.
+  // I file veri NON vengono salvati nel gestionale.
   const marker = (order.fasi||[]).find(f=>f && f.key==="__bozza__");
   const allegati = (order.fasi||[]).filter(f=>f && f.key==="__allegato__");
   order.fasi = [...(marker ? [marker] : []), ...allegati];
@@ -2197,8 +2200,8 @@ function recalcFasi(order){
 function getOrderExternalAttachments(order){
   return (order?.fasi||[]).filter(f=>f && f.key==="__allegato__" && f.url);
 }
-function normalizeExternalFileUrl(url, download=false){
-  let u=(url||"").trim();
+function externalFileUrl(url, download=false){
+  let u=String(url||"").trim();
   if(!u) return "";
   if(/dropbox\.com/i.test(u)){
     try{
@@ -2212,56 +2215,69 @@ function normalizeExternalFileUrl(url, download=false){
 }
 async function addOrderExternalAttachment(orderId){
   const o=findItem("orders",orderId); if(!o) return;
+
   const nome=prompt("Nome del file (es. bozza-logo.pdf):");
   if(!nome) return;
+
   const url=prompt("Incolla il link Dropbox o il link diretto al file:");
   if(!url) return;
-  const clean=normalizeExternalFileUrl(url,false);
+
+  const clean=externalFileUrl(url,false);
   if(!/^https?:\/\//i.test(clean)){
-    showToast("Inserisci un link valido che inizi con http:// o https://");
+    showToast("Il collegamento deve iniziare con http:// o https://");
     return;
   }
+
   o.fasi=o.fasi||[];
-  o.fasi.push({key:"__allegato__", id:uid(), nome:nome.trim(), url:clean, createdAt:new Date().toISOString()});
+  o.fasi.push({
+    key:"__allegato__",
+    id:uuid(),
+    nome:String(nome).trim(),
+    url:clean,
+    createdAt:new Date().toISOString()
+  });
+
   await saveSingleRecord("orders",o);
   openJobCard(orderId);
-  showToast("File collegato");
+  showToast("File collegato alla scheda");
 }
 async function removeOrderExternalAttachment(orderId, attachmentId){
   const o=findItem("orders",orderId); if(!o) return;
-  if(!confirm("Rimuovere il collegamento al file dalla scheda? Il file originale non verrà cancellato.")) return;
-  o.fasi=(o.fasi||[]).filter(f=>!(f && f.key==="__allegato__" && f.id===attachmentId));
-  await saveSingleRecord("orders",o);
-  openJobCard(orderId);
+  askConfirm("Rimuovere il collegamento al file? Il file originale resterà su Dropbox.", async ()=>{
+    o.fasi=(o.fasi||[]).filter(f=>!(f && f.key==="__allegato__" && f.id===attachmentId));
+    await saveSingleRecord("orders",o);
+    openJobCard(orderId);
+    showToast("Collegamento rimosso");
+  });
 }
 function openOrderExternalAttachment(orderId, attachmentId, download=false){
   const o=findItem("orders",orderId); if(!o) return;
   const a=getOrderExternalAttachments(o).find(x=>x.id===attachmentId); if(!a) return;
-  window.open(normalizeExternalFileUrl(a.url,download),"_blank","noopener,noreferrer");
+  const url=externalFileUrl(a.url,download);
+  if(url) window.open(url,"_blank","noopener,noreferrer");
 }
 function renderOrderExternalAttachments(o){
   const files=getOrderExternalAttachments(o);
   return `
-    <div style="border:1px solid var(--border);border-radius:14px;padding:14px;background:#F8FAFC;">
+    <div style="margin-top:14px;border:1px solid var(--border);border-radius:14px;padding:14px;background:#F8FAFC;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
         <div>
           <strong>File allegati</strong>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Il gestionale conserva solo nome e collegamento. Il file rimane su Dropbox o sul servizio esterno.</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+            Il file resta su Dropbox o sul servizio esterno. Nel gestionale salviamo solo il collegamento.
+          </div>
         </div>
-        <button class="btn btn-outline btn-sm" onclick="addOrderExternalAttachment('${o.id}')">+ Allega file</button>
+        <button class="btn btn-outline btn-sm" onclick="addOrderExternalAttachment('${o.id}')">+ ALLEGA FILE</button>
       </div>
       ${files.length ? files.map(a=>`
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff;margin-bottom:8px;">
-          <div style="min-width:0;">
-            <div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ${escapeHtml(a.nome||"File")}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Collegamento esterno</div>
+          <div style="min-width:0;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ${escapeHtml(a.nome||"File")}</div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="openOrderExternalAttachment('${o.id}','${a.id}',false)">APRI</button>
+            <button class="btn btn-primary btn-sm" onclick="openOrderExternalAttachment('${o.id}','${a.id}',true)">SCARICA</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeOrderExternalAttachment('${o.id}','${a.id}')">RIMUOVI</button>
           </div>
-          <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;">
-            <button class="btn btn-outline btn-sm" onclick="openOrderExternalAttachment('${o.id}','${a.id}',false)">Apri</button>
-            <button class="btn btn-primary btn-sm" onclick="openOrderExternalAttachment('${o.id}','${a.id}',true)">Scarica</button>
-            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeOrderExternalAttachment('${o.id}','${a.id}')">Rimuovi</button>
-          </div>
-        </div>`).join("") : `<div style="font-size:13px;color:var(--muted);padding:6px 0;">Nessun file collegato.</div>`}
+        </div>`).join("") : `<div style="font-size:13px;color:var(--muted);">Nessun file collegato.</div>`}
     </div>`;
 }
 
@@ -2665,6 +2681,10 @@ function shouldDeferCurrentViewRender(){
   if(currentView === "clienti" && clientFormOpen) return true;
   if(currentView === "preventivi" && quoteFormOpen) return true;
   if(currentView === "ordini" && orderFormOpen) return true;
+  // Protezione generale: se QUALSIASI pannello modulo è aperto
+  // (es. Nuova Entrata, Spesa, Incasso, ecc.) la sincronizzazione
+  // aggiorna i dati ma non ricostruisce la pagina e non chiude il modulo.
+  if(document.querySelector(".form-panel.open")) return true;
   return userIsEditingAnyField();
 }
 function requestSafeCurrentViewRender(){
@@ -5416,7 +5436,7 @@ function openJobCard(orderId){
     <div class="ticket-meta ticket-meta-big">
       <div><span>Operatori</span>${workerMultiSelector(o)}</div>
       <div><span>Data consegna</span><input class="inline inline-big" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value)"></div>
-      <div><span>Stato</span><select class="inline inline-big status-select-big" style="background:${(o.stato==="In produzione" && hasExternal(o))?"#2E9D57":STATUS_DOT[o.stato]};color:${(o.stato==="In produzione" && hasExternal(o))?"#FFFFFF":statusTextColor(o.stato)};border:1px solid ${o.stato==="Da fare"?"#DDE2E5":"transparent"}" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${(s==="In produzione" && hasExternal(o))?"IN PRODUZIONE ESTERNA":s.toUpperCase()}</option>`).join("")}</select></div>
+      <div><span>Stato</span><select class="inline inline-big status-select-big" style="background:${(o.stato==="In produzione" && orderHasExternal(o))?"#2E9D57":STATUS_DOT[o.stato]};color:${(o.stato==="In produzione" && orderHasExternal(o))?"#FFFFFF":statusTextColor(o.stato)};border:${o.stato==="Da fare"?"1px solid #DDE2E5":"none"}" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${(s==="In produzione" && orderHasExternal(o))?"IN PRODUZIONE ESTERNA":s.toUpperCase()}</option>`).join("")}</select></div>
     </div>
 
     <div class="modal-section">
@@ -5431,7 +5451,7 @@ function openJobCard(orderId){
     <div class="modal-section">
       <h3>Descrizione generale del lavoro</h3>
       <textarea class="desc-lavoro" rows="12" placeholder="Descrivi in modo dettagliato il lavoro, materiali, misure, colori, note operative e indicazioni per la produzione…" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
-      <div style="margin-top:14px;">${renderOrderExternalAttachments(o)}</div>
+      ${renderOrderExternalAttachments(o)}
     </div>
 
     ${renderBozzaSection(o)}
