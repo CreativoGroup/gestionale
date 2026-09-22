@@ -3354,14 +3354,11 @@ function renderDashboard(){
     ${scorteBasse.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">Avvisi magazzino</h3><table><thead><tr><th>Codice</th><th>Colore</th><th>Taglia</th><th>Disponibili</th><th>Scorta minima</th></tr></thead><tbody>${scorteBasse.map(w=>`<tr><td style="font-weight:700;">${w.codice}</td><td>${w.colore}</td><td>${w.taglia}</td><td class="low-stock">${w.quantita} ${w.unita}</td><td>${w.scortaMinima} ${w.unita}</td></tr>`).join("")}</tbody></table></div>` : ""}
     <div class="card dashboard-crediti-aperti" style="margin-top:16px;">
       <h3 style="margin-top:0;">Crediti aperti (ultimi inseriti)</h3>
-      ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Ordini da saldare</th><th>Da saldare</th><th>Fatturazione</th><th></th></tr></thead><tbody>${creditiApertiDash.map(g=>`
+      ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Ordini da saldare</th><th>Da saldare</th><th></th></tr></thead><tbody>${creditiApertiDash.map(g=>`
         <tr class="credit-mobile-row">
           <td class="credit-client-name">${clientName(g.clientId)}</td>
           <td class="mobile-hide">${g.orders.length===1 ? orderCategorieLabel(g.orders[0].o) : `${g.orders.length} ordini — ${g.orders.map(x=>orderCategorieLabel(x.o)).join(", ")}`}</td>
           <td class="credit-residuo" style="color:var(--danger);font-weight:800;">${fmtMoney(g.totaleSaldo)}</td>
-          <td style="white-space:nowrap;">${g.orders.length===1
-            ? fatturazioneCreditoButton(g.orders[0].o)
-            : `<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-start;">${g.orders.map(x=>`<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(orderCategorieLabel(x.o))}</span>${fatturazioneCreditoButton(x.o)}</div>`).join("")}</div>`}</td>
           <td class="credit-action" style="white-space:nowrap;">${g.orders.length===1
             ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button>`
             : `<button class="btn btn-outline btn-sm" onclick="openCreditiCliente('${g.clientId}')">Dettaglio</button>`}</td>
@@ -3410,31 +3407,6 @@ function creditiApertiRaggruppati(){
     })
     .sort((a,b)=>compareOrdersNewestFirst(a.ultimoInserimentoOrdine,b.ultimoInserimentoOrdine));
 }
-function fatturazioneCreditoLabel(o){
-  return o?.fatturato ? "FATTURATO" : "DA FATTURARE";
-}
-function fatturazioneCreditoButton(o, extraClass=""){
-  if(!o) return "";
-  const isFatturato=!!o.fatturato;
-  const cls=isFatturato ? "btn btn-outline btn-sm" : "btn btn-primary btn-sm";
-  const style=isFatturato ? 'style="border-color:#1f9d68;color:#1f9d68;"' : '';
-  return `<button class="${cls} ${extraClass}" ${style} onclick="event.stopPropagation();toggleFatturazioneCredito('${o.id}')">${fatturazioneCreditoLabel(o)}</button>`;
-}
-function toggleFatturazioneCredito(orderId){
-  const o=findItem('orders',orderId);
-  if(!o) return;
-  o.daFatturare=true;
-  o.fatturato=!o.fatturato;
-  saveState('orders');
-  showToast(o.fatturato ? "Ordine segnato come fatturato" : "Ordine rimesso da fatturare");
-  if(currentView==="incassi") renderIncassi();
-  else renderDashboard();
-  if(document.getElementById("modalBackdrop")?.classList.contains("open")){
-    const modal=document.getElementById("modalBody");
-    if(modal?.dataset?.creditiClientId) openCreditiCliente(modal.dataset.creditiClientId);
-  }
-}
-
 function openCreditiCliente(clientId){
   const orders = state.orders
     .filter(o=>o.clientId===clientId && o.stato==="Consegnato")
@@ -3442,9 +3414,7 @@ function openCreditiCliente(clientId){
     .filter(x=>x.saldo>0.001)
     .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
   const totale = orders.reduce((s,x)=>s+x.saldo,0);
-  const creditModal=document.getElementById("modalBody");
-  creditModal.dataset.creditiClientId=clientId;
-  creditModal.innerHTML = `
+  document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>${clientName(clientId)}</h2>
     <p style="color:var(--muted);margin-top:0;">${orders.length} ordini da saldare — totale <strong style="color:var(--danger);">${fmtMoney(totale)} da saldare</strong></p>
@@ -3456,7 +3426,6 @@ function openCreditiCliente(clientId){
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="text-align:right;"><div class="lr-main">${fmtMoney(orderTotale(x.o))}</div><div class="lr-sub" style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)} da saldare</div></div>
-            ${fatturazioneCreditoButton(x.o)}
             <button class="btn btn-ghost btn-sm" onclick="deleteOrderFromCreditiCliente('${x.o.id}','${clientId}')">✕</button>
           </div>
         </div>`).join("")}
@@ -6193,9 +6162,9 @@ function renderIncassi(){
     <h3 style="margin:0 0 10px;">Crediti aperti per ordine (ultimo inserimento)</h3>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Cliente</th><th>Categoria</th><th>Totale ordine</th><th>Saldo da incassare</th><th>Fatturazione</th></tr></thead>
+        <thead><tr><th>Cliente</th><th>Categoria</th><th>Totale ordine</th><th>Saldo da incassare</th></tr></thead>
         <tbody>
-          ${creditiAperti.length ? creditiAperti.map(x=>`<tr><td>${clientName(x.o.clientId)}</td><td>${orderCategorieLabel(x.o)}</td><td>${fmtMoney(orderTotale(x.o))}</td><td style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)}</td><td>${fatturazioneCreditoButton(x.o)}</td></tr>`).join("") : `<tr><td colspan="5" class="empty">Nessun credito aperto.</td></tr>`}
+          ${creditiAperti.length ? creditiAperti.map(x=>`<tr><td>${clientName(x.o.clientId)}</td><td>${orderCategorieLabel(x.o)}</td><td>${fmtMoney(orderTotale(x.o))}</td><td style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)}</td></tr>`).join("") : `<tr><td colspan="4" class="empty">Nessun credito aperto.</td></tr>`}
         </tbody>
       </table>
     </div>
