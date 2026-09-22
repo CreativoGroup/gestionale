@@ -1709,9 +1709,19 @@ const STATUSES = ["Da fare","In preparazione grafica","In produzione","Completat
 const KANBAN_STATUSES = STATUSES.filter(s=>s!=="Consegnato");
 const WORKFLOW_VISIBLE_STAGES = ["Da fare","In preparazione grafica","In produzione","Produzione esterna"];
 const STATUS_CLASS = {"Da fare":"pill-todo","In preparazione grafica":"pill-lavorazione","In produzione":"pill-produzione","Completato":"pill-done","Consegnato":"pill-delivered"};
-const STATUS_DOT = {"Da fare":"#64748B","In preparazione grafica":"#3B82F6","In produzione":"#F59E0B","Completato":"#2ECC71","Consegnato":"#3D4A78"};
+const STATUS_DOT = {"Da fare":"#FFFFFF","In preparazione grafica":"#E4573D","In produzione":"#F4C430","Completato":"#2E9D57","Consegnato":"#3D4A78"};
 function statusDot(stato){ return `<span class="status-dot" style="background:${STATUS_DOT[stato]||'#ccc'}"></span>`; }
-function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#4A4A4A" : "#fff"; }
+function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#28323F" : "#fff"; }
+function orderStatusVisual(o){
+  const external = !!(o && o.stato==="In produzione" && typeof hasExternal==="function" && hasExternal(o));
+  if(external) return {bg:"#2E9D57", color:"#FFFFFF", label:"IN PRODUZIONE ESTERNA"};
+  if(o?.stato==="Da fare") return {bg:"#FFFFFF", color:"#28323F", label:"DA FARE"};
+  if(o?.stato==="In preparazione grafica") return {bg:"#E4573D", color:"#FFFFFF", label:"IN PREPARAZIONE GRAFICA"};
+  if(o?.stato==="In produzione") return {bg:"#F4C430", color:"#28323F", label:"IN PRODUZIONE"};
+  if(o?.stato==="Completato") return {bg:"#2E9D57", color:"#FFFFFF", label:"COMPLETATO"};
+  return {bg:STATUS_DOT[o?.stato]||"#FFFFFF", color:statusTextColor(o?.stato), label:(o?.stato||"").toUpperCase()};
+}
+
 const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
 const QUOTE_CLASS = {"Bozza":"pill-draft","Inviato":"pill-sent","Accettato":"pill-accepted","Rifiutato":"pill-refused"};
 const STEP_TEMPLATES = {
@@ -2187,17 +2197,90 @@ function emptyRiga(isOrder){
 }
 /* Ricalcola le fasi di lavorazione in base alle categorie presenti nelle righe, preservando lo stato delle spunte già fatte */
 function recalcFasi(order){
-  // Le vecchie checklist "Fasi di lavorazione" non vengono più generate.
-  // Manteniamo solo l'eventuale stato della gestione bozza salvato nello stesso campo JSON.
+  // Manteniamo gestione bozza e collegamenti a file esterni nel campo JSON fasi.
   const marker = (order.fasi||[]).find(f=>f && f.key==="__bozza__");
-  order.fasi = marker ? [marker] : [];
+  const allegati = (order.fasi||[]).filter(f=>f && f.key==="__allegato__");
+  order.fasi = [...(marker ? [marker] : []), ...allegati];
 }
+
+function getOrderExternalAttachments(order){
+  return (order?.fasi||[]).filter(f=>f && f.key==="__allegato__" && f.url);
+}
+function normalizeExternalFileUrl(url, download=false){
+  let u=(url||"").trim();
+  if(!u) return "";
+  if(/dropbox\.com/i.test(u)){
+    try{
+      const obj=new URL(u);
+      obj.searchParams.delete("raw");
+      obj.searchParams.set("dl", download ? "1" : "0");
+      return obj.toString();
+    }catch(e){}
+  }
+  return u;
+}
+async function addOrderExternalAttachment(orderId){
+  const o=findItem("orders",orderId); if(!o) return;
+  const nome=prompt("Nome del file (es. bozza-logo.pdf):");
+  if(!nome) return;
+  const url=prompt("Incolla il link Dropbox o il link diretto al file:");
+  if(!url) return;
+  const clean=normalizeExternalFileUrl(url,false);
+  if(!/^https?:\/\//i.test(clean)){
+    showToast("Inserisci un link valido che inizi con http:// o https://");
+    return;
+  }
+  o.fasi=o.fasi||[];
+  o.fasi.push({key:"__allegato__", id:uid(), nome:nome.trim(), url:clean, createdAt:new Date().toISOString()});
+  await saveSingleRecord("orders",o);
+  openJobCard(orderId);
+  showToast("File collegato");
+}
+async function removeOrderExternalAttachment(orderId, attachmentId){
+  const o=findItem("orders",orderId); if(!o) return;
+  if(!confirm("Rimuovere il collegamento al file dalla scheda? Il file originale non verrà cancellato.")) return;
+  o.fasi=(o.fasi||[]).filter(f=>!(f && f.key==="__allegato__" && f.id===attachmentId));
+  await saveSingleRecord("orders",o);
+  openJobCard(orderId);
+}
+function openOrderExternalAttachment(orderId, attachmentId, download=false){
+  const o=findItem("orders",orderId); if(!o) return;
+  const a=getOrderExternalAttachments(o).find(x=>x.id===attachmentId); if(!a) return;
+  window.open(normalizeExternalFileUrl(a.url,download),"_blank","noopener,noreferrer");
+}
+function renderOrderExternalAttachments(o){
+  const files=getOrderExternalAttachments(o);
+  return `
+    <div style="border:1px solid var(--border);border-radius:14px;padding:14px;background:#F8FAFC;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+        <div>
+          <strong>File allegati</strong>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Il gestionale conserva solo nome e collegamento. Il file rimane su Dropbox o sul servizio esterno.</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="addOrderExternalAttachment('${o.id}')">+ Allega file</button>
+      </div>
+      ${files.length ? files.map(a=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff;margin-bottom:8px;">
+          <div style="min-width:0;">
+            <div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ${escapeHtml(a.nome||"File")}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Collegamento esterno</div>
+          </div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;">
+            <button class="btn btn-outline btn-sm" onclick="openOrderExternalAttachment('${o.id}','${a.id}',false)">Apri</button>
+            <button class="btn btn-primary btn-sm" onclick="openOrderExternalAttachment('${o.id}','${a.id}',true)">Scarica</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeOrderExternalAttachment('${o.id}','${a.id}')">Rimuovi</button>
+          </div>
+        </div>`).join("") : `<div style="font-size:13px;color:var(--muted);padding:6px 0;">Nessun file collegato.</div>`}
+    </div>`;
+}
+
 function getBozzaMeta(order){
   return (order.fasi||[]).find(f=>f && f.key==="__bozza__") || {key:"__bozza__", scelta:"", stato:""};
 }
 function setBozzaScelta(orderId, scelta){
   const o=findItem('orders',orderId); if(!o) return;
-  o.fasi=[{key:"__bozza__", scelta, stato:""}];
+  const allegati=(o.fasi||[]).filter(f=>f && f.key==="__allegato__");
+  o.fasi=[{key:"__bozza__", scelta, stato:""}, ...allegati];
   saveState('orders');
   openJobCard(orderId);
 }
@@ -2205,7 +2288,8 @@ function setBozzaInAttesa(orderId){
   const o=findItem('orders',orderId); if(!o) return;
   const m=getBozzaMeta(o);
   if(!m.scelta) return;
-  o.fasi=[{key:"__bozza__", scelta:m.scelta, stato:"IN ATTESA DI CONFERMA BOZZA"}];
+  const allegati=(o.fasi||[]).filter(f=>f && f.key==="__allegato__");
+  o.fasi=[{key:"__bozza__", scelta:m.scelta, stato:"IN ATTESA DI CONFERMA BOZZA"}, ...allegati];
   saveState('orders');
   openJobCard(orderId);
   showToast("Bozza in attesa di conferma");
@@ -5341,7 +5425,10 @@ function openJobCard(orderId){
     <div class="ticket-meta ticket-meta-big">
       <div><span>Operatori</span>${workerMultiSelector(o)}</div>
       <div><span>Data consegna</span><input class="inline inline-big" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value)"></div>
-      <div><span>Stato</span><select class="inline inline-big status-select-big" style="background:${STATUS_DOT[o.stato]};color:${statusTextColor(o.stato)}" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${s}</option>`).join("")}</select></div>
+      <div><span>Stato</span>${(()=>{
+        const sv=orderStatusVisual(o);
+        return `<select class="inline inline-big status-select-big" style="background:${sv.bg};color:${sv.color};border:1px solid ${o.stato==="Da fare"?"#DDE2E5":"transparent"}" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${(s==="In produzione" && hasExternal(o))?"IN PRODUZIONE ESTERNA":s.toUpperCase()}</option>`).join("")}</select>`;
+      })()}</div>
     </div>
 
     <div class="modal-section">
@@ -5356,6 +5443,7 @@ function openJobCard(orderId){
     <div class="modal-section">
       <h3>Descrizione generale del lavoro</h3>
       <textarea class="desc-lavoro" rows="12" placeholder="Descrivi in modo dettagliato il lavoro, materiali, misure, colori, note operative e indicazioni per la produzione…" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
+      <div style="margin-top:14px;">${renderOrderExternalAttachments(o)}</div>
     </div>
 
     ${renderBozzaSection(o)}
