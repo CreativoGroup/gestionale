@@ -2130,6 +2130,14 @@ function catalogColorsForCode(code){
   return p && Array.isArray(p.colors) ? p.colors : [];
 }
 function catalogSizesForCode(code, colore=""){
+  const normalized = String(code||"").trim().toUpperCase();
+
+  // Fruit of the Loom Kids Premium Set-In Sweat 62-031-0 / FR620310:
+  // il catalogo precedente accorpava erroneamente le taglie in "3-4-14-15".
+  if(normalized==="FR620310" || normalized==="620310" || normalized==="62-031-0"){
+    return ["3-4","5-6","7-8","9-11","12-13","14-15"];
+  }
+
   const p = catalogProduct(code);
   if(p && colore && p.colorSizes && typeof p.colorSizes==="object"){
     const target = warehouseColorKey(colore);
@@ -4415,22 +4423,31 @@ function prodottoOptions(categoria, selected){
   return `<option value="">Seleziona…</option>` + opts.map(p=>`<option value="${p}" ${p===selected?'selected':''}>${p}</option>`).join("");
 }
 function magazzinoAllowedCategorie(o){
-  const set = new Set();
-  const directMap = new Set(["T-shirt","Polo","Felpa","Shopper","Cappello"]);
+  const set=new Set();
+  const directMap=new Set(["T-shirt","Polo","Felpa","Shopper","Cappello","Altro tessuto"]);
+
   (o.righe||[]).forEach(r=>{
+    const prodotto=String(r.prodotto||"").trim();
+
+    // STAMPA: mostra Prodotto/Magazzino per TUTTI,
+    // esclusivamente quando il prodotto è "Tessuto del cliente".
     if(r.categoria==="Stampa"){
-      if(!r.prodotto || r.prodotto==="Tessuto del cliente") return;
-      if(directMap.has(r.prodotto)) set.add(r.prodotto);
-      else if(r.prodotto==="Altro") set.add("Altro tessuto");
+      if(!prodotto || prodotto==="Tessuto del cliente") return;
+      if(prodotto==="Altro") set.add("Altro tessuto");
+      else if(directMap.has(prodotto)) set.add(prodotto);
       else set.add("*");
     }
+
+    // RICAMO: mostra Prodotto/Magazzino per TUTTI,
+    // esclusivamente quando il prodotto è "Patch".
     if(r.categoria==="Ricamo"){
-      if(!r.prodotto || r.prodotto==="Patch") return;
-      if(directMap.has(r.prodotto)) set.add(r.prodotto);
-      else if(r.prodotto==="Altro") set.add("Altro tessuto");
+      if(!prodotto || prodotto==="Patch") return;
+      if(prodotto==="Altro") set.add("Altro tessuto");
+      else if(directMap.has(prodotto)) set.add(prodotto);
       else set.add("*");
     }
   });
+
   return set;
 }
 function stockTotalePerCodice(codice){
@@ -5660,30 +5677,40 @@ async function recoverPendingWarehouse(){
   if(!pending.length){ showToast("Nessun inserimento da recuperare"); return; }
 
   let salvati=0;
+  const rimasti=[];
+
   for(const p of pending){
     const existing=state.warehouse.find(w=>
-      (w.warehouseGroup||"Tessile")===(p.warehouseGroup||"Tessile") &&
-      String(w.codice||"").trim().toUpperCase()===String(p.codice||"").trim().toUpperCase() &&
-      warehouseColorKey(w.colore)===warehouseColorKey(p.colore) &&
-      String(w.taglia||"UNICA").trim().toUpperCase()===String(p.taglia||"UNICA").trim().toUpperCase()
+      warehouseRowKeyMatch(w,p.warehouseGroup||"Tessile",p.codice||"",p.colore||"",p.taglia||"UNICA")
     );
+
+    let saved=null;
     if(existing){
-      const candidate={...existing,quantita:Number(existing.quantita||0)+Number(p.quantita||0)};
-      if(await upsertOne("warehouse",candidate)){ Object.assign(existing,candidate); salvati++; }
+      saved=await updateWarehouseDirect(existing,{
+        quantita:Number(existing.quantita||0)+Number(p.quantita||0)
+      });
     }else{
-      const item={
-        id:uuid(), codice:p.codice||"", nome:p.nome||"", categoria:p.categoria||"Tessile",
-        colore:canonicalWarehouseColor(p.colore||""), taglia:p.taglia||"UNICA",
-        unita:"pz", quantita:Number(p.quantita)||0, scortaMinima:Number(p.scortaMinima)||0,
+      saved=await insertWarehouseDirect({
+        codice:p.codice||"",
+        nome:p.nome||"",
+        categoria:p.categoria||"Tessile",
+        colore:canonicalWarehouseColor(p.colore||""),
+        taglia:p.taglia||"UNICA",
+        unita:"pz",
+        quantita:Number(p.quantita)||0,
+        scortaMinima:Number(p.scortaMinima)||0,
         warehouseGroup:p.warehouseGroup||"Tessile"
-      };
-      const saved=await upsertOneReturning("warehouse",item);
-      if(saved){ state.warehouse.push(saved); salvati++; }
+      });
     }
+
+    if(saved) salvati++;
+    else rimasti.push(p);
   }
-  if(salvati===pending.length) localStorage.removeItem("warehousePendingRecovery");
+
+  localStorage.setItem("warehousePendingRecovery",JSON.stringify(rimasti));
+  await reloadWarehouseFromDb();
   renderMagazzino();
-  showToast(`${salvati} inserimenti recuperati`);
+  showToast(`${salvati} inserimenti recuperati${rimasti.length?`, ${rimasti.length} ancora da salvare`:""}`);
 }
 
 function warehouseGroupLabel(group){
@@ -5809,82 +5836,204 @@ function quickWarehouseRowHtml(){
     </div>
   `;
 }
-async function quickAddToWarehouse(){
-  const group = magazzinoGroupFilter;
-  const qty = Number(document.getElementById("quick-quantita")?.value)||0;
-  const colore = canonicalWarehouseColor(document.getElementById("quick-colore")?.value.trim() || "");
-  const taglia = document.getElementById("quick-taglia")?.value.trim() || "UNICA";
-  if(qty<=0){ showToast("Inserisci una quantità maggiore di zero"); return; }
-  if(group==="Tessile" && !colore){ showToast("Seleziona il colore"); return; }
-  if(group==="Tessile" && !taglia){ showToast("Seleziona la taglia"); return; }
 
-  let codice="", nome="", categoria="";
-  if(group==="Tessile"){
-    const raw = document.getElementById("quick-codice")?.value.trim() || "";
-    if(!raw){ showToast("Seleziona o inserisci un prodotto"); return; }
-    codice = normalizeCatalogCode(raw);
-    const p = catalogProduct(codice);
-    nome = p?.name || raw;
-    categoria = p?.appCategory || "Tessile";
-  }else{
-    nome = document.getElementById("quick-product")?.value || "";
-    if(!nome){ showToast("Seleziona un prodotto"); return; }
-    categoria = group==="Gadget" ? "Gadget" : "Materiali di stampa";
-  }
-
-  const normalizedTaglia = taglia || "UNICA";
-  const existing = state.warehouse.find(w =>
-    (w.warehouseGroup||"Tessile")===group &&
+function warehouseRowKeyMatch(w, group, codice, colore, taglia){
+  return (w.warehouseGroup||"Tessile")===group &&
     String(w.codice||"").trim().toUpperCase()===String(codice||"").trim().toUpperCase() &&
-    String(w.nome||"").trim().toLowerCase()===String(nome||"").trim().toLowerCase() &&
     warehouseColorKey(w.colore)===warehouseColorKey(colore) &&
-    String(w.taglia||"UNICA").trim().toUpperCase()===String(normalizedTaglia).trim().toUpperCase()
-  );
+    String(w.taglia||"UNICA").trim().toUpperCase()===String(taglia||"UNICA").trim().toUpperCase();
+}
 
-  // Salvataggio di sicurezza nel browser PRIMA di inviare a Supabase.
-  // Se la rete fallisce, l'inserimento può essere recuperato dal pannello dedicato.
-  const pending = {
-    id: uuid(), codice, nome, categoria, colore, taglia:normalizedTaglia,
-    unita:"pz", quantita:qty, scortaMinima:0, warehouseGroup:group,
-    savedAt:new Date().toISOString()
-  };
+async function updateWarehouseDirect(existing, patch){
+  const candidate={...existing,...patch};
+  const row=toDbRow("warehouse",candidate);
+
+  activeDbWrites++;
   try{
-    const arr=JSON.parse(localStorage.getItem("warehousePendingRecovery")||"[]");
-    arr.push(pending);
-    localStorage.setItem("warehousePendingRecovery",JSON.stringify(arr.slice(-100)));
-  }catch(e){}
+    const {data,error}=await sb
+      .from(TABLES.warehouse)
+      .update({
+        codice:row.codice,
+        nome:row.nome,
+        categoria:row.categoria,
+        colore:row.colore,
+        taglia:row.taglia,
+        quantita:row.quantita,
+        scorta_minima:row.scorta_minima,
+        unita:row.unita,
+        warehouse_group:row.warehouse_group
+      })
+      .eq("id",existing.id)
+      .select("*")
+      .single();
 
-  if(existing){
-    const candidate = {...existing, quantita:Number(existing.quantita||0)+qty};
-    const ok = await upsertOne("warehouse", candidate);
-    if(!ok){
-      showToast("Quantità NON salvata. Usa RECUPERA INSERIMENTI.");
-      return;
+    if(error){
+      console.error("ERRORE UPDATE MAGAZZINO",error);
+      showToast(`MAGAZZINO NON SALVATO: ${error.message||"errore Supabase"}`);
+      return null;
     }
-    Object.assign(existing,candidate);
-  }else{
-    const item = {
-      id:uuid(), codice, nome, categoria, colore, taglia:normalizedTaglia,
-      unita:"pz", quantita:qty, scortaMinima:0, warehouseGroup:group
-    };
-    const saved = await upsertOneReturning("warehouse", item);
-    if(!saved){
-      showToast("Articolo NON salvato. Usa RECUPERA INSERIMENTI.");
-      return;
+
+    const saved=fromDbRow("warehouse",data);
+    if(!syncSnapshots.warehouse) syncSnapshots.warehouse=new Map();
+    syncSnapshots.warehouse.set(saved.id,rowFingerprint("warehouse",saved));
+    return saved;
+  }finally{
+    activeDbWrites=Math.max(0,activeDbWrites-1);
+  }
+}
+
+async function insertWarehouseDirect(base){
+  // Non assumiamo il tipo della colonna ID.
+  // 1) ID testuale storico del gestionale
+  // 2) UUID
+  // 3) nessun ID, lasciando il default del database
+  const attempts=[
+    {...base,id:uid()},
+    {...base,id:uuid()},
+    {...base}
+  ];
+
+  let lastError=null;
+
+  for(let i=0;i<attempts.length;i++){
+    const obj=attempts[i];
+    const row=toDbRow("warehouse",{...obj,id:obj.id||null});
+    if(!obj.id) delete row.id;
+
+    activeDbWrites++;
+    try{
+      const {data,error}=await sb
+        .from(TABLES.warehouse)
+        .insert(row)
+        .select("*")
+        .single();
+
+      if(!error && data){
+        const saved=fromDbRow("warehouse",data);
+        if(!syncSnapshots.warehouse) syncSnapshots.warehouse=new Map();
+        syncSnapshots.warehouse.set(saved.id,rowFingerprint("warehouse",saved));
+        return saved;
+      }
+      lastError=error;
+      console.warn("Tentativo inserimento magazzino fallito",i+1,error);
+    }finally{
+      activeDbWrites=Math.max(0,activeDbWrites-1);
     }
-    state.warehouse.push(saved);
   }
 
-  // Rimuove dal recupero solo l'ultimo inserimento confermato.
-  try{
-    const arr=JSON.parse(localStorage.getItem("warehousePendingRecovery")||"[]");
-    const idx=arr.findIndex(x=>x.id===pending.id);
-    if(idx>=0) arr.splice(idx,1);
-    localStorage.setItem("warehousePendingRecovery",JSON.stringify(arr));
-  }catch(e){}
+  console.error("ERRORE INSERT MAGAZZINO",lastError);
+  showToast(`MAGAZZINO NON SALVATO: ${lastError?.message||"errore Supabase"}`);
+  return null;
+}
 
-  renderMagazzino();
-  showToast(`${qty} pz salvati in ${warehouseGroupLabel(group)}`);
+async function reloadWarehouseFromDb(){
+  activeDbWrites++;
+  try{
+    const {data,error}=await sb.from(TABLES.warehouse).select("*");
+    if(error){
+      console.error("Errore rilettura magazzino",error);
+      showToast(`Salvato, ma rilettura fallita: ${error.message||"riprova"}`);
+      return false;
+    }
+    state.warehouse=(data||[])
+      .map(r=>fromDbRow("warehouse",r))
+      .filter(w=>Number(w.quantita)>0);
+    if(!syncSnapshots.warehouse) syncSnapshots.warehouse=new Map();
+    state.warehouse.forEach(w=>syncSnapshots.warehouse.set(w.id,rowFingerprint("warehouse",w)));
+    return true;
+  }finally{
+    activeDbWrites=Math.max(0,activeDbWrites-1);
+  }
+}
+
+async function quickAddToWarehouse(){
+  const button = document.querySelector('button[onclick="quickAddToWarehouse()"]');
+  if(button){ button.disabled=true; button.textContent="SALVATAGGIO…"; }
+
+  try{
+    const group=magazzinoGroupFilter;
+    const qty=Number(document.getElementById("quick-quantita")?.value)||0;
+    const colore=canonicalWarehouseColor(document.getElementById("quick-colore")?.value?.trim()||"");
+    const taglia=document.getElementById("quick-taglia")?.value?.trim()||"";
+
+    if(qty<=0){ showToast("Inserisci una quantità maggiore di zero"); return; }
+    if(group==="Tessile" && !colore){ showToast("Seleziona il colore"); return; }
+    if(group==="Tessile" && !taglia){ showToast("Seleziona la taglia"); return; }
+
+    let codice="",nome="",categoria="";
+    if(group==="Tessile"){
+      const raw=document.getElementById("quick-codice")?.value?.trim()||"";
+      if(!raw){ showToast("Seleziona un prodotto"); return; }
+      codice=normalizeCatalogCode(raw);
+      const p=catalogProduct(codice);
+      nome=p?.name||catalogNameForCode(codice)||raw;
+      categoria=p?.appCategory||"Tessile";
+    }else{
+      nome=document.getElementById("quick-product")?.value||"";
+      if(!nome){ showToast("Seleziona un prodotto"); return; }
+      categoria=group==="Gadget"?"Gadget":"Materiali di stampa";
+    }
+
+    const normalizedTaglia=taglia||"UNICA";
+
+    // Copia locale di sicurezza prima della scrittura
+    const recovery={
+      recoveryId:uuid(),
+      codice,nome,categoria,colore,taglia:normalizedTaglia,
+      unita:"pz",quantita:qty,scortaMinima:0,warehouseGroup:group,
+      savedAt:new Date().toISOString()
+    };
+    try{
+      const arr=JSON.parse(localStorage.getItem("warehousePendingRecovery")||"[]");
+      arr.push(recovery);
+      localStorage.setItem("warehousePendingRecovery",JSON.stringify(arr.slice(-200)));
+    }catch(e){}
+
+    // IMPORTANTISSIMO: per trovare la riga esistente NON confrontiamo il nome,
+    // perché può cambiare tra catalogo vecchio/nuovo.
+    const existing=state.warehouse.find(w=>
+      warehouseRowKeyMatch(w,group,codice,colore,normalizedTaglia)
+    );
+
+    let saved=null;
+
+    if(existing){
+      saved=await updateWarehouseDirect(existing,{
+        nome:nome||existing.nome,
+        categoria:categoria||existing.categoria,
+        quantita:Number(existing.quantita||0)+qty
+      });
+    }else{
+      saved=await insertWarehouseDirect({
+        codice,nome,categoria,colore,taglia:normalizedTaglia,
+        quantita:qty,scortaMinima:0,unita:"pz",warehouseGroup:group
+      });
+    }
+
+    if(!saved){
+      showToast("NON salvato. L'inserimento resta disponibile in RECUPERA INSERIMENTI.");
+      return;
+    }
+
+    // Rileggiamo SEMPRE il magazzino da Supabase.
+    // Quello che appare dopo è ciò che esiste realmente nel database.
+    await reloadWarehouseFromDb();
+
+    try{
+      const arr=JSON.parse(localStorage.getItem("warehousePendingRecovery")||"[]");
+      const filtered=arr.filter(x=>x.recoveryId!==recovery.recoveryId);
+      localStorage.setItem("warehousePendingRecovery",JSON.stringify(filtered));
+    }catch(e){}
+
+    renderMagazzino();
+    showToast(`${qty} pz SALVATI nel magazzino`);
+
+  }catch(err){
+    console.error("Errore inatteso quickAddToWarehouse",err);
+    showToast(`ERRORE MAGAZZINO: ${err?.message||"riprova"}`);
+  }finally{
+    if(button){ button.disabled=false; button.textContent="AGGIUNGI NEL MAGAZZINO"; }
+  }
 }
 
 function warehouseCategoryOptions(selected){
@@ -6073,44 +6222,48 @@ function renderMagazzino(){
   `;
 }
 async function saveWarehouseRow(id){
-  const w = findItem('warehouse', id); if(!w) return;
-  const candidate = {
-    ...w,
-    nome:document.getElementById(`wn-${id}`).value.trim(),
-    quantita:Math.max(0, Number(document.getElementById(`wq-${id}`).value)||0),
-    scortaMinima:Math.max(0, Number(document.getElementById(`wm-${id}`).value)||0)
-  };
-  const ok = await upsertOne("warehouse", candidate);
-  if(!ok){ showToast("Modifica NON salvata"); return; }
-  Object.assign(w,candidate);
+  const w=findItem("warehouse",id); if(!w) return;
+  const saved=await updateWarehouseDirect(w,{
+    nome:document.getElementById(`wn-${id}`)?.value?.trim()||w.nome,
+    quantita:Math.max(0,Number(document.getElementById(`wq-${id}`)?.value)||0),
+    scortaMinima:Math.max(0,Number(document.getElementById(`wm-${id}`)?.value)||0)
+  });
+  if(!saved) return;
+  await reloadWarehouseFromDb();
   renderMagazzino();
-  showToast("Magazzino aggiornato");
+  showToast("MAGAZZINO SALVATO");
 }
 async function addItem(){
-  const nome = document.getElementById("if-nome").value.trim();
-  const quantita = Number(document.getElementById("if-quantita").value)||0;
+  const nome=document.getElementById("if-nome")?.value?.trim()||"";
+  const quantita=Number(document.getElementById("if-quantita")?.value)||0;
   if(!nome){ showToast("Inserisci il nome dell'articolo"); return; }
   if(quantita<=0){ showToast("Inserisci una quantità maggiore di zero"); return; }
-  const item={
-    id:uuid(), codice: document.getElementById("if-codice").value.trim(), nome,
-    categoria: document.getElementById("if-categoria").value,
-    colore: canonicalWarehouseColor(document.getElementById("if-colore").value.trim()),
-    taglia: document.getElementById("if-taglia").value.trim() || "UNICA",
-    unita: "pz", quantita,
-    scortaMinima: Math.max(0, Number(document.getElementById("if-scorta").value)||0),
-    warehouseGroup: magazzinoGroupFilter
-  };
-  const saved=await upsertOneReturning("warehouse",item);
+
+  const saved=await insertWarehouseDirect({
+    codice:document.getElementById("if-codice")?.value?.trim()||"",
+    nome,
+    categoria:document.getElementById("if-categoria")?.value||magazzinoGroupFilter,
+    colore:canonicalWarehouseColor(document.getElementById("if-colore")?.value?.trim()||""),
+    taglia:document.getElementById("if-taglia")?.value?.trim()||"UNICA",
+    unita:"pz",
+    quantita,
+    scortaMinima:Math.max(0,Number(document.getElementById("if-scorta")?.value)||0),
+    warehouseGroup:magazzinoGroupFilter
+  });
+
   if(!saved) return;
-  state.warehouse.push(saved);
-  toggleForm('itemForm'); renderMagazzino(); showToast("Articolo aggiunto");
+  await reloadWarehouseFromDb();
+  toggleForm("itemForm");
+  renderMagazzino();
+  showToast("ARTICOLO SALVATO");
 }
-async function adjustStock(id, delta){
-  const w=findItem('warehouse',id); if(!w) return;
-  const candidate={...w,quantita:Math.max(0,Number(w.quantita||0)+delta)};
-  const ok=await upsertOne("warehouse",candidate);
-  if(!ok) return;
-  Object.assign(w,candidate);
+async function adjustStock(id,delta){
+  const w=findItem("warehouse",id); if(!w) return;
+  const saved=await updateWarehouseDirect(w,{
+    quantita:Math.max(0,Number(w.quantita||0)+Number(delta||0))
+  });
+  if(!saved) return;
+  await reloadWarehouseFromDb();
   renderMagazzino();
 }
 function deleteItem(id){
