@@ -2429,48 +2429,34 @@ function openBozzaMail(orderId){
     showToast("Il cliente non ha un indirizzo email");
     return;
   }
-  bozzaMailAttachments=[];
+
+  const m=getBozzaMeta(o);
+  if(m.scelta!=="BOZZA DA INVIARE PER MAIL"){
+    showToast("Per questo ordine non è previsto l'invio bozza via mail");
+    return;
+  }
+  if(o.stato!=="In preparazione grafica"){
+    showToast("La bozza via Gmail è disponibile solo in preparazione grafica");
+    return;
+  }
+
   const email=String(c.email||'').trim();
-  const subject=`Bozza - ${clientDisplayName(c)}`;
+  const riferimento=String(o.numero||o.id);
+  const subject=`[BOZZA ORDINE #${riferimento}] ${clientDisplayName(c)}`;
   const body=`Gentile cliente,
 
 le inviamo la bozza relativa al lavoro in corso.
 
-Attendiamo conferma prima di poter procedere con la stampa.
+Attendiamo conferma prima di poter procedere con la produzione.
+
+Rif. ordine: ${riferimento}
 
 Cordiali saluti
 Team Creativò`;
-  document.getElementById("modalBody").innerHTML=`
-    <button class="close-x" onclick="closeModal()">×</button>
-    <h2>Invia bozza via Mail</h2>
-    <p style="margin-top:0;color:var(--muted);">La mail verrà inviata dal gestionale tramite Gmail.</p>
-    <div class="field">
-      <label>A</label>
-      <input id="bozza-mail-to" value="${escapeHtml(email)}" readonly>
-    </div>
-    <div class="field">
-      <label>Oggetto</label>
-      <input id="bozza-mail-subject" value="${escapeHtml(subject)}">
-    </div>
-    <div class="field">
-      <label>Messaggio</label>
-      <textarea id="bozza-mail-body" rows="8">${escapeHtml(body)}</textarea>
-    </div>
-    <div class="field">
-      <label>Allegati</label>
-      <input id="bozza-mail-files" type="file" multiple onchange="handleBozzaMailFiles(this.files)" style="padding:9px;background:#fff;">
-      <div class="helptext">I file vengono usati solo per l'invio e non vengono salvati nel gestionale.</div>
-      <div id="bozza-mail-attachments"></div>
-    </div>
-    <div id="bozza-mail-status" class="helptext"></div>
-    <div class="form-actions">
-      <button id="bozza-mail-send" class="btn btn-primary" onclick="sendBozzaMail('${o.id}')">Invia mail</button>
-      <button class="btn btn-outline" onclick="openJobCard('${o.id}')">Indietro</button>
-    </div>
-  `;
-  document.getElementById("modalBackdrop").classList.add("open");
-}
 
+  const gmailUrl=`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.open(gmailUrl,"_blank","noopener");
+}
 async function handleBozzaMailFiles(fileList){
   const files=Array.from(fileList||[]);
   if(!files.length) return;
@@ -2560,6 +2546,7 @@ function inviaBozzaMattia(orderId){
 function renderBozzaSection(o){
   const m=getBozzaMeta(o);
   const choices=["BOZZA DA INVIARE PER MAIL","BOZZA DA INVIARE A MATTIA","NON SERVE BOZZA"];
+
   if(o.stato==="Da fare"){
     return `<div class="modal-section">
       <h3>Gestione bozza</h3>
@@ -2572,24 +2559,41 @@ function renderBozzaSection(o){
       </div>
     </div>`;
   }
+
   if(!m.scelta){
     return `<div class="modal-section"><h3>Gestione bozza</h3><p class="empty" style="padding:6px 0;">Nessuna scelta bozza impostata quando l'ordine era nello stato Da fare.</p></div>`;
   }
+
   if(m.scelta==="NON SERVE BOZZA"){
     return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-done">NON SERVE BOZZA</span></div>`;
   }
+
+  // Passare l'ordine in produzione equivale alla conferma della bozza.
+  if(o.stato==="In produzione" || o.stato==="Produzione esterna"){
+    return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-done">BOZZA CONFERMATA</span></div>`;
+  }
+
   if(m.stato==="IN ATTESA DI CONFERMA BOZZA"){
     return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-produzione">IN ATTESA DI CONFERMA BOZZA</span></div>`;
   }
-  if(m.scelta==="BOZZA DA INVIARE PER MAIL"){
-    if(o.stato==="In produzione"){
-      return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-produzione">BOZZA DA INVIARE PER MAIL</span></div>`;
-    }
-    return `<div class="modal-section"><h3>Gestione bozza</h3><button class="btn btn-primary" onclick="openBozzaMail('${o.id}')">APRI MAIL</button></div>`;
-  }
-  return `<div class="modal-section"><h3>Gestione bozza</h3><button class="btn btn-primary" onclick="inviaBozzaMattia('${o.id}')">INVIA A MATTIA</button></div>`;
-}
 
+  if(m.scelta==="BOZZA DA INVIARE PER MAIL"){
+    if(o.stato==="In preparazione grafica"){
+      return `<div class="modal-section">
+        <h3>Gestione bozza</h3>
+        <button class="btn btn-primary" onclick="openBozzaMail('${o.id}')">INVIA BOZZA TRAMITE GMAIL</button>
+        <div class="helptext" style="margin-top:8px;">Si apre Gmail con destinatario, oggetto e testo già compilati. Dopo l'invio, apri la mail inviata e premi BOZZA INVIATA nell'add-on Creativò Gestionale.</div>
+      </div>`;
+    }
+    return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-produzione">BOZZA DA INVIARE PER MAIL</span></div>`;
+  }
+
+  if(m.scelta==="BOZZA DA INVIARE A MATTIA"){
+    return `<div class="modal-section"><h3>Gestione bozza</h3><button class="btn btn-primary" onclick="inviaBozzaMattia('${o.id}')">INVIA A MATTIA</button></div>`;
+  }
+
+  return `<div class="modal-section"><h3>Gestione bozza</h3></div>`;
+}
 function orderCategorie(o){ return [...new Set((o.righe||[]).map(r=>r.categoria).filter(Boolean))]; }
 function orderCategorieLabel(o){ const c = orderCategorie(o); return c.length ? c.join(", ") : "—"; }
 function orderWorkersList(o){
@@ -5501,8 +5505,9 @@ function deleteOrder(id){
 let flussoFilters = {categoria:"", worker:""};
 function bozzaCardMeta(o){
   const m=getBozzaMeta(o);
-  if(m.stato==="IN ATTESA DI CONFERMA BOZZA") return {label:"IN ATTESA DI CONFERMA",cls:"jc-bozza-wait"};
   if(m.scelta==="NON SERVE BOZZA") return {label:"NON SERVE BOZZA",cls:"jc-bozza-ok"};
+  if((o.stato==="In produzione" || o.stato==="Produzione esterna") && m.scelta) return {label:"CONFERMATA",cls:"jc-bozza-ok"};
+  if(m.stato==="IN ATTESA DI CONFERMA BOZZA") return {label:"IN ATTESA DI CONFERMA",cls:"jc-bozza-wait"};
   if(m.scelta==="BOZZA DA INVIARE PER MAIL") return {label:"DA INVIARE PER MAIL",cls:"jc-bozza-mail"};
   if(m.scelta==="BOZZA DA INVIARE A MATTIA") return {label:"DA INVIARE A MATTIA",cls:"jc-bozza-mattia"};
   return {label:"DA IMPOSTARE",cls:"jc-bozza-none"};
