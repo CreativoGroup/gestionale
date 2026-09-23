@@ -2701,6 +2701,7 @@ function shouldDeferCurrentViewRender(){
   // (es. Nuova Entrata, Spesa, Incasso, ecc.) la sincronizzazione
   // aggiorna i dati ma non ricostruisce la pagina e non chiude il modulo.
   if(document.querySelector(".form-panel.open")) return true;
+  if(currentView==="magazzino" && quickWarehouseDraftHasData()) return true;
   return userIsEditingAnyField();
 }
 function requestSafeCurrentViewRender(){
@@ -5803,17 +5804,81 @@ function warehouseGroupTabsHtml(){
     </select>
   `;
 }
+
+let quickWarehouseDraft = {codice:"", colore:"", taglia:"", quantita:1};
+
+function quickWarehouseDraftHasData(){
+  return !!(String(quickWarehouseDraft.codice||"").trim() ||
+            String(quickWarehouseDraft.colore||"").trim() ||
+            String(quickWarehouseDraft.taglia||"").trim() ||
+            Number(quickWarehouseDraft.quantita||1)!==1);
+}
+function rememberQuickWarehouseDraft(){
+  const c=document.getElementById("quick-codice");
+  const p=document.getElementById("quick-product");
+  const col=document.getElementById("quick-colore");
+  const tg=document.getElementById("quick-taglia");
+  const q=document.getElementById("quick-quantita");
+  if(c) quickWarehouseDraft.codice=c.value||"";
+  else if(p) quickWarehouseDraft.codice=p.value||"";
+  if(col) quickWarehouseDraft.colore=col.value||"";
+  if(tg) quickWarehouseDraft.taglia=tg.value||"";
+  if(q) quickWarehouseDraft.quantita=Number(q.value)||1;
+}
+function clearQuickWarehouseDraft(){
+  quickWarehouseDraft={codice:"",colore:"",taglia:"",quantita:1};
+}
+function existingWarehouseColorsForCode(code){
+  const key=String(code||"").trim().toUpperCase();
+  return [...new Set(state.warehouse
+    .filter(w=>String(w.codice||"").trim().toUpperCase()===key && w.colore)
+    .map(w=>canonicalWarehouseColor(w.colore)))].sort(compareWarehouseColors);
+}
+function existingWarehouseSizesForCode(code,colore=""){
+  const key=String(code||"").trim().toUpperCase();
+  const ck=warehouseColorKey(colore);
+  return [...new Set(state.warehouse
+    .filter(w=>String(w.codice||"").trim().toUpperCase()===key && (!ck || warehouseColorKey(w.colore)===ck))
+    .map(w=>String(w.taglia||"").trim()).filter(Boolean))];
+}
+function quickWarehouseColors(code){
+  return [...new Set([
+    ...catalogColorsForCode(code).map(c=>canonicalWarehouseColor(c)),
+    ...existingWarehouseColorsForCode(code)
+  ])].sort(compareWarehouseColors);
+}
+function quickWarehouseSizes(code,colore=""){
+  const n=String(code||"").trim().toUpperCase();
+  if(n==="FR620310" || n==="620310" || n==="62-031-0")
+    return ["3-4","5-6","7-8","9-11","12-13","14-15"];
+  return [...new Set([
+    ...catalogSizesForCode(code,colore),
+    ...existingWarehouseSizesForCode(code,colore)
+  ])];
+}
+function restoreQuickWarehouseDraft(){
+  const c=document.getElementById("quick-codice");
+  const p=document.getElementById("quick-product");
+  const q=document.getElementById("quick-quantita");
+  if(c && quickWarehouseDraft.codice){
+    c.value=quickWarehouseDraft.codice;
+    quickWarehouseCatalogPick(quickWarehouseDraft.codice,true);
+  }
+  if(p && quickWarehouseDraft.codice) p.value=quickWarehouseDraft.codice;
+  if(q) q.value=String(quickWarehouseDraft.quantita||1);
+}
+
 function warehouseQuickProductField(){
   if(magazzinoGroupFilter==="Tessile"){
     return `
       <input id="quick-codice" class="inline" style="width:100%;min-width:190px;" list="quickCatalogProducts"
-        placeholder="Codice o nome…" onfocus="prepareQuickWarehouseDatalist()" onchange="quickWarehouseCatalogPick(this.value)">
+        placeholder="Codice o nome…" onfocus="prepareQuickWarehouseDatalist()" oninput="rememberQuickWarehouseDraft()" onchange="quickWarehouseCatalogPick(this.value)">
       <datalist id="quickCatalogProducts"></datalist>
       <div id="quick-product-name" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
     `;
   }
   const opts = warehouseGroupProducts(magazzinoGroupFilter).map(p=>`<option value="${p}">${p}</option>`).join("");
-  return `<select id="quick-product" class="inline" style="width:100%;"><option value="">Seleziona prodotto…</option>${opts}</select>`;
+  return `<select id="quick-product" class="inline" style="width:100%;" onchange="rememberQuickWarehouseDraft()"><option value="">Seleziona prodotto…</option>${opts}</select>`;
 }
 async function prepareQuickWarehouseDatalist(){
   const dl = document.getElementById("quickCatalogProducts");
@@ -5838,44 +5903,53 @@ async function prepareQuickWarehouseDatalist(){
   });
 }
 
-function quickWarehouseCatalogPick(value){
-  const raw = String(value||"").trim();
-  const code = normalizeCatalogCode(raw);
-  const p = catalogProduct(code);
-  const input = document.getElementById("quick-codice");
-  if(input && code) input.value = code;
+function quickWarehouseCatalogPick(value, restoring=false){
+  const raw=String(value||"").trim();
+  const code=normalizeCatalogCode(raw);
+  const p=catalogProduct(code);
+  const input=document.getElementById("quick-codice");
+  if(input && code) input.value=code;
+  quickWarehouseDraft.codice=code||raw;
 
-  const nameEl = document.getElementById("quick-product-name");
-  if(nameEl) nameEl.textContent = p?.name || "";
+  const nameEl=document.getElementById("quick-product-name");
+  if(nameEl) nameEl.textContent=p?.name || catalogNameForCode(code) || "";
 
-  const colorSel = document.getElementById("quick-colore");
-  const sizeSel = document.getElementById("quick-taglia");
+  const colorSel=document.getElementById("quick-colore");
+  const sizeSel=document.getElementById("quick-taglia");
+  const colors=quickWarehouseColors(code);
 
   if(colorSel && colorSel.tagName==="SELECT"){
-    const colors = [...new Set(catalogColorsForCode(code).map(c=>canonicalWarehouseColor(c)))].sort(compareWarehouseColors);
-    colorSel.innerHTML = colors.length
+    const wanted=restoring ? quickWarehouseDraft.colore : "";
+    colorSel.innerHTML=colors.length
       ? `<option value="">Seleziona colore…</option>${colors.map(c=>`<option value="${c}">${c}</option>`).join("")}`
       : `<option value="">Nessun colore disponibile</option>`;
-    colorSel.disabled = !colors.length;
+    colorSel.disabled=!colors.length;
+    if(wanted && colors.includes(wanted)) colorSel.value=wanted;
   }
 
   if(sizeSel && sizeSel.tagName==="SELECT"){
-    const sizes = catalogSizesForCode(code);
-    sizeSel.innerHTML = sizes.length
+    const selectedColor=(restoring ? quickWarehouseDraft.colore : "") || colorSel?.value || "";
+    const sizes=quickWarehouseSizes(code,selectedColor);
+    const wantedSize=restoring ? quickWarehouseDraft.taglia : "";
+    sizeSel.innerHTML=sizes.length
       ? `<option value="">Seleziona taglia…</option>${sizes.map(s=>`<option value="${s}">${s}</option>`).join("")}`
       : `<option value="">Nessuna taglia disponibile</option>`;
-    sizeSel.disabled = !sizes.length;
+    sizeSel.disabled=!sizes.length;
+    if(wantedSize && sizes.includes(wantedSize)) sizeSel.value=wantedSize;
   }
 }
 function quickWarehouseColorPick(colore){
-  const code = normalizeCatalogCode(document.getElementById("quick-codice")?.value || "");
-  const sizeSel = document.getElementById("quick-taglia");
+  quickWarehouseDraft.colore=colore||"";
+  const code=normalizeCatalogCode(document.getElementById("quick-codice")?.value || quickWarehouseDraft.codice || "");
+  const sizeSel=document.getElementById("quick-taglia");
   if(!sizeSel) return;
-  const sizes = catalogSizesForCode(code,colore);
-  sizeSel.innerHTML = sizes.length
+  const sizes=quickWarehouseSizes(code,colore);
+  const wanted=quickWarehouseDraft.taglia||"";
+  sizeSel.innerHTML=sizes.length
     ? `<option value="">Seleziona taglia…</option>${sizes.map(s=>`<option value="${s}">${s}</option>`).join("")}`
     : `<option value="">Nessuna taglia disponibile</option>`;
-  sizeSel.disabled = !sizes.length;
+  sizeSel.disabled=!sizes.length;
+  if(wanted && sizes.includes(wanted)) sizeSel.value=wanted;
 }
 
 function quickWarehouseRowHtml(){
@@ -5896,12 +5970,12 @@ function quickWarehouseRowHtml(){
           <tbody><tr>
             <td style="min-width:220px;">${warehouseQuickProductField()}</td>
             <td style="min-width:150px;">${isTextile
-              ? `<select id="quick-colore" class="inline" style="width:100%;" disabled onchange="quickWarehouseColorPick(this.value)"><option value="">Seleziona prima il prodotto…</option></select>`
+              ? `<select id="quick-colore" class="inline" style="width:100%;" disabled onchange="quickWarehouseDraft.colore=this.value; quickWarehouseColorPick(this.value)"><option value="">Seleziona prima il prodotto…</option></select>`
               : `<input id="quick-colore" class="inline" style="width:100%;" placeholder="Variante / colore">`}</td>
             <td style="min-width:150px;">${isTextile
-              ? `<select id="quick-taglia" class="inline" style="width:100%;" disabled><option value="">Seleziona prima il prodotto…</option></select>`
+              ? `<select id="quick-taglia" class="inline" style="width:100%;" disabled onchange="quickWarehouseDraft.taglia=this.value"><option value="">Seleziona prima il prodotto…</option></select>`
               : `<input id="quick-taglia" class="inline" style="width:100%;" placeholder="Formato / note">`}</td>
-            <td><input id="quick-quantita" class="num" type="number" min="1" value="1"></td>
+            <td><input id="quick-quantita" class="num" type="number" min="1" value="${quickWarehouseDraft.quantita||1}" oninput="quickWarehouseDraft.quantita=Number(this.value)||1"></td>
             <td><button class="btn btn-primary btn-sm" onclick="quickAddToWarehouse()">AGGIUNGI NEL MAGAZZINO</button></td>
           </tr></tbody>
         </table>
@@ -6292,6 +6366,7 @@ function renderMagazzino(){
       </table>
     </div>
   `;
+  setTimeout(()=>restoreQuickWarehouseDraft(),0);
 }
 async function saveWarehouseRow(id){
   const w=findItem("warehouse",id); if(!w) return;
