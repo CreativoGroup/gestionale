@@ -2394,7 +2394,7 @@ Team Creativò`;
       console.error("Invio conferma presa in carico",err);
       showToast(`Invio non riuscito: ${err?.message||"errore Gmail"}`);
     }
-  });
+  }, {title:"Conferma invio", confirmText:"Sì, invia"});
 }
 function renderOrderCommunications(o,c){
   const meta=getPresaCaricoMeta(o);
@@ -2860,14 +2860,17 @@ function rerenderKeepingFocus(renderFn){
 
 /* Conferma personalizzata (window.confirm può non funzionare in ambienti sandboxed) */
 let _pendingConfirmAction = null;
-function askConfirm(message, action){
+function askConfirm(message, action, options={}){
   _pendingConfirmAction = action;
+  const destructive = /^(Eliminare|Rimuovere)/i.test(String(message||"").trim());
+  const title = options.title || (destructive ? "Conferma eliminazione" : "Conferma operazione");
+  const confirmText = options.confirmText || (destructive ? "Sì, elimina" : "Conferma");
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
-    <h2>Conferma eliminazione</h2>
+    <h2>${title}</h2>
     <p style="color:var(--muted);">${message}</p>
     <div class="form-actions">
-      <button class="btn btn-primary" onclick="_runPendingConfirm()">Sì, elimina</button>
+      <button class="btn btn-primary" onclick="_runPendingConfirm()">${confirmText}</button>
       <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
     </div>
   `;
@@ -4909,15 +4912,7 @@ function renderMagazzinoInline(o){
 }
 function orderLinesWithWarehouse(o){
   const rows=o.righe||[];
-  const first=rows.slice(0,1);
-  const rest=rows.slice(1);
-  const hasTextile=magazzinoAllowedCategorie(o).size>0;
-  return `
-    ${linesEditor('orders',o.id,first,{showAdd:false,forceShowDots:rows.length>1})}
-    ${hasTextile ? `<div class="embedded-warehouse">${renderMagazzinoInline(o)}</div>` : ''}
-    ${rest.length ? `<div class="additional-work-lines"><h4 style="margin:0 0 10px;">Altre righe di lavorazione</h4>${linesEditor('orders',o.id,rest,{showAdd:false,forceShowDots:true})}</div>` : ''}
-    <div style="margin-top:14px;"><button class="btn btn-outline btn-sm" onclick="addRiga('orders','${o.id}')">+ Aggiungi altra riga</button></div>
-  `;
+  return linesEditor('orders',o.id,rows,{showAdd:true});
 }
 function linesEditor(collection, id, righe, options={}){
   const isOrder = collection === 'orders';
@@ -5626,12 +5621,14 @@ function openJobCard(orderId){
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
-      <div>
+      <div style="flex:1;min-width:0;">
         <p class="jobcard-eyebrow">Scheda di lavorazione${o.createdAt?` — creata il ${fmtDate(o.createdAt.slice(0,10))}`:''} <span style="font-size:8px;opacity:.5;text-transform:none;letter-spacing:0;">${o.numero?('#'+o.numero):''}</span></p>
-        <h2 style="margin-bottom:2px;">${c?clientDisplayName(c):"—"}</h2>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <h2 style="margin:0;">${c?clientDisplayName(c):"—"}</h2>
+          ${c ? `<button class="btn btn-outline btn-sm" onclick="openClientHistory('${c.id}')">ANAGRAFICA CLIENTE</button>` : ''}
+        </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
-        ${c ? `<button class="btn btn-outline btn-sm" onclick="openClientHistory('${c.id}')">ANAGRAFICA CLIENTE</button>` : ''}
         <div class="jobcard-flags">
         <label class="checkfield"><input type="checkbox" ${o.importante?'checked':''} onchange="updateOrderCheck('${o.id}','importante',this.checked)"> <span class="star ${o.importante?'active':''}" style="font-size:18px;">★</span> Importante</label>
         ${o.consegnaTipo==="Spedizione" ? `<label class="checkfield"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Spedito</label>` : ``}
@@ -5651,6 +5648,8 @@ function openJobCard(orderId){
       <p class="helptext" style="margin-top:-4px;">Ogni riga ha una propria categoria di lavoro.${o.righe.length>1 ? ' Scegli lo stato di ciascuna riga dal menu colorato.' : ''}</p>
       ${orderLinesWithWarehouse(o)}
     </div>
+
+    ${renderMagazzinoSection(o)}
 
     ${renderRitiroEsternoSection(o)}
 
