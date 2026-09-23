@@ -2315,7 +2315,7 @@ function setBozzaInAttesa(orderId){
   if(!m.scelta) return;
   const presaCarico=(o.fasi||[]).filter(f=>f && f.key==="__presa_carico__");
   const allegati=(o.fasi||[]).filter(f=>f && f.key==="__allegato__");
-  o.fasi=[{key:"__bozza__", scelta:m.scelta, stato:"IN ATTESA DI CONFERMA BOZZA"}, ...presaCarico, ...allegati];
+  o.fasi=[{key:"__bozza__", scelta:m.scelta, stato:"IN ATTESA DI RISPOSTA"}, ...presaCarico, ...allegati];
   saveState('orders');
   openJobCard(orderId);
   showToast("Bozza in attesa di conferma");
@@ -2427,7 +2427,7 @@ function renderOrderCommunications(o,c){
 
 let bozzaMailAttachments=[];
 
-async function openBozzaMail(orderId){
+function openBozzaMail(orderId){
   const o=findItem('orders',orderId); if(!o) return;
   const c=state.clients.find(x=>x.id===o.clientId);
   if(!c || !String(c.email||'').trim()){
@@ -2448,71 +2448,24 @@ async function openBozzaMail(orderId){
   const email=String(c.email||'').trim();
   const riferimento=String(o.numero||o.id);
   const subject=`[BOZZA ORDINE #${riferimento}] ${clientDisplayName(c)}`;
-  const bodyText=`Gentile cliente,
+  const body=`Gentile cliente,
 
 le inviamo la bozza relativa al lavoro in corso.
 
 Attendiamo conferma prima di poter procedere con la produzione.
 
-Rif. ordine: ${riferimento}`;
+Rif. ordine: ${riferimento}
 
-  // Apriamo subito Gmail per evitare il blocco popup del browser.
-  // La funzione Supabase ci restituirà poi l'URL esatto dell'account/bozza.
-  const gmailWindow=window.open('https://mail.google.com/mail/','_blank');
+Cordiali saluti
 
-  showToast("Creo la bozza nell'account Gmail aziendale…");
+Creativò Group Srls
+06 45665328 · 375 9095981
+creativogroup.it
+Via Giuseppe Taverna 43
+00135 Roma`;
 
-  try{
-    const {data:sessionData}=await sb.auth.getSession();
-    const session=sessionData?.session;
-    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
-
-    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
-      method:"POST",
-      headers:{
-        "Authorization":`Bearer ${session.access_token}`,
-        "apikey":SUPABASE_KEY,
-        "Content-Type":"application/json"
-      },
-      body:JSON.stringify({
-        mode:"draft",
-        to:email,
-        subject,
-        bodyText,
-        orderId:o.id,
-        orderNumber:o.numero||null,
-        attachments:[]
-      })
-    });
-
-    const raw=await response.text();
-    let result={};
-    try{ result=JSON.parse(raw); }catch(e){ result={}; }
-    if(!response.ok) throw new Error(result?.error||result?.message||raw||`Errore HTTP ${response.status}`);
-
-    const gmailUrl=String(result?.gmailUrl||result?.gmailDraftsUrl||"").trim();
-    if(!gmailUrl) throw new Error("Bozza creata, ma collegamento Gmail non disponibile");
-
-    if(gmailWindow && !gmailWindow.closed){
-      try{
-        gmailWindow.location.replace(gmailUrl);
-      }catch(e){
-        gmailWindow.location.href=gmailUrl;
-      }
-    }else{
-      window.open(gmailUrl,'_blank','noopener');
-    }
-
-    showToast("Bozza creata nell'account Gmail aziendale · firma inclusa");
-  }catch(err){
-    console.error("Creazione bozza Gmail aziendale",err);
-    if(gmailWindow && !gmailWindow.closed){
-      try{
-        gmailWindow.location.href='https://mail.google.com/mail/';
-      }catch(e){}
-    }
-    showToast(`Bozza non creata: ${err?.message||"errore Gmail"}`);
-  }
+  const gmailUrl=`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.open(gmailUrl,"_blank","noopener");
 }
 async function handleBozzaMailFiles(fileList){
   const files=Array.from(fileList||[]);
@@ -2630,15 +2583,15 @@ function renderBozzaSection(o){
     return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-done">BOZZA CONFERMATA</span></div>`;
   }
 
-  if(m.stato==="IN ATTESA DI CONFERMA BOZZA"){
-    return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-produzione">IN ATTESA DI CONFERMA BOZZA</span></div>`;
+  if(m.stato==="IN ATTESA DI RISPOSTA"){
+    return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-produzione">IN ATTESA DI RISPOSTA</span></div>`;
   }
 
   if(m.scelta==="BOZZA DA INVIARE PER MAIL"){
     if(o.stato==="In preparazione grafica"){
       return `<div class="modal-section">
         <h3>Gestione bozza</h3>
-        <button class="btn btn-primary" onclick="openBozzaMail('${o.id}')">INVIA BOZZA TRAMITE GMAIL</button>
+        <button class="btn btn-primary" onclick="openBozzaMail('${o.id}')">INVIA BOZZA VIA MAIL</button>
         <div class="helptext" style="margin-top:8px;">Si apre Gmail con destinatario, oggetto e testo già compilati. Dopo l'invio, apri la mail inviata e premi BOZZA INVIATA nell'add-on Creativò Gestionale.</div>
       </div>`;
     }
@@ -5559,7 +5512,7 @@ function bozzaCardMeta(o){
   const m=getBozzaMeta(o);
   if(m.scelta==="NON SERVE BOZZA") return {label:"NON SERVE BOZZA",cls:"jc-bozza-ok"};
   if((o.stato==="In produzione" || o.stato==="Produzione esterna") && m.scelta) return {label:"CONFERMATA",cls:"jc-bozza-ok"};
-  if(m.stato==="IN ATTESA DI CONFERMA BOZZA") return {label:"IN ATTESA DI CONFERMA",cls:"jc-bozza-wait"};
+  if(m.stato==="IN ATTESA DI RISPOSTA") return {label:"IN ATTESA DI RISPOSTA",cls:"jc-bozza-wait"};
   if(m.scelta==="BOZZA DA INVIARE PER MAIL") return {label:"DA INVIARE PER MAIL",cls:"jc-bozza-mail"};
   if(m.scelta==="BOZZA DA INVIARE A MATTIA") return {label:"DA INVIARE A MATTIA",cls:"jc-bozza-mattia"};
   return {label:"DA IMPOSTARE",cls:"jc-bozza-none"};
