@@ -2441,9 +2441,11 @@ function openBozzaMail(orderId){
     return;
   }
   if(o.stato!=="In preparazione grafica"){
-    showToast("La bozza via Gmail è disponibile solo in preparazione grafica");
+    showToast("La bozza via mail è disponibile solo in preparazione grafica");
     return;
   }
+
+  bozzaMailAttachments=[];
 
   const email=String(c.email||'').trim();
   const riferimento=String(o.numero||o.id);
@@ -2454,18 +2456,44 @@ le inviamo la bozza relativa al lavoro in corso.
 
 Attendiamo conferma prima di poter procedere con la produzione.
 
-Rif. ordine: ${riferimento}
+Rif. ordine: ${riferimento}`;
 
-Cordiali saluti
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Invia bozza via Mail</h2>
+    <p style="margin-top:0;color:var(--muted);">Messaggio precompilato. Puoi modificarlo e allegare i file prima dell'invio.</p>
 
-Creativò Group Srls
-06 45665328 · 375 9095981
-creativogroup.it
-Via Giuseppe Taverna 43
-00135 Roma`;
+    <div class="field">
+      <label>A</label>
+      <input id="bozza-mail-to" value="${escapeHtml(email)}" readonly>
+    </div>
 
-  const gmailUrl=`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.open(gmailUrl,"_blank","noopener");
+    <div class="field">
+      <label>Oggetto</label>
+      <input id="bozza-mail-subject" value="${escapeHtml(subject)}">
+    </div>
+
+    <div class="field">
+      <label>Messaggio</label>
+      <textarea id="bozza-mail-body" rows="9">${escapeHtml(body)}</textarea>
+    </div>
+
+    <div class="field">
+      <label>Allegati</label>
+      <input id="bozza-mail-files" type="file" multiple onchange="handleBozzaMailFiles(this.files)" style="padding:9px;background:#fff;">
+      <div class="helptext">Puoi allegare fino a 10 file. Gli allegati vengono usati solo per l'invio e non vengono salvati nel gestionale.</div>
+      <div id="bozza-mail-attachments"></div>
+    </div>
+
+    <div id="bozza-mail-status" class="helptext"></div>
+
+    <div class="form-actions">
+      <button id="bozza-mail-send" class="btn btn-primary" onclick="sendBozzaMail('${o.id}')">INVIA BOZZA</button>
+      <button class="btn btn-outline" onclick="openJobCard('${o.id}')">Indietro</button>
+    </div>
+  `;
+
+  document.getElementById("modalBackdrop").classList.add("open");
 }
 async function handleBozzaMailFiles(fileList){
   const files=Array.from(fileList||[]);
@@ -2592,7 +2620,7 @@ function renderBozzaSection(o){
       return `<div class="modal-section">
         <h3>Gestione bozza</h3>
         <button class="btn btn-primary" onclick="openBozzaMail('${o.id}')">INVIA BOZZA VIA MAIL</button>
-        <div class="helptext" style="margin-top:8px;">Si apre Gmail con destinatario, oggetto e testo già compilati. Dopo l'invio, apri la mail inviata e premi BOZZA INVIATA nell'add-on Creativò Gestionale.</div>
+        <div class="helptext" style="margin-top:8px;">Il messaggio si apre direttamente nel gestionale già compilato. Puoi modificare il testo, allegare i file e inviare. Dopo l'invio lo stato passa automaticamente a IN ATTESA DI RISPOSTA.</div>
       </div>`;
     }
     return `<div class="modal-section"><h3>Gestione bozza</h3><span class="pill pill-produzione">BOZZA DA INVIARE PER MAIL</span></div>`;
