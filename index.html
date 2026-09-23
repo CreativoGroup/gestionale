@@ -2254,7 +2254,7 @@ async function addOrderExternalAttachment(orderId){
     createdAt:new Date().toISOString()
   });
 
-  await saveSingleRecord("orders",o);
+  await upsertOne("orders",o);
   openJobCard(orderId);
   showToast("File collegato alla scheda");
 }
@@ -2262,7 +2262,7 @@ async function removeOrderExternalAttachment(orderId, attachmentId){
   const o=findItem("orders",orderId); if(!o) return;
   askConfirm("Rimuovere il collegamento al file? Il file originale resterà su Dropbox.", async ()=>{
     o.fasi=(o.fasi||[]).filter(f=>!(f && f.key==="__allegato__" && f.id===attachmentId));
-    await saveSingleRecord("orders",o);
+    await upsertOne("orders",o);
     openJobCard(orderId);
     showToast("Collegamento rimosso");
   });
@@ -2358,7 +2358,12 @@ abbiamo preso in carico il tuo ordine.
 Avviseremo appena il lavoro sarà pronto per essere ritirato.
 
 Cordiali saluti
-Team Creativò`;
+
+Creativò Group Srls
+06 45665328 · 375 9095981
+creativogroup.it
+Via Giuseppe Taverna 43
+00135 Roma`;
 
       const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
         method:"POST",
@@ -2385,7 +2390,7 @@ Team Creativò`;
         }
       ];
 
-      const ok=await saveSingleRecord("orders",o);
+      const ok=await upsertOne("orders",o);
       if(ok===false) throw new Error("Mail inviata, ma non è stato possibile registrare la data nel gestionale.");
 
       openJobCard(orderId);
@@ -2422,7 +2427,7 @@ function renderOrderCommunications(o,c){
 
 let bozzaMailAttachments=[];
 
-function openBozzaMail(orderId){
+async function openBozzaMail(orderId){
   const o=findItem('orders',orderId); if(!o) return;
   const c=state.clients.find(x=>x.id===o.clientId);
   if(!c || !String(c.email||'').trim()){
@@ -2443,19 +2448,68 @@ function openBozzaMail(orderId){
   const email=String(c.email||'').trim();
   const riferimento=String(o.numero||o.id);
   const subject=`[BOZZA ORDINE #${riferimento}] ${clientDisplayName(c)}`;
-  const body=`Gentile cliente,
+  const bodyText=`Gentile cliente,
 
 le inviamo la bozza relativa al lavoro in corso.
 
 Attendiamo conferma prima di poter procedere con la produzione.
 
-Rif. ordine: ${riferimento}
+Rif. ordine: ${riferimento}`;
 
-Cordiali saluti
-Team Creativò`;
+  // Apriamo subito una scheda vuota per evitare il blocco popup del browser.
+  const gmailWindow=window.open('about:blank','_blank');
+  if(gmailWindow){
+    try{
+      gmailWindow.document.title='Apertura Gmail…';
+      gmailWindow.document.body.innerHTML='<div style="font-family:Arial,sans-serif;padding:24px">Creazione bozza Gmail aziendale…</div>';
+    }catch(e){}
+  }
 
-  const gmailUrl=`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.open(gmailUrl,"_blank","noopener");
+  showToast("Creo la bozza nell'account Gmail aziendale…");
+
+  try{
+    const {data:sessionData}=await sb.auth.getSession();
+    const session=sessionData?.session;
+    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "apikey":SUPABASE_KEY,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        mode:"draft",
+        to:email,
+        subject,
+        bodyText,
+        orderId:o.id,
+        orderNumber:o.numero||null,
+        attachments:[]
+      })
+    });
+
+    const raw=await response.text();
+    let result={};
+    try{ result=JSON.parse(raw); }catch(e){ result={}; }
+    if(!response.ok) throw new Error(result?.error||result?.message||raw||`Errore HTTP ${response.status}`);
+
+    const gmailUrl=String(result?.gmailUrl||"").trim();
+    if(!gmailUrl) throw new Error("Bozza creata, ma collegamento Gmail non disponibile");
+
+    if(gmailWindow && !gmailWindow.closed){
+      gmailWindow.location.href=gmailUrl;
+    }else{
+      window.open(gmailUrl,'_blank','noopener');
+    }
+
+    showToast("Bozza creata nell'account Gmail aziendale");
+  }catch(err){
+    if(gmailWindow && !gmailWindow.closed) gmailWindow.close();
+    console.error("Creazione bozza Gmail aziendale",err);
+    showToast(`Bozza non creata: ${err?.message||"errore Gmail"}`);
+  }
 }
 async function handleBozzaMailFiles(fileList){
   const files=Array.from(fileList||[]);
@@ -7562,7 +7616,12 @@ abbiamo preso in carico il tuo ordine.
 Avviseremo appena il lavoro sarà pronto per essere ritirato.
 
 Cordiali saluti
-Team Creativò`;
+
+Creativò Group Srls
+06 45665328 · 375 9095981
+creativogroup.it
+Via Giuseppe Taverna 43
+00135 Roma`;
   const btn=document.getElementById("gmail-btn-order");
   if(btn){ btn.disabled=true; btn.textContent="Invio risposta…"; }
   try{
