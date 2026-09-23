@@ -2147,7 +2147,7 @@ async function prepareCatalogDatalistForOrder(orderId){
     await loadCatalogoProdotti();
     const o = findItem('orders', orderId);
     const allowed = magazzinoAllowedCategorie(o);
-    const products = catalogoProdotti.filter(p=>!allowed.size || allowed.has(p.appCategory));
+    const products = catalogoProdotti.filter(p=>!allowed.size || allowed.has("*") || allowed.has(p.appCategory));
     dl.innerHTML = "";
     products.forEach(p=>{
       const opt = document.createElement("option");
@@ -4416,10 +4416,19 @@ function prodottoOptions(categoria, selected){
 }
 function magazzinoAllowedCategorie(o){
   const set = new Set();
-  const warehouseProducts = new Set(["T-shirt","Polo","Felpa","Shopper","Cappello"]);
-  o.righe.forEach(r=>{
-    if((r.categoria==='Stampa' || r.categoria==='Ricamo') && warehouseProducts.has(r.prodotto)){
-      set.add(r.prodotto);
+  const directMap = new Set(["T-shirt","Polo","Felpa","Shopper","Cappello"]);
+  (o.righe||[]).forEach(r=>{
+    if(r.categoria==="Stampa"){
+      if(!r.prodotto || r.prodotto==="Tessuto del cliente") return;
+      if(directMap.has(r.prodotto)) set.add(r.prodotto);
+      else if(r.prodotto==="Altro") set.add("Altro tessuto");
+      else set.add("*");
+    }
+    if(r.categoria==="Ricamo"){
+      if(!r.prodotto || r.prodotto==="Patch") return;
+      if(directMap.has(r.prodotto)) set.add(r.prodotto);
+      else if(r.prodotto==="Altro") set.add("Altro tessuto");
+      else set.add("*");
     }
   });
   return set;
@@ -4705,7 +4714,7 @@ function orderLinesWithWarehouse(o){
   const rows=o.righe||[];
   const first=rows.slice(0,1);
   const rest=rows.slice(1);
-  const hasTextile=rows.some(r=>r.categoria==="Stampa" || r.categoria==="Ricamo");
+  const hasTextile=magazzinoAllowedCategorie(o).size>0;
   return `
     ${linesEditor('orders',o.id,first,{showAdd:false,forceShowDots:rows.length>1})}
     ${hasTextile ? `<div class="embedded-warehouse">${renderMagazzinoInline(o)}</div>` : ''}
@@ -5641,6 +5650,42 @@ const WAREHOUSE_PRINT_PRODUCTS = [
 ];
 let magazzinoGroupFilter = "Tessile";
 
+
+function warehousePendingRecoveryRows(){
+  try{return JSON.parse(localStorage.getItem("warehousePendingRecovery")||"[]");}
+  catch(e){return [];}
+}
+async function recoverPendingWarehouse(){
+  const pending=warehousePendingRecoveryRows();
+  if(!pending.length){ showToast("Nessun inserimento da recuperare"); return; }
+
+  let salvati=0;
+  for(const p of pending){
+    const existing=state.warehouse.find(w=>
+      (w.warehouseGroup||"Tessile")===(p.warehouseGroup||"Tessile") &&
+      String(w.codice||"").trim().toUpperCase()===String(p.codice||"").trim().toUpperCase() &&
+      warehouseColorKey(w.colore)===warehouseColorKey(p.colore) &&
+      String(w.taglia||"UNICA").trim().toUpperCase()===String(p.taglia||"UNICA").trim().toUpperCase()
+    );
+    if(existing){
+      const candidate={...existing,quantita:Number(existing.quantita||0)+Number(p.quantita||0)};
+      if(await upsertOne("warehouse",candidate)){ Object.assign(existing,candidate); salvati++; }
+    }else{
+      const item={
+        id:uuid(), codice:p.codice||"", nome:p.nome||"", categoria:p.categoria||"Tessile",
+        colore:canonicalWarehouseColor(p.colore||""), taglia:p.taglia||"UNICA",
+        unita:"pz", quantita:Number(p.quantita)||0, scortaMinima:Number(p.scortaMinima)||0,
+        warehouseGroup:p.warehouseGroup||"Tessile"
+      };
+      const saved=await upsertOneReturning("warehouse",item);
+      if(saved){ state.warehouse.push(saved); salvati++; }
+    }
+  }
+  if(salvati===pending.length) localStorage.removeItem("warehousePendingRecovery");
+  renderMagazzino();
+  showToast(`${salvati} inserimenti recuperati`);
+}
+
 function warehouseGroupLabel(group){
   if(group==="Gadget") return "MAGAZZINO GADGET";
   if(group==="Materiali di stampa") return "MAGAZZINO MATERIALI DI STAMPA";
@@ -5764,7 +5809,7 @@ function quickWarehouseRowHtml(){
     </div>
   `;
 }
-function quickAddToWarehouse(){
+async function quickAddToWarehouse(){
   const group = magazzinoGroupFilter;
   const qty = Number(document.getElementById("quick-quantita")?.value)||0;
   const colore = canonicalWarehouseColor(document.getElementById("quick-colore")?.value.trim() || "");
@@ -5784,7 +5829,6 @@ function quickAddToWarehouse(){
   }else{
     nome = document.getElementById("quick-product")?.value || "";
     if(!nome){ showToast("Seleziona un prodotto"); return; }
-    codice = "";
     categoria = group==="Gadget" ? "Gadget" : "Materiali di stampa";
   }
 
@@ -5793,24 +5837,54 @@ function quickAddToWarehouse(){
     (w.warehouseGroup||"Tessile")===group &&
     String(w.codice||"").trim().toUpperCase()===String(codice||"").trim().toUpperCase() &&
     String(w.nome||"").trim().toLowerCase()===String(nome||"").trim().toLowerCase() &&
-    String(w.colore||"").trim().toLowerCase()===String(colore||"").trim().toLowerCase() &&
+    warehouseColorKey(w.colore)===warehouseColorKey(colore) &&
     String(w.taglia||"UNICA").trim().toUpperCase()===String(normalizedTaglia).trim().toUpperCase()
   );
 
+  // Salvataggio di sicurezza nel browser PRIMA di inviare a Supabase.
+  // Se la rete fallisce, l'inserimento può essere recuperato dal pannello dedicato.
+  const pending = {
+    id: uuid(), codice, nome, categoria, colore, taglia:normalizedTaglia,
+    unita:"pz", quantita:qty, scortaMinima:0, warehouseGroup:group,
+    savedAt:new Date().toISOString()
+  };
+  try{
+    const arr=JSON.parse(localStorage.getItem("warehousePendingRecovery")||"[]");
+    arr.push(pending);
+    localStorage.setItem("warehousePendingRecovery",JSON.stringify(arr.slice(-100)));
+  }catch(e){}
+
   if(existing){
-    existing.quantita = Number(existing.quantita||0) + qty;
-    existing.scortaMinima = Math.max(0, Number(existing.scortaMinima)||0);
+    const candidate = {...existing, quantita:Number(existing.quantita||0)+qty};
+    const ok = await upsertOne("warehouse", candidate);
+    if(!ok){
+      showToast("Quantità NON salvata. Usa RECUPERA INSERIMENTI.");
+      return;
+    }
+    Object.assign(existing,candidate);
   }else{
     const item = {
-      id:uid(), codice, nome, categoria, colore, taglia:normalizedTaglia,
+      id:uuid(), codice, nome, categoria, colore, taglia:normalizedTaglia,
       unita:"pz", quantita:qty, scortaMinima:0, warehouseGroup:group
     };
-    item.scortaMinima = Math.max(0, Number(item.scortaMinima)||0);
-    state.warehouse.push(item);
+    const saved = await upsertOneReturning("warehouse", item);
+    if(!saved){
+      showToast("Articolo NON salvato. Usa RECUPERA INSERIMENTI.");
+      return;
+    }
+    state.warehouse.push(saved);
   }
-  saveState('warehouse');
+
+  // Rimuove dal recupero solo l'ultimo inserimento confermato.
+  try{
+    const arr=JSON.parse(localStorage.getItem("warehousePendingRecovery")||"[]");
+    const idx=arr.findIndex(x=>x.id===pending.id);
+    if(idx>=0) arr.splice(idx,1);
+    localStorage.setItem("warehousePendingRecovery",JSON.stringify(arr));
+  }catch(e){}
+
   renderMagazzino();
-  showToast(`${qty} pz aggiunti a ${warehouseGroupLabel(group)}`);
+  showToast(`${qty} pz salvati in ${warehouseGroupLabel(group)}`);
 }
 
 function warehouseCategoryOptions(selected){
@@ -5935,6 +6009,7 @@ function renderMagazzino(){
           ${magazzinoGroupFilter==="Tessile"
             ? `<button class="btn btn-outline" onclick="toggleForm('pdfImportForm')">📄 Importa DDT / PDF</button>`
             : ``}
+          ${warehousePendingRecoveryRows().length ? `<button class="btn btn-outline" onclick="recoverPendingWarehouse()">↻ RECUPERA INSERIMENTI (${warehousePendingRecoveryRows().length})</button>` : ``}
           <button class="btn btn-primary" onclick="toggleForm('itemForm')">+ Nuovo articolo</button>
         </div>
       </div>
@@ -5997,33 +6072,47 @@ function renderMagazzino(){
     </div>
   `;
 }
-function saveWarehouseRow(id){
-  const w = findItem('warehouse', id);
-  w.nome = document.getElementById(`wn-${id}`).value.trim();
-  w.quantita = Math.max(0, Number(document.getElementById(`wq-${id}`).value)||0);
-  w.scortaMinima = Math.max(0, Number(document.getElementById(`wm-${id}`).value)||0);
-  saveState('warehouse');
+async function saveWarehouseRow(id){
+  const w = findItem('warehouse', id); if(!w) return;
+  const candidate = {
+    ...w,
+    nome:document.getElementById(`wn-${id}`).value.trim(),
+    quantita:Math.max(0, Number(document.getElementById(`wq-${id}`).value)||0),
+    scortaMinima:Math.max(0, Number(document.getElementById(`wm-${id}`).value)||0)
+  };
+  const ok = await upsertOne("warehouse", candidate);
+  if(!ok){ showToast("Modifica NON salvata"); return; }
+  Object.assign(w,candidate);
   renderMagazzino();
-  showToast("Articolo e scorta minima aggiornati");
+  showToast("Magazzino aggiornato");
 }
-function addItem(){
+async function addItem(){
   const nome = document.getElementById("if-nome").value.trim();
   const quantita = Number(document.getElementById("if-quantita").value)||0;
   if(!nome){ showToast("Inserisci il nome dell'articolo"); return; }
   if(quantita<=0){ showToast("Inserisci una quantità maggiore di zero"); return; }
-  state.warehouse.push({
-    id:uid(), codice: document.getElementById("if-codice").value.trim(), nome,
+  const item={
+    id:uuid(), codice: document.getElementById("if-codice").value.trim(), nome,
     categoria: document.getElementById("if-categoria").value,
     colore: canonicalWarehouseColor(document.getElementById("if-colore").value.trim()),
-    taglia: document.getElementById("if-taglia").value.trim(),
-    unita: "pz",
-    quantita,
+    taglia: document.getElementById("if-taglia").value.trim() || "UNICA",
+    unita: "pz", quantita,
     scortaMinima: Math.max(0, Number(document.getElementById("if-scorta").value)||0),
     warehouseGroup: magazzinoGroupFilter
-  });
-  saveState('warehouse'); toggleForm('itemForm'); renderMagazzino(); showToast("Articolo aggiunto");
+  };
+  const saved=await upsertOneReturning("warehouse",item);
+  if(!saved) return;
+  state.warehouse.push(saved);
+  toggleForm('itemForm'); renderMagazzino(); showToast("Articolo aggiunto");
 }
-function adjustStock(id, delta){ const w = findItem('warehouse',id); w.quantita = Math.max(0, Number(w.quantita)+delta); saveState('warehouse'); renderMagazzino(); }
+async function adjustStock(id, delta){
+  const w=findItem('warehouse',id); if(!w) return;
+  const candidate={...w,quantita:Math.max(0,Number(w.quantita||0)+delta)};
+  const ok=await upsertOne("warehouse",candidate);
+  if(!ok) return;
+  Object.assign(w,candidate);
+  renderMagazzino();
+}
 function deleteItem(id){
   askConfirm("Eliminare questo articolo?", ()=>{
     state.warehouse = state.warehouse.filter(w=>w.id!==id); dbDelete('warehouse', id); renderMagazzino();
@@ -6125,39 +6214,58 @@ function renderPdfPreview(){
     </div>
   `;
 }
-function confirmPdfImport(){
+async function confirmPdfImport(){
   const toInclude = pdfParsedRows.filter(r=>r.include && Number(r.quantita)>0);
-  toInclude.forEach(r=>{
+  let salvati=0;
+
+  for(const source of toInclude){
+    const r={...source};
     const cp = catalogProduct(r.codice);
     if(cp){
       r.nome = cp.name || r.nome;
       r.categoria = cp.appCategory || r.categoria;
     }
     r.taglia = r.taglia || "UNICA";
+
     const existing = state.warehouse.find(w =>
       String(w.codice||"").toUpperCase()===String(r.codice||"").toUpperCase() &&
       warehouseColorKey(w.colore)===warehouseColorKey(r.colore) &&
       String(w.taglia||"UNICA").toUpperCase()===String(r.taglia||"UNICA").toUpperCase()
     );
+
     if(existing){
-      existing.quantita = Number(existing.quantita) + Number(r.quantita);
-      existing.colore = canonicalWarehouseColor(existing.colore || r.colore);
-      existing.nome = existing.nome || r.nome;
-      if(!existing.categoria) existing.categoria = r.categoria;
-      if(!existing.warehouseGroup) existing.warehouseGroup = "Tessile";
-      existing.scortaMinima = Math.max(0, Number(existing.scortaMinima)||0);
-    } else {
-      const nuovo={id:uid(), codice:r.codice, nome:r.nome, categoria:r.categoria, colore:canonicalWarehouseColor(r.colore), taglia:r.taglia, unita:"pz", quantita:r.quantita, scortaMinima:0, warehouseGroup:"Tessile"};
+      const candidate={
+        ...existing,
+        quantita:Number(existing.quantita||0)+Number(r.quantita||0),
+        colore:canonicalWarehouseColor(existing.colore || r.colore),
+        nome:existing.nome || r.nome,
+        categoria:existing.categoria || r.categoria,
+        warehouseGroup:existing.warehouseGroup || "Tessile",
+        scortaMinima:Math.max(0,Number(existing.scortaMinima)||0)
+      };
+      if(await upsertOne("warehouse",candidate)){
+        Object.assign(existing,candidate);
+        salvati++;
+      }
+    }else{
+      const nuovo={
+        id:uuid(), codice:r.codice, nome:r.nome, categoria:r.categoria,
+        colore:canonicalWarehouseColor(r.colore), taglia:r.taglia, unita:"pz",
+        quantita:Number(r.quantita)||0, scortaMinima:0, warehouseGroup:"Tessile"
+      };
       nuovo.scortaMinima = minimoDefaultMagazzino(nuovo);
-      state.warehouse.push(nuovo);
+      const saved=await upsertOneReturning("warehouse",nuovo);
+      if(saved){ state.warehouse.push(saved); salvati++; }
     }
-  });
-  saveState('warehouse');
-  pdfParsedRows = [];
-  toggleForm('pdfImportForm');
-  document.getElementById('pdfFileInput').value = "";
+  }
+
+  if(salvati===toInclude.length){
+    pdfParsedRows = [];
+    toggleForm('pdfImportForm');
+    const inp=document.getElementById('pdfFileInput'); if(inp) inp.value="";
+  }
   renderMagazzino();
-  showToast(`${toInclude.length} articoli importati/aggiornati in magazzino`);
+  showToast(`${salvati} di ${toInclude.length} articoli salvati nel magazzino`);
 }
 
 /* ============ INCASSI / REPORT PAGAMENTI ============ */
