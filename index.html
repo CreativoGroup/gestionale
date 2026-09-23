@@ -4521,79 +4521,144 @@ function magazzinoTagliaDatalistOptions(codice,colore){
     return `<option value="${v}">${q>0?`Disponibile: ${q} pz`:"Catalogo — da ordinare"}</option>`;
   }).join("");
 }
-function restoreReservedStock(entry){
-  if(entry && entry.articoloId && Number(entry._reservedQty)>0){
-    adjustWarehouseQty(entry.articoloId, Number(entry._reservedQty));
+async function restoreReservedStockDb(entry){
+  if(!entry || !entry.articoloId || Number(entry._reservedQty)<=0) return true;
+  const w=findItem('warehouse',entry.articoloId);
+  if(!w){
+    entry._reservedQty=0;
+    entry.articoloId="";
+    return true;
   }
+  const saved=await updateWarehouseDirect(w,{quantita:Number(w.quantita||0)+Number(entry._reservedQty||0)});
+  if(!saved) return false;
+  const idx=state.warehouse.findIndex(x=>x.id===saved.id);
+  if(idx>=0) state.warehouse[idx]=saved;
+  entry._reservedQty=0;
+  entry.articoloId="";
+  return true;
 }
-function tryStornoMagazzino(entry){
-  restoreReservedStock(entry);
-  entry.stornato = false;
-  entry._reservedQty = 0;
-  entry.articoloId = "";
-  entry.daOrdinareQty = 0;
-  entry.ordineConfermato = false;
-  entry.inCarrello = false;
-  entry.inCarrelloAt = null;
 
-  const richiesta = Math.max(0,Number(entry.quantita)||0);
-  if(!entry.codice || !entry.colore || !entry.taglia || !richiesta) return;
+async function reserveWarehouseForEntry(entry){
+  entry.stornato=false;
+  entry.daOrdinareQty=0;
+  entry.ordineConfermato=false;
+  entry.inCarrello=false;
+  entry.inCarrelloAt=null;
 
-  const w = state.warehouse.find(x=>
+  const richiesta=Math.max(0,Number(entry.quantita)||0);
+  if(!entry.codice || !entry.colore || !entry.taglia || !richiesta) return true;
+
+  const w=state.warehouse.find(x=>
     String(x.codice||"").toUpperCase()===String(entry.codice||"").toUpperCase() &&
     warehouseColorKey(x.colore)===warehouseColorKey(entry.colore) &&
     (String(x.taglia||"").toUpperCase()===String(entry.taglia||"").toUpperCase() ||
      (!String(x.taglia||"").trim() && String(entry.taglia||"").toUpperCase()==="UNICA"))
   );
+
   if(!w){
-    entry.daOrdinareQty = richiesta;
-    return;
+    entry.daOrdinareQty=richiesta;
+    return true;
   }
 
-  const disponibile = Math.max(0,Number(w.quantita)||0);
-  const daStornare = Math.min(disponibile, richiesta);
+  const disponibile=Math.max(0,Number(w.quantita)||0);
+  const daStornare=Math.min(disponibile,richiesta);
 
   if(daStornare>0){
-    w.quantita = disponibile - daStornare;
-    entry._reservedQty = daStornare;
-    entry.articoloId = w.id;
+    const saved=await updateWarehouseDirect(w,{quantita:disponibile-daStornare});
+    if(!saved) return false;
+    const idx=state.warehouse.findIndex(x=>x.id===saved.id);
+    if(idx>=0) state.warehouse[idx]=saved;
+    entry._reservedQty=daStornare;
+    entry.articoloId=saved.id;
   }
 
-  entry.daOrdinareQty = Math.max(0, richiesta - daStornare);
-  entry.stornato = entry.daOrdinareQty===0;
+  entry.daOrdinareQty=Math.max(0,richiesta-daStornare);
+  entry.stornato=entry.daOrdinareQty===0;
+  return true;
 }
-function addMagazzinoRiga(orderId){
-  const o = findItem('orders', orderId);
-  if(!o.magazzino) o.magazzino = [];
-  o.magazzino.push({id:uid(), codice:"", nome:"", colore:"", taglia:"", quantita:1, stornato:false, _reservedQty:0, articoloId:"", daOrdinareQty:0, ordineConfermato:false, inCarrello:false, inCarrelloAt:null});
-  saveState('orders');
+
+async function addMagazzinoRiga(orderId){
+  const o=findItem('orders',orderId); if(!o) return;
+  if(!o.magazzino) o.magazzino=[];
+  o.magazzino.push({id:uid(),codice:"",nome:"",colore:"",taglia:"",quantita:1,stornato:false,_reservedQty:0,articoloId:"",daOrdinareQty:0,ordineConfermato:false,inCarrello:false,inCarrelloAt:null});
+  const ok=await upsertOne('orders',o);
+  if(!ok) return;
   openJobCard(orderId);
 }
-function removeMagazzinoRiga(orderId, rigaId){
-  const o = findItem('orders', orderId);
-  const entry = o.magazzino.find(m=>m.id===rigaId);
-  restoreReservedStock(entry);
-  if(entry && Number(entry._reservedQty)>0) saveState('warehouse');
-  o.magazzino = o.magazzino.filter(m=>m.id!==rigaId);
-  saveState('orders');
-  openJobCard(orderId);
-}
-function updateMagazzinoField(orderId, rigaId, field, value){
-  const o = findItem('orders', orderId);
-  const entry = o.magazzino.find(m=>m.id===rigaId);
-  if(field==='codice'){
-    entry.codice = normalizeCatalogCode(value);
-    const cp = catalogProduct(entry.codice);
-    entry.nome = cp ? (cp.name||"") : catalogNameForCode(entry.codice);
-    entry.colore=""; entry.taglia="";
+
+async function removeMagazzinoRiga(orderId,rigaId){
+  const o=findItem('orders',orderId); if(!o) return;
+  const entry=(o.magazzino||[]).find(m=>m.id===rigaId);
+  if(entry){
+    const restored=await restoreReservedStockDb(entry);
+    if(!restored) return;
   }
-  else if(field==='colore'){ entry.colore = String(value||"").trim(); entry.taglia=""; }
-  else if(field==='taglia'){ entry.taglia = String(value||"").trim() || "UNICA"; }
-  else if(field==='quantita'){ entry.quantita = Number(value)||0; }
-  tryStornoMagazzino(entry);
-  saveState('orders'); saveState('warehouse');
+  o.magazzino=(o.magazzino||[]).filter(m=>m.id!==rigaId);
+  const ok=await upsertOne('orders',o);
+  if(!ok) return;
+  await reloadWarehouseFromDb();
   openJobCard(orderId);
 }
+
+async function updateMagazzinoField(orderId,rigaId,field,value){
+  const o=findItem('orders',orderId); if(!o) return;
+  const entry=(o.magazzino||[]).find(m=>m.id===rigaId); if(!entry) return;
+
+  // Blocca doppi cambi mentre è in corso il collegamento con il database.
+  if(entry._savingWarehouseLink) return;
+  entry._savingWarehouseLink=true;
+
+  try{
+    // Prima rimettiamo a magazzino ciò che questa riga aveva già riservato.
+    const restored=await restoreReservedStockDb(entry);
+    if(!restored){ showToast("Impossibile ripristinare la quantità precedente"); return; }
+
+    entry.stornato=false;
+    entry.daOrdinareQty=0;
+    entry.ordineConfermato=false;
+    entry.inCarrello=false;
+    entry.inCarrelloAt=null;
+
+    if(field==='codice'){
+      entry.codice=normalizeCatalogCode(value);
+      const cp=catalogProduct(entry.codice);
+      entry.nome=cp ? (cp.name||"") : catalogNameForCode(entry.codice);
+      entry.colore="";
+      entry.taglia="";
+    }else if(field==='colore'){
+      entry.colore=String(value||"").trim();
+      entry.taglia="";
+    }else if(field==='taglia'){
+      entry.taglia=String(value||"").trim()||"UNICA";
+    }else if(field==='quantita'){
+      entry.quantita=Math.max(0,Number(value)||0);
+    }
+
+    // Scala il magazzino solo quando la riga è completa.
+    const reserved=await reserveWarehouseForEntry(entry);
+    if(!reserved){ showToast("Quantità NON aggiornata nel magazzino"); return; }
+
+    // Il flag è solo runtime e non deve finire nel JSON dell'ordine.
+    delete entry._savingWarehouseLink;
+
+    const orderSaved=await upsertOne('orders',o);
+    if(!orderSaved){
+      // Se l'ordine non si salva, restituiamo la quantità appena riservata.
+      await restoreReservedStockDb(entry);
+      return;
+    }
+
+    await reloadWarehouseFromDb();
+    openJobCard(orderId);
+    showToast(entry.articoloId ? `${entry._reservedQty} pz collegati e scalati dal magazzino` : "Prodotto collegato");
+  }catch(err){
+    console.error("Errore collegamento prodotto/magazzino",err);
+    showToast(`Errore collegamento magazzino: ${err?.message||"riprova"}`);
+  }finally{
+    delete entry._savingWarehouseLink;
+  }
+}
+
 function confermaOrdineMagazzino(orderId, rigaId){
   const o = findItem('orders', orderId);
   const entry = (o.magazzino||[]).find(m=>m.id===rigaId);
