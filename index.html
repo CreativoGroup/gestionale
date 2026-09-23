@@ -2206,11 +2206,12 @@ function emptyRiga(isOrder){
 }
 /* Ricalcola le fasi di lavorazione in base alle categorie presenti nelle righe, preservando lo stato delle spunte già fatte */
 function recalcFasi(order){
-  // Manteniamo gestione bozza e collegamenti esterni ai file.
+  // Manteniamo gestione bozza, comunicazioni ordine e collegamenti esterni ai file.
   // I file veri NON vengono salvati nel gestionale.
   const marker = (order.fasi||[]).find(f=>f && f.key==="__bozza__");
+  const presaCarico = (order.fasi||[]).find(f=>f && f.key==="__presa_carico__");
   const allegati = (order.fasi||[]).filter(f=>f && f.key==="__allegato__");
-  order.fasi = [...(marker ? [marker] : []), ...allegati];
+  order.fasi = [...(marker ? [marker] : []), ...(presaCarico ? [presaCarico] : []), ...allegati];
 }
 
 function getOrderExternalAttachments(order){
@@ -2302,8 +2303,9 @@ function getBozzaMeta(order){
 }
 function setBozzaScelta(orderId, scelta){
   const o=findItem('orders',orderId); if(!o) return;
+  const presaCarico=(o.fasi||[]).filter(f=>f && f.key==="__presa_carico__");
   const allegati=(o.fasi||[]).filter(f=>f && f.key==="__allegato__");
-  o.fasi=[{key:"__bozza__", scelta, stato:""}, ...allegati];
+  o.fasi=[{key:"__bozza__", scelta, stato:""}, ...presaCarico, ...allegati];
   saveState('orders');
   openJobCard(orderId);
 }
@@ -2311,12 +2313,113 @@ function setBozzaInAttesa(orderId){
   const o=findItem('orders',orderId); if(!o) return;
   const m=getBozzaMeta(o);
   if(!m.scelta) return;
+  const presaCarico=(o.fasi||[]).filter(f=>f && f.key==="__presa_carico__");
   const allegati=(o.fasi||[]).filter(f=>f && f.key==="__allegato__");
-  o.fasi=[{key:"__bozza__", scelta:m.scelta, stato:"IN ATTESA DI CONFERMA BOZZA"}, ...allegati];
+  o.fasi=[{key:"__bozza__", scelta:m.scelta, stato:"IN ATTESA DI CONFERMA BOZZA"}, ...presaCarico, ...allegati];
   saveState('orders');
   openJobCard(orderId);
   showToast("Bozza in attesa di conferma");
 }
+
+function getPresaCaricoMeta(order){
+  return (order?.fasi||[]).find(f=>f && f.key==="__presa_carico__") || null;
+}
+function formatDateTimeIt(value){
+  if(!value) return "";
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+async function sendOrderTakenEmail(orderId){
+  const o=findItem("orders",orderId); if(!o) return;
+  const c=state.clients.find(x=>x.id===o.clientId);
+  const to=String(c?.email||"").trim();
+
+  if(!to){
+    showToast("Il cliente non ha un indirizzo email");
+    return;
+  }
+
+  const existing=getPresaCaricoMeta(o);
+  const question=existing
+    ? `La conferma risulta già inviata il ${formatDateTimeIt(existing.sentAt)}. Vuoi inviarla di nuovo?`
+    : `Inviare la conferma di presa in carico a ${to}?`;
+
+  askConfirm(question, async ()=>{
+    try{
+      const {data:sessionData}=await sb.auth.getSession();
+      const session=sessionData?.session;
+      if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+
+      const subject="Ordine preso in carico";
+      const bodyText=`Gentile cliente,
+
+abbiamo preso in carico il tuo ordine.
+Avviseremo appena il lavoro sarà pronto per essere ritirato.
+
+Cordiali saluti
+Team Creativò`;
+
+      const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
+        method:"POST",
+        headers:{
+          "Authorization":`Bearer ${session.access_token}`,
+          "apikey":SUPABASE_KEY,
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({mode:"new",to,subject,bodyText,attachments:[]})
+      });
+
+      const raw=await response.text();
+      let result={}; try{result=JSON.parse(raw)}catch(e){}
+      if(!response.ok) throw new Error(result?.error||result?.message||raw||`Errore HTTP ${response.status}`);
+
+      const others=(o.fasi||[]).filter(f=>!(f && f.key==="__presa_carico__"));
+      o.fasi=[
+        ...others,
+        {
+          key:"__presa_carico__",
+          sentAt:new Date().toISOString(),
+          to,
+          subject
+        }
+      ];
+
+      const ok=await saveSingleRecord("orders",o);
+      if(ok===false) throw new Error("Mail inviata, ma non è stato possibile registrare la data nel gestionale.");
+
+      openJobCard(orderId);
+      showToast("Conferma presa in carico inviata");
+    }catch(err){
+      console.error("Invio conferma presa in carico",err);
+      showToast(`Invio non riuscito: ${err?.message||"errore Gmail"}`);
+    }
+  });
+}
+function renderOrderCommunications(o,c){
+  const meta=getPresaCaricoMeta(o);
+  const hasEmail=!!String(c?.email||"").trim();
+
+  return `
+    <div class="modal-section">
+      <h3>Comunicazioni cliente</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:800;">Conferma presa in carico</div>
+          ${
+            meta
+              ? `<div style="margin-top:5px;color:var(--ok);font-weight:750;">✓ Mail inviata il ${formatDateTimeIt(meta.sentAt)}${meta.to?` a ${escapeHtml(meta.to)}`:""}</div>`
+              : `<div style="margin-top:5px;color:var(--muted);">Non ancora inviata.</div>`
+          }
+        </div>
+        <button class="btn ${meta?'btn-outline':'btn-primary'}" ${hasEmail?'':'disabled'} onclick="sendOrderTakenEmail('${o.id}')">
+          ${meta?'REINVIA CONFERMA':'INVIA CONFERMA PRESA IN CARICO'}
+        </button>
+      </div>
+      ${!hasEmail ? `<div style="margin-top:8px;color:var(--danger);font-size:12.5px;font-weight:700;">Nessuna email presente nell'anagrafica cliente.</div>` : ``}
+    </div>`;
+}
+
 let bozzaMailAttachments=[];
 
 function openBozzaMail(orderId){
@@ -2526,7 +2629,6 @@ function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, 
 const NAV = [
   {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard"},
 
-  {id:"posta", label:"Posta", icon:"✉", subtitle:"Email aziendale collegata a Gmail", group:"Traffico"},
   {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico"},
   {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico"},
 
@@ -2665,7 +2767,7 @@ function renderTopbarActions(){
     posta: `<button class="btn btn-primary" onclick="loadGmailMessages(true)">↻ Aggiorna posta</button>`,
     whatsapp: ``,
     instagram: ``,
-    leads: `<button class="btn btn-primary" onclick="goTo(\'posta\')">✉ Apri Posta</button>`,
+    leads: ``,
     dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa l’app</button>`
   };
   document.getElementById("topbarActions").innerHTML = map[currentView] || "";
@@ -5553,6 +5655,8 @@ function openJobCard(orderId){
       <textarea class="desc-lavoro" rows="12" placeholder="Descrivi in modo dettagliato il lavoro, materiali, misure, colori, note operative e indicazioni per la produzione…" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
       ${renderOrderExternalAttachments(o)}
     </div>
+
+    ${renderOrderCommunications(o,c)}
 
     ${renderBozzaSection(o)}
 
