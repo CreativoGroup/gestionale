@@ -5746,15 +5746,120 @@ function updateRitiroEsterno(orderId,rigaId,status){
   openJobCard(orderId);
   showToast(status==="DA RITIRARE" ? "Aggiunto agli ordini da ritirare" : `Stato ritiro: ${status}`);
 }
+
+let jobCardEditSnapshot = null;
+
+async function warehouseQtyByIdDb(id){
+  if(!id) return null;
+  const {data,error}=await sb.from(TABLES.warehouse).select("*").eq("id",id).maybeSingle();
+  if(error){
+    console.error("Errore lettura magazzino per rollback",error);
+    return null;
+  }
+  return data ? fromDbRow("warehouse",data) : null;
+}
+
+async function adjustWarehouseByIdDb(id,delta){
+  if(!id || !Number(delta)) return true;
+  const w = await warehouseQtyByIdDb(id);
+  if(!w) return false;
+
+  const nuovaQta = Math.max(0,Number(w.quantita||0)+Number(delta||0));
+  const saved = await updateWarehouseDirect(w,{quantita:nuovaQta});
+  if(!saved) return false;
+
+  const idx=state.warehouse.findIndex(x=>x.id===saved.id);
+  if(nuovaQta<=0){
+    if(idx>=0) state.warehouse.splice(idx,1);
+  }else{
+    if(idx>=0) state.warehouse[idx]=saved;
+    else state.warehouse.push(saved);
+  }
+  return true;
+}
+
+function aggregateReservedByArticle(order){
+  const map = new Map();
+  (order?.magazzino||[]).forEach(m=>{
+    const id=String(m.articoloId||"").trim();
+    const q=Math.max(0,Number(m._reservedQty)||0);
+    if(id && q>0) map.set(id,(map.get(id)||0)+q);
+  });
+  return map;
+}
+
+async function cancelJobCard(orderId){
+  if(!jobCardEditSnapshot || jobCardEditSnapshot.orderId!==orderId){
+    closeModal();
+    return;
+  }
+
+  const current=findItem("orders",orderId);
+  const original=JSON.parse(JSON.stringify(jobCardEditSnapshot.order));
+
+  if(!current){
+    jobCardEditSnapshot=null;
+    closeModal();
+    return;
+  }
+
+  const nowMap=aggregateReservedByArticle(current);
+  const oldMap=aggregateReservedByArticle(original);
+  const ids=new Set([...nowMap.keys(),...oldMap.keys()]);
+
+  for(const articoloId of ids){
+    const nowQty=nowMap.get(articoloId)||0;
+    const oldQty=oldMap.get(articoloId)||0;
+    const delta=nowQty-oldQty;
+
+    if(delta!==0){
+      const ok=await adjustWarehouseByIdDb(articoloId,delta);
+      if(!ok){
+        showToast("Annullamento non completato: impossibile ripristinare il magazzino");
+        return;
+      }
+    }
+  }
+
+  const idx=state.orders.findIndex(o=>o.id===orderId);
+  if(idx>=0) state.orders[idx]=original;
+
+  const saved=await upsertOne("orders",original);
+  if(!saved){
+    showToast("Annullamento non completato: errore nel ripristino della scheda");
+    return;
+  }
+
+  await reloadWarehouseFromDb();
+  jobCardEditSnapshot=null;
+  closeModal();
+  renderCurrentView();
+  showToast("Modifiche annullate · magazzino ripristinato");
+}
+
+function saveJobCard(orderId){
+  if(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId){
+    jobCardEditSnapshot=null;
+  }
+  closeModal();
+  showToast("Scheda salvata");
+}
+
 function openJobCard(orderId){
   const o = findItem('orders', orderId);
+  if(o && (!jobCardEditSnapshot || jobCardEditSnapshot.orderId!==orderId)){
+    jobCardEditSnapshot={
+      orderId,
+      order:JSON.parse(JSON.stringify(o))
+    };
+  }
   const c = state.clients.find(x=>x.id===o.clientId);
   const imponibile = orderImponibile(o), iva = orderIva(o), totale = orderTotale(o);
   const pagamenti = state.payments.filter(p=>p.orderId===o.id);
   const incassato = pagamenti.reduce((s,p)=>s+Number(p.importo),0);
   const saldoResiduo = totale - incassato;
   document.getElementById("modalBody").innerHTML = `
-    <button class="close-x" onclick="closeModal()">×</button>
+    <button class="close-x" onclick="cancelJobCard('${o.id}')">×</button>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
       <div style="flex:1;min-width:0;">
         <p class="jobcard-eyebrow">Scheda di lavorazione${o.createdAt?` — creata il ${fmtDate(o.createdAt.slice(0,10))}`:''} <span style="font-size:8px;opacity:.5;text-transform:none;letter-spacing:0;">${o.numero?('#'+o.numero):''}</span></p>
@@ -5834,8 +5939,8 @@ function openJobCard(orderId){
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-outline" onclick="window.print()">Stampa</button>
         <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
-        <button class="btn btn-primary" onclick="closeModal(); showToast('Scheda salvata')">Salva</button>
-        <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+        <button class="btn btn-primary" onclick="saveJobCard('${o.id}')">Salva</button>
+        <button class="btn btn-outline" onclick="cancelJobCard('${o.id}')">Annulla</button>
       </div>
       <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteOrder('${o.id}')">Elimina ordine</button>
     </div>
