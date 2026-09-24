@@ -4711,7 +4711,12 @@ async function reserveWarehouseForEntry(entry){
   entry.inCarrello=false;
   entry.inCarrelloAt=null;
 
-  const richiesta=Math.max(0,Number(entry.quantita)||0);
+  const richiesta=Math.max(
+    0,
+    Number(entry.quantitaRichiesta ?? entry.quantita) || 0
+  );
+  entry.quantitaRichiesta = richiesta;
+  entry.quantita = richiesta;
   if(!entry.codice || !entry.colore || !entry.taglia || !richiesta) return true;
 
   const w=state.warehouse.find(x=>
@@ -4746,7 +4751,7 @@ async function reserveWarehouseForEntry(entry){
 async function addMagazzinoRiga(orderId){
   const o=findItem('orders',orderId); if(!o) return;
   if(!o.magazzino) o.magazzino=[];
-  o.magazzino.push({id:uid(),codice:"",nome:"",colore:"",taglia:"",quantita:1,stornato:false,_reservedQty:0,articoloId:"",daOrdinareQty:0,ordineConfermato:false,inCarrello:false,inCarrelloAt:null});
+  o.magazzino.push({id:uid(),codice:"",nome:"",colore:"",taglia:"",quantita:1,quantitaRichiesta:1,stornato:false,_reservedQty:0,articoloId:"",daOrdinareQty:0,ordineConfermato:false,inCarrello:false,inCarrelloAt:null});
   const ok=await upsertOne('orders',o);
   if(!ok) return;
   openJobCard(orderId);
@@ -4797,7 +4802,9 @@ async function updateMagazzinoField(orderId,rigaId,field,value){
     }else if(field==='taglia'){
       entry.taglia=String(value||"").trim()||"UNICA";
     }else if(field==='quantita'){
-      entry.quantita=Math.max(0,Number(value)||0);
+      const nuovaQuantita=Math.max(0,Number(value)||0);
+      entry.quantita=nuovaQuantita;
+      entry.quantitaRichiesta=nuovaQuantita;
     }
 
     // Scala il magazzino solo quando la riga è completa.
@@ -4829,6 +4836,12 @@ function confermaOrdineMagazzino(orderId, rigaId){
   const o = findItem('orders', orderId);
   const entry = (o.magazzino||[]).find(m=>m.id===rigaId);
   if(!entry || Number(entry.daOrdinareQty)<=0) return;
+  entry.quantitaRichiesta = Math.max(
+    Number(entry.quantitaRichiesta)||0,
+    Number(entry.quantita)||0,
+    (Number(entry._reservedQty)||0) + (Number(entry.daOrdinareQty)||0)
+  );
+  entry.quantita = entry.quantitaRichiesta;
   entry.ordineConfermato = true;
   saveState('orders');
   openJobCard(orderId);
@@ -4838,6 +4851,12 @@ function segnaInseritoNelCarrello(orderId, rigaId){
   const o = findItem('orders', orderId);
   const entry = (o && o.magazzino ? o.magazzino : []).find(m=>m.id===rigaId);
   if(!entry || !entry.ordineConfermato || Number(entry.daOrdinareQty)<=0) return;
+  entry.quantitaRichiesta = Math.max(
+    Number(entry.quantitaRichiesta)||0,
+    Number(entry.quantita)||0,
+    (Number(entry._reservedQty)||0) + (Number(entry.daOrdinareQty)||0)
+  );
+  entry.quantita = entry.quantitaRichiesta;
   entry.inCarrello = true;
   entry.inCarrelloAt = new Date().toISOString();
   saveState('orders');
@@ -4857,6 +4876,17 @@ function computeMagazzinoDaOrdinare(){
   return list;
 }
 function renderMagazzinoSection(o){
+  // Migrazione trasparente delle vecchie righe:
+  // finché una riga è ancora da completare, il totale richiesto si ricava con certezza
+  // da "già riservato + ancora da ordinare".
+  (o.magazzino||[]).forEach(m=>{
+    const ricostruibile=(Number(m._reservedQty)||0)+(Number(m.daOrdinareQty)||0);
+    if(!m.quantitaRichiesta && ricostruibile>0){
+      m.quantitaRichiesta=Math.max(Number(m.quantita)||0,ricostruibile);
+      m.quantita=m.quantitaRichiesta;
+    }
+  });
+
   const allowed = magazzinoAllowedCategorie(o);
   if(!allowed.size) return "";
   const entries = [...(o.magazzino || [])].sort((a,b)=>{
@@ -4907,7 +4937,7 @@ function renderMagazzinoSection(o){
                   onchange="updateMagazzinoField('${o.id}','${m.id}','taglia',this.value)">
                 <datalist id="sizeList-${m.id}">${magazzinoTagliaDatalistOptions(m.codice,m.colore)}</datalist>
               </td>
-              <td><input class="num" type="number" min="1" value="${m.quantita}" onchange="updateMagazzinoField('${o.id}','${m.id}','quantita',this.value)"></td>
+              <td><input class="num" type="number" min="1" value="${Math.max(Number(m.quantitaRichiesta)||0,Number(m.quantita)||0,(Number(m._reservedQty)||0)+(Number(m.daOrdinareQty)||0))}" onchange="updateMagazzinoField('${o.id}','${m.id}','quantita',this.value)"></td>
               <td>${status}</td>
               <td><button class="btn btn-ghost btn-sm" onclick="removeMagazzinoRiga('${o.id}','${m.id}')">✕</button></td>
             </tr>`;
@@ -6441,14 +6471,25 @@ async function autoAssegnaMerceArrivata(){
 
       // Snapshot per rollback in caso di errore.
       const oldEntry = {
-        _reservedQty:Number(r.entry._reservedQty)||0,
+        quantita:Math.max(0,Number(r.entry.quantita)||0),
+        quantitaRichiesta:Math.max(0,Number(r.entry.quantitaRichiesta)||0),
+        _reservedQty:Math.max(0,Number(r.entry._reservedQty)||0),
         articoloId:r.entry.articoloId||"",
-        daOrdinareQty:Number(r.entry.daOrdinareQty)||0,
+        daOrdinareQty:Math.max(0,Number(r.entry.daOrdinareQty)||0),
         stornato:!!r.entry.stornato,
         ordineConfermato:!!r.entry.ordineConfermato,
         inCarrello:!!r.entry.inCarrello,
         inCarrelloAt:r.entry.inCarrelloAt||null
       };
+
+      // Quantità totale realmente richiesta dalla scheda.
+      // È importante non fidarsi solo di "quantita": in vecchie righe può essere
+      // rimasta disallineata rispetto a "già riservato + ancora da ordinare".
+      const quantitaRichiesta = Math.max(
+        oldEntry.quantitaRichiesta,
+        oldEntry.quantita,
+        oldEntry._reservedQty + oldEntry.daOrdinareQty
+      );
 
       // 1) scala la merce dal magazzino
       const savedWarehouse = await updateWarehouseDirect(w,{
@@ -6460,10 +6501,20 @@ async function autoAssegnaMerceArrivata(){
       const wi = state.warehouse.findIndex(x=>x.id===savedWarehouse.id);
       if(wi>=0) state.warehouse[wi]=savedWarehouse;
 
-      // 2) collega la quantità alla scheda lavoro
-      r.entry._reservedQty = oldEntry._reservedQty + q;
+      // 2) collega la quantità alla scheda lavoro.
+      // Manteniamo SEMPRE la quantità totale richiesta originale:
+      // es. 3 L richieste => dopo l'arrivo deve restare "Quantità 3",
+      // non la sola quantità dell'ultimo movimento.
+      const nuovoRiservato = Math.min(
+        quantitaRichiesta,
+        oldEntry._reservedQty + q
+      );
+
+      r.entry.quantitaRichiesta = quantitaRichiesta;
+      r.entry.quantita = quantitaRichiesta;
+      r.entry._reservedQty = nuovoRiservato;
       r.entry.articoloId = savedWarehouse.id;
-      r.entry.daOrdinareQty = Math.max(0,oldEntry.daOrdinareQty-q);
+      r.entry.daOrdinareQty = Math.max(0,quantitaRichiesta-nuovoRiservato);
       r.entry.stornato = r.entry.daOrdinareQty===0;
 
       if(r.entry.daOrdinareQty===0){
@@ -6491,6 +6542,8 @@ async function autoAssegnaMerceArrivata(){
           disponibile = Math.max(0,Number(rollbackWarehouse.quantita)||0);
         }
 
+        r.entry.quantita = oldEntry.quantita;
+        r.entry.quantitaRichiesta = oldEntry.quantitaRichiesta;
         r.entry._reservedQty = oldEntry._reservedQty;
         r.entry.articoloId = oldEntry.articoloId;
         r.entry.daOrdinareQty = oldEntry.daOrdinareQty;
