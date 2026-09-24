@@ -6321,6 +6321,8 @@ async function quickAddToWarehouse(){
     // Quello che appare dopo è ciò che esiste realmente nel database.
     await reloadWarehouseFromDb();
 
+    const autoAssegnati = await autoAssegnaMerceArrivata();
+
     try{
       const arr=JSON.parse(localStorage.getItem("warehousePendingRecovery")||"[]");
       const filtered=arr.filter(x=>x.recoveryId!==recovery.recoveryId);
@@ -6328,7 +6330,11 @@ async function quickAddToWarehouse(){
     }catch(e){}
 
     renderMagazzino();
-    showToast(`${qty} pz SALVATI nel magazzino`);
+    showToast(
+      autoAssegnati>0
+        ? `${qty} pz ricevuti · ${autoAssegnati} pz assegnati automaticamente alle commesse`
+        : `${qty} pz SALVATI nel magazzino`
+    );
 
   }catch(err){
     console.error("Errore inatteso quickAddToWarehouse",err);
@@ -6383,6 +6389,129 @@ function sameVariant(a,b){
   const sizeB = String(b.taglia||"UNICA").trim().toUpperCase() || "UNICA";
   return codeA===codeB && colorA===colorB && sizeA===sizeB;
 }
+
+async function autoAssegnaMerceArrivata(){
+  let totaleAssegnato = 0;
+
+  // Lavora solo su merce realmente presente.
+  const righeMagazzino = [...state.warehouse]
+    .filter(w=>Number(w.quantita)>0)
+    .sort((a,b)=>{
+      const c = String(a.codice||"").localeCompare(String(b.codice||""),"it",{numeric:true,sensitivity:"base"});
+      if(c!==0) return c;
+      const co = compareWarehouseColors(a.colore,b.colore);
+      if(co!==0) return co;
+      return String(a.taglia||"").localeCompare(String(b.taglia||""),"it",{numeric:true,sensitivity:"base"});
+    });
+
+  for(const w of righeMagazzino){
+    let disponibile = Math.max(0,Number(w.quantita)||0);
+    if(disponibile<=0) continue;
+
+    // Prima vengono servite le commesse messe nel carrello da più tempo.
+    const richieste = [];
+    state.orders
+      .filter(o=>o.stato!=="Consegnato")
+      .forEach(order=>{
+        (order.magazzino||[]).forEach(entry=>{
+          if(
+            entry.inCarrello &&
+            Number(entry.daOrdinareQty)>0 &&
+            sameVariant(w,entry)
+          ){
+            richieste.push({order,entry});
+          }
+        });
+      });
+
+    richieste.sort((a,b)=>{
+      const da = a.entry.inCarrelloAt || a.order.createdAt || "";
+      const db = b.entry.inCarrelloAt || b.order.createdAt || "";
+      return da.localeCompare(db);
+    });
+
+    for(const r of richieste){
+      if(disponibile<=0) break;
+
+      const mancano = Math.max(0,Number(r.entry.daOrdinareQty)||0);
+      if(mancano<=0) continue;
+
+      const q = Math.min(disponibile,mancano);
+      if(q<=0) continue;
+
+      // Snapshot per rollback in caso di errore.
+      const oldEntry = {
+        _reservedQty:Number(r.entry._reservedQty)||0,
+        articoloId:r.entry.articoloId||"",
+        daOrdinareQty:Number(r.entry.daOrdinareQty)||0,
+        stornato:!!r.entry.stornato,
+        ordineConfermato:!!r.entry.ordineConfermato,
+        inCarrello:!!r.entry.inCarrello,
+        inCarrelloAt:r.entry.inCarrelloAt||null
+      };
+
+      // 1) scala la merce dal magazzino
+      const savedWarehouse = await updateWarehouseDirect(w,{
+        quantita:Math.max(0,disponibile-q)
+      });
+      if(!savedWarehouse) continue;
+
+      disponibile = Math.max(0,Number(savedWarehouse.quantita)||0);
+      const wi = state.warehouse.findIndex(x=>x.id===savedWarehouse.id);
+      if(wi>=0) state.warehouse[wi]=savedWarehouse;
+
+      // 2) collega la quantità alla scheda lavoro
+      r.entry._reservedQty = oldEntry._reservedQty + q;
+      r.entry.articoloId = savedWarehouse.id;
+      r.entry.daOrdinareQty = Math.max(0,oldEntry.daOrdinareQty-q);
+      r.entry.stornato = r.entry.daOrdinareQty===0;
+
+      if(r.entry.daOrdinareQty===0){
+        // Arrivato tutto: non è più "nel carrello", è disponibile sulla commessa.
+        r.entry.ordineConfermato = false;
+        r.entry.inCarrello = false;
+        r.entry.inCarrelloAt = null;
+      }else{
+        // Arrivo parziale: resta nel carrello solo la quantità ancora mancante.
+        r.entry.ordineConfermato = true;
+        r.entry.inCarrello = true;
+      }
+
+      // 3) salva la scheda lavoro
+      const orderSaved = await upsertOne("orders",r.order);
+
+      if(!orderSaved){
+        // Rollback: rimette i pezzi a magazzino e ripristina la riga.
+        const rollbackWarehouse = await updateWarehouseDirect(savedWarehouse,{
+          quantita:Number(savedWarehouse.quantita||0)+q
+        });
+        if(rollbackWarehouse){
+          const rwi = state.warehouse.findIndex(x=>x.id===rollbackWarehouse.id);
+          if(rwi>=0) state.warehouse[rwi]=rollbackWarehouse;
+          disponibile = Math.max(0,Number(rollbackWarehouse.quantita)||0);
+        }
+
+        r.entry._reservedQty = oldEntry._reservedQty;
+        r.entry.articoloId = oldEntry.articoloId;
+        r.entry.daOrdinareQty = oldEntry.daOrdinareQty;
+        r.entry.stornato = oldEntry.stornato;
+        r.entry.ordineConfermato = oldEntry.ordineConfermato;
+        r.entry.inCarrello = oldEntry.inCarrello;
+        r.entry.inCarrelloAt = oldEntry.inCarrelloAt;
+        continue;
+      }
+
+      totaleAssegnato += q;
+    }
+  }
+
+  if(totaleAssegnato>0){
+    await reloadWarehouseFromDb();
+  }
+
+  return totaleAssegnato;
+}
+
 function destinazioniCarrelloPerMagazzino(w){
   let disponibile = Math.max(0, Number(w.quantita)||0);
   if(disponibile<=0) return [];
@@ -6496,7 +6625,7 @@ function renderMagazzino(){
     <div class="card" style="margin-bottom:14px;padding:13px 16px;">
       <strong>${warehouseGroupLabel(magazzinoGroupFilter)}</strong>
       <div class="helptext" style="margin:4px 0 0;">
-        Qui vedi solo le giacenze reali di questa sottocategoria. I colori vengono mostrati con il <strong>nome completo in inglese</strong>; quando importi un DDT, i codici colore (es. WH, BK, NY, DG) vengono riconosciuti e convertiti automaticamente. Nella colonna <strong>Scorta minima</strong> puoi impostare liberamente la soglia di avviso e poi premere <strong>Aggiorna</strong>.
+        Qui vedi solo le giacenze reali di questa sottocategoria. I colori vengono mostrati con il <strong>nome completo in inglese</strong>. Quando entra merce già segnata <strong>NEL CARRELLO</strong> per una commessa, il gestionale la assegna automaticamente alla scheda di lavoro, la storna dal magazzino e lascia libera solo l'eventuale eccedenza. Nella colonna <strong>Scorta minima</strong> puoi impostare liberamente la soglia di avviso e poi premere <strong>Aggiorna</strong>.
       </div>
     </div>
     <div class="section-header">
@@ -6533,8 +6662,13 @@ async function saveWarehouseRow(id){
   });
   if(!saved) return;
   await reloadWarehouseFromDb();
+  const autoAssegnati = await autoAssegnaMerceArrivata();
   renderMagazzino();
-  showToast("MAGAZZINO SALVATO");
+  showToast(
+    autoAssegnati>0
+      ? `MAGAZZINO SALVATO · ${autoAssegnati} pz assegnati alle commesse`
+      : "MAGAZZINO SALVATO"
+  );
 }
 async function addItem(){
   const nome=document.getElementById("if-nome")?.value?.trim()||"";
@@ -6556,9 +6690,14 @@ async function addItem(){
 
   if(!saved) return;
   await reloadWarehouseFromDb();
+  const autoAssegnati = await autoAssegnaMerceArrivata();
   toggleForm("itemForm");
   renderMagazzino();
-  showToast("ARTICOLO SALVATO");
+  showToast(
+    autoAssegnati>0
+      ? `ARTICOLO SALVATO · ${autoAssegnati} pz assegnati alle commesse`
+      : "ARTICOLO SALVATO"
+  );
 }
 async function adjustStock(id,delta){
   const w=findItem("warehouse",id); if(!w) return;
@@ -6567,6 +6706,7 @@ async function adjustStock(id,delta){
   });
   if(!saved) return;
   await reloadWarehouseFromDb();
+  if(Number(delta)>0) await autoAssegnaMerceArrivata();
   renderMagazzino();
 }
 function deleteItem(id){
@@ -6909,13 +7049,24 @@ async function confirmPdfImport(){
     }
   }
 
+  let autoAssegnati = 0;
+  if(salvati>0){
+    await reloadWarehouseFromDb();
+    autoAssegnati = await autoAssegnaMerceArrivata();
+  }
+
   if(salvati===toInclude.length){
     pdfParsedRows = [];
     toggleForm('pdfImportForm');
     const inp=document.getElementById('pdfFileInput'); if(inp) inp.value="";
   }
+
   renderMagazzino();
-  showToast(`${salvati} di ${toInclude.length} articoli salvati nel magazzino`);
+  showToast(
+    autoAssegnati>0
+      ? `${salvati} varianti importate · ${autoAssegnati} pz assegnati automaticamente alle commesse`
+      : `${salvati} di ${toInclude.length} articoli salvati nel magazzino`
+  );
 }
 
 /* ============ INCASSI / REPORT PAGAMENTI ============ */
