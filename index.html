@@ -5551,26 +5551,83 @@ async function addOrder(){
   openJobCard(savedOrder.id);
 }
 function deleteOrderFromCreditiCliente(orderId, clientId){
-  askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati.", ()=>{
+  askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati e la merce riservata verrà restituita al magazzino.", async ()=>{
     const paymentIds = state.payments.filter(p=>p.orderId===orderId).map(p=>p.id);
     const order = findItem('orders', orderId);
-    if(order){ (order.magazzino||[]).forEach(m=>{ if(m.stornato && m._reservedQty) adjustWarehouseQty(m.articoloId, m._reservedQty); }); saveState('warehouse'); }
+
+    if(order){
+      for(const m of (order.magazzino||[])){
+        if(Number(m._reservedQty)>0 && m.articoloId){
+          const restored = await restoreReservedStockDb(m);
+          if(!restored){
+            showToast("Ordine NON eliminato: impossibile restituire tutta la merce al magazzino");
+            return;
+          }
+        }
+      }
+
+      const savedBeforeDelete = await upsertOne("orders", order);
+      if(!savedBeforeDelete){
+        showToast("Ordine NON eliminato: errore durante il ripristino del magazzino");
+        return;
+      }
+    }
+
     state.orders = state.orders.filter(o=>o.id!==orderId);
     state.payments = state.payments.filter(p=>p.orderId!==orderId);
-    dbDelete('orders', orderId); dbDeleteMany('payments', paymentIds);
-    const rimasti = state.orders.filter(o=>o.clientId===clientId && o.stato==="Consegnato").map(o=>({o,saldo:orderSaldo(o)})).filter(x=>x.saldo>0.001);
+
+    await dbDelete('orders', orderId);
+    await dbDeleteMany('payments', paymentIds);
+
+    await reloadWarehouseFromDb();
+
+    const rimasti = state.orders
+      .filter(o=>o.clientId===clientId && o.stato==="Consegnato")
+      .map(o=>({o,saldo:orderSaldo(o)}))
+      .filter(x=>x.saldo>0.001);
+
     if(rimasti.length) openCreditiCliente(clientId); else closeModal();
+    showToast("Ordine eliminato · merce restituita al magazzino");
   });
 }
 function deleteOrder(id){
-  askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati.", ()=>{
+  askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati e la merce riservata verrà restituita al magazzino.", async ()=>{
     const paymentIds = state.payments.filter(p=>p.orderId===id).map(p=>p.id);
     const order = findItem('orders', id);
-    if(order){ (order.magazzino||[]).forEach(m=>{ if(m.stornato && m._reservedQty) adjustWarehouseQty(m.articoloId, m._reservedQty); }); saveState('warehouse'); }
+
+    // PRIMA restituiamo realmente al database tutta la merce già stornata
+    // dalla scheda. Non controlliamo "stornato": basta che esista una quantità
+    // riservata, perché può esserci anche un arrivo parziale o uno stato vecchio.
+    if(order){
+      for(const m of (order.magazzino||[])){
+        if(Number(m._reservedQty)>0 && m.articoloId){
+          const restored = await restoreReservedStockDb(m);
+          if(!restored){
+            showToast("Ordine NON eliminato: impossibile restituire tutta la merce al magazzino");
+            return;
+          }
+        }
+      }
+
+      // Salviamo l'ordine svuotato dalle riserve prima di eliminarlo, così anche
+      // in caso di rete lenta non può restare una prenotazione fantasma.
+      const savedBeforeDelete = await upsertOne("orders", order);
+      if(!savedBeforeDelete){
+        showToast("Ordine NON eliminato: errore durante il ripristino del magazzino");
+        return;
+      }
+    }
+
+    // Solo dopo il ripristino della merce eliminiamo ordine e pagamenti.
     state.orders = state.orders.filter(o=>o.id!==id);
     state.payments = state.payments.filter(p=>p.orderId!==id);
-    dbDelete('orders', id); dbDeleteMany('payments', paymentIds);
+
+    await dbDelete('orders', id);
+    await dbDeleteMany('payments', paymentIds);
+
+    await reloadWarehouseFromDb();
     renderCurrentView();
+    showToast("Ordine eliminato · merce restituita al magazzino");
   });
 }
 
