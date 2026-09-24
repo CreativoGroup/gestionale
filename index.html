@@ -1794,7 +1794,17 @@ const WAREHOUSE_COLOR_MAP = {
   "NA":"Natural","NATURAL":"Natural",
   "IV":"Ivory","IVORY":"Ivory",
   "GO":"Gold","GOLD":"Gold",
-  "SI":"Silver","SILVER":"Silver"
+  "SI":"Silver","SILVER":"Silver",
+
+  /* Codici colore usati nelle conferme d'ordine Action Wear */
+  "94":"Heather Grey","HEATHER GREY":"Heather Grey",
+  "FN":"French Navy","FRENCH NAVY":"French Navy",
+  "YEFL":"Yellow Fluo","YELLOW FLUO":"Yellow Fluo",
+  "AZ":"Deep Navy","DEEP NAVY":"Deep Navy",
+  "GL":"Light Graphite","LIGHT GRAPHITE":"Light Graphite",
+  "30":"White","36":"Black","40":"Red","41":"Burgundy",
+  "44":"Orange","47":"Kelly Green","51":"Royal Blue",
+  "52":"Light Pink","57":"Fuchsia"
 };
 
 function canonicalWarehouseColor(v){
@@ -6458,7 +6468,7 @@ function renderMagazzino(){
     ${quickWarehouseRowHtml()}
     <div class="form-panel" id="pdfImportForm" style="${magazzinoGroupFilter==='Tessile'?'':'display:none !important;'}">
       <h3>Importa articoli da DDT / documento PDF</h3>
-      <p class="helptext" style="margin-top:0;">Per ora il riconoscimento automatico è ottimizzato per i DDT Action Wear del magazzino tessile. Controlla sempre l'anteprima prima di confermare.</p>
+      <p class="helptext" style="margin-top:0;">Il riconoscimento automatico supporta i DDT Action Wear e le Conferme d'ordine Action Wear. Prima dell'importazione vedrai sempre l'anteprima completa di codice, articolo, colore, taglia e quantità.</p>
       <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfImport(event)">
       <p id="pdfImportStatus" class="helptext"></p>
       <div id="pdfImportPreview"></div>
@@ -6595,68 +6605,262 @@ function guessArticoloCategoria(nome){
   if(n.includes("cap") || n.includes("hat") || n.includes("five")) return "Cappello";
   return "Altro tessuto";
 }
+let pdfImportDetectedFormat = "";
+
 function parseActionWearLines(lines){
-  const lineRe = /^([A-Z0-9]{3,10})\s+([A-Z]{2,4})\s+\d{5,7}\s+(.+?)\s+N\.\s+(\d+)\s*$/;
-  const sizeRe = /(\S+)\/(\d+)/g;
   const results = [];
+
+  // ------------------------------------------------------
+  // FORMATO 1: vecchi DDT Action Wear
+  // Esempio:
+  // BS010 BK 123456 Descrizione N. 10
+  // S/2 M/3 L/5
+  // ------------------------------------------------------
+  const oldLineRe = /^([A-Z0-9]{3,14})\s+([A-Z0-9]{1,6})\s+\d{5,7}\s+(.+?)\s+N\.\s+(\d+)\s*$/i;
+  const oldSizeRe = /(\S+)\/(\d+)/g;
+
   for(let i=0;i<lines.length;i++){
-    const m = lines[i].match(lineRe);
+    const line = String(lines[i]||"").replace(/\s+/g," ").trim();
+    const m = line.match(oldLineRe);
     if(!m) continue;
-    const [, codice, colore, nomeRaw, qtaTotale] = m;
-    const nome = nomeRaw.trim();
-    const nextLine = lines[i+1] || "";
-    const sizes = [...nextLine.matchAll(sizeRe)];
+
+    const [, codiceRaw, coloreRaw, nomeRaw, qtaTotale] = m;
+    const codice = String(codiceRaw||"").trim().toUpperCase();
+    const coloreDDT = String(coloreRaw||"").trim().toUpperCase();
+    const nome = String(nomeRaw||"").trim();
+
+    const nextLine = String(lines[i+1]||"").replace(/\s+/g," ").trim();
+    const sizes = [...nextLine.matchAll(oldSizeRe)];
+
     if(sizes.length){
       sizes.forEach(s=>{
-        results.push({codice, colore:canonicalWarehouseColor(colore), coloreDDT:colore, nome, taglia:s[1], quantita:parseInt(s[2],10), categoria:guessArticoloCategoria(nome), include:true});
+        results.push({
+          codice,
+          colore:canonicalWarehouseColor(coloreDDT),
+          coloreDDT,
+          nome,
+          taglia:String(s[1]||"").trim(),
+          quantita:parseInt(s[2],10),
+          categoria:guessArticoloCategoria(nome),
+          include:true
+        });
       });
     } else {
-      results.push({codice, colore:canonicalWarehouseColor(colore), coloreDDT:colore, nome, taglia:"UNICA", quantita:parseInt(qtaTotale,10), categoria:guessArticoloCategoria(nome), include:true});
+      results.push({
+        codice,
+        colore:canonicalWarehouseColor(coloreDDT),
+        coloreDDT,
+        nome,
+        taglia:"UNICA",
+        quantita:parseInt(qtaTotale,10),
+        categoria:guessArticoloCategoria(nome),
+        include:true
+      });
     }
   }
+
+  if(results.length){
+    pdfImportDetectedFormat = "DDT Action Wear";
+    return results;
+  }
+
+  // ------------------------------------------------------
+  // FORMATO 2: Conferma d'ordine Action Wear
+  //
+  // Esempio:
+  // BS201 - NY - S Evolution Polo 8 4,40 € 35,20 € ...
+  //
+  // Il prezzo unitario viene usato come "ancora" per separare
+  // con sicurezza descrizione e quantità.
+  // ------------------------------------------------------
+  const orderLineRe =
+    /^([A-Z0-9]{2,16})\s*-\s*([A-Z0-9]{1,8})\s*-\s*(\S+)\s+(.+?)\s+(\d+)\s+\d{1,4}(?:\.\d{3})*,\d{2}\s*€/i;
+
+  for(let i=0;i<lines.length;i++){
+    const line = String(lines[i]||"").replace(/\s+/g," ").trim();
+    const m = line.match(orderLineRe);
+    if(!m) continue;
+
+    const codice = String(m[1]||"").trim().toUpperCase();
+    const coloreDDT = String(m[2]||"").trim().toUpperCase();
+    const taglia = String(m[3]||"").trim().toUpperCase();
+    const nome = String(m[4]||"").trim();
+    const quantita = parseInt(m[5],10);
+
+    if(!codice || !coloreDDT || !taglia || !Number.isFinite(quantita) || quantita<=0) continue;
+
+    results.push({
+      codice,
+      colore:canonicalWarehouseColor(coloreDDT),
+      coloreDDT,
+      nome,
+      taglia,
+      quantita,
+      categoria:guessArticoloCategoria(nome),
+      include:true
+    });
+  }
+
+  if(results.length){
+    pdfImportDetectedFormat = "Conferma d'ordine Action Wear";
+  }
+
   return results;
 }
+
+function enrichPdfRowsFromCatalog(){
+  pdfParsedRows.forEach(r=>{
+    const cp = catalogProduct(r.codice);
+    if(!cp) return;
+
+    if(cp.name) r.nome = cp.name;
+    if(cp.appCategory) r.categoria = cp.appCategory;
+
+    // Se il colore del documento è già presente nel catalogo con lo stesso
+    // significato, usiamo il nome canonico del catalogo.
+    if(Array.isArray(cp.colors) && cp.colors.length){
+      const target = warehouseColorKey(r.colore);
+      const found = cp.colors.find(c=>warehouseColorKey(c)===target);
+      if(found) r.colore = canonicalWarehouseColor(found);
+    }
+  });
+}
+
 async function handlePdfImport(evt){
-  const file = evt.target.files[0]; if(!file) return;
+  const file = evt.target.files[0];
+  if(!file) return;
+
   const statusEl = document.getElementById("pdfImportStatus");
+  const previewEl = document.getElementById("pdfImportPreview");
+
+  pdfParsedRows = [];
+  pdfImportDetectedFormat = "";
+  if(previewEl) previewEl.innerHTML = "";
   statusEl.textContent = "Lettura del PDF in corso…";
+
   try{
     const lines = await extractPdfLines(file);
     pdfParsedRows = parseActionWearLines(lines);
+
     if(!pdfParsedRows.length){
-      statusEl.textContent = "Non ho riconosciuto articoli in questo PDF. Controlla che sia un DDT Action Wear nello stesso formato, oppure mandamelo in chat.";
-      document.getElementById("pdfImportPreview").innerHTML = "";
+      statusEl.textContent =
+        "Non ho riconosciuto articoli in questo PDF. Sono supportati i DDT Action Wear e le Conferme d'ordine Action Wear.";
+      if(previewEl) previewEl.innerHTML = "";
       return;
     }
-    statusEl.textContent = `Trovate ${pdfParsedRows.length} righe. Controlla e correggi prima di confermare.`;
+
+    // Carica il catalogo per mostrare già in anteprima nomi/categorie corretti.
+    try{
+      await loadCatalogoProdotti();
+      enrichPdfRowsFromCatalog();
+    }catch(e){
+      console.warn("Catalogo non disponibile durante l'anteprima PDF:", e);
+    }
+
+    const totalePezzi = pdfParsedRows.reduce((s,r)=>s+(Number(r.quantita)||0),0);
+
+    statusEl.textContent =
+      `PDF riconosciuto: ${pdfImportDetectedFormat}. ` +
+      `${pdfParsedRows.length} varianti, ${totalePezzi} pezzi totali. ` +
+      `Controlla l'anteprima prima di confermare.`;
+
     renderPdfPreview();
   }catch(err){
     console.error(err);
-    statusEl.textContent = "Errore nella lettura del PDF. Prova a mandarmelo in chat invece.";
+    statusEl.textContent =
+      "Errore nella lettura del PDF. Nessun articolo è stato aggiunto al magazzino.";
+    if(previewEl) previewEl.innerHTML = "";
   }
 }
+
 function renderPdfPreview(){
-  document.getElementById("pdfImportPreview").innerHTML = `
+  const previewEl = document.getElementById("pdfImportPreview");
+  if(!previewEl) return;
+
+  const incluse = pdfParsedRows.filter(r=>r.include && Number(r.quantita)>0);
+  const totalePezzi = incluse.reduce((s,r)=>s+(Number(r.quantita)||0),0);
+
+  previewEl.innerHTML = `
+    <div class="card" style="margin-top:14px;padding:16px;border:1px solid #B7E4C7;background:#F6FFF9;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:12px;font-weight:900;color:#187A44;text-transform:uppercase;letter-spacing:.45px;">
+            Anteprima importazione — nessun articolo è ancora stato inserito
+          </div>
+          <div style="font-size:17px;font-weight:900;margin-top:4px;">
+            ${pdfImportDetectedFormat || "Documento Action Wear"}
+          </div>
+        </div>
+        <div style="font-size:13px;font-weight:800;color:#475569;text-align:right;">
+          <div><strong>${incluse.length}</strong> varianti selezionate</div>
+          <div><strong>${totalePezzi}</strong> pezzi totali</div>
+        </div>
+      </div>
+      <div class="helptext" style="margin:10px 0 0;">
+        Controlla codice, articolo, colore, taglia e quantità. Puoi correggere i valori oppure togliere la spunta alle righe che non vuoi importare.
+        Il magazzino verrà modificato solo dopo aver premuto <strong>Conferma e importa nel magazzino</strong>.
+      </div>
+    </div>
+
     <div class="table-wrap" style="margin-top:12px;">
       <table class="lines-table">
-        <thead><tr><th></th><th>Codice</th><th>Nome</th><th>Categoria</th><th>Colore</th><th>Taglia</th><th>Quantità</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Importa</th>
+            <th>Codice</th>
+            <th>Nome</th>
+            <th>Categoria</th>
+            <th>Colore</th>
+            <th>Taglia</th>
+            <th>Quantità</th>
+          </tr>
+        </thead>
         <tbody>
           ${pdfParsedRows.map((r,i)=>`
             <tr>
-              <td><input type="checkbox" ${r.include?'checked':''} onchange="pdfParsedRows[${i}].include=this.checked"></td>
-              <td><input value="${r.codice}" onchange="pdfParsedRows[${i}].codice=this.value"></td>
-              <td><input value="${r.nome}" onchange="pdfParsedRows[${i}].nome=this.value"></td>
-              <td><select onchange="pdfParsedRows[${i}].categoria=this.value">${warehouseCategoryOptions(r.categoria)}</select></td>
-              <td><input value="${r.colore}" title="${r.coloreDDT?`Codice DDT originale: ${r.coloreDDT}`:'' }" onchange="pdfParsedRows[${i}].colore=canonicalWarehouseColor(this.value);this.value=pdfParsedRows[${i}].colore"></td>
-              <td><input value="${r.taglia}" onchange="pdfParsedRows[${i}].taglia=this.value"></td>
-              <td><input type="number" min="0" value="${r.quantita}" onchange="pdfParsedRows[${i}].quantita=Number(this.value)||0"></td>
+              <td>
+                <input type="checkbox" ${r.include?'checked':''}
+                  onchange="pdfParsedRows[${i}].include=this.checked;renderPdfPreview()">
+              </td>
+              <td>
+                <input value="${r.codice}"
+                  onchange="pdfParsedRows[${i}].codice=this.value.trim().toUpperCase();enrichPdfRowsFromCatalog();renderPdfPreview()">
+              </td>
+              <td>
+                <input value="${r.nome}"
+                  onchange="pdfParsedRows[${i}].nome=this.value">
+              </td>
+              <td>
+                <select onchange="pdfParsedRows[${i}].categoria=this.value">
+                  ${warehouseCategoryOptions(r.categoria)}
+                </select>
+              </td>
+              <td>
+                <input value="${r.colore}"
+                  title="${r.coloreDDT?`Codice documento originale: ${r.coloreDDT}`:''}"
+                  onchange="pdfParsedRows[${i}].colore=canonicalWarehouseColor(this.value);this.value=pdfParsedRows[${i}].colore">
+              </td>
+              <td>
+                <input value="${r.taglia}"
+                  onchange="pdfParsedRows[${i}].taglia=this.value.trim().toUpperCase();this.value=pdfParsedRows[${i}].taglia">
+              </td>
+              <td>
+                <input type="number" min="0" value="${r.quantita}"
+                  onchange="pdfParsedRows[${i}].quantita=Number(this.value)||0;renderPdfPreview()">
+              </td>
             </tr>`).join("")}
         </tbody>
       </table>
     </div>
+
     <div class="form-actions" style="margin-top:14px;">
-      <button class="btn btn-primary" onclick="confirmPdfImport()">Conferma e importa nel magazzino</button>
-      <button class="btn btn-outline" onclick="pdfParsedRows=[]; document.getElementById('pdfImportPreview').innerHTML=''; document.getElementById('pdfImportStatus').textContent=''; document.getElementById('pdfFileInput').value='';">Annulla</button>
+      <button class="btn btn-primary" onclick="confirmPdfImport()">
+        Conferma e importa nel magazzino
+      </button>
+      <button class="btn btn-outline"
+        onclick="pdfParsedRows=[];pdfImportDetectedFormat='';document.getElementById('pdfImportPreview').innerHTML='';document.getElementById('pdfImportStatus').textContent='';document.getElementById('pdfFileInput').value='';">
+        Annulla
+      </button>
     </div>
   `;
 }
