@@ -142,6 +142,10 @@
   .kanban-col[data-stage="external"] h4{border-left:5px solid #10B981;}
   .job-card{background:#FFFFFF;border:1px solid #D9E1EA;border-radius:14px;padding:17px 16px;margin-bottom:14px;font-size:15px;cursor:pointer;box-shadow:0 4px 14px rgba(15,23,42,.07);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
   .job-card.job-card-business,.job-card.job-card-family{border-top:1px solid #D9E1EA;}
+  .job-card.job-card-cat-stampa{background:#EEF7FF;border-color:#CFE6FA;}
+  .job-card.job-card-cat-ricamo{background:#FFF1F6;border-color:#F8D3E2;}
+  .job-card.job-card-cat-servizio{background:#EAF7F1;border-color:#BEDFCF;}
+  .job-card.job-card-cat-esterna{background:#F1FAEE;border-color:#D4EBCB;}
   .job-card:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(15,23,42,.11);border-color:#B8C5D4;}
   .job-card.job-card-importante{border:2px solid #F2B705;background:#FFFFFF;box-shadow:0 6px 18px rgba(242,183,5,.16);}
   .job-card .jc-star{color:#9A6700;font-size:12px;font-weight:800;letter-spacing:.4px;margin-bottom:8px;}
@@ -3846,7 +3850,7 @@ function compareOrdersNewestFirst(a,b){
 }
 function creditiApertiRaggruppati(){
   const map = new Map();
-  state.orders.filter(o=>o.stato==="Consegnato").forEach(o=>{
+  state.orders.filter(o=>o.stato==="Consegnato" && !o.daFatturare && !o.fatturato).forEach(o=>{
     const saldo = orderSaldo(o);
     if(saldo<=0.001) return;
     if(!map.has(o.clientId)) map.set(o.clientId, []);
@@ -3866,7 +3870,7 @@ function creditiApertiRaggruppati(){
 }
 function openCreditiCliente(clientId){
   const orders = state.orders
-    .filter(o=>o.clientId===clientId && o.stato==="Consegnato")
+    .filter(o=>o.clientId===clientId && o.stato==="Consegnato" && !o.daFatturare && !o.fatturato)
     .map(o=>({o, saldo:orderSaldo(o)}))
     .filter(x=>x.saldo>0.001)
     .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
@@ -5756,7 +5760,7 @@ function deleteOrderFromCreditiCliente(orderId, clientId){
     await reloadWarehouseFromDb();
 
     const rimasti = state.orders
-      .filter(o=>o.clientId===clientId && o.stato==="Consegnato")
+      .filter(o=>o.clientId===clientId && o.stato==="Consegnato" && !o.daFatturare && !o.fatturato)
       .map(o=>({o,saldo:orderSaldo(o)}))
       .filter(x=>x.saldo>0.001);
 
@@ -5832,11 +5836,22 @@ function renderFlusso(){
     "In produzione":{key:"production",label:"IN PRODUZIONE"},
     "Produzione esterna":{key:"external",label:"PRODUZIONE ESTERNA"}
   };
+  const jobCardCategoryClass = (o) => {
+    const righe = Array.isArray(o.righe) ? o.righe.filter(r=>r && r.categoria) : [];
+    if(righe.length !== 1) return "";
+    const categoria = String(righe[0].categoria || "").trim();
+    if(["Stampa","Allestimenti","Piccolo Formato","Stampante Xerox"].includes(categoria)) return "job-card-cat-stampa";
+    if(["Ricamo","Gadget"].includes(categoria)) return "job-card-cat-ricamo";
+    if(categoria === "Servizio") return "job-card-cat-servizio";
+    if(categoria === "Lavorazioni Esterne") return "job-card-cat-esterna";
+    return "";
+  };
   const renderCard = (o, external=false) => {
     const cl = findItem('clients', o.clientId);
     const tipoClass = cl && cl.tipo==="Family" ? "job-card-family" : "job-card-business";
     const suppliers = external ? externalSuppliers(o) : [];
-    return `<div class="job-card ${tipoClass} ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
+    const catClass = jobCardCategoryClass(o);
+    return `<div class="job-card ${tipoClass} ${catClass} ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
       ${o.importante ? `<div class="jc-star">★ IMPORTANTE</div>` : ``}
       <div class="jc-client">${clientName(o.clientId)} <span style="font-size:10px;font-weight:600;color:#94A3B8;">${o.numero?('#'+o.numero):''}</span></div>
       <div class="jc-lines">
@@ -7646,7 +7661,7 @@ function renderIncassi(){
   const incassatoNonFatturatoMese = pagamentiNonFatturatiMese
     .reduce((s,p)=>s+Number(p.importo||0),0);
   const creditiAperti = state.orders
-    .filter(o=>o.stato==="Consegnato")
+    .filter(o=>o.stato==="Consegnato" && !o.daFatturare && !o.fatturato)
     .map(o=>({o, saldo:orderSaldo(o)}))
     .filter(x=>x.saldo>0.001)
     .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
