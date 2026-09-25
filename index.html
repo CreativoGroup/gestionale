@@ -7628,12 +7628,23 @@ function paymentCategorieLabel(p){ const o = findItem('orders', p.orderId); retu
 function paymentMatchesCategoria(p, cat){ if(!cat) return true; const o = findItem('orders', p.orderId); return o ? orderCategorie(o).includes(cat) : false; }
 function renderIncassi(){
   const f = incassiFilters;
-  const totaleIncassato = state.payments.reduce((s,p)=>s+Number(p.importo),0);
-  const totaleEntrateStorico = (state.entrate||[]).reduce((s,e)=>s+Number(e.importo),0);
-  const totaleSpeseStorico = state.expenses.reduce((s,e)=>s+Number(e.importo),0);
-  const totaleCostiFissiStorico = (state.fixedCosts||[]).reduce((s,e)=>s+Number(e.importo),0);
-  const guadagnoStorico = totaleIncassato + totaleEntrateStorico - totaleSpeseStorico - totaleCostiFissiStorico;
-  const incassatoMeseCorrente = paymentsTotaleMese(currentMonth());
+  const meseCorrente = currentMonth();
+
+  // Incassi del mese corrente: comprende TUTTI i pagamenti registrati,
+  // indipendentemente dal fatto che la scheda sia fatturata oppure no.
+  const incassatoMeseCorrente = state.payments
+    .filter(p=>p.data && p.data.slice(0,7)===meseCorrente)
+    .reduce((s,p)=>s+Number(p.importo||0),0);
+
+  // Incassi del mese corrente riferiti SOLO a ordini NON fatturati.
+  const pagamentiNonFatturatiMese = state.payments.filter(p=>{
+    if(!p.data || p.data.slice(0,7)!==meseCorrente) return false;
+    const ordine=findItem("orders",p.orderId);
+    return ordine && !ordine.fatturato;
+  });
+
+  const incassatoNonFatturatoMese = pagamentiNonFatturatiMese
+    .reduce((s,p)=>s+Number(p.importo||0),0);
   const creditiAperti = state.orders
     .filter(o=>o.stato==="Consegnato")
     .map(o=>({o, saldo:orderSaldo(o)}))
@@ -7722,11 +7733,29 @@ function renderIncassi(){
       </div>
     </div>
     <div class="grid grid-auto" style="margin-bottom:18px;">
-      <div class="card stat"><p class="stat-label">Totale incassato (storico)</p><p class="stat-value">${fmtMoney(totaleIncassato)}</p></div>
-      <div class="card stat"><p class="stat-label">Incassi ordini mese corrente</p><p class="stat-value">${fmtMoney(incassatoMeseCorrente)}</p><p class="stat-sub">solo pagamenti registrati sugli ordini</p></div>
-      <div class="card stat"><p class="stat-label">Crediti aperti</p><p class="stat-value" style="${totaleCrediti>0?'color:var(--danger)':''}">${fmtMoney(totaleCrediti)}</p><p class="stat-sub">${creditiAperti.length} ordini consegnati non pagati</p></div>
-      <div class="card stat"><p class="stat-label">Guadagno netto (mese filtro)</p><p class="stat-value" style="${guadagno<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagno)}</p><p class="stat-sub">incassi ordini + altre entrate − spese − costi fissi</p></div>
-      <div class="card stat"><p class="stat-label">Guadagno netto (storico)</p><p class="stat-value" style="${guadagnoStorico<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagnoStorico)}</p><p class="stat-sub">incassi ordini + altre entrate − spese − costi fissi</p></div>
+      <div class="card stat">
+        <p class="stat-label">Totale incassato MENSILE</p>
+        <p class="stat-value">${fmtMoney(incassatoMeseCorrente)}</p>
+        <p class="stat-sub">tutti i pagamenti registrati nel mese corrente</p>
+      </div>
+
+      <div class="card stat">
+        <p class="stat-label">Incassato mensile NON fatturato</p>
+        <p class="stat-value">${fmtMoney(incassatoNonFatturatoMese)}</p>
+        <p class="stat-sub">${pagamentiNonFatturatiMese.length} pagamenti su schede non segnate come Fatturato</p>
+      </div>
+
+      <div class="card stat">
+        <p class="stat-label">Crediti aperti</p>
+        <p class="stat-value" style="${totaleCrediti>0?'color:var(--danger)':''}">${fmtMoney(totaleCrediti)}</p>
+        <p class="stat-sub">${creditiAperti.length} ordini consegnati non pagati</p>
+      </div>
+
+      <div class="card stat">
+        <p class="stat-label">Guadagno netto (mese filtro)</p>
+        <p class="stat-value" style="${guadagno<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagno)}</p>
+        <p class="stat-sub">incassi ordini + altre entrate − spese − costi fissi</p>
+      </div>
     </div>
 
     <div class="card" style="margin-bottom:22px;">
