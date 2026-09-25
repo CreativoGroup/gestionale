@@ -3583,14 +3583,24 @@ function selectWhatsappConversation(waId){
   selectedWhatsappWaId=String(waId||"");
   renderWhatsapp();
 }
-async function refreshWhatsappInbox(){
+async function refreshWhatsappInbox(silent=false){
   const {data,error}=await sb.from("whatsapp_messages").select("*").order("message_timestamp",{ascending:true});
-  if(error){ console.error(error); showToast("Errore aggiornamento WhatsApp"); return; }
+  if(error){
+    console.error(error);
+    if(!silent) showToast("Errore aggiornamento WhatsApp");
+    return;
+  }
   state.whatsappMessages=(data||[]).map(r=>fromDbRow("whatsappMessages",r));
   snapshotCollection("whatsappMessages");
-  renderWhatsapp();
-  showToast("WhatsApp aggiornato");
+  if(currentView==="whatsapp") renderWhatsapp();
+  if(!silent) showToast("WhatsApp aggiornato");
 }
+
+setInterval(()=>{
+  if(currentView==="whatsapp"){
+    refreshWhatsappInbox(true);
+  }
+},7000);
 function createLeadFromWhatsapp(waId, leadOrder=false){
   const conv=whatsappConversationGroups().find(x=>x.waId===waId);
   if(!conv) return;
@@ -3615,16 +3625,165 @@ function createOrderFromWhatsapp(waId){
   newOrderForClient(client.id);
 }
 
+
+async function sendWhatsappRequest({to,message,contactName,file}){
+  const {data:sessionData}=await sb.auth.getSession();
+  const session=sessionData?.session;
+
+  if(!session){
+    throw new Error("Sessione scaduta: accedi di nuovo");
+  }
+
+  const headers={
+    "Authorization":`Bearer ${session.access_token}`,
+    "apikey":SUPABASE_KEY
+  };
+
+  let body;
+
+  if(file){
+    const form=new FormData();
+    form.append("to",normalizeWaPhone(to));
+    form.append("message",String(message||""));
+    form.append("contactName",String(contactName||""));
+    form.append("file",file,file.name);
+    body=form;
+  }else{
+    headers["Content-Type"]="application/json";
+    body=JSON.stringify({
+      to:normalizeWaPhone(to),
+      message:String(message||""),
+      contactName:String(contactName||"")
+    });
+  }
+
+  const response=await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-send`,{
+    method:"POST",
+    headers,
+    body
+  });
+
+  let result={};
+  try{
+    result=await response.json();
+  }catch(e){
+    result={ok:false,error:"Risposta non valida dal servizio WhatsApp"};
+  }
+
+  if(!response.ok || !result.ok){
+    throw new Error(result?.error || "Errore durante l'invio WhatsApp");
+  }
+
+  return result;
+}
+
+function fillWhatsappNewPhone(){
+  const select=document.getElementById("waNewClient");
+  const phone=document.getElementById("waNewPhone");
+  if(!select || !phone) return;
+  const id=select.value;
+  const c=(state.clients||[]).find(x=>x.id===id);
+  if(c?.telefono) phone.value="+"+normalizeWaPhone(c.telefono);
+}
+
+function openNewWhatsappMessage(){
+  const clients=(state.clients||[])
+    .filter(c=>normalizeWaPhone(c.telefono))
+    .sort((a,b)=>clientDisplayName(a).localeCompare(clientDisplayName(b),"it"));
+
+  document.getElementById("modalBody").innerHTML=`
+    <div class="modal-head">
+      <div>
+        <h3 style="margin:0;">Nuovo messaggio WhatsApp</h3>
+        <p class="helptext" style="margin:5px 0 0;">Scrivi a un cliente già presente oppure inserisci manualmente un numero.</p>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="closeModal()">CHIUDI</button>
+    </div>
+
+    <div class="field">
+      <label>Cliente</label>
+      <select id="waNewClient" onchange="fillWhatsappNewPhone()">
+        <option value="">— Seleziona cliente —</option>
+        ${clients.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(clientDisplayName(c))} · ${escapeHtml(c.telefono||"")}</option>`).join("")}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Numero WhatsApp</label>
+      <input id="waNewPhone" placeholder="+39..." />
+    </div>
+
+    <div class="field">
+      <label>Messaggio</label>
+      <textarea id="waNewText" rows="6" placeholder="Scrivi il messaggio..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Allegato facoltativo</label>
+      <input id="waNewFile" type="file"
+        accept=".jpg,.jpeg,.png,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/jpeg,image/png,application/pdf" />
+      <div class="helptext" style="margin-top:5px;">Puoi allegare JPG, PNG, PDF e i principali documenti Office.</div>
+    </div>
+
+    <div class="notice" style="margin-top:12px;">
+      Se il cliente non ti ha scritto nelle ultime 24 ore, WhatsApp può richiedere un modello di messaggio approvato da Meta. In quel caso il gestionale mostrerà l'errore ricevuto.
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeModal()">ANNULLA</button>
+      <button id="waNewSendBtn" class="btn btn-primary" onclick="sendNewWhatsappMessage()">INVIA WHATSAPP</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function sendNewWhatsappMessage(){
+  const btn=document.getElementById("waNewSendBtn");
+  const phone=String(document.getElementById("waNewPhone")?.value||"").trim();
+  const message=String(document.getElementById("waNewText")?.value||"").trim();
+  const file=document.getElementById("waNewFile")?.files?.[0]||null;
+  const clientId=String(document.getElementById("waNewClient")?.value||"");
+  const client=(state.clients||[]).find(c=>c.id===clientId);
+  const contactName=client?clientDisplayName(client):"";
+
+  if(!normalizeWaPhone(phone)){
+    showToast("Inserisci il numero WhatsApp");
+    return;
+  }
+  if(!message && !file){
+    showToast("Scrivi un messaggio oppure allega un file");
+    return;
+  }
+
+  try{
+    if(btn){btn.disabled=true;btn.textContent="INVIO...";}
+    await sendWhatsappRequest({to:phone,message,contactName,file});
+    closeModal();
+    selectedWhatsappWaId=normalizeWaPhone(phone);
+    await refreshWhatsappInbox(true);
+    renderWhatsapp();
+    showToast("Messaggio WhatsApp inviato");
+  }catch(error){
+    console.error(error);
+    showToast(error.message||"Errore durante l'invio WhatsApp");
+  }finally{
+    const b=document.getElementById("waNewSendBtn");
+    if(b){b.disabled=false;b.textContent="INVIA WHATSAPP";}
+  }
+}
+
 async function sendWhatsappReply(waId){
   const conv=whatsappConversationGroups().find(x=>x.waId===waId);
   if(!conv) return;
 
   const textarea=document.getElementById("whatsappReplyText");
+  const fileInput=document.getElementById("whatsappReplyFile");
   const btn=document.getElementById("whatsappReplyBtn");
   const message=String(textarea?.value||"").trim();
+  const file=fileInput?.files?.[0]||null;
 
-  if(!message){
-    showToast("Scrivi prima un messaggio");
+  if(!message && !file){
+    showToast("Scrivi un messaggio oppure allega un file");
     return;
   }
 
@@ -3634,64 +3793,37 @@ async function sendWhatsappReply(waId){
       btn.textContent="INVIO...";
     }
     if(textarea) textarea.disabled=true;
+    if(fileInput) fileInput.disabled=true;
 
-    const {data:sessionData}=await sb.auth.getSession();
-    const session=sessionData?.session;
-
-    if(!session){
-      showToast("Sessione scaduta: accedi di nuovo");
-      return;
-    }
-
-    const response=await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-send`,{
-      method:"POST",
-      headers:{
-        "Authorization":`Bearer ${session.access_token}`,
-        "apikey":SUPABASE_KEY,
-        "Content-Type":"application/json"
-      },
-      body:JSON.stringify({
-        to:normalizeWaPhone(conv.phone||conv.waId),
-        message,
-        contactName:conv.name||""
-      })
+    await sendWhatsappRequest({
+      to:conv.phone||conv.waId,
+      message,
+      contactName:conv.name||"",
+      file
     });
 
-    let result={};
-    try{
-      result=await response.json();
-    }catch(e){
-      result={ok:false,error:"Risposta non valida dal servizio WhatsApp"};
-    }
-
-    if(!response.ok || !result.ok){
-      const err=result?.error || "Errore durante l'invio WhatsApp";
-      console.error("whatsapp-send:",result);
-      showToast(err);
-      return;
-    }
-
     if(textarea) textarea.value="";
+    if(fileInput) fileInput.value="";
 
-    await refreshWhatsappInbox();
-
-    // Mantiene aperta la conversazione appena usata.
     selectedWhatsappWaId=waId;
+    await refreshWhatsappInbox(true);
     renderWhatsapp();
 
     showToast("Messaggio WhatsApp inviato");
 
   }catch(error){
     console.error(error);
-    showToast("Errore durante l'invio WhatsApp");
+    showToast(error.message||"Errore durante l'invio WhatsApp");
   }finally{
     const btn2=document.getElementById("whatsappReplyBtn");
     const textarea2=document.getElementById("whatsappReplyText");
+    const file2=document.getElementById("whatsappReplyFile");
     if(btn2){
       btn2.disabled=false;
       btn2.textContent="INVIA WHATSAPP";
     }
     if(textarea2) textarea2.disabled=false;
+    if(file2) file2.disabled=false;
   }
 }
 
@@ -3720,6 +3852,7 @@ function renderWhatsapp(){
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <span class="pill" style="background:#ECFDF3;border-color:#A7F3D0;color:#067647;">COLLEGATO</span>
+          <button class="btn btn-primary btn-sm" onclick="openNewWhatsappMessage()">+ NUOVO MESSAGGIO</button>
           <button class="btn btn-outline btn-sm" onclick="refreshWhatsappInbox()">AGGIORNA</button>
         </div>
       </div>
@@ -3772,8 +3905,14 @@ function renderWhatsapp(){
               onkeydown="whatsappReplyKeydown(event,'${escapeHtml(active.waId)}')"
               style="width:100%;resize:vertical;margin-bottom:10px;"
             ></textarea>
+            <input
+              id="whatsappReplyFile"
+              type="file"
+              accept=".jpg,.jpeg,.png,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/jpeg,image/png,application/pdf"
+              style="width:100%;margin-bottom:10px;"
+            />
             <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-              <div class="helptext">Invio dal numero WhatsApp Business Creativò · ⌘/Ctrl + Invio per inviare</div>
+              <div class="helptext">Testo o allegato · JPG, PNG, PDF e documenti · ⌘/Ctrl + Invio per inviare</div>
               <button
                 id="whatsappReplyBtn"
                 class="btn btn-primary"
@@ -3786,7 +3925,7 @@ function renderWhatsapp(){
           </div>
         `:`<p class="empty">Seleziona una conversazione.</p>`}
       </div>
-    </div>`:`<div class="card"><h3 style="margin-top:0;">Conversazioni</h3><p class="empty">Nessun messaggio WhatsApp ricevuto. Quando arriva un messaggio, comparirà automaticamente qui.</p></div>`}
+    </div>`:`<div class="card"><h3 style="margin-top:0;">Conversazioni</h3><p class="empty">Nessuna conversazione ancora presente. Puoi attendere un messaggio in arrivo oppure usare “+ NUOVO MESSAGGIO”.</p></div>`}
   `;
 }
 
