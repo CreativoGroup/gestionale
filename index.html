@@ -3614,6 +3614,94 @@ function createOrderFromWhatsapp(waId){
   }
   newOrderForClient(client.id);
 }
+
+async function sendWhatsappReply(waId){
+  const conv=whatsappConversationGroups().find(x=>x.waId===waId);
+  if(!conv) return;
+
+  const textarea=document.getElementById("whatsappReplyText");
+  const btn=document.getElementById("whatsappReplyBtn");
+  const message=String(textarea?.value||"").trim();
+
+  if(!message){
+    showToast("Scrivi prima un messaggio");
+    return;
+  }
+
+  try{
+    if(btn){
+      btn.disabled=true;
+      btn.textContent="INVIO...";
+    }
+    if(textarea) textarea.disabled=true;
+
+    const {data:sessionData}=await sb.auth.getSession();
+    const session=sessionData?.session;
+
+    if(!session){
+      showToast("Sessione scaduta: accedi di nuovo");
+      return;
+    }
+
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-send`,{
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "apikey":SUPABASE_KEY,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        to:normalizeWaPhone(conv.phone||conv.waId),
+        message,
+        contactName:conv.name||""
+      })
+    });
+
+    let result={};
+    try{
+      result=await response.json();
+    }catch(e){
+      result={ok:false,error:"Risposta non valida dal servizio WhatsApp"};
+    }
+
+    if(!response.ok || !result.ok){
+      const err=result?.error || "Errore durante l'invio WhatsApp";
+      console.error("whatsapp-send:",result);
+      showToast(err);
+      return;
+    }
+
+    if(textarea) textarea.value="";
+
+    await refreshWhatsappInbox();
+
+    // Mantiene aperta la conversazione appena usata.
+    selectedWhatsappWaId=waId;
+    renderWhatsapp();
+
+    showToast("Messaggio WhatsApp inviato");
+
+  }catch(error){
+    console.error(error);
+    showToast("Errore durante l'invio WhatsApp");
+  }finally{
+    const btn2=document.getElementById("whatsappReplyBtn");
+    const textarea2=document.getElementById("whatsappReplyText");
+    if(btn2){
+      btn2.disabled=false;
+      btn2.textContent="INVIA WHATSAPP";
+    }
+    if(textarea2) textarea2.disabled=false;
+  }
+}
+
+function whatsappReplyKeydown(event,waId){
+  if((event.ctrlKey || event.metaKey) && event.key==="Enter"){
+    event.preventDefault();
+    sendWhatsappReply(waId);
+  }
+}
+
 function renderWhatsapp(){
   const root=document.getElementById("view-whatsapp");
   if(!root) return;
@@ -3675,7 +3763,27 @@ function renderWhatsapp(){
               </div>`;
             }).join("")}
           </div>
-          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);" class="helptext">La risposta diretta dal gestionale verrà attivata nel prossimo passaggio. Per ora questa inbox riceve e organizza i messaggi in arrivo.</div>
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="font-weight:800;margin-bottom:8px;">Rispondi su WhatsApp</div>
+            <textarea
+              id="whatsappReplyText"
+              rows="4"
+              placeholder="Scrivi il messaggio..."
+              onkeydown="whatsappReplyKeydown(event,'${escapeHtml(active.waId)}')"
+              style="width:100%;resize:vertical;margin-bottom:10px;"
+            ></textarea>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+              <div class="helptext">Invio dal numero WhatsApp Business Creativò · ⌘/Ctrl + Invio per inviare</div>
+              <button
+                id="whatsappReplyBtn"
+                class="btn btn-primary"
+                onclick="sendWhatsappReply('${escapeHtml(active.waId)}')"
+              >INVIA WHATSAPP</button>
+            </div>
+            <div class="helptext" style="margin-top:8px;">
+              I messaggi liberi sono soggetti alla finestra di assistenza prevista da WhatsApp; se Meta non consente l'invio, il gestionale mostrerà l'errore ricevuto.
+            </div>
+          </div>
         `:`<p class="empty">Seleziona una conversazione.</p>`}
       </div>
     </div>`:`<div class="card"><h3 style="margin-top:0;">Conversazioni</h3><p class="empty">Nessun messaggio WhatsApp ricevuto. Quando arriva un messaggio, comparirà automaticamente qui.</p></div>`}
