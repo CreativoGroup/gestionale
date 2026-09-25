@@ -1618,6 +1618,51 @@
   }
 
 </style>
+
+<style id="whatsapp-refine-style">
+  .wa-shell{display:grid;grid-template-columns:minmax(300px,34%) minmax(0,1fr);gap:16px;align-items:start}
+  .wa-sidebar{padding:0!important;overflow:hidden}
+  .wa-sidebar-head{padding:16px;border-bottom:1px solid var(--border)}
+  .wa-search{width:100%;margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;font:inherit;background:#fff}
+  .wa-filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .wa-filter-btn{border:1px solid var(--border);background:#fff;color:var(--muted);padding:6px 10px;border-radius:999px;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
+  .wa-filter-btn.active{background:#111827;color:#fff;border-color:#111827}
+  .wa-conv-list{max-height:68vh;overflow:auto}
+  .wa-conv-btn{width:100%;text-align:left;border:0;border-bottom:1px solid var(--border);padding:14px 16px;cursor:pointer;background:#fff}
+  .wa-conv-btn:hover{background:#F8FAFC}
+  .wa-conv-btn.active{background:#F0FDF4}
+  .wa-conv-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .wa-conv-name{font-weight:850;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wa-conv-time{font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .wa-conv-phone{font-size:12px;color:var(--muted);margin-top:3px}
+  .wa-conv-last{font-size:13px;color:var(--muted);margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wa-linked{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;border-radius:999px;padding:3px 7px;background:#ECFDF3;color:#067647;margin-top:7px}
+  .wa-unlinked{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;border-radius:999px;padding:3px 7px;background:#FFF7ED;color:#9A3412;margin-top:7px}
+  .wa-chat-card{min-width:0}
+  .wa-chat-scroll{display:flex;flex-direction:column;gap:10px;max-height:54vh;overflow:auto;padding:6px 4px 14px;scroll-behavior:smooth}
+  .wa-bubble{max-width:82%;border-radius:16px;padding:10px 12px;box-shadow:0 2px 7px rgba(15,23,42,.04)}
+  .wa-bubble.in{align-self:flex-start;background:#F3F4F6;border:1px solid #E5E7EB;border-bottom-left-radius:5px}
+  .wa-bubble.out{align-self:flex-end;background:#DCF8C6;border:1px solid #B7E4A5;border-bottom-right-radius:5px}
+  .wa-bubble-meta{font-size:10px;color:var(--muted);margin-top:5px;text-align:right;display:flex;justify-content:flex-end;gap:6px;align-items:center}
+  .wa-compose{margin-top:10px;padding-top:14px;border-top:1px solid var(--border)}
+  .wa-compose textarea{width:100%;resize:vertical;margin-bottom:10px;min-height:92px;padding:12px;border:1px solid var(--border);border-radius:14px;font:inherit}
+  .wa-file-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .wa-file-input{flex:1;min-width:220px}
+  .wa-status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+  .wa-stat{border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff}
+  .wa-stat-label{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase}
+  .wa-stat-value{font-size:20px;font-weight:900;margin-top:3px}
+  .wa-meta-wait{background:#FFF7ED!important;border-color:#FED7AA!important;color:#9A3412!important}
+  .wa-db-ok{background:#ECFDF3!important;border-color:#A7F3D0!important;color:#067647!important}
+  .wa-empty-search{padding:28px 18px;text-align:center;color:var(--muted);font-size:13px}
+  @media (max-width: 900px){
+    .wa-shell{grid-template-columns:1fr}
+    .wa-conv-list{max-height:34vh}
+    .wa-chat-scroll{max-height:48vh}
+    .wa-status-grid{grid-template-columns:1fr}
+  }
+</style>
+
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -3536,6 +3581,34 @@ async function expireStaleWaitingLeads(){
 
 /* ============ META: WHATSAPP / INSTAGRAM ============ */
 let selectedWhatsappWaId = "";
+let whatsappSearchQuery = "";
+let whatsappFilter = "all";
+
+function setWhatsappSearch(value){
+  whatsappSearchQuery=String(value||"");
+  renderWhatsapp();
+}
+function setWhatsappFilter(value){
+  whatsappFilter=String(value||"all");
+  renderWhatsapp();
+}
+function whatsappTodayCount(){
+  const today=new Date();
+  return (state.whatsappMessages||[]).filter(m=>{
+    const d=new Date(m.messageTimestamp||m.createdAt||0);
+    return !Number.isNaN(d.getTime()) &&
+      d.getFullYear()===today.getFullYear() &&
+      d.getMonth()===today.getMonth() &&
+      d.getDate()===today.getDate();
+  }).length;
+}
+function scrollWhatsappToBottom(){
+  requestAnimationFrame(()=>{
+    const el=document.getElementById("waChatScroll");
+    if(el) el.scrollTop=el.scrollHeight;
+  });
+}
+
 
 function waDateLabel(iso){
   if(!iso) return "—";
@@ -4074,97 +4147,195 @@ function whatsappReplyKeydown(event,waId){
 function renderWhatsapp(){
   const root=document.getElementById("view-whatsapp");
   if(!root) return;
-  const convs=whatsappConversationGroups();
-  if(!selectedWhatsappWaId && convs.length) selectedWhatsappWaId=convs[0].waId;
-  if(selectedWhatsappWaId && !convs.some(c=>c.waId===selectedWhatsappWaId)) selectedWhatsappWaId=convs[0]?.waId||"";
-  const active=convs.find(c=>c.waId===selectedWhatsappWaId)||null;
+
+  const allConvs=whatsappConversationGroups();
+  if(!selectedWhatsappWaId && allConvs.length) selectedWhatsappWaId=allConvs[0].waId;
+  if(selectedWhatsappWaId && !allConvs.some(c=>c.waId===selectedWhatsappWaId)) selectedWhatsappWaId=allConvs[0]?.waId||"";
+
+  const query=String(whatsappSearchQuery||"").trim().toLowerCase();
+
+  const convs=allConvs.filter(c=>{
+    const linked=!!findClientByWhatsappPhone(c.phone||c.waId);
+    if(whatsappFilter==="linked" && !linked) return false;
+    if(whatsappFilter==="unlinked" && linked) return false;
+
+    if(!query) return true;
+    const last=c.messages[c.messages.length-1]||{};
+    const hay=[
+      c.name||"",
+      c.phone||"",
+      c.waId||"",
+      last.body||""
+    ].join(" ").toLowerCase();
+
+    return hay.includes(query);
+  });
+
+  const active=allConvs.find(c=>c.waId===selectedWhatsappWaId)||null;
   const existingClient=active?findClientByWhatsappPhone(active.phone||active.waId):null;
+  const linkedCount=allConvs.filter(c=>findClientByWhatsappPhone(c.phone||c.waId)).length;
 
   root.innerHTML=`
     <div class="card" style="margin-bottom:18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
         <div>
           <h3 style="margin:0 0 6px;">WhatsApp</h3>
-          <p class="helptext" style="margin:0;">Messaggi ricevuti tramite WhatsApp Business e salvati nel gestionale.</p>
+          <p class="helptext" style="margin:0;">Inbox operativa collegata al database del gestionale.</p>
         </div>
+
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <span class="pill" style="background:#ECFDF3;border-color:#A7F3D0;color:#067647;">COLLEGATO AL DATABASE</span>
-          <button class="btn btn-outline btn-sm" onclick="openWhatsappCoexistence()">COLLEGA WHATSAPP BUSINESS</button>
+          <span class="pill wa-db-ok">DATABASE COLLEGATO</span>
+          <span class="pill wa-meta-wait">NUMERO REALE: IN ATTESA META</span>
+          <button class="btn btn-outline btn-sm" onclick="openWhatsappCoexistence()">RIPROVA COLLEGAMENTO META</button>
           <button class="btn btn-primary btn-sm" onclick="openNewWhatsappMessage()">+ NUOVO MESSAGGIO</button>
           <button class="btn btn-outline btn-sm" onclick="refreshWhatsappInbox()">AGGIORNA</button>
         </div>
       </div>
-    </div>
-    ${convs.length?`
-    <div style="display:grid;grid-template-columns:minmax(260px,34%) minmax(0,1fr);gap:16px;align-items:start;">
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div style="padding:16px;border-bottom:1px solid var(--border);font-weight:800;">Conversazioni (${convs.length})</div>
-        <div style="max-height:68vh;overflow:auto;">
-          ${convs.map(c=>{
-            const last=c.messages[c.messages.length-1]||{};
-            const activeClass=c.waId===selectedWhatsappWaId?"background:#F0FDF4;":"";
-            return `<button onclick="selectWhatsappConversation('${escapeHtml(c.waId)}')" style="width:100%;text-align:left;border:0;border-bottom:1px solid var(--border);padding:14px 16px;cursor:pointer;${activeClass}">
-              <div style="font-weight:800;color:var(--text);">${escapeHtml(c.name||c.phone||c.waId)}</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:3px;">+${escapeHtml(normalizeWaPhone(c.phone||c.waId))}</div>
-              <div style="font-size:13px;color:var(--muted);margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(last.body||"[Messaggio]")}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:5px;">${waDateLabel(last.messageTimestamp||last.createdAt)}</div>
-            </button>`;
-          }).join("")}
+
+      <div class="wa-status-grid">
+        <div class="wa-stat">
+          <div class="wa-stat-label">Conversazioni</div>
+          <div class="wa-stat-value">${allConvs.length}</div>
+        </div>
+        <div class="wa-stat">
+          <div class="wa-stat-label">Messaggi oggi</div>
+          <div class="wa-stat-value">${whatsappTodayCount()}</div>
+        </div>
+        <div class="wa-stat">
+          <div class="wa-stat-label">Clienti riconosciuti</div>
+          <div class="wa-stat-value">${linkedCount}/${allConvs.length}</div>
         </div>
       </div>
-      <div class="card">
+    </div>
+
+    ${allConvs.length?`
+    <div class="wa-shell">
+      <div class="card wa-sidebar">
+        <div class="wa-sidebar-head">
+          <div style="font-weight:850;">Conversazioni (${allConvs.length})</div>
+
+          <input
+            class="wa-search"
+            placeholder="Cerca nome, numero o messaggio..."
+            value="${escapeHtml(whatsappSearchQuery)}"
+            oninput="setWhatsappSearch(this.value)"
+          />
+
+          <div class="wa-filter-row">
+            <button class="wa-filter-btn ${whatsappFilter==="all"?"active":""}" onclick="setWhatsappFilter('all')">Tutte</button>
+            <button class="wa-filter-btn ${whatsappFilter==="linked"?"active":""}" onclick="setWhatsappFilter('linked')">Clienti</button>
+            <button class="wa-filter-btn ${whatsappFilter==="unlinked"?"active":""}" onclick="setWhatsappFilter('unlinked')">Non collegati</button>
+          </div>
+        </div>
+
+        <div class="wa-conv-list">
+          ${convs.length ? convs.map(c=>{
+            const last=c.messages[c.messages.length-1]||{};
+            const linkedClient=findClientByWhatsappPhone(c.phone||c.waId);
+            const isActive=c.waId===selectedWhatsappWaId;
+
+            return `<button
+              onclick="selectWhatsappConversation('${escapeHtml(c.waId)}')"
+              class="wa-conv-btn ${isActive?"active":""}"
+            >
+              <div class="wa-conv-top">
+                <div class="wa-conv-name">${escapeHtml(c.name||c.phone||c.waId)}</div>
+                <div class="wa-conv-time">${waDateLabel(last.messageTimestamp||last.createdAt)}</div>
+              </div>
+
+              <div class="wa-conv-phone">+${escapeHtml(normalizeWaPhone(c.phone||c.waId))}</div>
+              <div class="wa-conv-last">${last.direction==="outbound"?"Tu: ":""}${escapeHtml(last.body||`[${last.messageType||"Messaggio"}]`)}</div>
+
+              ${linkedClient
+                ? `<span class="wa-linked">✓ ${escapeHtml(clientDisplayName(linkedClient))}</span>`
+                : `<span class="wa-unlinked">Cliente non collegato</span>`
+              }
+            </button>`;
+          }).join("") : `<div class="wa-empty-search">Nessuna conversazione corrisponde alla ricerca.</div>`}
+        </div>
+      </div>
+
+      <div class="card wa-chat-card">
         ${active?`
-          <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:10px;">
             <div>
               <h3 style="margin:0 0 5px;">${escapeHtml(active.name||active.phone||active.waId)}</h3>
-              <div class="helptext">+${escapeHtml(normalizeWaPhone(active.phone||active.waId))}${existingClient?` · Cliente: <strong>${escapeHtml(clientDisplayName(existingClient))}</strong>`:" · Cliente non ancora collegato"}</div>
+              <div class="helptext" style="margin:0;">
+                +${escapeHtml(normalizeWaPhone(active.phone||active.waId))}
+                ${existingClient
+                  ? ` · Cliente collegato: <strong>${escapeHtml(clientDisplayName(existingClient))}</strong>`
+                  : ` · <strong style="color:#9A3412;">Cliente non ancora collegato</strong>`
+                }
+              </div>
             </div>
+
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-              <button class="btn btn-outline btn-sm" onclick="createLeadFromWhatsapp('${escapeHtml(active.waId)}',false)">CREA LEAD</button>
-              <button class="btn btn-primary btn-sm" onclick="createLeadFromWhatsapp('${escapeHtml(active.waId)}',true)">CREA LEAD + ORDINE</button>
-              <button class="btn btn-outline btn-sm" onclick="createOrderFromWhatsapp('${escapeHtml(active.waId)}')">CREA ORDINE</button>
+              ${!existingClient?`<button class="btn btn-outline btn-sm" onclick="createLeadFromWhatsapp('${escapeHtml(active.waId)}',false)">CREA LEAD</button>`:""}
+              ${!existingClient?`<button class="btn btn-primary btn-sm" onclick="createLeadFromWhatsapp('${escapeHtml(active.waId)}',true)">LEAD + ORDINE</button>`:""}
+              ${existingClient?`<button class="btn btn-outline btn-sm" onclick="createOrderFromWhatsapp('${escapeHtml(active.waId)}')">CREA ORDINE</button>`:""}
             </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:10px;max-height:58vh;overflow:auto;padding:4px;">
+
+          <div id="waChatScroll" class="wa-chat-scroll">
             ${active.messages.map(m=>{
               const out=m.direction==="outbound";
-              return `<div style="align-self:${out?"flex-end":"flex-start"};max-width:82%;background:${out?"#DCF8C6":"#F3F4F6"};border:1px solid ${out?"#B7E4A5":"#E5E7EB"};border-radius:14px;padding:10px 12px;">
+              const label=m.messageType && m.messageType!=="text"
+                ? `<span>${escapeHtml(m.messageType.toUpperCase())}</span>`
+                : "";
+
+              return `<div class="wa-bubble ${out?"out":"in"}">
                 <div style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(m.body||`[${m.messageType||"Messaggio"}]`)}</div>
-                <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right;">${waDateLabel(m.messageTimestamp||m.createdAt)}</div>
+                <div class="wa-bubble-meta">
+                  ${label}
+                  <span>${waDateLabel(m.messageTimestamp||m.createdAt)}</span>
+                  ${out && m.status?`<span>· ${escapeHtml(m.status)}</span>`:""}
+                </div>
               </div>`;
             }).join("")}
           </div>
-          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
-            <div style="font-weight:800;margin-bottom:8px;">Rispondi su WhatsApp</div>
+
+          <div class="wa-compose">
+            <div style="font-weight:850;margin-bottom:8px;">Rispondi su WhatsApp</div>
+
             <textarea
               id="whatsappReplyText"
               rows="4"
               placeholder="Scrivi il messaggio..."
               onkeydown="whatsappReplyKeydown(event,'${escapeHtml(active.waId)}')"
-              style="width:100%;resize:vertical;margin-bottom:10px;"
             ></textarea>
-            <input
-              id="whatsappReplyFile"
-              type="file"
-              accept=".jpg,.jpeg,.png,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/jpeg,image/png,application/pdf"
-              style="width:100%;margin-bottom:10px;"
-            />
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-              <div class="helptext">Testo o allegato · JPG, PNG, PDF e documenti · ⌘/Ctrl + Invio per inviare</div>
+
+            <div class="wa-file-row">
+              <input
+                id="whatsappReplyFile"
+                class="wa-file-input"
+                type="file"
+                accept=".jpg,.jpeg,.png,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/jpeg,image/png,application/pdf"
+              />
+
               <button
                 id="whatsappReplyBtn"
                 class="btn btn-primary"
                 onclick="sendWhatsappReply('${escapeHtml(active.waId)}')"
               >INVIA WHATSAPP</button>
             </div>
-            <div class="helptext" style="margin-top:8px;">
-              I messaggi liberi sono soggetti alla finestra di assistenza prevista da WhatsApp; se Meta non consente l'invio, il gestionale mostrerà l'errore ricevuto.
+
+            <div class="helptext" style="margin-top:8px;margin-bottom:0;">
+              Testo o allegato · JPG, PNG, PDF e documenti · ⌘/Ctrl + Invio per inviare.
+              Se Meta blocca l'invio fuori dalla finestra consentita, il gestionale mostrerà l'errore ricevuto.
             </div>
           </div>
         `:`<p class="empty">Seleziona una conversazione.</p>`}
       </div>
-    </div>`:`<div class="card"><h3 style="margin-top:0;">Conversazioni</h3><p class="empty">Nessuna conversazione ancora presente. Puoi attendere un messaggio in arrivo oppure usare “+ NUOVO MESSAGGIO”.</p></div>`}
+    </div>
+    `:`
+    <div class="card">
+      <h3 style="margin-top:0;">Conversazioni</h3>
+      <p class="empty">Nessuna conversazione ancora presente. Puoi attendere un messaggio in arrivo oppure usare “+ NUOVO MESSAGGIO”.</p>
+    </div>
+    `}
   `;
+
+  if(active) scrollWhatsappToBottom();
 }
 
 function renderMetaChannel(channel){
