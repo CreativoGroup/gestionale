@@ -1674,6 +1674,7 @@
     <section class="view" id="view-whatsapp"></section>
     <section class="view" id="view-instagram"></section>
     <section class="view" id="view-leads"></section>
+    <section class="view" id="view-leadOrdine"></section>
   </main>
 </div>
 <div class="modal-backdrop" id="modalBackdrop"><div class="modal" id="modalBody"></div></div>
@@ -1747,7 +1748,13 @@ const FORNITORI_PER_PRODOTTO_ESTERNO = {
   "Cartelline": FORNITORI_STANDARD_TIPOGRAFIA,
   "Blocco appunti": FORNITORI_STANDARD_TIPOGRAFIA
 };
-const PAY_METHODS = ["Bonifico","Contanti","Carta"];
+const PAY_METHODS = ["Contanti","Carta di Pagamento","Bonifico"];
+
+function normalizePaymentMethod(v){
+  const s=String(v||"").trim();
+  if(s==="Carta") return "Carta di Pagamento";
+  return s;
+}
 const PAY_TIPI = ["Acconto","Saldo"];
 const CLIENT_TYPES = ["Business","Family"];
 const CARATTERE_OPTIONS = ["Tra i migliori","Buon cliente","Potenziale","Ripetitivo","Grande ordine","Da coccolare","Dormiente","Da evitare"];
@@ -1915,7 +1922,7 @@ function fromDbRow(collection, r){
       const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
       return o;
     }
-    case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:r.metodo};
+    case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:normalizePaymentMethod(r.metodo)};
     case "warehouse": {
       const categoria = r.categoria || "";
       const warehouseGroup = categoria==="Gadget"
@@ -1925,9 +1932,9 @@ function fromDbRow(collection, r){
           : "Tessile";
       return {id:r.id, codice:r.codice||"", nome:r.nome, categoria, colore:r.colore||"", taglia:r.taglia||"", quantita:Number(r.quantita)||0, scortaMinima:Number(r.scorta_minima)||0, unita:r.unita||"pz", warehouseGroup};
     }
-    case "expenses": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
-    case "fixedCosts": return {id:r.id, descrizione:r.descrizione||"", importo:Number(r.importo)||0, metodo:r.metodo||"", data:r.data, filePath:r.file_path||"", fileName:r.file_name||"", createdAt:r.created_at};
-    case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:r.metodo, data:r.data};
+    case "expenses": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:normalizePaymentMethod(r.metodo), data:r.data};
+    case "fixedCosts": return {id:r.id, descrizione:r.descrizione||"", importo:Number(r.importo)||0, metodo:normalizePaymentMethod(r.metodo), data:r.data, filePath:r.file_path||"", fileName:r.file_name||"", createdAt:r.created_at};
+    case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:normalizePaymentMethod(r.metodo), data:r.data};
     case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, luogo:r.luogo||"", note:r.note||""};
     case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
     case "noteComunicazioni": return {id:r.id, tipo:r.tipo||"Chiamata", nomePersona:r.nome_persona||"", testo:r.testo||"", operatore:r.operatore||"", fatto:!!r.fatto, creatoIl:r.creato_il||"", fattoIl:r.fatto_il||""};
@@ -2746,6 +2753,7 @@ const NAV = [
   {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info e richieste"},
 
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Anagrafica"},
+  {id:"leadOrdine", label:"LEAD ORDINE", icon:"◆", subtitle:"Nuovi clienti che hanno già confermato un ordine", group:"Operativa"},
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
@@ -2877,6 +2885,7 @@ function renderTopbarActions(){
     whatsapp: ``,
     instagram: ``,
     leads: ``,
+    leadOrdine: ``,
     dashboard: `<button id="installAppBtn" class="btn btn-primary" style="display:none;" onclick="installPwa()">Installa l’app</button>`
   };
   document.getElementById("topbarActions").innerHTML = map[currentView] || "";
@@ -2885,7 +2894,7 @@ function renderCurrentView(){
   ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti, preventivi:renderPreventivi,
     ordini:renderOrdini, flusso:renderFlusso,
     magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
-    posta:renderPosta, whatsapp:()=>renderMetaChannel("whatsapp"), instagram:()=>renderMetaChannel("instagram"), leads:renderLeads})[currentView]();
+    posta:renderPosta, whatsapp:()=>renderMetaChannel("whatsapp"), instagram:()=>renderMetaChannel("instagram"), leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
 }
 let clientFormOpen = false;
 let quoteFormOpen = false;
@@ -3021,13 +3030,14 @@ function renderLeads(){
     return !q || hay.includes(q);
   };
 
-  const attivi=all.filter(l=>!l.convertedOrderId && matchesFilters(l));
-  const archiviati=all.filter(l=>!!l.convertedOrderId && matchesFilters(l));
+  const normalLeads=all.filter(l=>String(l.fonte||"")!=="gmail_ordine");
+  const attivi=normalLeads.filter(l=>!l.convertedOrderId && matchesFilters(l));
+  const archiviati=normalLeads.filter(l=>!!l.convertedOrderId && matchesFilters(l));
 
-  const nuovi=all.filter(l=>l.stato==="Nuovo").length;
-  const inAttesa=all.filter(l=>l.stato==="In attesa di conferma").length;
-  const accettati=all.filter(l=>l.stato==="Accettato").length;
-  const persi=all.filter(l=>l.stato==="Perso").length;
+  const nuovi=normalLeads.filter(l=>l.stato==="Nuovo").length;
+  const inAttesa=normalLeads.filter(l=>l.stato==="In attesa di conferma").length;
+  const accettati=normalLeads.filter(l=>l.stato==="Accettato").length;
+  const persi=normalLeads.filter(l=>l.stato==="Perso").length;
 
   const rowsAttivi = attivi.length ? `
     <table class="lead-table">
@@ -3102,6 +3112,100 @@ function renderLeads(){
         Lead per i quali è stato effettivamente creato un ordine. Lo stato è bloccato.
       </p>
       <div class="lead-table-wrap">${rowsArchiviati}</div>
+    </div>
+  `;
+}
+
+
+function renderLeadOrdine(){
+  const root=document.getElementById("view-leadOrdine");
+  if(!root) return;
+
+  const pending=[...(state.leads||[])]
+    .filter(l=>String(l.fonte||"")==="gmail_ordine" && !l.convertedOrderId)
+    .sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
+
+  const converted=[...(state.leads||[])]
+    .filter(l=>String(l.fonte||"")==="gmail_ordine" && !!l.convertedOrderId)
+    .sort((a,b)=>String(b.convertedAt||b.aggiornatoIl||"").localeCompare(String(a.convertedAt||a.aggiornatoIl||"")));
+
+  root.innerHTML=`
+    <div class="card" style="margin-bottom:18px;">
+      <div class="section-header" style="margin-bottom:8px;">
+        <div>
+          <h3 style="margin:0;">LEAD ORDINE</h3>
+          <p class="helptext" style="margin:6px 0 0;">
+            Qui arrivano i <strong>nuovi clienti</strong> per i quali da Gmail è stato premuto
+            <strong>CREA LEAD + ORDINE</strong>. Sono già nello stato <strong>Accettato</strong>:
+            devi solo controllare l'anagrafica, creare il cliente e aprire la scheda ordine.
+          </p>
+        </div>
+        <span class="pill ${pending.length?'pill-open':'pill-done'}">${pending.length} da inserire</span>
+      </div>
+
+      <div class="lead-table-wrap">
+        ${pending.length ? `
+          <table class="lead-table">
+            <thead>
+              <tr>
+                <th>Nome / Azienda</th>
+                <th>Email</th>
+                <th>Oggetto ordine</th>
+                <th>Stato</th>
+                <th>Data</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pending.map(l=>`
+                <tr>
+                  <td>
+                    <strong>${escapeHtml(leadDisplayName(l))}</strong>
+                    ${l.azienda&&l.nome?`<div style="font-size:11px;color:var(--muted);">${escapeHtml(l.nome)}</div>`:""}
+                  </td>
+                  <td>${escapeHtml(l.email||"—")}</td>
+                  <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
+                  <td><span class="lead-status-pill lead-status-ok">Accettato</span></td>
+                  <td>${fmtLeadDate(l.creatoIl)}</td>
+                  <td>
+                    <button class="btn btn-primary btn-sm" onclick="openLeadDetail('${l.id}')">
+                      APRI E CREA ORDINE
+                    </button>
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        ` : `<p class="empty">Nessun Lead Ordine da trasformare in cliente.</p>`}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-header" style="margin-bottom:8px;">
+        <h3 style="margin:0;">Lead Ordine già trasformati</h3>
+        <span style="font-size:12px;color:var(--muted);">${converted.length} completati</span>
+      </div>
+      <p class="helptext" style="margin-top:0;">
+        Qui rimane lo storico dei Lead Ordine che sono già diventati cliente + ordine.
+      </p>
+      <div class="lead-table-wrap">
+        ${converted.length ? `
+          <table class="lead-table">
+            <thead><tr><th>Nome / Azienda</th><th>Email</th><th>Oggetto</th><th>Data</th><th></th></tr></thead>
+            <tbody>
+              ${converted.map(l=>`
+                <tr>
+                  <td><strong>${escapeHtml(leadDisplayName(l))}</strong></td>
+                  <td>${escapeHtml(l.email||"—")}</td>
+                  <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
+                  <td>${fmtLeadDate(l.convertedAt||l.aggiornatoIl)}</td>
+                  <td><button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        ` : `<p class="empty">Nessun Lead Ordine completato.</p>`}
+      </div>
     </div>
   `;
 }
@@ -3182,8 +3286,10 @@ function openLeadDetail(id){
     </div>
     <div class="form-actions" style="margin-top:16px;">
       ${l.stato==="Accettato" && !l.convertedOrderId ? `
-        <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">Trasforma in cliente ed effettua ordine</button>
-        <button class="btn btn-primary" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente ed effettua ordine</button>
+        <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">
+          ${String(l.fonte||"")==="gmail_ordine" ? "TRASFORMA IN CLIENTE E CREA ORDINE" : "Trasforma in cliente ed effettua ordine"}
+        </button>
+        <button class="btn btn-outline" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente esistente e crea ordine</button>
       ` : ""}
       ${l.gmailMessageId?`<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>`:""}
       <button class="btn btn-ghost" onclick="discardLead('${l.id}');closeModal();">Scarta</button>
@@ -3207,6 +3313,7 @@ async function setLeadStatus(id,status){
   }
   showToast("Lead aggiornato");
   if(currentView==="leads") renderLeads();
+  if(currentView==="leadOrdine") renderLeadOrdine();
   if(currentView==="dashboard") renderDashboard();
 }
 
@@ -3324,6 +3431,7 @@ function deleteLead(id){
       state.leads=(state.leads||[]).filter(x=>x.id!==id);
       showToast("Lead eliminato");
       if(currentView==="leads") renderLeads();
+      if(currentView==="leadOrdine") renderLeadOrdine();
       if(currentView==="dashboard") renderDashboard();
     }
   );
@@ -3398,6 +3506,7 @@ async function expireStaleWaitingLeads(){
   }
 
   if(currentView==="leads") renderLeads();
+  if(currentView==="leadOrdine") renderLeadOrdine();
   if(currentView==="dashboard") renderDashboard();
 }
 
@@ -5520,7 +5629,6 @@ function renderOrdini(){
     (!f.search || (clientName(o.clientId)+" "+(o.descrizione||"")+" "+orderCategorieLabel(o)).toLowerCase().includes(f.search.toLowerCase()));
   const attivi = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato!=="Consegnato" && matches(o)));
   const archiviati = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato==="Consegnato" && matches(o)));
-  const fatturati = sortOrdersByInsertionDesc(state.orders.filter(o=>o.fatturato && matches(o)));
   document.getElementById("view-ordini").innerHTML = `
     <div class="form-panel ${orderFormOpen ? 'open' : ''}" id="orderForm">
       <h3>Nuovo ordine</h3>
@@ -5549,9 +5657,6 @@ function renderOrdini(){
     <h3 style="margin:26px 0 10px;">Archiviati — consegnati <span style="color:var(--muted);font-weight:500;font-size:14px;">(${archiviati.length})</span></h3>
     ${ordiniTableHtml(archiviati)}
 
-    <h3 style="margin:26px 0 10px;">FATTURATI <span style="color:var(--muted);font-weight:500;font-size:14px;">(${fatturati.length})</span></h3>
-    <p class="helptext" style="margin-top:-4px;">Qui compaiono esclusivamente le schede segnate come <strong>Fatturato</strong>, indipendentemente dal loro stato operativo.</p>
-    ${ordiniTableHtml(fatturati)}
   `;
 }
 function toggleImportante(orderId){
@@ -7415,7 +7520,7 @@ function buildMonthlyRows(year){
     const ordersInMonth = state.orders.filter(o=>o.createdAt && o.createdAt.slice(0,7)===monthKey);
     const paymentsInMonth = state.payments.filter(p=>p.data && p.data.slice(0,7)===monthKey);
     const contanti = paymentsInMonth.filter(p=>p.metodo==="Contanti").reduce((s,p)=>s+Number(p.importo),0);
-    const carta = paymentsInMonth.filter(p=>p.metodo==="Carta").reduce((s,p)=>s+Number(p.importo),0);
+    const carta = paymentsInMonth.filter(p=>normalizePaymentMethod(p.metodo)==="Carta di Pagamento").reduce((s,p)=>s+Number(p.importo),0);
     const bonifico = paymentsInMonth.filter(p=>p.metodo==="Bonifico").reduce((s,p)=>s+Number(p.importo),0);
     const soldiIncassati = contanti+carta+bonifico;
     const entrate = (state.entrate||[]).filter(e=>e.data && e.data.slice(0,7)===monthKey).reduce((s,e)=>s+Number(e.importo),0);
@@ -7535,6 +7640,14 @@ function renderIncassi(){
     .filter(x=>x.saldo>0.001)
     .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
   const totaleCrediti = creditiAperti.reduce((s,x)=>s+x.saldo,0);
+
+  const ordiniFatturati = sortOrdersByInsertionDesc(
+    state.orders.filter(o=>o.fatturato)
+  );
+  const totaleOrdiniFatturati = ordiniFatturati.reduce((s,o)=>s+orderTotale(o),0);
+  const incassatoOrdiniFatturati = ordiniFatturati.reduce((s,o)=>s+orderIncassato(o),0);
+  const saldoOrdiniFatturati = ordiniFatturati.reduce((s,o)=>s+Math.max(0,orderSaldo(o)),0);
+
   const guadagno = (paymentsTotaleMese(f.mese) + entrateTotaleMese(f.mese)) - speseTotaleMese(f.mese) - costiFissiTotaleMese(f.mese);
   const filtered = state.payments.filter(p => (!f.metodo||p.metodo===f.metodo) && paymentMatchesCategoria(p,f.categoria) && (!f.mese||p.data.slice(0,7)===f.mese));
 
@@ -7574,7 +7687,7 @@ function renderIncassi(){
       <div class="card" style="margin-bottom:18px;"><canvas id="monthlyChart" height="90"></canvas></div>
       <div class="table-wrap" style="margin-bottom:20px;overflow-x:auto;">
         <table>
-          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta</th><th>Bonifico</th><th>Totale pagamenti</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Differenza</th></tr></thead>
+          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta di Pagamento</th><th>Bonifico</th><th>Totale pagamenti</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Differenza</th></tr></thead>
           <tbody>
             ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td style="font-weight:700;">${fmtMoney(r.soldiIncassati)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td>${fmtMoney(r.costiFissi)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
             <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.costiFissi)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
@@ -7614,6 +7727,63 @@ function renderIncassi(){
       <div class="card stat"><p class="stat-label">Crediti aperti</p><p class="stat-value" style="${totaleCrediti>0?'color:var(--danger)':''}">${fmtMoney(totaleCrediti)}</p><p class="stat-sub">${creditiAperti.length} ordini consegnati non pagati</p></div>
       <div class="card stat"><p class="stat-label">Guadagno netto (mese filtro)</p><p class="stat-value" style="${guadagno<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagno)}</p><p class="stat-sub">incassi ordini + altre entrate − spese − costi fissi</p></div>
       <div class="card stat"><p class="stat-label">Guadagno netto (storico)</p><p class="stat-value" style="${guadagnoStorico<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagnoStorico)}</p><p class="stat-sub">incassi ordini + altre entrate − spese − costi fissi</p></div>
+    </div>
+
+    <div class="card" style="margin-bottom:22px;">
+      <div class="section-header" style="margin-bottom:10px;">
+        <div>
+          <h3 style="margin:0;">Ordini FATTURATI</h3>
+          <p class="helptext" style="margin:5px 0 0;">
+            Qui trovi esclusivamente gli ordini segnati come <strong>Fatturato</strong>.
+            Questa sezione è separata dallo storico pagamenti: un ordine può essere fatturato ma avere ancora un saldo da incassare.
+          </p>
+        </div>
+        <span class="pill pill-done">${ordiniFatturati.length} fatturati</span>
+      </div>
+
+      <div class="grid grid-auto" style="margin-bottom:14px;">
+        <div class="card stat">
+          <p class="stat-label">Valore ordini fatturati</p>
+          <p class="stat-value">${fmtMoney(totaleOrdiniFatturati)}</p>
+        </div>
+        <div class="card stat">
+          <p class="stat-label">Incassato su fatturati</p>
+          <p class="stat-value">${fmtMoney(incassatoOrdiniFatturati)}</p>
+        </div>
+        <div class="card stat">
+          <p class="stat-label">Saldo ancora da incassare</p>
+          <p class="stat-value" style="${saldoOrdiniFatturati>0?'color:var(--danger)':''}">${fmtMoney(saldoOrdiniFatturati)}</p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ordine</th>
+              <th>Cliente</th>
+              <th>Stato</th>
+              <th>Totale</th>
+              <th>Incassato</th>
+              <th>Saldo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ordiniFatturati.length ? ordiniFatturati.map(o=>`
+              <tr>
+                <td style="font-weight:800;">${o.numero?`#${o.numero}`:"—"}</td>
+                <td>${clientName(o.clientId)}</td>
+                <td><span class="pill ${STATUS_CLASS[o.stato]||''}">${statusDot(o.stato)}${o.stato||"—"}</span></td>
+                <td style="font-weight:800;">${fmtMoney(orderTotale(o))}</td>
+                <td>${fmtMoney(orderIncassato(o))}</td>
+                <td style="${orderSaldo(o)>0.001?'color:var(--danger);font-weight:800;':'color:var(--ok);font-weight:800;'}">${fmtMoney(orderSaldo(o))}</td>
+                <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">APRI SCHEDA</button></td>
+              </tr>
+            `).join("") : `<tr><td colspan="7" class="empty">Nessun ordine fatturato.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div class="section-header">
