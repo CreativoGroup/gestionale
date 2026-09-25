@@ -3572,6 +3572,7 @@ const whatsappMetaSignupState = {
   wabaId: "",
   phoneNumberId: "",
   event: "",
+  finished: false,
   completing: false,
   completed: false
 };
@@ -3582,6 +3583,7 @@ function resetWhatsappMetaSignupState(){
   whatsappMetaSignupState.wabaId = "";
   whatsappMetaSignupState.phoneNumberId = "";
   whatsappMetaSignupState.event = "";
+  whatsappMetaSignupState.finished = false;
   whatsappMetaSignupState.completing = false;
   whatsappMetaSignupState.completed = false;
 }
@@ -3614,12 +3616,19 @@ window.fbAsyncInit = function(){
   document.head.appendChild(js);
 })();
 
-async function completeWhatsappMetaSignup(){
+async function maybeCompleteWhatsappMetaSignup(){
   if(whatsappMetaSignupState.completed || whatsappMetaSignupState.completing) return;
 
-  if(!whatsappMetaSignupState.code && !whatsappMetaSignupState.accessToken){
-    return;
-  }
+  // Con Embedded Signup dobbiamo attendere SIA il codice OAuth
+  // SIA l'evento FINISH del flusso WhatsApp.
+  if(!whatsappMetaSignupState.finished) return;
+  if(!whatsappMetaSignupState.code && !whatsappMetaSignupState.accessToken) return;
+
+  await completeWhatsappMetaSignup();
+}
+
+async function completeWhatsappMetaSignup(){
+  if(whatsappMetaSignupState.completed || whatsappMetaSignupState.completing) return;
 
   whatsappMetaSignupState.completing = true;
 
@@ -3631,7 +3640,7 @@ async function completeWhatsappMetaSignup(){
       throw new Error("Sessione del gestionale scaduta");
     }
 
-    showToast("Meta autorizzato. Completo il collegamento WhatsApp...");
+    showToast("WhatsApp autorizzato. Completo il collegamento...");
 
     const response=await fetch(
       `${SUPABASE_URL}/functions/v1/whatsapp-coexistence-complete`,
@@ -3730,8 +3739,9 @@ window.addEventListener("message",(event)=>{
     payload.event==="FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" ||
     payload.event==="FINISH"
   ){
-    showToast("Meta ha completato l'onboarding WhatsApp");
-    completeWhatsappMetaSignup();
+    whatsappMetaSignupState.finished = true;
+    showToast("Onboarding WhatsApp completato su Meta");
+    maybeCompleteWhatsappMetaSignup();
   }else if(payload.event==="CANCEL"){
     showToast("Collegamento WhatsApp annullato");
   }else if(payload.event==="ERROR"){
@@ -3755,14 +3765,16 @@ function openWhatsappCoexistence(){
       if(response?.authResponse?.code){
         whatsappMetaSignupState.code=String(response.authResponse.code);
         console.log("Meta authorization code ricevuto");
-        completeWhatsappMetaSignup();
+        showToast("Autorizzazione Meta ricevuta. Completa il collegamento nella finestra WhatsApp.");
+        maybeCompleteWhatsappMetaSignup();
         return;
       }
 
       if(response?.authResponse?.accessToken){
         whatsappMetaSignupState.accessToken=String(response.authResponse.accessToken);
         console.log("Meta access token ricevuto");
-        completeWhatsappMetaSignup();
+        showToast("Autorizzazione Meta ricevuta. Completa il collegamento nella finestra WhatsApp.");
+        maybeCompleteWhatsappMetaSignup();
         return;
       }
 
@@ -3776,8 +3788,7 @@ function openWhatsappCoexistence(){
       override_default_response_type: true,
       extras: {
         setup: {},
-        featureType: "whatsapp_business_app_onboarding",
-        sessionInfoVersion: "3"
+        featureType: "whatsapp_business_app_onboarding"
       }
     });
   }catch(error){
