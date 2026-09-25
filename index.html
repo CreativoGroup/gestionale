@@ -3560,6 +3560,91 @@ function findClientByWhatsappPhone(phone){
     return !!cf && (cf===full || cf===local || cl===full || cl===local);
   }) || null;
 }
+
+const META_APP_ID = "2194804298099450";
+const META_WHATSAPP_CONFIG_ID = "1463176375729806";
+let metaFacebookSdkReady = false;
+
+window.fbAsyncInit = function(){
+  try{
+    FB.init({
+      appId: META_APP_ID,
+      cookie: true,
+      xfbml: false,
+      version: "v26.0"
+    });
+    metaFacebookSdkReady = true;
+    console.log("Meta SDK pronto");
+  }catch(error){
+    console.error("Errore inizializzazione Meta SDK:", error);
+  }
+};
+
+(function loadMetaSdk(){
+  if(document.getElementById("facebook-jssdk")) return;
+  const js=document.createElement("script");
+  js.id="facebook-jssdk";
+  js.async=true;
+  js.defer=true;
+  js.crossOrigin="anonymous";
+  js.src="https://connect.facebook.net/it_IT/sdk.js";
+  document.head.appendChild(js);
+})();
+
+window.addEventListener("message",(event)=>{
+  if(event.origin!=="https://www.facebook.com" && event.origin!=="https://web.facebook.com") return;
+
+  let payload=event.data;
+  if(typeof payload==="string"){
+    try{ payload=JSON.parse(payload); }catch(e){ return; }
+  }
+
+  if(!payload || payload.type!=="WA_EMBEDDED_SIGNUP") return;
+
+  console.log("WA Embedded Signup:",payload);
+
+  if(payload.event==="FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" || payload.event==="FINISH"){
+    showToast("Collegamento WhatsApp completato su Meta");
+    setTimeout(()=>refreshWhatsappInbox(true),1000);
+  }else if(payload.event==="CANCEL"){
+    showToast("Collegamento WhatsApp annullato");
+  }else if(payload.event==="ERROR"){
+    showToast("Meta ha segnalato un errore nel collegamento");
+  }
+});
+
+function openWhatsappCoexistence(){
+  if(!metaFacebookSdkReady || typeof FB==="undefined"){
+    showToast("Meta sta caricando. Riprova tra qualche secondo.");
+    return;
+  }
+
+  try{
+    FB.login(function(response){
+      console.log("Risposta Meta Coexistence:",response);
+
+      if(response?.authResponse?.code){
+        console.log("Meta authorization code ricevuto");
+        showToast("Autorizzazione Meta ricevuta. Completa tutti i passaggi nella finestra.");
+      }else if(response?.status==="unknown"){
+        showToast("Collegamento Meta non completato");
+      }
+    },{
+      config_id: META_WHATSAPP_CONFIG_ID,
+      response_type: "code",
+      override_default_response_type: true,
+      extras: {
+        setup: {},
+        featureType: "whatsapp_business_app_onboarding",
+        sessionInfoVersion: "3"
+      }
+    });
+  }catch(error){
+    console.error("Errore apertura Meta Coexistence:",error);
+    showToast("Impossibile aprire il collegamento Meta");
+  }
+}
+
 function whatsappConversationGroups(){
   const map=new Map();
   [...(state.whatsappMessages||[])]
@@ -3851,7 +3936,8 @@ function renderWhatsapp(){
           <p class="helptext" style="margin:0;">Messaggi ricevuti tramite WhatsApp Business e salvati nel gestionale.</p>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <span class="pill" style="background:#ECFDF3;border-color:#A7F3D0;color:#067647;">COLLEGATO</span>
+          <span class="pill" style="background:#ECFDF3;border-color:#A7F3D0;color:#067647;">COLLEGATO AL DATABASE</span>
+          <button class="btn btn-outline btn-sm" onclick="openWhatsappCoexistence()">COLLEGA WHATSAPP BUSINESS</button>
           <button class="btn btn-primary btn-sm" onclick="openNewWhatsappMessage()">+ NUOVO MESSAGGIO</button>
           <button class="btn btn-outline btn-sm" onclick="refreshWhatsappInbox()">AGGIORNA</button>
         </div>
