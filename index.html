@@ -1842,13 +1842,13 @@ function minimoRichiestoMagazzino(w){
 function computeScorteMonitorate(){
   return state.warehouse
     .filter(w=>{
-      const minimo = Math.max(0, Number(w.scortaMinima)||0);
+      const minimo = minimoRichiestoMagazzino(w);
       return minimo>0 && Number(w.quantita||0) <= minimo;
     })
     .map(w=>({
       ...w,
       quantita:Number(w.quantita)||0,
-      scortaMinima:Math.max(0, Number(w.scortaMinima)||0),
+      scortaMinima:minimoRichiestoMagazzino(w),
       virtuale:false
     }))
     .sort((a,b)=>
@@ -1892,7 +1892,7 @@ function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toIS
 /* ---- Mapping camelCase (app) <-> snake_case (database) ---- */
 function toDbRow(collection, o){
   switch(collection){
-    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, richiesta:o.richiesta||null, carattere:o.carattere||null, archiviato_recenti:!!o.archiviatoRecenti, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null, dropbox_folder_url:o.dropboxFolderUrl||null};
+    case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, nome_commerciale:o.nomeCommerciale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, richiesta:o.richiesta||null, carattere:o.carattere||null, archiviato_recenti:!!o.archiviatoRecenti, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null, dropbox_folder_url:o.dropboxFolderUrl||null};
     case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito};
     case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, avviso_metodo:o.avvisoMetodo||null, avvisato_il:o.avvisatoIl||null, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
@@ -1908,7 +1908,7 @@ function toDbRow(collection, o){
 }
 function fromDbRow(collection, r){
   switch(collection){
-    case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", richiesta:r.richiesta||"", carattere:r.carattere||"", archiviatoRecenti:!!r.archiviato_recenti, creatoIl:r.creato_il||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||"", dropboxFolderUrl:r.dropbox_folder_url||""};
+    case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", nomeCommerciale:r.nome_commerciale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", richiesta:r.richiesta||"", carattere:r.carattere||"", archiviatoRecenti:!!r.archiviato_recenti, creatoIl:r.creato_il||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||"", dropboxFolderUrl:r.dropbox_folder_url||""};
     case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito};
     case "orders": {
       const normalizedStatus = r.stato==="In lavorazione" ? "In preparazione grafica" : r.stato;
@@ -2147,22 +2147,78 @@ function catalogColorsForCode(code){
   const p = catalogProduct(code);
   return p && Array.isArray(p.colors) ? p.colors : [];
 }
+
+function warehouseSizeSortKey(v){
+  const raw=String(v||"").trim().toUpperCase();
+  if(!raw) return [99,999,999,""];
+
+  // Taglie bambino / età: 1/2, 3-4, 5/6, 9-11, 12, 14-15...
+  if(/^\d+(?:\s*[-/]\s*\d+)?$/.test(raw)){
+    const nums=raw.split(/[-/]/).map(n=>Number(n.trim()));
+    return [0,nums[0]||0,nums[1] ?? nums[0] ?? 0,raw];
+  }
+
+  // Taglie adulto: XXS, XS, S, M, L, XL, XXL, 3XL, 4XL...
+  const adultOrder={
+    "XXXS":0,
+    "XXS":1,
+    "XS":2,
+    "S":3,
+    "M":4,
+    "L":5,
+    "XL":6,
+    "XXL":7,
+    "2XL":7,
+    "3XL":8,
+    "XXXL":8,
+    "4XL":9,
+    "5XL":10,
+    "6XL":11,
+    "7XL":12,
+    "8XL":13
+  };
+  if(Object.prototype.hasOwnProperty.call(adultOrder,raw)){
+    return [1,adultOrder[raw],0,raw];
+  }
+
+  // UNICA sempre in fondo.
+  if(raw==="UNICA" || raw==="ONE SIZE" || raw==="ONESIZE"){
+    return [3,999,999,raw];
+  }
+
+  // Eventuali taglie non standard dopo quelle note.
+  return [2,500,500,raw];
+}
+
+function compareWarehouseSizes(a,b){
+  const ka=warehouseSizeSortKey(a);
+  const kb=warehouseSizeSortKey(b);
+  for(let i=0;i<3;i++){
+    if(ka[i]!==kb[i]) return ka[i]-kb[i];
+  }
+  return String(ka[3]).localeCompare(String(kb[3]),"it",{numeric:true,sensitivity:"base"});
+}
+
+function sortWarehouseSizes(values){
+  return [...values].sort(compareWarehouseSizes);
+}
+
 function catalogSizesForCode(code, colore=""){
   const normalized = String(code||"").trim().toUpperCase();
 
   // Fruit of the Loom Kids Premium Set-In Sweat 62-031-0 / FR620310:
   // il catalogo precedente accorpava erroneamente le taglie in "3-4-14-15".
   if(normalized==="FR620310" || normalized==="620310" || normalized==="62-031-0"){
-    return ["3-4","5-6","7-8","9-11","12-13","14-15"];
+    return sortWarehouseSizes(["3-4","5-6","7-8","9-11","12-13","14-15"]);
   }
 
   const p = catalogProduct(code);
   if(p && colore && p.colorSizes && typeof p.colorSizes==="object"){
     const target = warehouseColorKey(colore);
     const matchedKey = Object.keys(p.colorSizes).find(k=>warehouseColorKey(k)===target);
-    if(matchedKey && Array.isArray(p.colorSizes[matchedKey]) && p.colorSizes[matchedKey].length) return p.colorSizes[matchedKey];
+    if(matchedKey && Array.isArray(p.colorSizes[matchedKey]) && p.colorSizes[matchedKey].length) return sortWarehouseSizes(p.colorSizes[matchedKey]);
   }
-  if(p && Array.isArray(p.sizes) && p.sizes.length) return p.sizes;
+  if(p && Array.isArray(p.sizes) && p.sizes.length) return sortWarehouseSizes(p.sizes);
   return p ? ["UNICA"] : [];
 }
 async function prepareCatalogDatalistForOrder(orderId){
@@ -2193,7 +2249,7 @@ async function prepareCatalogDatalistForOrder(orderId){
 }
 
 /* ============ HELPER CLIENTI ============ */
-function clientDisplayName(c){ if(!c) return "—"; return c.tipo==="Business" ? c.ragioneSociale : `${c.nome||""} ${c.cognome||""}`.trim(); }
+function clientDisplayName(c){ if(!c) return "—"; return c.tipo==="Business" ? (String(c.nomeCommerciale||"").trim() || String(c.ragioneSociale||"").trim() || "—") : `${c.nome||""} ${c.cognome||""}`.trim(); }
 function clientName(id){ const c = state.clients.find(x=>x.id===id); return clientDisplayName(c); }
 
 /* ============ HELPER RIGHE / TOTALI ============ */
@@ -2208,6 +2264,7 @@ function orderSaldo(o){ return orderTotale(o) - orderIncassato(o); }
 function paymentsTotaleMese(mese){ return state.payments.filter(p=>p.data.slice(0,7)===mese).reduce((s,p)=>s+Number(p.importo),0); }
 function entrateTotaleMese(mese){ return (state.entrate||[]).filter(e=>e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
 function speseTotaleMese(mese){ return state.expenses.filter(e=>e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
+function costiFissiTotaleMese(mese){ return (state.fixedCosts||[]).filter(e=>e.data && e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
 
 /* ============ SEED DEMO ============ */
 function emptyRiga(isOrder){
@@ -2688,7 +2745,7 @@ const NAV = [
   {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi in corso e storico", group:"Info e richieste"},
   {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info e richieste"},
 
-  {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Operativa"},
+  {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Anagrafica"},
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
@@ -2703,7 +2760,7 @@ function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && cu
 function renderNav(){
   const items = visibleNav();
   const current = NAV.find(n=>n.id===currentView) || items[0];
-  const groups = ["Dashboard","Traffico","Info e richieste","Operativa","Amministrazione"];
+  const groups = ["Dashboard","Traffico","Info e richieste","Anagrafica","Operativa","Amministrazione"];
 
   const groupedButtons = groups.map(group=>{
     const groupItems = items.filter(n=>n.group===group);
@@ -3562,6 +3619,7 @@ function renderDashboard(){
       <div class="card stat clickable" onclick="openDashboardList('ritirare')"><p class="stat-label">Ordini da ritirare</p><p class="stat-value" style="${ritiriDaFare.length?'color:var(--warn)':''}">${ritiriDaFare.length}</p><p class="stat-sub">lavorazioni esterne da ritirare</p></div>
       <div class="card stat clickable" onclick="openDashboardList('preventivi')"><p class="stat-label">Preventivi in attesa</p><p class="stat-value">${preventiviAperti}</p><p class="stat-sub">bozza o inviati</p></div>
       <div class="card stat clickable" onclick="goTo('leads')"><p class="stat-label">Lead da confermare</p><p class="stat-value" style="${leadDaConfermare.length?'color:var(--accent)':''}">${leadDaConfermare.length}</p><p class="stat-sub">nuove richieste da qualificare</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('scorte')"><p class="stat-label">Avvisi magazzino</p><p class="stat-value" style="${scorteBasse.length?'color:var(--danger)':''}">${scorteBasse.length}</p><p class="stat-sub">articoli a/scorta minima</p></div>
     </div>
 
 
@@ -4036,9 +4094,10 @@ function clientFieldsHTML(prefix, existing){
       </div>
     </div>
     <div class="form-grid" id="${prefix}-business" style="margin-top:12px;">
-      <div class="field"><label>Ragione sociale / Nome azienda</label><input id="${prefix}-ragsoc" placeholder="Es. Bar Centrale Srl" value="${e.ragioneSociale||''}" list="${prefix}-ragsoc-list" autocomplete="off"></div>
-      <div class="field"><label>Nome</label><input id="${prefix}-refnome" value="${e.refNome||''}" list="${prefix}-nomi-list" autocomplete="off"></div>
-      <div class="field"><label>Cognome</label><input id="${prefix}-refcognome" value="${e.refCognome||''}" list="${prefix}-cognomi-list" autocomplete="off"></div>
+      <div class="field"><label>Ragione sociale / Azienda ufficiale</label><input id="${prefix}-ragsoc" placeholder="Es. Bar Centrale Srl" value="${e.ragioneSociale||''}" list="${prefix}-ragsoc-list" autocomplete="off"></div>
+      <div class="field"><label>Nome commerciale</label><input id="${prefix}-nomecommerciale" placeholder="Es. Bar Centrale" value="${e.nomeCommerciale||''}" autocomplete="off"><span class="helptext" style="margin:4px 0 0;">È il nome mostrato nelle schede lavoro. Se vuoto viene usata la ragione sociale.</span></div>
+      <div class="field"><label>Nome referente</label><input id="${prefix}-refnome" value="${e.refNome||''}" list="${prefix}-nomi-list" autocomplete="off"></div>
+      <div class="field"><label>Cognome referente</label><input id="${prefix}-refcognome" value="${e.refCognome||''}" list="${prefix}-cognomi-list" autocomplete="off"></div>
     </div>
     <div class="form-grid" id="${prefix}-family" style="margin-top:12px;display:none;">
       <div class="field"><label>Nome</label><input id="${prefix}-nome" value="${e.nome||''}" list="${prefix}-nomi-list" autocomplete="off"></div>
@@ -4107,13 +4166,14 @@ function updateGlobalClientSuggestions(value){
     const nome = (c.nome||c.refNome||"").toLowerCase();
     const cognome = (c.cognome||c.refCognome||"").toLowerCase();
     const ragione = (c.ragioneSociale||"").toLowerCase();
+    const commerciale = (c.nomeCommerciale||"").toLowerCase();
     const email = (c.email||"").toLowerCase();
     const piva = (c.partitaIva||"").toLowerCase();
     const telefono = (c.telefono||"");
     const telefonoDigits = telefono.replace(/\D/g, "");
     const nameForward = `${nome} ${cognome}`.trim();
     const nameReverse = `${cognome} ${nome}`.trim();
-    const searchable = [display,nome,cognome,ragione,email,piva,nameForward,nameReverse].join(" ");
+    const searchable = [display,nome,cognome,ragione,commerciale,email,piva,nameForward,nameReverse].join(" ");
     return searchable.includes(q) ||
       searchable.replace(/[^a-z0-9àèéìòù]/gi, "").includes(qCompact) ||
       (qDigits.length >= 2 && telefonoDigits.includes(qDigits));
@@ -4192,6 +4252,7 @@ async function createClientFromPrefix(prefix, existingId){
     if(!settore){ showToast("Il settore è obbligatorio per i clienti Business"); return null; }
     payload = {
       tipo, ragioneSociale,
+      nomeCommerciale:document.getElementById(`${prefix}-nomecommerciale`)?.value.trim()||"",
       refNome:document.getElementById(`${prefix}-refnome`).value.trim(),
       refCognome:document.getElementById(`${prefix}-refcognome`).value.trim(),
       settore, richiesta:"", telefono, email, ...comuni
@@ -4678,9 +4739,12 @@ function magazzinoTagliaDatalistOptions(codice,colore){
   const vals = [...new Set([...disponibili.keys(), ...catalogo])];
   vals.sort((a,b)=>{
     const qa=disponibili.get(a)||0, qb=disponibili.get(b)||0;
-    if((qa>0)!==(qb>0)) return qb>0 ? 1 : -1;
-    if(qa!==qb) return qb-qa;
-    return a.localeCompare(b,undefined,{numeric:true,sensitivity:"base"});
+
+    // Prima tutte le taglie realmente disponibili.
+    if((qa>0)!==(qb>0)) return qa>0 ? -1 : 1;
+
+    // Dentro ciascun gruppo: dalla taglia più piccola alla più grande.
+    return compareWarehouseSizes(a,b);
   });
   return vals.map(v=>{
     const q=disponibili.get(v)||0;
@@ -5456,6 +5520,7 @@ function renderOrdini(){
     (!f.search || (clientName(o.clientId)+" "+(o.descrizione||"")+" "+orderCategorieLabel(o)).toLowerCase().includes(f.search.toLowerCase()));
   const attivi = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato!=="Consegnato" && matches(o)));
   const archiviati = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato==="Consegnato" && matches(o)));
+  const fatturati = sortOrdersByInsertionDesc(state.orders.filter(o=>o.fatturato && matches(o)));
   document.getElementById("view-ordini").innerHTML = `
     <div class="form-panel ${orderFormOpen ? 'open' : ''}" id="orderForm">
       <h3>Nuovo ordine</h3>
@@ -5483,6 +5548,10 @@ function renderOrdini(){
     ${ordiniTableHtml(attivi)}
     <h3 style="margin:26px 0 10px;">Archiviati — consegnati <span style="color:var(--muted);font-weight:500;font-size:14px;">(${archiviati.length})</span></h3>
     ${ordiniTableHtml(archiviati)}
+
+    <h3 style="margin:26px 0 10px;">FATTURATI <span style="color:var(--muted);font-weight:500;font-size:14px;">(${fatturati.length})</span></h3>
+    <p class="helptext" style="margin-top:-4px;">Qui compaiono esclusivamente le schede segnate come <strong>Fatturato</strong>, indipendentemente dal loro stato operativo.</p>
+    ${ordiniTableHtml(fatturati)}
   `;
 }
 function toggleImportante(orderId){
@@ -6199,10 +6268,10 @@ function quickWarehouseSizes(code,colore=""){
   const n=String(code||"").trim().toUpperCase();
   if(n==="FR620310" || n==="620310" || n==="62-031-0")
     return ["3-4","5-6","7-8","9-11","12-13","14-15"];
-  return [...new Set([
+  return sortWarehouseSizes([...new Set([
     ...catalogSizesForCode(code,colore),
     ...existingWarehouseSizesForCode(code,colore)
-  ])];
+  ])]);
 }
 function restoreQuickWarehouseDraft(){
   const c=document.getElementById("quick-codice");
@@ -6546,7 +6615,7 @@ let magazzinoTagliaFilter = "";
 function magazzinoFilterValues(){
   const base = state.warehouse.filter(w=>Number(w.quantita)>0 && (w.warehouseGroup||"Tessile")===magazzinoGroupFilter);
   const colori = [...new Set(base.map(w=>canonicalWarehouseColor(w.colore)).filter(Boolean))].sort(compareWarehouseColors);
-  const taglie = [...new Set(base.map(w=>String(w.taglia||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"it",{numeric:true,sensitivity:"base"}));
+  const taglie = sortWarehouseSizes([...new Set(base.map(w=>String(w.taglia||"").trim()).filter(Boolean))]);
   return {colori,taglie};
 }
 function applyMagazzinoFilters(){
@@ -6568,7 +6637,7 @@ function filteredMagazzinoRows(q){
       if(codeCmp!==0) return codeCmp;
       const colorCmp = compareWarehouseColors(a.colore,b.colore);
       if(colorCmp!==0) return colorCmp;
-      return String(a.taglia||"").localeCompare(String(b.taglia||""),"it",{numeric:true,sensitivity:"base"});
+      return compareWarehouseSizes(a.taglia,b.taglia);
     });
 }
 
@@ -6593,7 +6662,7 @@ async function autoAssegnaMerceArrivata(){
       if(c!==0) return c;
       const co = compareWarehouseColors(a.colore,b.colore);
       if(co!==0) return co;
-      return String(a.taglia||"").localeCompare(String(b.taglia||""),"it",{numeric:true,sensitivity:"base"});
+      return compareWarehouseSizes(a.taglia,b.taglia);
     });
 
   for(const w of righeMagazzino){
@@ -6876,13 +6945,21 @@ async function saveWarehouseRow(id){
     scortaMinima:Math.max(0,Number(document.getElementById(`wm-${id}`)?.value)||0)
   });
   if(!saved) return;
+
+  const savedIdx=state.warehouse.findIndex(x=>x.id===saved.id);
+  if(savedIdx>=0) state.warehouse[savedIdx]=saved;
+
   await reloadWarehouseFromDb();
   const autoAssegnati = await autoAssegnaMerceArrivata();
+
   renderMagazzino();
+  renderDashboard();
+
+  const minimoSalvato=Math.max(0,Number(saved.scortaMinima)||0);
   showToast(
     autoAssegnati>0
-      ? `MAGAZZINO SALVATO · ${autoAssegnati} pz assegnati alle commesse`
-      : "MAGAZZINO SALVATO"
+      ? `MAGAZZINO SALVATO · scorta minima ${minimoSalvato} pz · ${autoAssegnati} pz assegnati alle commesse`
+      : `MAGAZZINO SALVATO · scorta minima ${minimoSalvato} pz`
   );
 }
 async function addItem(){
@@ -7307,7 +7384,8 @@ function statsInRange(startDate, endDate){
   const incassi = state.payments.filter(p=>p.data>=startDate && p.data<=endDate).reduce((s,p)=>s+Number(p.importo),0);
   const entrate = (state.entrate||[]).filter(e=>e.data>=startDate && e.data<=endDate).reduce((s,e)=>s+Number(e.importo),0);
   const spese = state.expenses.filter(e=>e.data>=startDate && e.data<=endDate).reduce((s,e)=>s+Number(e.importo),0);
-  return {incassi, entrate, spese, diff:incassi+entrate-spese};
+  const costiFissi = (state.fixedCosts||[]).filter(e=>e.data>=startDate && e.data<=endDate).reduce((s,e)=>s+Number(e.importo),0);
+  return {incassi, entrate, spese, costiFissi, diff:incassi+entrate-spese-costiFissi};
 }
 function buildDailyRows(numDays){
   const rows = [];
@@ -7353,6 +7431,56 @@ function buildMonthlyRows(year){
     };
   });
 }
+
+function openOrderValueDetails(monthKey,label){
+  const orders = state.orders
+    .filter(o=>o.createdAt && o.createdAt.slice(0,7)===monthKey)
+    .sort((a,b)=>compareOrdersNewestFirst(a,b));
+
+  const totale = orders.reduce((s,o)=>s+orderTotale(o),0);
+  const incassato = orders.reduce((s,o)=>s+orderIncassato(o),0);
+  const saldo = orders.reduce((s,o)=>s+Math.max(0,orderSaldo(o)),0);
+
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Composizione Totale Ordini — ${label}</h2>
+    <p class="helptext" style="margin-top:0;">
+      Qui vedi esattamente quali schede formano il valore “Totale Ordini”.
+      Conta la <strong>data di creazione della scheda</strong>, non la data del pagamento e non lo stato dell'ordine.
+    </p>
+    <div class="grid grid-auto" style="margin-bottom:14px;">
+      <div class="card stat"><p class="stat-label">Valore ordini</p><p class="stat-value">${fmtMoney(totale)}</p></div>
+      <div class="card stat"><p class="stat-label">Incassato su questi ordini</p><p class="stat-value">${fmtMoney(incassato)}</p></div>
+      <div class="card stat"><p class="stat-label">Saldo ancora aperto</p><p class="stat-value">${fmtMoney(saldo)}</p></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Ordine</th><th>Cliente</th><th>Creato</th><th>Stato</th><th>Imponibile</th><th>Spedizione</th><th>IVA</th><th>Sconto</th><th>Totale</th><th>Incassato</th><th>Saldo</th></tr>
+        </thead>
+        <tbody>
+          ${orders.length ? orders.map(o=>`
+            <tr>
+              <td>${o.numero?`#${o.numero}`:"—"}</td>
+              <td>${escapeHtml(clientName(o.clientId))}</td>
+              <td>${o.createdAt?fmtDate(o.createdAt.slice(0,10)):"—"}</td>
+              <td>${escapeHtml(o.stato||"—")}</td>
+              <td>${fmtMoney(orderImponibile(o))}</td>
+              <td>${fmtMoney(orderSpedizioneCosto(o))}</td>
+              <td>${fmtMoney(orderIva(o))}</td>
+              <td>${fmtMoney(Number(o.sconto)||0)}</td>
+              <td style="font-weight:800;">${fmtMoney(orderTotale(o))}</td>
+              <td>${fmtMoney(orderIncassato(o))}</td>
+              <td style="${orderSaldo(o)>0.001?'color:var(--danger);font-weight:800;':''}">${fmtMoney(orderSaldo(o))}</td>
+            </tr>`).join("") : `<tr><td colspan="11" class="empty">Nessun ordine creato in questo mese.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+    <div class="form-actions" style="margin-top:16px;"><button class="btn btn-outline" onclick="closeModal()">Chiudi</button></div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
 function openReportDetails(start, end, label){
   const pagamenti = state.payments.filter(p=>p.data>=start && p.data<=end).map(p=>({tipo:"Incasso", data:p.data, descrizione:`${clientName(p.clientId)} — ${p.tipo}`, importo:p.importo, metodo:p.metodo}));
   const entrate = (state.entrate||[]).filter(e=>e.data>=start && e.data<=end).map(e=>({tipo:"Entrata", data:e.data, descrizione:e.descrizione, importo:e.importo, metodo:e.metodo}));
@@ -7398,15 +7526,16 @@ function renderIncassi(){
   const totaleIncassato = state.payments.reduce((s,p)=>s+Number(p.importo),0);
   const totaleEntrateStorico = (state.entrate||[]).reduce((s,e)=>s+Number(e.importo),0);
   const totaleSpeseStorico = state.expenses.reduce((s,e)=>s+Number(e.importo),0);
-  const guadagnoStorico = totaleIncassato + totaleEntrateStorico - totaleSpeseStorico;
-  const incassatoMeseCorrente = paymentsTotaleMese(currentMonth()) + entrateTotaleMese(currentMonth());
+  const totaleCostiFissiStorico = (state.fixedCosts||[]).reduce((s,e)=>s+Number(e.importo),0);
+  const guadagnoStorico = totaleIncassato + totaleEntrateStorico - totaleSpeseStorico - totaleCostiFissiStorico;
+  const incassatoMeseCorrente = paymentsTotaleMese(currentMonth());
   const creditiAperti = state.orders
     .filter(o=>o.stato==="Consegnato")
     .map(o=>({o, saldo:orderSaldo(o)}))
     .filter(x=>x.saldo>0.001)
     .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
   const totaleCrediti = creditiAperti.reduce((s,x)=>s+x.saldo,0);
-  const guadagno = (paymentsTotaleMese(f.mese) + entrateTotaleMese(f.mese)) - speseTotaleMese(f.mese);
+  const guadagno = (paymentsTotaleMese(f.mese) + entrateTotaleMese(f.mese)) - speseTotaleMese(f.mese) - costiFissiTotaleMese(f.mese);
   const filtered = state.payments.filter(p => (!f.metodo||p.metodo===f.metodo) && paymentMatchesCategoria(p,f.categoria) && (!f.mese||p.data.slice(0,7)===f.mese));
 
   let reportHtml = "";
@@ -7447,16 +7576,19 @@ function renderIncassi(){
         <table>
           <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta</th><th>Bonifico</th><th>Totale pagamenti</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Differenza</th></tr></thead>
           <tbody>
-            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td>${fmtMoney(r.totaleOrdini)}</td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td style="font-weight:700;">${fmtMoney(r.soldiIncassati)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td>${fmtMoney(r.costiFissi)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
+            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td style="font-weight:700;">${fmtMoney(r.soldiIncassati)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td>${fmtMoney(r.costiFissi)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
             <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.costiFissi)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
           </tbody>
         </table>
       </div>
       <div class="card" style="margin-bottom:18px;">
         <p style="margin:0;font-size:13px;line-height:1.5;color:var(--muted);">
-          <strong>Come viene calcolato “Totale Ordini”:</strong>
-          somma il valore totale di tutte le schede ordine create nel mese (quantità × prezzo, IVA/spedizione/sconti secondo la scheda).
-          Non rappresenta gli incassi effettivi. Gli incassi reali sono separati nelle colonne Contanti, Carta e Bonifico.
+          <strong>Come leggere questi numeri:</strong><br>
+          <strong>Totale Ordini</strong> = valore delle schede create nel mese: righe (quantità × prezzo) + eventuale spedizione + eventuale IVA − sconto. Include quindi anche ordini non ancora pagati e ordini non ancora consegnati.<br>
+          <strong>Totale pagamenti</strong> = soldi realmente registrati come incasso in quel mese, indipendentemente da quando l'ordine era stato creato.<br>
+          <strong>Entrate</strong> = entrate extra non collegate agli ordini.<br>
+          <strong>Differenza</strong> = pagamenti + entrate − spese − costi fissi.<br>
+          Clicca sull'importo di <strong>Totale Ordini</strong> di un mese per vedere tutte le schede che lo compongono.
         </p>
       </div>`;
   }
@@ -7478,10 +7610,10 @@ function renderIncassi(){
     </div>
     <div class="grid grid-auto" style="margin-bottom:18px;">
       <div class="card stat"><p class="stat-label">Totale incassato (storico)</p><p class="stat-value">${fmtMoney(totaleIncassato)}</p></div>
-      <div class="card stat"><p class="stat-label">Incassato mese corrente</p><p class="stat-value">${fmtMoney(incassatoMeseCorrente)}</p></div>
+      <div class="card stat"><p class="stat-label">Incassi ordini mese corrente</p><p class="stat-value">${fmtMoney(incassatoMeseCorrente)}</p><p class="stat-sub">solo pagamenti registrati sugli ordini</p></div>
       <div class="card stat"><p class="stat-label">Crediti aperti</p><p class="stat-value" style="${totaleCrediti>0?'color:var(--danger)':''}">${fmtMoney(totaleCrediti)}</p><p class="stat-sub">${creditiAperti.length} ordini consegnati non pagati</p></div>
-      <div class="card stat"><p class="stat-label">Guadagno netto (mese filtro)</p><p class="stat-value" style="${guadagno<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagno)}</p><p class="stat-sub">incassi + entrate − spese del mese</p></div>
-      <div class="card stat"><p class="stat-label">Guadagno netto (storico)</p><p class="stat-value" style="${guadagnoStorico<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagnoStorico)}</p><p class="stat-sub">totale incassi + entrate − spese</p></div>
+      <div class="card stat"><p class="stat-label">Guadagno netto (mese filtro)</p><p class="stat-value" style="${guadagno<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagno)}</p><p class="stat-sub">incassi ordini + altre entrate − spese − costi fissi</p></div>
+      <div class="card stat"><p class="stat-label">Guadagno netto (storico)</p><p class="stat-value" style="${guadagnoStorico<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagnoStorico)}</p><p class="stat-sub">incassi ordini + altre entrate − spese − costi fissi</p></div>
     </div>
 
     <div class="section-header">
