@@ -1870,9 +1870,9 @@ function computeScorteMonitorate(){
 }
 
 /* ============ STATO ============ */
-let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[], leads:[], gmailActionStatus:[], noteComunicazioni:[]};
+let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[], leads:[], gmailActionStatus:[], noteComunicazioni:[], whatsappMessages:[]};
 let currentView = "dashboard";
-const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads", gmailActionStatus:"gmail_action_status", noteComunicazioni:"note_comunicazioni"};
+const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads", gmailActionStatus:"gmail_action_status", noteComunicazioni:"note_comunicazioni", whatsappMessages:"whatsapp_messages"};
 
 /* Sincronizzazione multi-dispositivo: salva solo le righe davvero cambiate e rilegge periodicamente Supabase. */
 const syncSnapshots = {};
@@ -1915,6 +1915,7 @@ function toDbRow(collection, o){
     case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, client_id:o.clientId||null, converted_order_id:o.convertedOrderId||null, converted_at:o.convertedAt||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
     case "noteComunicazioni": return {id:o.id, tipo:o.tipo||"Chiamata", nome_persona:o.nomePersona||null, testo:o.testo||null, operatore:o.operatore||null, fatto:!!o.fatto, creato_il:o.creatoIl||new Date().toISOString(), fatto_il:o.fattoIl||null};
     case "gmailActionStatus": return {id:o.id, gmail_message_id:o.gmailMessageId, replied:!!o.replied, lead_generated:!!o.leadGenerated, order_generated:!!o.orderGenerated, updated_at:o.updatedAt||new Date().toISOString()};
+    case "whatsappMessages": return {id:o.id, whatsapp_message_id:o.whatsappMessageId||null, wa_id:o.waId||null, contact_name:o.contactName||null, from_number:o.fromNumber||null, phone_number_id:o.phoneNumberId||null, display_phone_number:o.displayPhoneNumber||null, direction:o.direction||"inbound", message_type:o.messageType||null, body:o.body||null, message_timestamp:o.messageTimestamp||null, status:o.status||null, raw_payload:o.rawPayload||null, created_at:o.createdAt||null};
   }
 }
 function fromDbRow(collection, r){
@@ -1943,6 +1944,7 @@ function fromDbRow(collection, r){
     case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
     case "noteComunicazioni": return {id:r.id, tipo:r.tipo||"Chiamata", nomePersona:r.nome_persona||"", testo:r.testo||"", operatore:r.operatore||"", fatto:!!r.fatto, creatoIl:r.creato_il||"", fattoIl:r.fatto_il||""};
     case "gmailActionStatus": return {id:r.id, gmailMessageId:r.gmail_message_id||"", replied:!!r.replied, leadGenerated:!!r.lead_generated, orderGenerated:!!r.order_generated, updatedAt:r.updated_at||""};
+    case "whatsappMessages": return {id:r.id, whatsappMessageId:r.whatsapp_message_id||"", waId:r.wa_id||"", contactName:r.contact_name||"", fromNumber:r.from_number||"", phoneNumberId:r.phone_number_id||"", displayPhoneNumber:r.display_phone_number||"", direction:r.direction||"inbound", messageType:r.message_type||"", body:r.body||"", messageTimestamp:r.message_timestamp||r.created_at||"", status:r.status||"", rawPayload:r.raw_payload||null, createdAt:r.created_at||""};
   }
 }
 
@@ -2896,7 +2898,7 @@ function renderCurrentView(){
   ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti,
     ordini:renderOrdini, flusso:renderFlusso,
     magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
-    posta:renderPosta, whatsapp:()=>renderMetaChannel("whatsapp"), instagram:()=>renderMetaChannel("instagram"), leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
+    posta:renderPosta, whatsapp:renderWhatsapp, instagram:()=>renderMetaChannel("instagram"), leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
 }
 let clientFormOpen = false;
 let quoteFormOpen = false;
@@ -3308,7 +3310,7 @@ function openLeadDetail(id){
     <div class="form-actions" style="margin-top:16px;">
       ${l.stato==="Accettato" && !l.convertedOrderId ? `
         <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">
-          ${String(l.fonte||"")==="gmail_ordine" ? "TRASFORMA IN CLIENTE E CREA ORDINE" : "Trasforma in cliente ed effettua ordine"}
+          ${["gmail_ordine","whatsapp_ordine"].includes(String(l.fonte||"")) ? "TRASFORMA IN CLIENTE E CREA ORDINE" : "Trasforma in cliente ed effettua ordine"}
         </button>
         <button class="btn btn-outline" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente esistente e crea ordine</button>
       ` : ""}
@@ -3532,26 +3534,169 @@ async function expireStaleWaitingLeads(){
 }
 
 
-/* ============ META: WHATSAPP / INSTAGRAM (struttura pronta, connessione da attivare) ============ */
+/* ============ META: WHATSAPP / INSTAGRAM ============ */
+let selectedWhatsappWaId = "";
+
+function waDateLabel(iso){
+  if(!iso) return "—";
+  try{
+    return new Intl.DateTimeFormat("it-IT",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date(iso));
+  }catch(e){ return "—"; }
+}
+function normalizeWaPhone(v){
+  let s=String(v||"").replace(/\D/g,"");
+  if(s.startsWith("00")) s=s.slice(2);
+  return s;
+}
+function localWaPhone(v){
+  let s=normalizeWaPhone(v);
+  if(s.startsWith("39") && s.length>=11) s=s.slice(2);
+  return s;
+}
+function findClientByWhatsappPhone(phone){
+  const full=normalizeWaPhone(phone), local=localWaPhone(phone);
+  return (state.clients||[]).find(c=>{
+    const cf=normalizeWaPhone(c.telefono), cl=localWaPhone(c.telefono);
+    return !!cf && (cf===full || cf===local || cl===full || cl===local);
+  }) || null;
+}
+function whatsappConversationGroups(){
+  const map=new Map();
+  [...(state.whatsappMessages||[])]
+    .sort((a,b)=>String(a.messageTimestamp||a.createdAt||"").localeCompare(String(b.messageTimestamp||b.createdAt||"")))
+    .forEach(m=>{
+      const key=String(m.waId||m.fromNumber||"").trim();
+      if(!key) return;
+      if(!map.has(key)) map.set(key,{waId:key,name:m.contactName||key,phone:m.fromNumber||key,messages:[]});
+      const g=map.get(key);
+      if(m.contactName) g.name=m.contactName;
+      if(m.fromNumber) g.phone=m.fromNumber;
+      g.messages.push(m);
+    });
+  return [...map.values()].sort((a,b)=>{
+    const ad=a.messages[a.messages.length-1]?.messageTimestamp||a.messages[a.messages.length-1]?.createdAt||"";
+    const bd=b.messages[b.messages.length-1]?.messageTimestamp||b.messages[b.messages.length-1]?.createdAt||"";
+    return String(bd).localeCompare(String(ad));
+  });
+}
+function selectWhatsappConversation(waId){
+  selectedWhatsappWaId=String(waId||"");
+  renderWhatsapp();
+}
+async function refreshWhatsappInbox(){
+  const {data,error}=await sb.from("whatsapp_messages").select("*").order("message_timestamp",{ascending:true});
+  if(error){ console.error(error); showToast("Errore aggiornamento WhatsApp"); return; }
+  state.whatsappMessages=(data||[]).map(r=>fromDbRow("whatsappMessages",r));
+  snapshotCollection("whatsappMessages");
+  renderWhatsapp();
+  showToast("WhatsApp aggiornato");
+}
+function createLeadFromWhatsapp(waId, leadOrder=false){
+  const conv=whatsappConversationGroups().find(x=>x.waId===waId);
+  if(!conv) return;
+  const body=conv.messages.map(m=>`${m.direction==="outbound"?"Creativò":"Cliente"}: ${m.body||""}`).join("\n");
+  openManualLeadForm({
+    nome:conv.name||"",
+    telefono:"+"+normalizeWaPhone(conv.phone||conv.waId),
+    oggettoRichiesta:"Richiesta WhatsApp",
+    richiesta:body,
+    stato:leadOrder?"Accettato":"Nuovo",
+    fonte:leadOrder?"whatsapp_ordine":"whatsapp"
+  });
+}
+function createOrderFromWhatsapp(waId){
+  const conv=whatsappConversationGroups().find(x=>x.waId===waId);
+  if(!conv) return;
+  const client=findClientByWhatsappPhone(conv.phone||conv.waId);
+  if(!client){
+    showToast("Cliente non trovato: usa CREA LEAD + ORDINE");
+    return;
+  }
+  newOrderForClient(client.id);
+}
+function renderWhatsapp(){
+  const root=document.getElementById("view-whatsapp");
+  if(!root) return;
+  const convs=whatsappConversationGroups();
+  if(!selectedWhatsappWaId && convs.length) selectedWhatsappWaId=convs[0].waId;
+  if(selectedWhatsappWaId && !convs.some(c=>c.waId===selectedWhatsappWaId)) selectedWhatsappWaId=convs[0]?.waId||"";
+  const active=convs.find(c=>c.waId===selectedWhatsappWaId)||null;
+  const existingClient=active?findClientByWhatsappPhone(active.phone||active.waId):null;
+
+  root.innerHTML=`
+    <div class="card" style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+          <h3 style="margin:0 0 6px;">WhatsApp</h3>
+          <p class="helptext" style="margin:0;">Messaggi ricevuti tramite WhatsApp Business e salvati nel gestionale.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="pill" style="background:#ECFDF3;border-color:#A7F3D0;color:#067647;">COLLEGATO</span>
+          <button class="btn btn-outline btn-sm" onclick="refreshWhatsappInbox()">AGGIORNA</button>
+        </div>
+      </div>
+    </div>
+    ${convs.length?`
+    <div style="display:grid;grid-template-columns:minmax(260px,34%) minmax(0,1fr);gap:16px;align-items:start;">
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:16px;border-bottom:1px solid var(--border);font-weight:800;">Conversazioni (${convs.length})</div>
+        <div style="max-height:68vh;overflow:auto;">
+          ${convs.map(c=>{
+            const last=c.messages[c.messages.length-1]||{};
+            const activeClass=c.waId===selectedWhatsappWaId?"background:#F0FDF4;":"";
+            return `<button onclick="selectWhatsappConversation('${escapeHtml(c.waId)}')" style="width:100%;text-align:left;border:0;border-bottom:1px solid var(--border);padding:14px 16px;cursor:pointer;${activeClass}">
+              <div style="font-weight:800;color:var(--text);">${escapeHtml(c.name||c.phone||c.waId)}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px;">+${escapeHtml(normalizeWaPhone(c.phone||c.waId))}</div>
+              <div style="font-size:13px;color:var(--muted);margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(last.body||"[Messaggio]")}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:5px;">${waDateLabel(last.messageTimestamp||last.createdAt)}</div>
+            </button>`;
+          }).join("")}
+        </div>
+      </div>
+      <div class="card">
+        ${active?`
+          <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:14px;">
+            <div>
+              <h3 style="margin:0 0 5px;">${escapeHtml(active.name||active.phone||active.waId)}</h3>
+              <div class="helptext">+${escapeHtml(normalizeWaPhone(active.phone||active.waId))}${existingClient?` · Cliente: <strong>${escapeHtml(clientDisplayName(existingClient))}</strong>`:" · Cliente non ancora collegato"}</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+              <button class="btn btn-outline btn-sm" onclick="createLeadFromWhatsapp('${escapeHtml(active.waId)}',false)">CREA LEAD</button>
+              <button class="btn btn-primary btn-sm" onclick="createLeadFromWhatsapp('${escapeHtml(active.waId)}',true)">CREA LEAD + ORDINE</button>
+              <button class="btn btn-outline btn-sm" onclick="createOrderFromWhatsapp('${escapeHtml(active.waId)}')">CREA ORDINE</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;max-height:58vh;overflow:auto;padding:4px;">
+            ${active.messages.map(m=>{
+              const out=m.direction==="outbound";
+              return `<div style="align-self:${out?"flex-end":"flex-start"};max-width:82%;background:${out?"#DCF8C6":"#F3F4F6"};border:1px solid ${out?"#B7E4A5":"#E5E7EB"};border-radius:14px;padding:10px 12px;">
+                <div style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(m.body||`[${m.messageType||"Messaggio"}]`)}</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right;">${waDateLabel(m.messageTimestamp||m.createdAt)}</div>
+              </div>`;
+            }).join("")}
+          </div>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);" class="helptext">La risposta diretta dal gestionale verrà attivata nel prossimo passaggio. Per ora questa inbox riceve e organizza i messaggi in arrivo.</div>
+        `:`<p class="empty">Seleziona una conversazione.</p>`}
+      </div>
+    </div>`:`<div class="card"><h3 style="margin-top:0;">Conversazioni</h3><p class="empty">Nessun messaggio WhatsApp ricevuto. Quando arriva un messaggio, comparirà automaticamente qui.</p></div>`}
+  `;
+}
+
 function renderMetaChannel(channel){
-  const isWa=channel==="whatsapp";
   const root=document.getElementById("view-"+channel);
   if(!root) return;
-  const label=isWa?"WhatsApp":"Instagram";
+  const label=channel==="instagram"?"Instagram":"Meta";
   root.innerHTML=`
     <div class="card" style="margin-bottom:18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
         <div>
           <h3 style="margin:0 0 6px;">${label}</h3>
-          <p class="helptext" style="margin:0;">Area predisposta per il traffico Meta. La connessione verrà attivata quando saranno disponibili account/numero Business.</p>
+          <p class="helptext" style="margin:0;">Area predisposta per il traffico Meta. La connessione di questo canale non è ancora attiva.</p>
         </div>
         <span class="pill">NON COLLEGATO</span>
       </div>
     </div>
-    <div class="card">
-      <h3 style="margin-top:0;">Conversazioni</h3>
-      <p class="empty">Nessun canale ${label} collegato. Questa sezione è già pronta nel menu e non salva messaggi o allegati finché non configuriamo la connessione Meta.</p>
-    </div>`;
+    <div class="card"><h3 style="margin-top:0;">Conversazioni</h3><p class="empty">Nessun canale ${label} collegato.</p></div>`;
 }
 
 /* ============ NOTE: CHIAMATE E COMUNICAZIONI ============ */
