@@ -147,7 +147,7 @@
   .job-card.job-card-cat-servizio{background:#EAF7F1;border-color:#BEDFCF;}
   .job-card.job-card-cat-esterna{background:#F1FAEE;border-color:#D4EBCB;}
   .job-card:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(15,23,42,.11);border-color:#B8C5D4;}
-  .job-card.job-card-importante{border:2px solid #F2B705;background:#FFFFFF;box-shadow:0 6px 18px rgba(242,183,5,.16);}
+  .job-card.job-card-importante{border:2px solid #F2B705;box-shadow:0 6px 18px rgba(242,183,5,.16);}
   .job-card .jc-star{color:#9A6700;font-size:12px;font-weight:800;letter-spacing:.4px;margin-bottom:8px;}
   .job-card .jc-client{font-weight:800;font-size:17px;line-height:1.25;margin-bottom:8px;color:#172033;}
   .job-card .jc-cat{color:#0F766E;font-size:13.5px;font-weight:700;margin-bottom:7px;}
@@ -1697,14 +1697,14 @@ let currentUser = null;
 let gmailAutoRefreshTimer = null; // {id, email, role}
 
 /* ============ CONFIGURAZIONE ============ */
-const CATEGORIES = ["Stampa","Ricamo","Servizio","Gadget","Allestimenti","Piccolo Formato","Lavorazioni Esterne"];
+const CATEGORIES = ["Stampa","Ricamo","Servizio","Gadget","Allestimenti","Stampante Xerox","Lavorazioni Esterne"];
 const PRODOTTI_PER_CATEGORIA = {
   "Stampa": ["Tessuto del cliente","T-shirt","Polo","Felpa","Shopper","Cappello","Altro"],
   "Ricamo": ["Tessuto del cliente","T-shirt","Polo","Felpa","Shopper","Cappello","Patch","Altro"],
   "Servizio": ["Logo","Sito","Grafica pubblicitaria","Altro"],
   "Gadget": ["Penna","USB","Tessera","Tazza","Borraccia","Tela canvas","Altro"],
   "Allestimenti": ["Sticker","Prespaziato","Poster","Banner","Velcro","Altro"],
-  "Piccolo Formato": ["Biglietti da visita","A4","A3","Carta adesiva","Altro"],
+  "Stampante Xerox": ["Biglietti da visita","A4","A3","Carta adesiva","Altro"],
   "Lavorazioni Esterne": ["Tipografia","Serigrafia","Grande Formato","Piccolo Formato","Biglietti da visita","Volantini","Pieghevoli","Cartelline","Blocco appunti","Gadget","Altro"]
 };
 const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone"];
@@ -2753,7 +2753,6 @@ const NAV = [
   {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico"},
 
   {id:"note", label:"Note", icon:"✎", subtitle:"Chiamate e comunicazioni interne da gestire", group:"Info e richieste"},
-  {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi in corso e storico", group:"Info e richieste"},
   {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info e richieste"},
 
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Anagrafica"},
@@ -2877,7 +2876,6 @@ function renderTopbarActions(){
   const map = {
     note: `<button class="btn btn-primary" onclick="document.getElementById('nota-persona')?.focus()">+ Nuova nota</button>`,
     clienti: `<button class="btn btn-primary" onclick="toggleForm('clientForm')">+ Nuovo cliente</button>`,
-    preventivi: `<button class="btn btn-primary" onclick="toggleForm('quoteForm')">+ Nuovo preventivo</button>`,
     ordini: `<button class="btn btn-primary" onclick="pendingLeadOrderConversion=null;toggleForm('orderForm')">+ Nuovo ordine</button>`,
     magazzino: ``,
     lavoriCompletati: ``,
@@ -2895,7 +2893,7 @@ function renderTopbarActions(){
   document.getElementById("topbarActions").innerHTML = map[currentView] || "";
 }
 function renderCurrentView(){
-  ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti, preventivi:renderPreventivi,
+  ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti,
     ordini:renderOrdini, flusso:renderFlusso,
     magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
     posta:renderPosta, whatsapp:()=>renderMetaChannel("whatsapp"), instagram:()=>renderMetaChannel("instagram"), leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
@@ -3261,9 +3259,28 @@ async function saveManualLead(fonte='manuale'){
   const ok=await upsertOne('leads',lead);
   if(!ok){if(btn){btn.disabled=false;btn.textContent='Salva Lead';}return;}
   if(!state.leads.some(x=>x.id===lead.id)) state.leads.unshift(lead);
+
+  // Se il Lead nasce da una Nota, la Nota viene archiviata automaticamente.
+  if(String(fonte||"").startsWith("nota:")){
+    const noteId=String(fonte).slice(5);
+    const n=findItem("noteComunicazioni",noteId);
+    if(n){
+      n.fatto=true;
+      n.fattoIl=new Date().toISOString();
+      const savedNote=await upsertOneReturning("noteComunicazioni",n);
+      if(savedNote){
+        const ni=state.noteComunicazioni.findIndex(x=>x.id===noteId);
+        if(ni>=0) state.noteComunicazioni[ni]=savedNote;
+      }
+    }
+  }
+
   closeModal();
-  renderLeads();
+  if(currentView==="note") renderNote();
+  else renderLeads();
+
   showToast('Lead creato');
+  setTimeout(()=>openLeadDetail(lead.id),80);
 }
 
 function openLeadDetail(id){
@@ -3600,7 +3617,10 @@ function renderNote(){
             <div style="margin-top:8px;white-space:pre-wrap;">${escapeHtml(n.testo||"")}</div>
             <div class="lr-sub" style="margin-top:7px;">${escapeHtml(noteDateLabel(n.creatoIl))}</div>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="markNotaFatta('${n.id}')">FATTO</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+            <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">TRASFORMA IN LEAD</button>
+            <button class="btn btn-primary btn-sm" onclick="markNotaFatta('${n.id}')">FATTO</button>
+          </div>
         </div>`).join("") : `<p class="empty">Nessuna chiamata o comunicazione da gestire.</p>`}
     </div>
 
@@ -3623,6 +3643,25 @@ function renderNote(){
     </div>
   `;
 }
+
+function trasformaNotaInLead(id){
+  const n=findItem("noteComunicazioni",id);
+  if(!n) return;
+
+  const tipoLabel=n.tipo==="Chiamata" ? "Chiamata" : "Comunicazione";
+
+  openManualLeadForm({
+    nome:n.nomePersona||"",
+    azienda:"",
+    email:"",
+    telefono:"",
+    oggettoRichiesta:`${tipoLabel} - ${n.nomePersona||"Nuovo contatto"}`,
+    richiesta:n.testo||"",
+    stato:"Nuovo",
+    fonte:`nota:${n.id}`
+  });
+}
+
 async function addNotaComunicazione(){
   const tipo=String(noteDraft.tipo||document.getElementById("nota-tipo")?.value||"Chiamata");
   const nomePersona=String(noteDraft.nomePersona||document.getElementById("nota-persona")?.value||"").trim();
@@ -3730,7 +3769,6 @@ function renderDashboard(){
       <div class="card stat clickable" onclick="openDashboardList('fatturare')"><p class="stat-label">Schede da fatturare</p><p class="stat-value" style="${daFatturare.length?'color:var(--accent)':''}">${daFatturare.length}</p><p class="stat-sub">contrassegnate "da fatturare"</p></div>
       <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${pezziDaOrdinare?'color:var(--teal)':''}">${pezziDaOrdinare}</p><p class="stat-sub">pezzi confermati da ordinare</p></div>
       <div class="card stat clickable" onclick="openDashboardList('ritirare')"><p class="stat-label">Ordini da ritirare</p><p class="stat-value" style="${ritiriDaFare.length?'color:var(--warn)':''}">${ritiriDaFare.length}</p><p class="stat-sub">lavorazioni esterne da ritirare</p></div>
-      <div class="card stat clickable" onclick="openDashboardList('preventivi')"><p class="stat-label">Preventivi in attesa</p><p class="stat-value">${preventiviAperti}</p><p class="stat-sub">bozza o inviati</p></div>
       <div class="card stat clickable" onclick="goTo('leads')"><p class="stat-label">Lead da confermare</p><p class="stat-value" style="${leadDaConfermare.length?'color:var(--accent)':''}">${leadDaConfermare.length}</p><p class="stat-sub">nuove richieste da qualificare</p></div>
       <div class="card stat clickable" onclick="openDashboardList('scorte')"><p class="stat-label">Avvisi magazzino</p><p class="stat-value" style="${scorteBasse.length?'color:var(--danger)':''}">${scorteBasse.length}</p><p class="stat-sub">articoli a/scorta minima</p></div>
     </div>
@@ -4121,7 +4159,6 @@ function openDashboardList(type){
     materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
     ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato!=="Consegnato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"))},
     avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato && orderPendingPickupRows(o).length===0)},
-    preventivi: {title:"Preventivi in attesa", items: state.quotes.filter(q=>q.stato==="Bozza"||q.stato==="Inviato"), isQuote:true},
     scorte: {title:"Articoli sotto scorta", items: computeScorteMonitorate(), isStock:true}
   };
   const cfg = configs[type];
@@ -5836,14 +5873,34 @@ function renderFlusso(){
     "In produzione":{key:"production",label:"IN PRODUZIONE"},
     "Produzione esterna":{key:"external",label:"PRODUZIONE ESTERNA"}
   };
+  const jobCardCategoryGroup = (categoria) => {
+    const c = String(categoria || "").trim();
+    if(["Stampa","Allestimenti","Piccolo Formato","Stampante Xerox"].includes(c)) return "azzurro";
+    if(["Ricamo","Gadget"].includes(c)) return "rosa";
+    if(c === "Servizio") return "servizio";
+    if(c === "Lavorazioni Esterne") return "esterna";
+    return "";
+  };
+
   const jobCardCategoryClass = (o) => {
     const righe = Array.isArray(o.righe) ? o.righe.filter(r=>r && r.categoria) : [];
-    if(righe.length !== 1) return "";
-    const categoria = String(righe[0].categoria || "").trim();
-    if(["Stampa","Allestimenti","Piccolo Formato","Stampante Xerox"].includes(categoria)) return "job-card-cat-stampa";
-    if(["Ricamo","Gadget"].includes(categoria)) return "job-card-cat-ricamo";
-    if(categoria === "Servizio") return "job-card-cat-servizio";
-    if(categoria === "Lavorazioni Esterne") return "job-card-cat-esterna";
+    if(!righe.length) return "";
+
+    const gruppi = [...new Set(
+      righe
+        .map(r=>jobCardCategoryGroup(r.categoria))
+        .filter(Boolean)
+    )];
+
+    // Colora anche una scheda con più righe, ma solo quando TUTTE
+    // appartengono allo stesso gruppo-colore.
+    if(gruppi.length !== 1) return "";
+    if(righe.some(r=>jobCardCategoryGroup(r.categoria)!==gruppi[0])) return "";
+
+    if(gruppi[0] === "azzurro") return "job-card-cat-stampa";
+    if(gruppi[0] === "rosa") return "job-card-cat-ricamo";
+    if(gruppi[0] === "servizio") return "job-card-cat-servizio";
+    if(gruppi[0] === "esterna") return "job-card-cat-esterna";
     return "";
   };
   const renderCard = (o, external=false) => {
@@ -5855,7 +5912,10 @@ function renderFlusso(){
       ${o.importante ? `<div class="jc-star">★ IMPORTANTE</div>` : ``}
       <div class="jc-client">${clientName(o.clientId)} <span style="font-size:10px;font-weight:600;color:#94A3B8;">${o.numero?('#'+o.numero):''}</span></div>
       <div class="jc-lines">
-        ${(o.righe||[]).filter(r=>r.categoria).map(r=>`<div class="jc-line">${r.categoria}${r.prodotto?' — '+r.prodotto:''} <span style="color:#64748B;font-weight:600;">×${r.quantita}</span></div>`).join("") || `<div class="jc-line" style="color:#64748B">Nessuna categoria assegnata</div>`}
+        ${(o.righe||[]).filter(r=>r.categoria).map(r=>{
+          const catLabel = r.categoria==="Piccolo Formato" ? "Stampante Xerox" : r.categoria;
+          return `<div class="jc-line">${catLabel}${r.prodotto?' — '+r.prodotto:''} <span style="color:#64748B;font-weight:600;">×${r.quantita}</span></div>`;
+        }).join("") || `<div class="jc-line" style="color:#64748B">Nessuna categoria assegnata</div>`}
         ${external ? `<div class="jc-line" style="margin-top:6px;color:#475569;font-weight:600;">Fornitore: <strong style="color:#172033;">${suppliers.length?suppliers.join(', '):'da indicare'}</strong></div>` : ``}
       </div>
       ${(()=>{const b=bozzaCardMeta(o);return `<div class="jc-bozza-wrap"><span class="jc-bozza-title">GESTIONE BOZZA</span><span class="jc-bozza-badge ${b.cls}">${b.label}</span></div>`;})()}
