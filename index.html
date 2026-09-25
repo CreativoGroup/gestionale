@@ -3563,16 +3563,38 @@ function findClientByWhatsappPhone(phone){
 
 const META_APP_ID = "2194804298099450";
 const META_WHATSAPP_CONFIG_ID = "1463176375729806";
+
 let metaFacebookSdkReady = false;
+
+const whatsappMetaSignupState = {
+  code: "",
+  accessToken: "",
+  wabaId: "",
+  phoneNumberId: "",
+  event: "",
+  completing: false,
+  completed: false
+};
+
+function resetWhatsappMetaSignupState(){
+  whatsappMetaSignupState.code = "";
+  whatsappMetaSignupState.accessToken = "";
+  whatsappMetaSignupState.wabaId = "";
+  whatsappMetaSignupState.phoneNumberId = "";
+  whatsappMetaSignupState.event = "";
+  whatsappMetaSignupState.completing = false;
+  whatsappMetaSignupState.completed = false;
+}
 
 window.fbAsyncInit = function(){
   try{
     FB.init({
       appId: META_APP_ID,
       cookie: true,
-      xfbml: false,
+      xfbml: true,
       version: "v26.0"
     });
+
     metaFacebookSdkReady = true;
     console.log("Meta SDK pronto");
   }catch(error){
@@ -3582,6 +3604,7 @@ window.fbAsyncInit = function(){
 
 (function loadMetaSdk(){
   if(document.getElementById("facebook-jssdk")) return;
+
   const js=document.createElement("script");
   js.id="facebook-jssdk";
   js.async=true;
@@ -3591,25 +3614,129 @@ window.fbAsyncInit = function(){
   document.head.appendChild(js);
 })();
 
+async function completeWhatsappMetaSignup(){
+  if(whatsappMetaSignupState.completed || whatsappMetaSignupState.completing) return;
+
+  if(!whatsappMetaSignupState.code && !whatsappMetaSignupState.accessToken){
+    return;
+  }
+
+  whatsappMetaSignupState.completing = true;
+
+  try{
+    const {data:sessionData}=await sb.auth.getSession();
+    const session=sessionData?.session;
+
+    if(!session){
+      throw new Error("Sessione del gestionale scaduta");
+    }
+
+    showToast("Meta autorizzato. Completo il collegamento WhatsApp...");
+
+    const response=await fetch(
+      `${SUPABASE_URL}/functions/v1/whatsapp-coexistence-complete`,
+      {
+        method:"POST",
+        headers:{
+          "Authorization":`Bearer ${session.access_token}`,
+          "apikey":SUPABASE_KEY,
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          code:whatsappMetaSignupState.code || null,
+          accessToken:whatsappMetaSignupState.accessToken || null,
+          wabaId:whatsappMetaSignupState.wabaId || null,
+          phoneNumberId:whatsappMetaSignupState.phoneNumberId || null,
+          event:whatsappMetaSignupState.event || null
+        })
+      }
+    );
+
+    let result={};
+
+    try{
+      result=await response.json();
+    }catch(e){
+      result={ok:false,error:"Risposta non valida dal servizio Meta"};
+    }
+
+    if(!response.ok || !result?.ok){
+      throw new Error(result?.error || "Collegamento WhatsApp non completato");
+    }
+
+    whatsappMetaSignupState.completed = true;
+
+    const statusParts = [
+      result.displayPhoneNumber || "",
+      result.platformType ? `• ${result.platformType}` : "",
+      result.codeVerificationStatus ? `• ${result.codeVerificationStatus}` : ""
+    ].filter(Boolean).join(" ");
+
+    console.log("WhatsApp Coexistence completata:",result);
+
+    showToast(
+      statusParts
+        ? `WhatsApp collegato: ${statusParts}`
+        : "WhatsApp Business collegato correttamente"
+    );
+
+    setTimeout(()=>refreshWhatsappInbox(true),700);
+
+  }catch(error){
+    console.error("Errore completamento WhatsApp Coexistence:",error);
+    showToast(
+      error instanceof Error
+        ? error.message
+        : "Errore durante il collegamento WhatsApp"
+    );
+  }finally{
+    whatsappMetaSignupState.completing = false;
+  }
+}
+
 window.addEventListener("message",(event)=>{
-  if(event.origin!=="https://www.facebook.com" && event.origin!=="https://web.facebook.com") return;
+  if(
+    event.origin!=="https://www.facebook.com" &&
+    event.origin!=="https://web.facebook.com"
+  ){
+    return;
+  }
 
   let payload=event.data;
+
   if(typeof payload==="string"){
-    try{ payload=JSON.parse(payload); }catch(e){ return; }
+    try{
+      payload=JSON.parse(payload);
+    }catch(e){
+      return;
+    }
   }
 
   if(!payload || payload.type!=="WA_EMBEDDED_SIGNUP") return;
 
   console.log("WA Embedded Signup:",payload);
 
-  if(payload.event==="FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" || payload.event==="FINISH"){
-    showToast("Collegamento WhatsApp completato su Meta");
-    setTimeout(()=>refreshWhatsappInbox(true),1000);
+  whatsappMetaSignupState.event=String(payload.event||"");
+
+  if(payload?.data?.waba_id){
+    whatsappMetaSignupState.wabaId=String(payload.data.waba_id);
+  }
+
+  if(payload?.data?.phone_number_id){
+    whatsappMetaSignupState.phoneNumberId=String(payload.data.phone_number_id);
+  }
+
+  if(
+    payload.event==="FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" ||
+    payload.event==="FINISH"
+  ){
+    showToast("Meta ha completato l'onboarding WhatsApp");
+    completeWhatsappMetaSignup();
   }else if(payload.event==="CANCEL"){
     showToast("Collegamento WhatsApp annullato");
   }else if(payload.event==="ERROR"){
-    showToast("Meta ha segnalato un errore nel collegamento");
+    const msg=payload?.data?.error_message || "Meta ha segnalato un errore nel collegamento";
+    showToast(msg);
   }
 });
 
@@ -3619,18 +3746,32 @@ function openWhatsappCoexistence(){
     return;
   }
 
+  resetWhatsappMetaSignupState();
+
   try{
     FB.login(function(response){
       console.log("Risposta Meta Coexistence:",response);
 
       if(response?.authResponse?.code){
+        whatsappMetaSignupState.code=String(response.authResponse.code);
         console.log("Meta authorization code ricevuto");
-        showToast("Autorizzazione Meta ricevuta. Completa tutti i passaggi nella finestra.");
-      }else if(response?.status==="unknown"){
+        completeWhatsappMetaSignup();
+        return;
+      }
+
+      if(response?.authResponse?.accessToken){
+        whatsappMetaSignupState.accessToken=String(response.authResponse.accessToken);
+        console.log("Meta access token ricevuto");
+        completeWhatsappMetaSignup();
+        return;
+      }
+
+      if(response?.status==="unknown"){
         showToast("Collegamento Meta non completato");
       }
     },{
       config_id: META_WHATSAPP_CONFIG_ID,
+      auth_type: "rerequest",
       response_type: "code",
       override_default_response_type: true,
       extras: {
