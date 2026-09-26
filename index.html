@@ -3217,8 +3217,8 @@ function renderLeadOrdine(){
                   <td><span class="lead-status-pill lead-status-ok">Accettato</span></td>
                   <td>${fmtLeadDate(l.creatoIl)}</td>
                   <td>
-                    <button class="btn btn-primary btn-sm" onclick="openLeadDetail('${l.id}')">
-                      APRI E CREA ORDINE
+                    <button class="btn btn-primary btn-sm" style="border-radius:999px;padding:9px 15px;font-weight:800;box-shadow:0 4px 10px rgba(240,91,55,.18);" onclick="openLeadDetail('${l.id}')">
+                      ✦ APRI E CREA ORDINE
                     </button>
                   </td>
                 </tr>
@@ -3248,7 +3248,7 @@ function renderLeadOrdine(){
                   <td>${escapeHtml(l.email||"—")}</td>
                   <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
                   <td>${fmtLeadDate(l.convertedAt||l.aggiornatoIl)}</td>
-                  <td><button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button></td>
+                  <td><button class="btn btn-outline btn-sm" style="border-radius:999px;padding:8px 14px;font-weight:700;" onclick="openLeadDetail('${l.id}')">VEDI DETTAGLI</button></td>
                 </tr>
               `).join("")}
             </tbody>
@@ -3353,15 +3353,15 @@ function openLeadDetail(id){
       <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(l.richiesta||"—")}</div></div>
     </div>
     <div class="form-actions" style="margin-top:16px;">
-      <button class="btn btn-outline" onclick="openEditLead('${l.id}')">MODIFICA LEAD</button>
+      <button class="btn btn-outline" style="${String(l.fonte||"")==="gmail_ordine" ? "border-radius:999px;padding:11px 18px;font-weight:800;" : ""}" onclick="openEditLead('${l.id}')">✎ MODIFICA LEAD</button>
       ${l.stato==="Accettato" && !l.convertedOrderId ? `
-        <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">
-          ${["gmail_ordine","whatsapp_ordine"].includes(String(l.fonte||"")) ? "TRASFORMA IN CLIENTE E CREA ORDINE" : "Trasforma in cliente ed effettua ordine"}
+        <button class="btn btn-primary" style="${String(l.fonte||"")==="gmail_ordine" ? "border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" : ""}" onclick="transformLeadToClient('${l.id}', true)">
+          ${["gmail_ordine","whatsapp_ordine"].includes(String(l.fonte||"")) ? "✓ TRASFORMA IN CLIENTE E CREA ORDINE" : "Trasforma in cliente ed effettua ordine"}
         </button>
-        <button class="btn btn-outline" onclick="linkLeadToExistingClient('${l.id}')">Collega a cliente esistente e crea ordine</button>
+        <button class="btn btn-outline" style="${String(l.fonte||"")==="gmail_ordine" ? "border-radius:999px;padding:11px 18px;font-weight:800;" : ""}" onclick="linkLeadToExistingClient('${l.id}')">↗ COLLEGA A CLIENTE ESISTENTE E CREA ORDINE</button>
       ` : ""}
-      ${l.gmailMessageId?`<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>`:""}
-      <button class="btn btn-ghost" onclick="discardLead('${l.id}');closeModal();">Scarta</button>
+      ${l.gmailMessageId && String(l.fonte||"")!=="gmail_ordine" ? `<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>` : ""}
+      <button class="btn btn-ghost" style="${String(l.fonte||"")==="gmail_ordine" ? "border-radius:999px;padding:10px 16px;color:var(--muted);font-weight:700;" : ""}" onclick="discardLead('${l.id}');closeModal();">SCARTA</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
@@ -4640,7 +4640,7 @@ function renderDashboard(){
   const scorteBasse = computeScorteMonitorate();
   const completatiDaConsegnare = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato==="Completato"));
   const daSpedire = state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato");
-  const daFatturare = state.orders.filter(o=>o.daFatturare && !o.fatturato);
+  const daFatturare = state.orders.filter(o=>o.daFatturare && !o.fatturato && (o.stato==="Completato" || o.stato==="Consegnato"));
   const ordiniImportanti = state.orders.filter(o=>o.importante && o.stato!=="Consegnato");
   const magazzinoDaOrdinare = computeMagazzinoDaOrdinare();
   const pezziDaOrdinare = magazzinoDaOrdinare.reduce((s,x)=>s + Number(x.entry.daOrdinareQty||0), 0);
@@ -4652,7 +4652,7 @@ function renderDashboard(){
     if(sa!==sb) return sa-sb;
     return clientName(a.clientId).localeCompare(clientName(b.clientId));
   });
-  const ritiriDaFare = state.orders.filter(o=>o.stato!=="Consegnato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"));
+  const ritiriDaFare = state.orders.filter(o=>o.stato==="Completato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"));
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
   const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
@@ -5048,10 +5048,10 @@ function openDashboardList(type){
     attivi: {title:"Ordini attivi", items: state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato")},
     completati: {title:"Completati da consegnare", items: state.orders.filter(o=>o.stato==="Completato")},
     spedire: {title:"Ordini da spedire", items: state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato")},
-    fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato), isFatturare:true},
+    fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato && (o.stato==="Completato" || o.stato==="Consegnato")), isFatturare:true},
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
     materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
-    ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato!=="Consegnato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"))},
+    ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato==="Completato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"))},
     avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato && orderPendingPickupRows(o).length===0)},
     scorte: {title:"Articoli sotto scorta", items: computeScorteMonitorate(), isStock:true}
   };
