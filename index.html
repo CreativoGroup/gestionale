@@ -4708,8 +4708,8 @@ function renderDashboard(){
             <td>${clientName(o.clientId)}</td>
             <td class="mobile-hide">${orderCategorieLabel(o)}</td>
             <td class="mobile-hide">${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : ""}</td>
+            <td class="mobile-hide"><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">AGGIUNGI PAGAMENTO</button></td>
             <td>${completedOrderStageButton(o)}</td>
-            <td class="mobile-hide"><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">Scheda</button></td>
           </tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`}
       </div>
@@ -6458,14 +6458,14 @@ function renderCompletedDeliveryRows(list){
   return list.length ? `
     <div class="table-wrap" style="box-shadow:none;">
       <table>
-        <thead><tr><th>Cliente</th><th>Lavorazione</th><th>Fornitore</th><th>Stato cliente</th><th></th></tr></thead>
+        <thead><tr><th>Cliente</th><th>Lavorazione</th><th>Fornitore</th><th>Pagamento</th><th>Stato cliente</th></tr></thead>
         <tbody>${list.map(o=>`
           <tr>
             <td><strong>${clientName(o.clientId)}</strong></td>
             <td>${orderCategorieLabel(o)}</td>
             <td>${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : "—"}</td>
+            <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">AGGIUNGI PAGAMENTO</button></td>
             <td>${completedOrderStageButton(o)}</td>
-            <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">Scheda</button></td>
           </tr>`).join("")}</tbody>
       </table>
     </div>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`;
