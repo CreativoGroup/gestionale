@@ -6923,7 +6923,7 @@ function openJobCard(orderId){
         <label class="checkfield"><input type="checkbox" ${o.importante?'checked':''} onchange="updateOrderCheck('${o.id}','importante',this.checked)"> <span class="star ${o.importante?'active':''}" style="font-size:18px;">★</span> Importante</label>
         ${o.consegnaTipo==="Spedizione" ? `<label class="checkfield"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Spedito</label>` : ``}
         ${o.daFatturare ? `<label class="checkfield"><input type="checkbox" ${o.fatturato?'checked':''} onchange="updateOrderCheck('${o.id}','fatturato',this.checked)"> Fatturato</label>` : ``}
-        ${o.stato==="Completato" ? `<label class="checkfield"><input type="checkbox" ${o.clienteAvvisato?'checked':''} onchange="updateOrderCheck('${o.id}','clienteAvvisato',this.checked)"> Cliente avvisato</label>` : ``}
+        ${o.stato==="Completato" ? `<label class="checkfield"><input type="checkbox" ${o.clienteAvvisato?'checked':''} onchange="setClienteAvvisatoFromCard('${o.id}',this.checked)"> Cliente avvisato</label>` : ``}
         </div>
       </div>
     </div>
@@ -7119,11 +7119,102 @@ function renderFasiGrouped(o){
   `).join("");
 }
 function toggleStep(orderId, idx){ const o = findItem('orders',orderId); o.fasi[idx].completata = !o.fasi[idx].completata; saveState('orders'); }
-function updateOrderField(orderId, field, value){
-  findItem('orders',orderId)[field] = value; saveState('orders');
-  if(field==='stato') openJobCard(orderId);
+async function updateOrderField(orderId, field, value){
+  const o=findItem('orders',orderId);
+  if(!o) return;
+
+  const oldValue=o[field];
+  o[field]=value;
+
+  // Lo stato della scheda deve essere salvato subito e non deve essere
+  // annullato quando si chiude la scheda con la X.
+  if(field==='stato'){
+    const saved=await upsertOneReturning('orders',o);
+    if(!saved){
+      o[field]=oldValue;
+      showToast("Stato non aggiornato: riprova");
+      openJobCard(orderId);
+      return;
+    }
+
+    const i=state.orders.findIndex(x=>x.id===orderId);
+    if(i>=0) state.orders[i]=saved;
+
+    // Aggiorna anche lo snapshot della scheda: la X non deve ripristinare
+    // il vecchio stato già salvato nel database.
+    if(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId){
+      jobCardEditSnapshot.order=JSON.parse(JSON.stringify(saved));
+    }
+
+    openJobCard(orderId);
+    renderCurrentView();
+    showToast(`Stato aggiornato: ${value}`);
+    return;
+  }
+
+  saveState('orders');
 }
-function updateOrderCheck(orderId, field, checked){ findItem('orders',orderId)[field] = checked; saveState('orders'); openJobCard(orderId); }
+
+async function setClienteAvvisatoFromCard(orderId, checked){
+  const o=findItem('orders',orderId);
+  if(!o) return;
+
+  const before=JSON.parse(JSON.stringify(o));
+
+  o.clienteAvvisato=!!checked;
+  if(checked){
+    o.avvisoMetodo=o.avvisoMetodo || "Manuale";
+    o.avvisatoIl=o.avvisatoIl || new Date().toISOString();
+  }else{
+    o.avvisoMetodo="";
+    o.avvisatoIl="";
+  }
+
+  const saved=await upsertOneReturning('orders',o);
+  if(!saved){
+    const i=state.orders.findIndex(x=>x.id===orderId);
+    if(i>=0) state.orders[i]=before;
+    showToast("Stato cliente non aggiornato: riprova");
+    openJobCard(orderId);
+    return;
+  }
+
+  const i=state.orders.findIndex(x=>x.id===orderId);
+  if(i>=0) state.orders[i]=saved;
+
+  if(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId){
+    jobCardEditSnapshot.order=JSON.parse(JSON.stringify(saved));
+  }
+
+  openJobCard(orderId);
+  renderCurrentView();
+  showToast(checked ? "Cliente segnato AVVISATO" : "Cliente rimesso DA AVVISARE");
+}
+
+async function updateOrderCheck(orderId, field, checked){
+  const o=findItem('orders',orderId);
+  if(!o) return;
+
+  const oldValue=o[field];
+  o[field]=checked;
+
+  const saved=await upsertOneReturning('orders',o);
+  if(!saved){
+    o[field]=oldValue;
+    showToast("Modifica non salvata: riprova");
+    openJobCard(orderId);
+    return;
+  }
+
+  const i=state.orders.findIndex(x=>x.id===orderId);
+  if(i>=0) state.orders[i]=saved;
+
+  if(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId){
+    jobCardEditSnapshot.order=JSON.parse(JSON.stringify(saved));
+  }
+
+  openJobCard(orderId);
+}
 function deletePaymentFromCard(paymentId, orderId){
   state.payments = state.payments.filter(p=>p.id!==paymentId); dbDelete('payments', paymentId); openJobCard(orderId);
 }
