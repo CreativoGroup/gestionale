@@ -8486,20 +8486,45 @@ function buildMonthlyRows(year){
     const monthKey = `${year}-${mm}`;
     const ordersInMonth = state.orders.filter(o=>o.createdAt && o.createdAt.slice(0,7)===monthKey);
     const paymentsInMonth = state.payments.filter(p=>p.data && p.data.slice(0,7)===monthKey);
-    const contanti = paymentsInMonth.filter(p=>p.metodo==="Contanti").reduce((s,p)=>s+Number(p.importo),0);
-    const carta = paymentsInMonth.filter(p=>normalizePaymentMethod(p.metodo)==="Carta di Pagamento").reduce((s,p)=>s+Number(p.importo),0);
-    const bonifico = paymentsInMonth.filter(p=>p.metodo==="Bonifico").reduce((s,p)=>s+Number(p.importo),0);
+
+    // Separazione richiesta:
+    // - "Pagamenti" = incassi collegati a schede NON fatturate
+    // - "Pagamenti fatturati" = incassi collegati a schede fatturate
+    const paymentsFatturati = paymentsInMonth.filter(p=>{
+      const ordine=findItem("orders",p.orderId);
+      return !!(ordine && ordine.fatturato);
+    });
+    const paymentsNonFatturati = paymentsInMonth.filter(p=>{
+      const ordine=findItem("orders",p.orderId);
+      return !(ordine && ordine.fatturato);
+    });
+
+    const contanti = paymentsNonFatturati.filter(p=>p.metodo==="Contanti").reduce((s,p)=>s+Number(p.importo),0);
+    const carta = paymentsNonFatturati.filter(p=>normalizePaymentMethod(p.metodo)==="Carta di Pagamento").reduce((s,p)=>s+Number(p.importo),0);
+    const bonifico = paymentsNonFatturati.filter(p=>p.metodo==="Bonifico").reduce((s,p)=>s+Number(p.importo),0);
     const soldiIncassati = contanti+carta+bonifico;
+
+    const pagamentiFatturati = paymentsFatturati.reduce((s,p)=>s+Number(p.importo||0),0);
+    const totaleIncassiReali = soldiIncassati + pagamentiFatturati;
+
     const entrate = (state.entrate||[]).filter(e=>e.data && e.data.slice(0,7)===monthKey).reduce((s,e)=>s+Number(e.importo),0);
     const spese = state.expenses.filter(e=>e.data && e.data.slice(0,7)===monthKey).reduce((s,e)=>s+Number(e.importo),0);
     const costiFissi = (state.fixedCosts||[]).filter(e=>e.data && e.data.slice(0,7)===monthKey).reduce((s,e)=>s+Number(e.importo),0);
+
     // "Totale Ordini" = valore lordo delle schede create nel mese, NON soldi incassati.
     const totaleOrdini = ordersInMonth.reduce((s,o)=>s+orderTotale(o),0);
+
     return {
       mese:nome, monthKey, nOrdini:ordersInMonth.length, totaleOrdini,
-      nPagamenti:paymentsInMonth.length, contanti, carta, bonifico, soldiIncassati,
+      nPagamenti:paymentsNonFatturati.length,
+      contanti, carta, bonifico, soldiIncassati,
+      nPagamentiFatturati:paymentsFatturati.length,
+      pagamentiFatturati,
+      totaleIncassiReali,
       entrate, spese, costiFissi,
-      differenza:soldiIncassati+entrate-spese-costiFissi
+      // La differenza resta una fotografia reale della cassa:
+      // comprende sia incassi non fatturati sia incassi di schede fatturate.
+      differenza:totaleIncassiReali+entrate-spese-costiFissi
     };
   });
 }
@@ -8660,15 +8685,34 @@ function renderIncassi(){
   } else {
     const year = new Date().getFullYear();
     const rows = buildMonthlyRows(year);
-    const tot = rows.reduce((a,r)=>({nOrdini:a.nOrdini+r.nOrdini, totaleOrdini:a.totaleOrdini+r.totaleOrdini, nPagamenti:a.nPagamenti+r.nPagamenti, contanti:a.contanti+r.contanti, carta:a.carta+r.carta, bonifico:a.bonifico+r.bonifico, soldiIncassati:a.soldiIncassati+r.soldiIncassati, entrate:a.entrate+r.entrate, spese:a.spese+r.spese, costiFissi:a.costiFissi+r.costiFissi, differenza:a.differenza+r.differenza}), {nOrdini:0,totaleOrdini:0,nPagamenti:0,contanti:0,carta:0,bonifico:0,soldiIncassati:0,entrate:0,spese:0,costiFissi:0,differenza:0});
+    const tot = rows.reduce((a,r)=>({
+      nOrdini:a.nOrdini+r.nOrdini,
+      totaleOrdini:a.totaleOrdini+r.totaleOrdini,
+      nPagamenti:a.nPagamenti+r.nPagamenti,
+      contanti:a.contanti+r.contanti,
+      carta:a.carta+r.carta,
+      bonifico:a.bonifico+r.bonifico,
+      soldiIncassati:a.soldiIncassati+r.soldiIncassati,
+      nPagamentiFatturati:a.nPagamentiFatturati+r.nPagamentiFatturati,
+      pagamentiFatturati:a.pagamentiFatturati+r.pagamentiFatturati,
+      totaleIncassiReali:a.totaleIncassiReali+r.totaleIncassiReali,
+      entrate:a.entrate+r.entrate,
+      spese:a.spese+r.spese,
+      costiFissi:a.costiFissi+r.costiFissi,
+      differenza:a.differenza+r.differenza
+    }), {
+      nOrdini:0,totaleOrdini:0,nPagamenti:0,contanti:0,carta:0,bonifico:0,
+      soldiIncassati:0,nPagamentiFatturati:0,pagamentiFatturati:0,totaleIncassiReali:0,
+      entrate:0,spese:0,costiFissi:0,differenza:0
+    });
     reportHtml = `
       <div class="card" style="margin-bottom:18px;"><canvas id="monthlyChart" height="90"></canvas></div>
       <div class="table-wrap" style="margin-bottom:20px;overflow-x:auto;">
         <table>
-          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta di Pagamento</th><th>Bonifico</th><th>Totale pagamenti</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Differenza</th></tr></thead>
+          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta di Pagamento</th><th>Bonifico</th><th>Totale pagamenti NON fatturati</th><th>Pagamenti fatturati</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Differenza</th></tr></thead>
           <tbody>
-            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td style="font-weight:700;">${fmtMoney(r.soldiIncassati)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td>${fmtMoney(r.costiFissi)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
-            <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.costiFissi)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
+            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td style="font-weight:700;">${fmtMoney(r.soldiIncassati)}</td><td style="font-weight:700;">${fmtMoney(r.pagamentiFatturati)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td>${fmtMoney(r.costiFissi)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
+            <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.pagamentiFatturati)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.costiFissi)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
           </tbody>
         </table>
       </div>
@@ -8676,9 +8720,10 @@ function renderIncassi(){
         <p style="margin:0;font-size:13px;line-height:1.5;color:var(--muted);">
           <strong>Come leggere questi numeri:</strong><br>
           <strong>Totale Ordini</strong> = valore delle schede create nel mese: righe (quantità × prezzo) + eventuale spedizione + eventuale IVA − sconto. Include quindi anche ordini non ancora pagati e ordini non ancora consegnati.<br>
-          <strong>Totale pagamenti</strong> = soldi realmente registrati come incasso in quel mese, indipendentemente da quando l'ordine era stato creato.<br>
+          <strong>Totale pagamenti NON fatturati</strong> = incassi registrati nel mese collegati a schede non fatturate.<br>
+          <strong>Pagamenti fatturati</strong> = incassi registrati nel mese collegati a schede già fatturate.<br>
           <strong>Entrate</strong> = entrate extra non collegate agli ordini.<br>
-          <strong>Differenza</strong> = pagamenti + entrate − spese − costi fissi.<br>
+          <strong>Differenza</strong> = pagamenti non fatturati + pagamenti fatturati + entrate − spese − costi fissi.<br>
           Clicca sull'importo di <strong>Totale Ordini</strong> di un mese per vedere tutte le schede che lo compongono.
         </p>
       </div>`;
