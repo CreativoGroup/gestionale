@@ -4630,7 +4630,7 @@ function completedOrderStageButton(o){
   const stage=orderCustomerStage(o);
   if(stage==="DA RITIRARE") return `<button class="btn btn-primary btn-sm" style="background:var(--teal);color:#fff;" onclick="segnaRitiroCompletato('${o.id}')">DA RITIRARE</button>`;
   if(stage==="DA AVVISARE") return `<button class="btn btn-primary btn-sm" style="background:var(--warn);color:#fff;" onclick="openAvvisaCliente('${o.id}')">DA AVVISARE</button>`;
-  return `<button class="btn btn-outline btn-sm" style="border-color:var(--ok);color:var(--ok);" onclick="consegnaOrdineAvvisato('${o.id}')">AVVISATO</button>${o.avvisoMetodo ? `<div class="lr-sub" style="margin-top:4px;text-align:center;">${escapeHtml(o.avvisoMetodo)}</div>` : ``}`;
+  return `<button class="btn btn-outline btn-sm" style="border-color:var(--ok);color:var(--ok);" onclick="openAvvisaCliente('${o.id}')">AVVISATO</button>${o.avvisoMetodo ? `<div class="lr-sub" style="margin-top:4px;text-align:center;">${escapeHtml(o.avvisoMetodo)}</div>` : ``}`;
 }
 function renderDashboard(){
   const activeOrders = state.orders.filter(o=>o.stato!=="Consegnato");
@@ -7117,34 +7117,143 @@ function openCompletedOrderPayment(orderId){
   openAddPaymentModal(orderId);
 }
 
+function addPaymentPreviewOrder(orderId){
+  const o=findItem("orders",orderId);
+  if(!o) return null;
+
+  const copy=JSON.parse(JSON.stringify(o));
+  const scontoEl=document.getElementById("ap-sconto");
+  const ivaEl=document.getElementById("ap-iva");
+  const fattEl=document.getElementById("ap-da-fatturare");
+
+  if(scontoEl) copy.sconto=Math.max(0,Number(scontoEl.value)||0);
+  if(ivaEl) copy.ivaApplicata=!!ivaEl.checked;
+  if(fattEl) copy.daFatturare=!!fattEl.checked;
+
+  return copy;
+}
+
+function refreshAddPaymentTotals(orderId){
+  const preview=addPaymentPreviewOrder(orderId);
+  if(!preview) return;
+
+  const totale=orderTotale(preview);
+  const incassato=orderIncassato(preview);
+  const saldo=Math.max(0,totale-incassato);
+
+  const totalEl=document.getElementById("ap-total-preview");
+  const saldoEl=document.getElementById("ap-saldo-preview");
+  const helpEl=document.getElementById("ap-help");
+  const importoEl=document.getElementById("ap-importo");
+
+  if(totalEl) totalEl.textContent=fmtMoney(totale);
+  if(saldoEl) saldoEl.textContent=fmtMoney(saldo);
+  if(helpEl) helpEl.textContent=`Importo suggerito in base al saldo ancora da incassare: ${fmtMoney(saldo)}.`;
+
+  // Quando si modifica IVA o sconto aggiorniamo anche l'importo suggerito.
+  if(importoEl) importoEl.value=saldo>0 ? saldo.toFixed(2) : "";
+}
+
 function openAddPaymentModal(orderId){
   const o = findItem('orders', orderId);
   const saldo = orderSaldo(o);
+  const totale = orderTotale(o);
+
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="openJobCard('${orderId}')">×</button>
     <h2>Aggiungi pagamento</h2>
-    <p class="helptext" style="margin-top:0;">Importo suggerito in base al saldo ancora da incassare: ${fmtMoney(saldo)}.</p>
+    <p id="ap-help" class="helptext" style="margin-top:0;">Importo suggerito in base al saldo ancora da incassare: ${fmtMoney(saldo)}.</p>
+
+    <div class="card" style="box-shadow:none;margin:14px 0 18px;padding:16px;">
+      <div style="font-weight:800;margin-bottom:12px;">Fatturazione e totale</div>
+
+      <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+        <label class="checkfield">
+          <input id="ap-da-fatturare" type="checkbox" ${o.daFatturare?'checked':''} onchange="refreshAddPaymentTotals('${orderId}')">
+          Da fatturare
+        </label>
+        <label class="checkfield">
+          <input id="ap-iva" type="checkbox" ${o.ivaApplicata?'checked':''} onchange="refreshAddPaymentTotals('${orderId}')">
+          Applica IVA 22%
+        </label>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Sconto (€)</label>
+          <input id="ap-sconto" type="number" min="0" step="0.01" value="${Number(o.sconto||0).toFixed(2)}" oninput="refreshAddPaymentTotals('${orderId}')">
+        </div>
+        <div class="field">
+          <label>Totale lavorazione aggiornato</label>
+          <div style="padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;font-weight:800;">
+            <span id="ap-total-preview">${fmtMoney(totale)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-weight:800;">
+        <span>Saldo da incassare</span>
+        <span id="ap-saldo-preview" style="color:var(--danger);">${fmtMoney(Math.max(0,saldo))}</span>
+      </div>
+    </div>
+
     <div class="form-grid">
       <div class="field"><label>Tipo</label><select id="ap-tipo">${PAY_TIPI.map(t=>`<option>${t}</option>`).join("")}</select></div>
       <div class="field"><label>Importo €</label><input id="ap-importo" type="number" min="0" step="0.01" value="${saldo>0?saldo.toFixed(2):''}"></div>
       <div class="field"><label>Giorno</label><input id="ap-data" type="date" value="${today()}"></div>
       <div class="field"><label>Modalità di pagamento</label><select id="ap-metodo">${PAY_METHODS.map(m=>`<option>${m}</option>`).join("")}</select></div>
     </div>
+
     <div class="form-actions">
       <button class="btn btn-primary" onclick="submitAddPayment('${orderId}')">Salva</button>
       <button class="btn btn-outline" onclick="openJobCard('${orderId}')">Annulla</button>
     </div>
   `;
 }
-function submitAddPayment(orderId){
-  const importo = Number(document.getElementById("ap-importo").value)||0;
-  if(importo<=0){ showToast("Inserisci un importo valido"); return; }
+
+async function submitAddPayment(orderId){
   const o = findItem('orders', orderId);
-  state.payments.push({id:uid(), orderId, clientId:o.clientId,
-    tipo:document.getElementById("ap-tipo").value, importo,
-    data:document.getElementById("ap-data").value||today(),
-    metodo:document.getElementById("ap-metodo").value});
-  saveState('payments'); showToast("Pagamento registrato"); openJobCard(orderId);
+  if(!o) return;
+
+  const importo = Number(document.getElementById("ap-importo")?.value)||0;
+  if(importo<=0){ showToast("Inserisci un importo valido"); return; }
+
+  const oldOrder=JSON.parse(JSON.stringify(o));
+
+  o.sconto=Math.max(0,Number(document.getElementById("ap-sconto")?.value)||0);
+  o.daFatturare=!!document.getElementById("ap-da-fatturare")?.checked;
+  o.ivaApplicata=!!document.getElementById("ap-iva")?.checked;
+
+  const savedOrder=await upsertOneReturning("orders",o);
+  if(!savedOrder){
+    const oi=state.orders.findIndex(x=>x.id===orderId);
+    if(oi>=0) state.orders[oi]=oldOrder;
+    showToast("Errore salvataggio fatturazione");
+    return;
+  }
+
+  const oi=state.orders.findIndex(x=>x.id===orderId);
+  if(oi>=0) state.orders[oi]=savedOrder;
+
+  const payment={
+    id:uid(),
+    orderId,
+    clientId:o.clientId,
+    tipo:document.getElementById("ap-tipo")?.value||"",
+    importo,
+    data:document.getElementById("ap-data")?.value||today(),
+    metodo:document.getElementById("ap-metodo")?.value||""
+  };
+
+  const savedPayment=await upsertOneReturning("payments",payment);
+  if(!savedPayment){
+    showToast("Fatturazione salvata, ma pagamento non registrato");
+    return;
+  }
+
+  state.payments.push(savedPayment);
+  showToast("Pagamento registrato");
+  openJobCard(orderId);
 }
 
 function openEditPaymentModal(paymentId, returnOrderId){
