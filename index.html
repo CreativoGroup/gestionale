@@ -3353,6 +3353,7 @@ function openLeadDetail(id){
       <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(l.richiesta||"—")}</div></div>
     </div>
     <div class="form-actions" style="margin-top:16px;">
+      <button class="btn btn-outline" onclick="openEditLead('${l.id}')">MODIFICA LEAD</button>
       ${l.stato==="Accettato" && !l.convertedOrderId ? `
         <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">
           ${["gmail_ordine","whatsapp_ordine"].includes(String(l.fonte||"")) ? "TRASFORMA IN CLIENTE E CREA ORDINE" : "Trasforma in cliente ed effettua ordine"}
@@ -3364,6 +3365,75 @@ function openLeadDetail(id){
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
+}
+
+
+function openEditLead(id){
+  const l=(state.leads||[]).find(x=>x.id===id);
+  if(!l) return;
+
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="openLeadDetail('${l.id}')">×</button>
+    <h2>Modifica Lead</h2>
+
+    <div class="form-grid">
+      <div class="field"><label>Nome</label><input id="edit-lead-nome" value="${escapeHtml(l.nome||'')}"></div>
+      <div class="field"><label>Azienda</label><input id="edit-lead-azienda" value="${escapeHtml(l.azienda||'')}"></div>
+      <div class="field"><label>Email</label><input id="edit-lead-email" type="email" value="${escapeHtml(l.email||'')}"></div>
+      <div class="field"><label>Telefono</label><input id="edit-lead-telefono" value="${escapeHtml(l.telefono||'')}"></div>
+      <div class="field" style="grid-column:1/-1;"><label>Oggetto</label><input id="edit-lead-oggetto" value="${escapeHtml(l.oggettoRichiesta||'')}"></div>
+      <div class="field">
+        <label>Stato</label>
+        <select id="edit-lead-stato" ${l.convertedOrderId?'disabled':''}>
+          ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field" style="grid-column:1/-1;"><label>Richiesta</label><textarea id="edit-lead-richiesta" rows="5">${escapeHtml(l.richiesta||'')}</textarea></div>
+    </div>
+
+    <div class="form-actions" style="margin-top:16px;">
+      <button class="btn btn-primary" onclick="saveLeadEdit('${l.id}')">SALVA MODIFICHE</button>
+      <button class="btn btn-outline" onclick="openLeadDetail('${l.id}')">Annulla</button>
+    </div>
+  `;
+}
+
+async function saveLeadEdit(id){
+  const l=(state.leads||[]).find(x=>x.id===id);
+  if(!l) return;
+
+  const before=JSON.parse(JSON.stringify(l));
+
+  l.nome=String(document.getElementById("edit-lead-nome")?.value||"").trim();
+  l.azienda=String(document.getElementById("edit-lead-azienda")?.value||"").trim();
+  l.email=String(document.getElementById("edit-lead-email")?.value||"").trim().toLowerCase();
+  l.telefono=String(document.getElementById("edit-lead-telefono")?.value||"").trim();
+  l.oggettoRichiesta=String(document.getElementById("edit-lead-oggetto")?.value||"").trim();
+  l.richiesta=String(document.getElementById("edit-lead-richiesta")?.value||"").trim();
+
+  if(!l.convertedOrderId){
+    l.stato=String(document.getElementById("edit-lead-stato")?.value||l.stato||"Nuovo");
+  }
+
+  l.aggiornatoIl=new Date().toISOString();
+
+  const saved=await upsertOneReturning("leads",l);
+  if(!saved){
+    const i=state.leads.findIndex(x=>x.id===id);
+    if(i>=0) state.leads[i]=before;
+    showToast("Errore salvataggio Lead");
+    return;
+  }
+
+  const i=state.leads.findIndex(x=>x.id===id);
+  if(i>=0) state.leads[i]=saved;
+
+  if(currentView==="leads") renderLeads();
+  if(currentView==="leadOrdine") renderLeadOrdine();
+  if(currentView==="dashboard") renderDashboard();
+
+  showToast("Lead aggiornato");
+  openLeadDetail(id);
 }
 
 async function setLeadStatus(id,status){
@@ -4533,11 +4603,34 @@ async function segnaRitiroCompletato(orderId){
   renderDashboard();
   showToast("Ritiro completato: ora il cliente è da avvisare");
 }
+async function consegnaOrdineAvvisato(orderId){
+  const o=findItem("orders",orderId);
+  if(!o || !o.clienteAvvisato) return;
+
+  const oldState=o.stato;
+  o.stato="Consegnato";
+
+  const saved=await upsertOneReturning("orders",o);
+  if(!saved){
+    o.stato=oldState;
+    showToast("Impossibile segnare come consegnato");
+    return;
+  }
+
+  const i=state.orders.findIndex(x=>x.id===orderId);
+  if(i>=0) state.orders[i]=saved;
+
+  if(currentView==="dashboard") renderDashboard();
+  if(currentView==="lavoriCompletati") renderLavoriCompletati();
+
+  showToast("Ordine CONSEGNATO");
+}
+
 function completedOrderStageButton(o){
   const stage=orderCustomerStage(o);
   if(stage==="DA RITIRARE") return `<button class="btn btn-primary btn-sm" style="background:var(--teal);color:#fff;" onclick="segnaRitiroCompletato('${o.id}')">DA RITIRARE</button>`;
   if(stage==="DA AVVISARE") return `<button class="btn btn-primary btn-sm" style="background:var(--warn);color:#fff;" onclick="openAvvisaCliente('${o.id}')">DA AVVISARE</button>`;
-  return `<button class="btn btn-outline btn-sm" style="border-color:var(--ok);color:var(--ok);" onclick="openAvvisaCliente('${o.id}')">AVVISATO</button>${o.avvisoMetodo ? `<div class="lr-sub" style="margin-top:4px;text-align:center;">${escapeHtml(o.avvisoMetodo)}</div>` : ``}`;
+  return `<button class="btn btn-outline btn-sm" style="border-color:var(--ok);color:var(--ok);" onclick="consegnaOrdineAvvisato('${o.id}')">AVVISATO</button>${o.avvisoMetodo ? `<div class="lr-sub" style="margin-top:4px;text-align:center;">${escapeHtml(o.avvisoMetodo)}</div>` : ``}`;
 }
 function renderDashboard(){
   const activeOrders = state.orders.filter(o=>o.stato!=="Consegnato");
@@ -4616,7 +4709,7 @@ function renderDashboard(){
             <td class="mobile-hide">${orderCategorieLabel(o)}</td>
             <td class="mobile-hide">${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : ""}</td>
             <td>${completedOrderStageButton(o)}</td>
-            <td class="mobile-hide"><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td>
+            <td class="mobile-hide"><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">Scheda</button></td>
           </tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`}
       </div>
@@ -6372,7 +6465,7 @@ function renderCompletedDeliveryRows(list){
             <td>${orderCategorieLabel(o)}</td>
             <td>${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : "—"}</td>
             <td>${completedOrderStageButton(o)}</td>
-            <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td>
+            <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">Scheda</button></td>
           </tr>`).join("")}</tbody>
       </table>
     </div>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`;
@@ -6414,7 +6507,7 @@ function renderLavoriCompletati(){
                 <td>${orderCategorieLabel(o)}</td>
                 <td>${d}</td>
                 <td><span class="pill pill-delivered">CONSEGNATO</span></td>
-                <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td>
+                <td><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">Scheda</button></td>
               </tr>`;
             }).join("")}</tbody>
           </table>
@@ -7017,6 +7110,13 @@ function duplicateOrder(orderId){
   showToast("Scheda duplicata");
   openJobCard(clone.id);
 }
+
+function openCompletedOrderPayment(orderId){
+  // Apre il modal e porta subito l'utente al form AGGIUNGI PAGAMENTO.
+  openJobCard(orderId);
+  openAddPaymentModal(orderId);
+}
+
 function openAddPaymentModal(orderId){
   const o = findItem('orders', orderId);
   const saldo = orderSaldo(o);
@@ -8709,10 +8809,10 @@ function renderIncassi(){
       <div class="card" style="margin-bottom:18px;"><canvas id="monthlyChart" height="90"></canvas></div>
       <div class="table-wrap" style="margin-bottom:20px;overflow-x:auto;">
         <table>
-          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta di Pagamento</th><th>Bonifico</th><th>Totale pagamenti NON fatturati</th><th>Pagamenti fatturati</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Differenza</th></tr></thead>
+          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta di Pagamento</th><th>Bonifico</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Totale pagamenti NON fatturati</th><th>Pagamenti fatturati</th><th>Differenza</th></tr></thead>
           <tbody>
-            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td style="font-weight:700;">${fmtMoney(r.soldiIncassati)}</td><td style="font-weight:700;">${fmtMoney(r.pagamentiFatturati)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td>${fmtMoney(r.costiFissi)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
-            <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.pagamentiFatturati)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.costiFissi)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
+            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td>${fmtMoney(r.costiFissi)}</td><td style="font-weight:700;">${fmtMoney(r.soldiIncassati)}</td><td style="font-weight:700;">${fmtMoney(r.pagamentiFatturati)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
+            <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.costiFissi)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.pagamentiFatturati)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
           </tbody>
         </table>
       </div>
