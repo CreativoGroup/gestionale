@@ -1690,8 +1690,16 @@
 .job-v2-stage.current .job-v2-stage-num{background:#f5b400;color:#fff;}
 .job-v2-stage-title{font-size:12px;font-weight:900;}
 .job-v2-stage-copy{font-size:11px;color:var(--muted);line-height:1.45;min-height:34px;}
-.job-v2-stage-actions{display:flex;flex-direction:column;gap:7px;margin-top:auto;}
+.job-v2-stage-actions{display:flex;flex-direction:column;gap:8px;margin-top:auto;}
 .job-v2-stage-actions .btn{width:100%;justify-content:center;}
+.job-v2-stage-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:4px;padding-top:4px;border-top:1px dashed #e6ebf1;}
+.job-v2-stage-nav.single-next{justify-content:flex-end;}
+.job-v2-nav-link{appearance:none;border:0;background:transparent;padding:0;font-size:12px;font-weight:800;letter-spacing:.01em;color:#7b8898;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.16s ease;}
+.job-v2-nav-link:hover{color:#ef5b2f;transform:translateX(1px);}
+.job-v2-nav-link.back:hover{transform:translateX(-1px);}
+.job-v2-nav-link.next{color:#ef5b2f;}
+.job-v2-nav-link.complete{color:#21834c;}
+.job-v2-nav-link:disabled{opacity:.35;cursor:not-allowed;transform:none;}
 .job-v2-wa-btn{border-color:#38a169!important;color:#21834c!important;background:#f4fff8!important;}
 .job-v2-mail-btn{border-color:#93b8ff!important;color:#2468d4!important;background:#f7faff!important;}
 .job-v2-stage-disabled{opacity:.5;pointer-events:none;}
@@ -7471,21 +7479,25 @@ function jobStageFlowHtml(o,c){
   return `<div class="job-v2-status-flow">
     ${card(0,"DA FARE",
       `Giorno consigliato di inizio<br><strong class="job-v2-start">${fmtRecommendedStart(o.dataConsegna)}</strong>${bozzaChoice}`,
-      `<button class="btn btn-primary btn-sm" onclick="updateOrderField('${o.id}','stato','In preparazione grafica')">PASSA A PREPARAZIONE GRAFICA</button>`
+      `<div class="job-v2-stage-nav single-next"><button class="job-v2-nav-link next" onclick="updateOrderField('${o.id}','stato','In preparazione grafica')">Vai a preparazione grafica <span>→</span></button></div>`
     )}
 
     ${card(1,"IN PREPARAZIONE GRAFICA",
       `Gestisci la bozza secondo il canale scelto.`,
       `${prepAction}
-       <button class="btn btn-outline btn-sm" onclick="updateOrderField('${o.id}','stato','Da fare')">← TORNA A DA FARE</button>
-       <button class="btn btn-primary btn-sm" onclick="updateOrderField('${o.id}','stato','In produzione')">PASSA A IN PRODUZIONE</button>`
+       <div class="job-v2-stage-nav">
+         <button class="job-v2-nav-link back" onclick="updateOrderField('${o.id}','stato','Da fare')"><span>←</span> Torna a da fare</button>
+         <button class="job-v2-nav-link next" onclick="updateOrderField('${o.id}','stato','In produzione')">Vai a in produzione <span>→</span></button>
+       </div>`
     )}
 
     ${card(2,"IN PRODUZIONE",
       `Comunica al cliente che l'ordine è in produzione e che verrà avvisato quando sarà pronto.`,
       `${productionAction}
-       <button class="btn btn-outline btn-sm" onclick="updateOrderField('${o.id}','stato','In preparazione grafica')">← TORNA A PREPARAZIONE GRAFICA</button>
-       <button class="btn btn-primary btn-sm" onclick="updateOrderField('${o.id}','stato','Completato')">SEGNA COME COMPLETATO</button>`
+       <div class="job-v2-stage-nav">
+         <button class="job-v2-nav-link back" onclick="updateOrderField('${o.id}','stato','In preparazione grafica')"><span>←</span> Torna a preparazione grafica</button>
+         <button class="job-v2-nav-link complete" onclick="updateOrderField('${o.id}','stato','Completato')">Segna completato <span>→</span></button>
+       </div>`
     )}
   </div>`;
 }
