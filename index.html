@@ -2038,6 +2038,24 @@
 .external-logistics-actions{display:flex;gap:16px;flex-wrap:wrap;align-items:center;}
 .external-logistics-add{margin-top:12px;}
 
+
+/* ===== SERVIZIO: VERDE SOLO NEL FLUSSO DI LAVORO ===== */
+.flow-job.service-job{
+  border-color:#9fc8ae;
+}
+.flow-job.service-job .flow-job-client,
+.flow-job.service-job .flow-job-desc{
+  color:#1f6b3a;
+}
+.flow-job.service-job .flow-worker{
+  background:#edf7f0;
+  color:#2c6d45;
+}
+.flow-job.service-job .flow-worker-dot{
+  background:#d8eddf;
+  color:#245b39;
+}
+
 </style>
 
 <style id="whatsapp-refine-style">
@@ -7337,6 +7355,11 @@ function flowExternalSupplier(o){
   const supplier=ext.map(r=>String(r.fornitore||"").trim()).find(Boolean);
   return supplier||"da indicare";
 }
+
+function flowHasService(o){
+  return !!(o && (o.righe||[]).some(r=>r && r.categoria==="Servizio"));
+}
+
 function flowShortDescription(o){
   const lines=(o.righe||[]).filter(r=>r && (r.prodotto||r.categoria));
   if(!lines.length) return "Nessuna lavorazione";
@@ -7443,7 +7466,7 @@ function renderFlusso(){
     const workerText=workers.length ? workers.join(", ") : "Non assegnato";
     const initials=workers.length ? flowWorkerInitials(workers[0]) : "—";
 
-    return `<div class="flow-job ${o.importante?'important':''} ${overdue?'overdue':''}" onclick="openJobCard('${o.id}')">
+    return `<div class="flow-job ${o.importante?'important':''} ${overdue?'overdue':''} ${flowHasService(o)?'service-job':''}" onclick="openJobCard('${o.id}')">
       <div class="flow-job-top">
         <div>
           <div class="flow-job-client">${escapeHtml(c?clientDisplayName(c):"Cliente")}</div>
