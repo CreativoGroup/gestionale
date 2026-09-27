@@ -1793,7 +1793,7 @@
 .worker-picker{position:relative;}
 .worker-picker-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:12px 14px;border:1px solid #d7dee8;border-radius:12px;background:#fff;font-size:15px;font-weight:800;cursor:pointer;color:#2c3747;}
 .worker-picker-summary:hover{border-color:#9fb7d9;background:#f8fbff;}
-.worker-picker-panel{display:none;position:absolute;z-index:30;top:calc(100% + 7px);left:0;right:0;background:#fff;border:1px solid #dbe2ea;border-radius:14px;padding:10px;box-shadow:0 10px 25px rgba(22,35,55,.12);}
+.worker-picker-panel{display:none;position:static;z-index:30;margin-top:8px;width:100%;box-sizing:border-box;background:#fff;border:1px solid #dbe2ea;border-radius:14px;padding:10px;box-shadow:0 8px 20px rgba(22,35,55,.08);}
 .worker-picker.open .worker-picker-panel{display:block;}
 .worker-option{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:800;color:#4f5b6b;}
 .worker-option:hover{background:#f5f8fc;}
@@ -2988,17 +2988,6 @@ function toggleOrderWorker(orderId, worker, checked){
     if(el) el.classList.add("open");
   },0);
 }
-function setAllOrderWorkers(orderId, checked){
-  const o=findItem('orders',orderId);
-  if(!o) return;
-  o.worker = checked ? WORKERS.join(" | ") : "";
-  saveState('orders');
-  openJobCard(orderId);
-  setTimeout(()=>{
-    const el=document.getElementById(`worker-picker-${orderId}`);
-    if(el) el.classList.add("open");
-  },0);
-}
 function toggleWorkerPicker(orderId){
   const el=document.getElementById(`worker-picker-${orderId}`);
   if(!el) return;
@@ -3006,7 +2995,6 @@ function toggleWorkerPicker(orderId){
 }
 function workerMultiSelector(o){
   const selected=orderWorkersList(o);
-  const allSelected=WORKERS.length>0 && WORKERS.every(w=>selected.includes(w));
 
   return `
     <div id="worker-picker-${o.id}" class="worker-picker">
@@ -3016,13 +3004,6 @@ function workerMultiSelector(o){
       </button>
 
       <div class="worker-picker-panel">
-        <div class="worker-option ${allSelected?'selected':''}"
-             style="border-bottom:1px solid #e8edf3;margin-bottom:5px;padding-bottom:11px;"
-             onclick="setAllOrderWorkers('${o.id}',${allSelected?'false':'true'})">
-          <span>${allSelected ? "DESELEZIONA TUTTI" : "SELEZIONA TUTTI GLI OPERATORI"}</span>
-          <span class="worker-option-mark">${allSelected?'✓':''}</span>
-        </div>
-
         ${WORKERS.map(w=>`
           <div class="worker-option ${selected.includes(w)?'selected':''}"
                onclick="toggleOrderWorker('${o.id}','${w}',${selected.includes(w)?'false':'true'})">
