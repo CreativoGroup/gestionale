@@ -1617,6 +1617,93 @@
     }
   }
 
+
+/* ===== SCHEDA DI LAVORAZIONE 2026 ===== */
+.job-v2{display:flex;flex-direction:column;gap:14px;}
+.job-v2-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:4px 2px 2px;}
+.job-v2-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.job-v2-title h2{margin:0;font-size:28px;letter-spacing:-.03em;}
+.job-v2-sub{margin:5px 0 0;color:var(--muted);font-size:12px;}
+.job-v2-card{background:#fff;border:1px solid #e7ebf0;border-radius:16px;padding:18px;box-shadow:0 5px 18px rgba(25,35,50,.045);position:relative;overflow:hidden;}
+.job-v2-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--job-accent,#2f80ed);}
+.job-v2-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.job-v2-section-title h3{margin:0;font-size:17px;display:flex;align-items:center;gap:9px;}
+.job-v2-num{display:inline-flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:9px;background:color-mix(in srgb,var(--job-accent,#2f80ed) 12%,white);color:var(--job-accent,#2f80ed);font-size:13px;font-weight:900;}
+.job-v2-info-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr 1fr;gap:0;border:1px solid #edf0f4;border-radius:13px;overflow:hidden;background:#fbfcfd;}
+.job-v2-info-cell{padding:14px 16px;border-right:1px solid #edf0f4;min-width:0;}
+.job-v2-info-cell:last-child{border-right:0;}
+.job-v2-info-cell label{display:block;font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.03em;margin-bottom:7px;}
+.job-v2-info-main{font-weight:800;font-size:14px;}
+.job-v2-info-sub{font-size:12px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere;}
+.job-v2-table-wrap{overflow-x:auto;border:1px solid #edf0f4;border-radius:13px;}
+.job-v2-table{width:100%;border-collapse:collapse;min-width:900px;}
+.job-v2-table th{background:#f7f9fb;color:#687386;font-size:11px;text-transform:uppercase;letter-spacing:.03em;padding:10px 11px;text-align:left;white-space:nowrap;}
+.job-v2-table td{padding:10px 11px;border-top:1px solid #edf0f4;vertical-align:top;}
+.job-v2-table input,.job-v2-table select,.job-v2-table textarea{width:100%;box-sizing:border-box;}
+.job-v2-product{min-width:250px;}
+.job-v2-desc-toggle{margin-top:7px;border-top:1px dashed #e5e9ee;padding-top:6px;}
+.job-v2-desc-toggle summary{cursor:pointer;color:#647084;font-size:11px;font-weight:800;list-style:none;display:flex;align-items:center;gap:6px;}
+.job-v2-desc-toggle summary::-webkit-details-marker{display:none;}
+.job-v2-desc-toggle summary:before{content:"›";display:inline-block;font-size:17px;line-height:1;transition:.18s transform;}
+.job-v2-desc-toggle[open] summary:before{transform:rotate(90deg);}
+.job-v2-desc-toggle textarea{margin-top:8px;min-height:88px;resize:vertical;}
+.job-v2-two{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;}
+.job-v2-three{display:grid;grid-template-columns:1fr .8fr 1.25fr;gap:14px;}
+.job-v2-soft{background:#fbfcfd;border:1px solid #edf0f4;border-radius:13px;padding:14px;}
+.job-v2-soft h4{margin:0 0 10px;font-size:13px;}
+.job-v2-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:start;}
+.job-v2-step{text-align:center;position:relative;}
+.job-v2-step:not(:last-child):after{content:"→";position:absolute;right:-10px;top:8px;color:#a8b0bb;}
+.job-v2-step-dot{width:24px;height:24px;border-radius:50%;border:2px solid #d9dfe7;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;background:#fff;}
+.job-v2-step.done .job-v2-step-dot{background:#26a65b;border-color:#26a65b;color:#fff;}
+.job-v2-step.active .job-v2-step-dot{border-color:#f0a000;color:#f0a000;}
+.job-v2-step-label{font-size:11px;font-weight:800;}
+.job-v2-step-date{font-size:10px;color:var(--muted);margin-top:3px;}
+.job-v2-money-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #edf0f4;font-size:12px;}
+.job-v2-money-row:last-child{border-bottom:0;}
+.job-v2-money-row.total{font-size:17px;font-weight:900;padding-top:12px;}
+.job-v2-money-row.balance{font-size:16px;font-weight:900;color:var(--danger);}
+.job-v2-pay-table{width:100%;border-collapse:collapse;font-size:12px;}
+.job-v2-pay-table th{color:var(--muted);font-size:10px;text-transform:uppercase;text-align:left;padding:7px;}
+.job-v2-pay-table td{border-top:1px solid #edf0f4;padding:8px 7px;}
+.job-v2-bottom-actions{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding-top:2px;}
+.job-v2-pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:900;}
+.job-v2-muted-label{font-size:11px;color:var(--muted);font-weight:800;margin-bottom:6px;}
+.job-v2-start{font-weight:900;color:#1e6bb8;}
+.job-v2-note{width:100%;min-height:110px;resize:vertical;}
+@media(max-width:900px){
+  .job-v2-info-grid,.job-v2-two,.job-v2-three{grid-template-columns:1fr;}
+  .job-v2-info-cell{border-right:0;border-bottom:1px solid #edf0f4;}
+  .job-v2-info-cell:last-child{border-bottom:0;}
+  .job-v2-progress{grid-template-columns:repeat(2,1fr);}
+}
+
+
+/* ===== STATO LAVORAZIONE + COMUNICAZIONI ===== */
+.job-v2-status-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:stretch;}
+.job-v2-stage{border:1px solid #e7ebf0;border-radius:14px;background:#fff;padding:14px;min-height:170px;display:flex;flex-direction:column;gap:9px;position:relative;}
+.job-v2-stage.current{border-color:#f2b24a;background:#fffaf0;box-shadow:0 5px 16px rgba(242,178,74,.13);}
+.job-v2-stage.done{background:#f8fcf9;border-color:#cfe9d7;}
+.job-v2-stage-head{display:flex;align-items:center;gap:8px;}
+.job-v2-stage-num{width:25px;height:25px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#eef2f7;color:#536173;font-size:11px;font-weight:900;flex:0 0 auto;}
+.job-v2-stage.done .job-v2-stage-num{background:#20a857;color:#fff;}
+.job-v2-stage.current .job-v2-stage-num{background:#f5b400;color:#fff;}
+.job-v2-stage-title{font-size:12px;font-weight:900;}
+.job-v2-stage-copy{font-size:11px;color:var(--muted);line-height:1.45;min-height:34px;}
+.job-v2-stage-actions{display:flex;flex-direction:column;gap:7px;margin-top:auto;}
+.job-v2-stage-actions .btn{width:100%;justify-content:center;}
+.job-v2-wa-btn{border-color:#38a169!important;color:#21834c!important;background:#f4fff8!important;}
+.job-v2-mail-btn{border-color:#93b8ff!important;color:#2468d4!important;background:#f7faff!important;}
+.job-v2-stage-disabled{opacity:.5;pointer-events:none;}
+.job-v2-admin-details{border:1px solid #e7ebf0;border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 5px 18px rgba(25,35,50,.045);}
+.job-v2-admin-details>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 19px;border-left:4px solid #ef5b4a;font-weight:900;}
+.job-v2-admin-details>summary::-webkit-details-marker{display:none;}
+.job-v2-admin-details>summary:after{content:"⌄";font-size:18px;color:var(--muted);transition:.18s transform;}
+.job-v2-admin-details[open]>summary:after{transform:rotate(180deg);}
+.job-v2-admin-body{padding:0 18px 18px;}
+@media(max-width:1000px){.job-v2-status-flow{grid-template-columns:1fr 1fr;}}
+@media(max-width:620px){.job-v2-status-flow{grid-template-columns:1fr;}}
+
 </style>
 
 <style id="whatsapp-refine-style">
@@ -2560,13 +2647,8 @@ function openBozzaMail(orderId){
     return;
   }
 
-  const m=getBozzaMeta(o);
-  if(m.scelta!=="BOZZA DA INVIARE PER MAIL"){
-    showToast("Per questo ordine non è previsto l'invio bozza via mail");
-    return;
-  }
   if(o.stato!=="In preparazione grafica"){
-    showToast("La bozza via mail è disponibile solo in preparazione grafica");
+    showToast("La bozza è disponibile solo nello stato In preparazione grafica");
     return;
   }
 
@@ -6104,28 +6186,87 @@ function linesEditor(collection, id, righe, options={}){
   const isOrder = collection === 'orders';
   const showDots = isOrder && (options.forceShowDots ?? (righe.length > 1));
   const showAdd = options.showAdd !== false;
+
+  if(isOrder){
+    return `
+      <div class="job-v2-table-wrap">
+        <table class="job-v2-table">
+          <thead>
+            <tr>
+              <th style="width:165px;">Categoria</th>
+              <th>Descrizione lavorazione</th>
+              <th style="width:90px;">Q.tà</th>
+              <th style="width:120px;">Prezzo unit.</th>
+              <th style="width:110px;">Totale</th>
+              ${showDots?`<th style="width:150px;">Stato</th>`:""}
+              <th style="width:44px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${righe.map((r,idx)=>`
+              <tr>
+                <td>
+                  <select class="inline riga-categoria-select"
+                    onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">
+                    ${categoryOptions(r.categoria,true)}
+                  </select>
+                </td>
+                <td class="job-v2-product">
+                  <input class="desc-input"
+                    value="${escapeHtml(r.prodotto||'')}"
+                    placeholder="Es. Targa in forex 50×30, Felpa ricamata, Volantini A5…"
+                    onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">
+                  <details class="job-v2-desc-toggle">
+                    <summary>Dettagli lavorazione ${r.descrizione?`· ${escapeHtml(String(r.descrizione).slice(0,55))}${String(r.descrizione).length>55?'…':''}`:""}</summary>
+                    <textarea class="desc-input" rows="4"
+                      placeholder="Materiali, misure, colori, posizione stampa/ricamo, note operative…"
+                      onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)">${escapeHtml(r.descrizione||'')}</textarea>
+                  </details>
+                </td>
+                <td class="num">
+                  <input class="num" type="number" min="0" step="1" value="${r.quantita}"
+                    onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)">
+                </td>
+                <td class="num">
+                  <input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}"
+                    onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)">
+                </td>
+                <td class="num" style="padding-top:15px;font-weight:800;">
+                  ${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}
+                </td>
+                ${showDots ? `<td>
+                  <select class="riga-status-select"
+                    style="background:${STATUS_DOT[r.stato]||'#fff'};color:${statusTextColor(r.stato)}"
+                    onchange="updateRigaField('${collection}','${id}','${r.id}','stato',this.value)">
+                    ${KANBAN_STATUSES.map(s=>`<option value="${s}" ${r.stato===s?'selected':''}>${s}</option>`).join("")}
+                  </select>
+                </td>` : ``}
+                <td><button class="btn btn-ghost btn-sm" onclick="removeRiga('${collection}','${id}','${r.id}')">✕</button></td>
+              </tr>
+            `).join("") || `<tr><td colspan="${showDots?7:6}" class="empty">Nessuna lavorazione inserita.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      ${showAdd ? `<button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addRiga('${collection}','${id}')">+ Aggiungi lavorazione</button>` : ''}
+    `;
+  }
+
   return `
     <div style="overflow-x:auto;">
-    <table class="lines-table">
-      <thead><tr>
-        ${isOrder ? `<th style="width:200px;">Categoria</th><th style="width:200px;">Prodotto</th>` : `<th>Descrizione</th>`}
-        <th class="num">Quantità</th><th class="num">Prezzo unit. €</th><th class="num">Totale</th>
-        ${showDots ? `<th>Stato riga</th>` : ``}
-        <th></th>
-      </tr></thead>
-      <tbody>
-        ${righe.map(r=>`
-          <tr>
-            ${isOrder ? `<td><select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">${categoryOptions(r.categoria, true)}</select></td>
-            <td>${PRODOTTI_PER_CATEGORIA[r.categoria] ? `<select class="inline riga-categoria-select" onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">${orderProductOptions(r.categoria, r.prodotto)}</select>` : `<span style="color:var(--muted);">—</span>`}</td>` : `<td><input class="desc-input" value="${r.descrizione||''}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>`}
-            <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
-            <td class="num"><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)"></td>
-            <td class="num" style="padding-top:8px;">${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</td>
-            ${showDots ? `<td><select class="riga-status-select" style="background:${STATUS_DOT[r.stato]||'#fff'};color:${statusTextColor(r.stato)}" onchange="updateRigaField('${collection}','${id}','${r.id}','stato',this.value)">${KANBAN_STATUSES.map(s=>`<option value="${s}" ${r.stato===s?'selected':''}>${s}</option>`).join("")}</select></td>` : ``}
-            <td><button class="btn btn-ghost btn-sm" onclick="removeRiga('${collection}','${id}','${r.id}')">✕</button></td>
-          </tr>`).join("") || `<tr><td colspan="${isOrder?(showDots?7:6):5}" class="empty" style="padding:10px 0;">Nessuna riga. Aggiungine una.</td></tr>`}
-      </tbody>
-    </table>
+      <table class="lines-table">
+        <thead><tr><th>Descrizione</th><th class="num">Quantità</th><th class="num">Prezzo unit. €</th><th class="num">Totale</th><th></th></tr></thead>
+        <tbody>
+          ${righe.map(r=>`
+            <tr>
+              <td><input class="desc-input" value="${escapeHtml(r.descrizione||'')}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>
+              <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
+              <td class="num"><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)"></td>
+              <td class="num">${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</td>
+              <td><button class="btn btn-ghost btn-sm" onclick="removeRiga('${collection}','${id}','${r.id}')">✕</button></td>
+            </tr>
+          `).join("") || `<tr><td colspan="5" class="empty">Nessuna riga.</td></tr>`}
+        </tbody>
+      </table>
     </div>
     ${showAdd ? `<button class="btn btn-outline btn-sm" onclick="addRiga('${collection}','${id}')">+ Aggiungi riga</button>` : ''}
   `;
@@ -6155,7 +6296,7 @@ function updateRigaField(collection, id, rigaId, field, value){
   const item = findItem(collection, id);
   const riga = item.righe.find(r=>r.id===rigaId);
   riga[field] = (field==='quantita'||field==='prezzoUnitario') ? Number(value)||0 : value;
-  if(collection==='orders' && field==='categoria'){ recalcFasi(item); riga.prodotto = ""; if(value!=="Lavorazioni Esterne"){ delete riga.ritiroEsterno; delete riga.fornitore; } }
+  if(collection==='orders' && field==='categoria'){ recalcFasi(item); if(value!=="Lavorazioni Esterne"){ delete riga.ritiroEsterno; delete riga.fornitore; } }
   if(collection==='orders' && field==='prodotto'){ riga.fornitore = ""; }
   saveState(collection);
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
@@ -6988,106 +7129,515 @@ function saveJobCard(orderId){
   showToast("Scheda salvata");
 }
 
+
+function recommendedWorkStartDate(deliveryDate, workingDays=3){
+  if(!deliveryDate) return "";
+  const d=new Date(`${deliveryDate}T12:00:00`);
+  if(Number.isNaN(d.getTime())) return "";
+  let left=Math.max(1,Number(workingDays)||3);
+  while(left>0){
+    d.setDate(d.getDate()-1);
+    const day=d.getDay();
+    if(day!==0 && day!==6) left--;
+  }
+  return d.toISOString().slice(0,10);
+}
+function fmtRecommendedStart(deliveryDate){
+  const x=recommendedWorkStartDate(deliveryDate,3);
+  return x ? fmtDate(x) : "—";
+}
+
+function orderStageMessage(kind, orderId){
+  const o=findItem("orders",orderId);
+  const c=o ? state.clients.find(x=>x.id===o.clientId) : null;
+  const nome=c ? clientDisplayName(c) : "cliente";
+  const ref=o?.numero ? ` #${o.numero}` : "";
+
+  if(kind==="bozza"){
+    return `Gentile ${nome},
+
+ti inviamo la bozza grafica relativa al tuo ordine${ref}.
+Ti chiediamo di verificarla e di comunicarci la conferma prima di procedere con la produzione.
+
+Grazie,
+Creativò Group`;
+  }
+
+  if(kind==="produzione"){
+    return `Gentile ${nome},
+
+il tuo ordine${ref} è entrato in produzione.
+Ti avviseremo appena il lavoro sarà pronto.
+
+Grazie,
+Creativò Group`;
+  }
+
+  return avvisoClienteDefaultText(orderId);
+}
+
+function openOrderWhatsappStage(orderId, kind){
+  const o=findItem("orders",orderId);
+  if(!o) return;
+  const c=state.clients.find(x=>x.id===o.clientId);
+  if(!c) return;
+
+  const phone=String(c.telefono||"").trim();
+  if(!normalizeWaPhone(phone)){
+    showToast("Il cliente non ha un numero WhatsApp valido");
+    return;
+  }
+
+  const title = kind==="bozza"
+    ? "WhatsApp · Bozza grafica"
+    : kind==="produzione"
+      ? "WhatsApp · Ordine in produzione"
+      : "WhatsApp · Avviso cliente";
+
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="openJobCard('${orderId}')">×</button>
+    <h2>${title}</h2>
+    <p class="helptext" style="margin-top:0;">Messaggio già compilato. Puoi modificarlo e allegare un file prima dell'invio.</p>
+
+    <input id="waNewClient" type="hidden" value="${escapeHtml(c.id)}">
+
+    <div class="field">
+      <label>Cliente</label>
+      <input value="${escapeHtml(clientDisplayName(c))}" readonly>
+    </div>
+
+    <div class="field">
+      <label>Numero WhatsApp</label>
+      <input id="waNewPhone" value="${escapeHtml(phone)}" readonly>
+    </div>
+
+    <div class="field">
+      <label>Messaggio</label>
+      <textarea id="waNewText" rows="8">${escapeHtml(orderStageMessage(kind,orderId))}</textarea>
+    </div>
+
+    <div class="field">
+      <label>Allegato facoltativo</label>
+      <input id="waNewFile" type="file"
+        accept=".jpg,.jpeg,.png,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/jpeg,image/png,application/pdf">
+    </div>
+
+    <div class="notice" style="margin-top:12px;">
+      L'invio WhatsApp dipende dal collegamento del numero reale e dalle regole Meta sulla finestra di conversazione.
+    </div>
+
+    <div class="form-actions">
+      <button id="waNewSendBtn" class="btn btn-primary" onclick="sendOrderWhatsappStage('${orderId}','${kind}')">INVIA WHATSAPP</button>
+      <button class="btn btn-outline" onclick="openJobCard('${orderId}')">Annulla</button>
+    </div>
+  `;
+}
+
+async function sendOrderWhatsappStage(orderId, kind){
+  const o=findItem("orders",orderId);
+  if(!o) return;
+  const c=state.clients.find(x=>x.id===o.clientId);
+  if(!c) return;
+
+  const btn=document.getElementById("waNewSendBtn");
+  const phone=String(document.getElementById("waNewPhone")?.value||c.telefono||"").trim();
+  const message=String(document.getElementById("waNewText")?.value||"").trim();
+  const file=document.getElementById("waNewFile")?.files?.[0]||null;
+
+  if(!message && !file){
+    showToast("Scrivi un messaggio oppure allega un file");
+    return;
+  }
+
+  try{
+    if(btn){btn.disabled=true;btn.textContent="INVIO...";}
+    await sendWhatsappRequest({
+      to:phone,
+      message,
+      contactName:clientDisplayName(c),
+      file
+    });
+
+    if(kind==="bozza"){
+      setBozzaInAttesa(orderId);
+    }else if(kind==="completato"){
+      await markClienteAvvisato(orderId,"WhatsApp");
+    }
+
+    showToast("Messaggio WhatsApp inviato");
+    openJobCard(orderId);
+  }catch(error){
+    console.error(error);
+    showToast(error?.message||"Errore durante l'invio WhatsApp");
+    if(btn){btn.disabled=false;btn.textContent="INVIA WHATSAPP";}
+  }
+}
+
+function openOrderProductionMail(orderId){
+  const o=findItem("orders",orderId);
+  if(!o) return;
+  const c=state.clients.find(x=>x.id===o.clientId);
+  const email=String(c?.email||"").trim();
+
+  if(!email){
+    showToast("Il cliente non ha un indirizzo email");
+    return;
+  }
+
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="openJobCard('${orderId}')">×</button>
+    <h2>Mail · Ordine in produzione</h2>
+    <div class="field">
+      <label>A</label>
+      <input id="stage-mail-to" value="${escapeHtml(email)}" readonly>
+    </div>
+    <div class="field">
+      <label>Oggetto</label>
+      <input id="stage-mail-subject" value="Ordine in produzione">
+    </div>
+    <div class="field">
+      <label>Messaggio</label>
+      <textarea id="stage-mail-body" rows="8">${escapeHtml(orderStageMessage("produzione",orderId))}</textarea>
+    </div>
+    <div id="stage-mail-status" class="helptext"></div>
+    <div class="form-actions">
+      <button id="stage-mail-send" class="btn btn-primary" onclick="sendOrderProductionMail('${orderId}')">INVIA MAIL</button>
+      <button class="btn btn-outline" onclick="openJobCard('${orderId}')">Annulla</button>
+    </div>
+  `;
+}
+
+async function sendOrderProductionMail(orderId){
+  const o=findItem("orders",orderId);
+  if(!o) return;
+  const to=String(document.getElementById("stage-mail-to")?.value||"").trim();
+  const subject=String(document.getElementById("stage-mail-subject")?.value||"Ordine in produzione").trim();
+  const bodyText=String(document.getElementById("stage-mail-body")?.value||"").trim();
+  const btn=document.getElementById("stage-mail-send");
+  const status=document.getElementById("stage-mail-status");
+
+  if(!to || !bodyText){
+    showToast("Controlla email e messaggio");
+    return;
+  }
+
+  try{
+    if(btn){btn.disabled=true;btn.textContent="INVIO...";}
+    if(status) status.textContent="Invio in corso…";
+
+    const {data:sessionData}=await sb.auth.getSession();
+    const session=sessionData?.session;
+    if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "apikey":SUPABASE_KEY,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({mode:"new",to,subject,bodyText,attachments:[]})
+    });
+
+    const raw=await response.text();
+    let result={}; try{result=JSON.parse(raw)}catch(e){}
+    if(!response.ok) throw new Error(result?.error||result?.message||raw||`Errore HTTP ${response.status}`);
+
+    showToast("Mail ordine in produzione inviata");
+    openJobCard(orderId);
+  }catch(err){
+    console.error(err);
+    if(status) status.textContent=`Errore: ${err?.message||"invio non riuscito"}`;
+    if(btn){btn.disabled=false;btn.textContent="INVIA MAIL";}
+  }
+}
+
+function jobStageFlowHtml(o,c){
+  const current = o.stato==="Produzione esterna" ? "In produzione" : o.stato;
+  const orderIdx = {
+    "Da fare":0,
+    "In preparazione grafica":1,
+    "In produzione":2,
+    "Completato":3,
+    "Consegnato":4
+  };
+  const idx = orderIdx[current] ?? 0;
+  const hasEmail=!!String(c?.email||"").trim();
+  const hasPhone=!!normalizeWaPhone(c?.telefono||"");
+
+  const card=(step,title,copy,actions)=>{
+    const done=idx>step;
+    const active=idx===step;
+    return `<div class="job-v2-stage ${done?'done':''} ${active?'current':''}">
+      <div class="job-v2-stage-head">
+        <span class="job-v2-stage-num">${done?'✓':step+1}</span>
+        <span class="job-v2-stage-title">${title}</span>
+      </div>
+      <div class="job-v2-stage-copy">${copy}</div>
+      <div class="job-v2-stage-actions">${actions||""}</div>
+    </div>`;
+  };
+
+  return `<div class="job-v2-status-flow">
+    ${card(0,"DA FARE",
+      `Giorno consigliato di inizio<br><strong class="job-v2-start">${fmtRecommendedStart(o.dataConsegna)}</strong>`,
+      `<button class="btn btn-outline btn-sm" onclick="updateOrderField('${o.id}','stato','In preparazione grafica')">AVVIA PREPARAZIONE GRAFICA</button>`
+    )}
+
+    ${card(1,"IN PREPARAZIONE GRAFICA",
+      `Invia la bozza grafica al cliente per approvazione.`,
+      `<button class="btn job-v2-mail-btn btn-sm" ${hasEmail?'':'disabled'} onclick="openBozzaMail('${o.id}')">✉ MAIL BOZZA GRAFICA</button>
+       <button class="btn job-v2-wa-btn btn-sm" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','bozza')">WHATSAPP BOZZA GRAFICA</button>`
+    )}
+
+    ${card(2,"IN PRODUZIONE",
+      `Comunica al cliente che l'ordine è in produzione e che verrà avvisato appena pronto.`,
+      `<button class="btn job-v2-mail-btn btn-sm" ${hasEmail?'':'disabled'} onclick="openOrderProductionMail('${o.id}')">✉ MAIL ORDINE IN PRODUZIONE</button>
+       <button class="btn job-v2-wa-btn btn-sm" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','produzione')">WHATSAPP IN PRODUZIONE</button>`
+    )}
+
+    ${card(3,"COMPLETATO",
+      `Avvisa il cliente che il lavoro è pronto per il ritiro o la spedizione.`,
+      `<button class="btn job-v2-mail-btn btn-sm" ${hasEmail?'':'disabled'} onclick="openAvvisoMail('${o.id}')">✉ MAIL AVVISO CLIENTE</button>
+       <button class="btn job-v2-wa-btn btn-sm" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','completato')">WHATSAPP AVVISO CLIENTE</button>`
+    )}
+  </div>`;
+}
+
+function jobProgressHtml(o){
+  const delivered=o.stato==="Consegnato";
+  const completed=delivered || o.stato==="Completato";
+  const notified=delivered || !!o.clienteAvvisato;
+  const working=!["Da fare"].includes(o.stato);
+  const steps=[
+    {label:"In lavorazione",done:working,date:o.createdAt?fmtDate(String(o.createdAt).slice(0,10)):""},
+    {label:"Completato",done:completed,date:o.stato==="Completato"&&o.dataConsegna?fmtDate(o.dataConsegna):""},
+    {label:"Avvisato",done:notified,date:o.avvisatoIl?fmtDate(String(o.avvisatoIl).slice(0,10)):""},
+    {label:"Consegnato",done:delivered,date:delivered&&o.dataConsegna?fmtDate(o.dataConsegna):""}
+  ];
+  return `<div class="job-v2-progress">${steps.map((s,i)=>{
+    const active=!s.done && (i===0 || steps[i-1].done);
+    return `<div class="job-v2-step ${s.done?'done':''} ${active?'active':''}">
+      <div class="job-v2-step-dot">${s.done?'✓':(i+1)}</div>
+      <div class="job-v2-step-label">${s.label}</div>
+      ${s.date?`<div class="job-v2-step-date">${s.date}</div>`:""}
+    </div>`;
+  }).join("")}</div>`;
+}
+
 function openJobCard(orderId){
   const o = findItem('orders', orderId);
-  if(o && (!jobCardEditSnapshot || jobCardEditSnapshot.orderId!==orderId)){
+  if(!o) return;
+
+  if(!jobCardEditSnapshot || jobCardEditSnapshot.orderId!==orderId){
     jobCardEditSnapshot={
       orderId,
       order:JSON.parse(JSON.stringify(o))
     };
   }
+
   const c = state.clients.find(x=>x.id===o.clientId);
-  const imponibile = orderImponibile(o), iva = orderIva(o), totale = orderTotale(o);
+  const imponibile = orderImponibile(o);
+  const iva = orderIva(o);
+  const totale = orderTotale(o);
   const pagamenti = state.payments.filter(p=>p.orderId===o.id);
   const incassato = pagamenti.reduce((s,p)=>s+Number(p.importo),0);
-  const saldoResiduo = totale - incassato;
+  const saldoResiduo = totale-incassato;
+  const startSuggested = fmtRecommendedStart(o.dataConsegna);
+  const stateBg = (o.stato==="In produzione" && orderHasExternal(o)) ? "#2E9D57" : (STATUS_DOT[o.stato]||"#eef1f5");
+  const stateColor = (o.stato==="In produzione" && orderHasExternal(o)) ? "#fff" : statusTextColor(o.stato);
+
   document.getElementById("modalBody").innerHTML = `
-    <button class="close-x" onclick="cancelJobCard('${o.id}')">×</button>
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
-      <div style="flex:1;min-width:0;">
-        <p class="jobcard-eyebrow">Scheda di lavorazione${o.createdAt?` — creata il ${fmtDate(o.createdAt.slice(0,10))}`:''} <span style="font-size:8px;opacity:.5;text-transform:none;letter-spacing:0;">${o.numero?('#'+o.numero):''}</span></p>
-        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-          <h2 style="margin:0;">${c?clientDisplayName(c):"—"}</h2>
-          ${c ? `<button class="btn btn-outline btn-sm" onclick="openClientHistory('${c.id}')">ANAGRAFICA CLIENTE</button>` : ''}
+    <div class="job-v2">
+      <div class="job-v2-head">
+        <div>
+          <button class="btn btn-ghost btn-sm" style="padding-left:0;" onclick="cancelJobCard('${o.id}')">← Torna</button>
+          <div class="job-v2-title">
+            <h2>Ordine ${o.numero?('#'+o.numero):''}</h2>
+            <span class="job-v2-pill" style="background:${stateBg};color:${stateColor};border:${o.stato==="Da fare"?'1px solid #dde2e5':'0'}">${o.stato.toUpperCase()}</span>
+          </div>
+          <p class="job-v2-sub">
+            ${o.createdAt?`Creato il ${fmtDate(String(o.createdAt).slice(0,10))}`:""}
+            ${orderWorkersLabel(o)!=="—"?` · ${escapeHtml(orderWorkersLabel(o))}`:""}
+          </p>
         </div>
+        <button class="close-x" onclick="cancelJobCard('${o.id}')">×</button>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
-        <div class="jobcard-flags">
-        <label class="checkfield"><input type="checkbox" ${o.importante?'checked':''} onchange="updateOrderCheck('${o.id}','importante',this.checked)"> <span class="star ${o.importante?'active':''}" style="font-size:18px;">★</span> Importante</label>
-        ${o.consegnaTipo==="Spedizione" ? `<label class="checkfield"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Spedito</label>` : ``}
-        ${o.daFatturare ? `<label class="checkfield"><input type="checkbox" ${o.fatturato?'checked':''} onchange="updateOrderCheck('${o.id}','fatturato',this.checked)"> Fatturato</label>` : ``}
-        ${o.stato==="Completato" ? `<label class="checkfield"><input type="checkbox" ${o.clienteAvvisato?'checked':''} onchange="setClienteAvvisatoFromCard('${o.id}',this.checked)"> Cliente avvisato</label>` : ``}
+
+      <section class="job-v2-card" style="--job-accent:#2f80ed;">
+        <div class="job-v2-section-title">
+          <h3><span class="job-v2-num">1</span> Informazioni ordine</h3>
+          ${o.importante?`<span class="job-v2-pill" style="background:#fff2cd;color:#a26400;">★ IMPORTANTE</span>`:""}
         </div>
+
+        <div class="job-v2-info-grid">
+          <div class="job-v2-info-cell">
+            <label>Cliente</label>
+            <div class="job-v2-info-main">${c?escapeHtml(clientDisplayName(c)):"—"}</div>
+            ${c?.email?`<div class="job-v2-info-sub">${escapeHtml(c.email)}</div>`:""}
+            ${c?.telefono?`<div class="job-v2-info-sub">${escapeHtml(c.telefono)}</div>`:""}
+            ${c?`<button class="btn btn-outline btn-sm" style="margin-top:9px;" onclick="openClientHistory('${c.id}')">ANAGRAFICA CLIENTE</button>`:""}
+          </div>
+
+          <div class="job-v2-info-cell">
+            <label>Operatori</label>
+            ${workerMultiSelector(o)}
+            <div class="job-v2-muted-label" style="margin-top:12px;">Priorità</div>
+            <label class="checkfield"><input type="checkbox" ${o.importante?'checked':''} onchange="updateOrderCheck('${o.id}','importante',this.checked)"> Importante</label>
+          </div>
+
+          <div class="job-v2-info-cell">
+            <label>Inizio lavoro consigliato</label>
+            <div class="job-v2-start">${startSuggested}</div>
+            <div class="job-v2-info-sub">Calcolato automaticamente 3 giorni lavorativi prima della consegna.</div>
+            <label style="margin-top:13px;">Consegna prevista</label>
+            <input class="inline" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value);openJobCard('${o.id}')">
+          </div>
+
+          <div class="job-v2-info-cell">
+            <label>Stato ordine</label>
+            <select class="inline status-select-big" style="background:${stateBg};color:${stateColor};border:${o.stato==="Da fare"?"1px solid #DDE2E5":"none"}"
+              onchange="updateOrderField('${o.id}','stato',this.value)">
+              ${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${(s==="In produzione"&&orderHasExternal(o))?"IN PRODUZIONE ESTERNA":s.toUpperCase()}</option>`).join("")}
+            </select>
+
+            <label style="margin-top:13px;">Modalità consegna</label>
+            <select class="inline" onchange="updateOrderField('${o.id}','consegnaTipo',this.value);openJobCard('${o.id}')">
+              ${CONSEGNA_TIPI.map(t=>`<option ${t===o.consegnaTipo?'selected':''}>${t}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="job-v2-card" style="--job-accent:#8a56e8;">
+        <div class="job-v2-section-title">
+          <h3><span class="job-v2-num">2</span> Lavorazioni (${(o.righe||[]).length})</h3>
+          <div class="job-v2-info-sub">Categoria predefinita · descrizione prodotto libera · dettagli espandibili</div>
+        </div>
+        ${orderLinesWithWarehouse(o)}
+        ${renderRitiroEsternoSection(o)}
+      </section>
+
+      <section class="job-v2-card" style="--job-accent:#20a857;">
+        <div class="job-v2-section-title">
+          <h3><span class="job-v2-num">3</span> Magazzino / Materiali</h3>
+        </div>
+        ${renderMagazzinoInline(o) || `<p class="empty">Nessun materiale associato alla scheda.</p>`}
+      </section>
+
+      <section class="job-v2-card" style="--job-accent:#f08a24;">
+        <div class="job-v2-section-title">
+          <h3><span class="job-v2-num">4</span> Stato lavorazione e comunicazione cliente</h3>
+          <span class="job-v2-pill" style="background:${stateBg};color:${stateColor};">${(o.stato==="Produzione esterna"?"IN PRODUZIONE":o.stato).toUpperCase()}</span>
+        </div>
+        ${jobStageFlowHtml(o,c)}
+      </section>
+
+      <details class="job-v2-admin-details">
+        <summary>
+          <span><strong>5. Amministrazione</strong> <span style="font-weight:500;color:var(--muted);margin-left:8px;">Fatturazione, pagamenti, sconti e consegna</span></span>
+          <span class="job-v2-pill" style="background:#fff1ef;color:#c94230;">${fmtMoney(saldoResiduo)} residuo</span>
+        </summary>
+        <div class="job-v2-admin-body">
+          <section class="job-v2-card" style="--job-accent:#ef5b4a;box-shadow:none;border-radius:13px;">
+
+        <div class="job-v2-section-title">
+          <h3><span class="job-v2-num">5</span> Amministrazione</h3>
+          <button class="btn btn-primary btn-sm" onclick="openAddPaymentModal('${o.id}')">+ AGGIUNGI PAGAMENTO</button>
+        </div>
+
+        <div class="job-v2-soft" style="margin-bottom:14px;">
+          <h4>Consegna</h4>
+          <div class="form-grid">
+            <div class="field">
+              <label>Data consegna</label>
+              <input type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value);openJobCard('${o.id}')">
+            </div>
+            <div class="field">
+              <label>Modalità consegna</label>
+              <select onchange="updateOrderField('${o.id}','consegnaTipo',this.value);openJobCard('${o.id}')">
+                ${CONSEGNA_TIPI.map(t=>`<option ${t===o.consegnaTipo?'selected':''}>${t}</option>`).join("")}
+              </select>
+            </div>
+            ${o.consegnaTipo==="Spedizione" ? `
+              <div class="field">
+                <label>Costo spedizione (€)</label>
+                <input type="number" min="0" step="0.01" value="${o.costoSpedizione||0}" onchange="updateOrderField('${o.id}','costoSpedizione',Number(this.value)||0);openJobCard('${o.id}')">
+              </div>
+              <div class="field" style="display:flex;align-items:end;">
+                <label class="checkfield"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Spedito</label>
+              </div>
+            ` : ""}
+          </div>
+          <div class="job-v2-info-sub">Inizio lavoro consigliato: <strong>${startSuggested}</strong></div>
+        </div>
+
+        <div class="job-v2-three">
+          <div class="job-v2-soft">
+            <h4>Riepilogo economico</h4>
+            <div class="job-v2-money-row"><span>Totale lavorazioni</span><strong>${fmtMoney(imponibile)}</strong></div>
+            ${orderSpedizioneCosto(o)>0?`<div class="job-v2-money-row"><span>Spedizione</span><strong>${fmtMoney(orderSpedizioneCosto(o))}</strong></div>`:""}
+            <div class="field" style="margin:10px 0 5px;"><label>Sconto (€)</label><input type="number" min="0" step="0.01" value="${o.sconto||0}" onchange="updateOrderField('${o.id}','sconto',Number(this.value)||0);openJobCard('${o.id}')"></div>
+            <label class="checkfield" style="margin-top:10px;"><input type="checkbox" ${o.ivaApplicata?'checked':''} onchange="updateOrderCheck('${o.id}','ivaApplicata',this.checked)"> Applica IVA 22%</label>
+            ${o.ivaApplicata?`<div class="job-v2-money-row"><span>IVA 22%</span><strong>${fmtMoney(iva)}</strong></div>`:""}
+            <div class="job-v2-money-row total"><span>Totale</span><span>${fmtMoney(totale)}</span></div>
+          </div>
+
+          <div class="job-v2-soft">
+            <h4>Fatturazione</h4>
+            <label class="checkfield"><input type="checkbox" ${o.daFatturare?'checked':''} onchange="updateOrderCheck('${o.id}','daFatturare',this.checked)"> Da fatturare</label>
+            ${o.daFatturare?`<label class="checkfield" style="margin-top:10px;"><input type="checkbox" ${o.fatturato?'checked':''} onchange="updateOrderCheck('${o.id}','fatturato',this.checked)"> Fatturato</label>`:""}
+            <div class="job-v2-info-sub" style="margin-top:16px;">Lo stato di fatturazione viene usato anche nei report Incassi.</div>
+          </div>
+
+          <div class="job-v2-soft">
+            <h4>Pagamenti</h4>
+            ${pagamenti.length ? `
+              <table class="job-v2-pay-table">
+                <thead><tr><th>Data</th><th>Tipo</th><th>Modalità</th><th>Importo</th><th></th></tr></thead>
+                <tbody>${pagamenti.map(p=>`
+                  <tr>
+                    <td>${fmtDate(p.data)}</td>
+                    <td>${escapeHtml(p.tipo||"")}</td>
+                    <td>${escapeHtml(p.metodo||"")}</td>
+                    <td><strong>${fmtMoney(p.importo)}</strong></td>
+                    <td><button class="btn btn-ghost btn-sm" onclick="openEditPaymentModal('${p.id}','${o.id}')">✎</button></td>
+                  </tr>`).join("")}
+                </tbody>
+              </table>` : `<p class="empty" style="padding:8px 0;">Nessun pagamento registrato.</p>`}
+            <div class="job-v2-money-row" style="margin-top:8px;"><span>Totale incassato</span><strong>${fmtMoney(incassato)}</strong></div>
+            <div class="job-v2-money-row balance"><span>Saldo residuo</span><span>${fmtMoney(saldoResiduo)}</span></div>
+          </div>
+        </div>
+          </section>
+        </div>
+      </details>
+
+      <section class="job-v2-two">
+        <div class="job-v2-card" style="--job-accent:#355db4;">
+          <div class="job-v2-section-title"><h3>Note operative</h3></div>
+          <textarea class="job-v2-note" placeholder="Note generali della commessa…" onchange="updateOrderField('${o.id}','descrizione',this.value)">${escapeHtml(o.descrizione||"")}</textarea>
+        </div>
+
+        <div class="job-v2-card" style="--job-accent:#2979d8;">
+          <div class="job-v2-section-title"><h3>Allegati e comunicazioni</h3></div>
+          ${renderOrderExternalAttachments(o)}
+          ${renderOrderCommunications(o,c)}
+        </div>
+      </section>
+
+      <div class="job-v2-bottom-actions">
+        <div style="display:flex;gap:9px;flex-wrap:wrap;">
+          <button class="btn btn-outline" onclick="window.print()">Stampa</button>
+          <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
+          <button class="btn btn-primary" onclick="saveJobCard('${o.id}')">Salva</button>
+          <button class="btn btn-outline" onclick="cancelJobCard('${o.id}')">Annulla</button>
+        </div>
+        <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteOrder('${o.id}')">Elimina ordine</button>
       </div>
-    </div>
-    <div class="ticket-meta ticket-meta-big">
-      <div><span>Operatori</span>${workerMultiSelector(o)}</div>
-      <div><span>Data consegna</span><input class="inline inline-big" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value)"></div>
-      <div><span>Stato</span><select class="inline inline-big status-select-big" style="background:${(o.stato==="In produzione" && orderHasExternal(o))?"#2E9D57":STATUS_DOT[o.stato]};color:${(o.stato==="In produzione" && orderHasExternal(o))?"#FFFFFF":statusTextColor(o.stato)};border:${o.stato==="Da fare"?"1px solid #DDE2E5":"none"}" onchange="updateOrderField('${o.id}','stato',this.value)">${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${(s==="In produzione" && orderHasExternal(o))?"IN PRODUZIONE ESTERNA":s.toUpperCase()}</option>`).join("")}</select></div>
-    </div>
-
-    <div class="modal-section">
-      <h3>Righe di lavorazione</h3>
-      <p class="helptext" style="margin-top:-4px;">Ogni riga ha una propria categoria di lavoro.${o.righe.length>1 ? ' Scegli lo stato di ciascuna riga dal menu colorato.' : ''}</p>
-      ${orderLinesWithWarehouse(o)}
-    </div>
-
-    ${renderMagazzinoSection(o)}
-
-    ${renderRitiroEsternoSection(o)}
-
-
-    <div class="modal-section">
-      <h3>Descrizione generale del lavoro</h3>
-      <textarea class="desc-lavoro" rows="12" placeholder="Descrivi in modo dettagliato il lavoro, materiali, misure, colori, note operative e indicazioni per la produzione…" onchange="updateOrderField('${o.id}','descrizione',this.value)">${o.descrizione||""}</textarea>
-      ${renderOrderExternalAttachments(o)}
-    </div>
-
-    ${renderOrderCommunications(o,c)}
-
-    ${renderBozzaSection(o)}
-
-    <div class="modal-section">
-      <h3>Fatturazione e pagamento</h3>
-      <div class="checkfield" style="margin-bottom:6px;"><input type="checkbox" ${o.daFatturare?'checked':''} onchange="updateOrderCheck('${o.id}','daFatturare',this.checked)"> Da fatturare</div>
-      <div class="checkfield" style="margin-bottom:14px;"><input type="checkbox" ${o.ivaApplicata?'checked':''} onchange="updateOrderCheck('${o.id}','ivaApplicata',this.checked)"> Applica IVA 22%</div>
-      <div class="form-grid">
-        <div class="field"><label>Sconto (€)</label><input type="number" min="0" step="0.01" value="${o.sconto||0}" onchange="updateOrderField('${o.id}','sconto',Number(this.value)||0); openJobCard('${o.id}')"></div>
-        <div class="field"><label>Modalità di consegna</label><select class="inline" onchange="updateOrderField('${o.id}','consegnaTipo',this.value); openJobCard('${o.id}')">${CONSEGNA_TIPI.map(t=>`<option ${t===o.consegnaTipo?'selected':''}>${t}</option>`).join("")}</select></div>
-        ${o.consegnaTipo==="Spedizione" ? `<div class="field"><label>Costo di spedizione (€)</label><input type="number" min="0" step="0.01" value="${o.costoSpedizione||0}" onchange="updateOrderField('${o.id}','costoSpedizione',Number(this.value)||0); openJobCard('${o.id}')"></div>` : ``}
-      </div>
-      <div class="totals-box" style="margin-top:16px;">
-        <div class="trow"><span>Imponibile</span><span>${fmtMoney(imponibile)}</span></div>
-        ${o.consegnaTipo==="Spedizione" && Number(o.costoSpedizione)>0 ? `<div class="trow"><span>Spedizione</span><span>${fmtMoney(o.costoSpedizione)}</span></div>` : ""}
-        ${o.ivaApplicata ? `<div class="trow"><span>IVA 22%${o.consegnaTipo==="Spedizione" && Number(o.costoSpedizione)>0 ? ' (merce + spedizione)' : ''}</span><span>${fmtMoney(iva)}</span></div>` : ""}
-        ${Number(o.sconto)>0 ? `<div class="trow"><span>Sconto</span><span>− ${fmtMoney(o.sconto)}</span></div>` : ""}
-        <div class="trow grand"><span>Totale lavorazione</span><span>${fmtMoney(totale)}</span></div>
-      </div>
-      <div class="form-actions" style="margin-top:14px;"><button class="btn btn-primary" onclick="openAddPaymentModal('${o.id}')">AGGIUNGI PAGAMENTO</button></div>
-      <div class="pay-list" style="margin-top:14px;">
-        ${pagamenti.length ? pagamenti.map(p=>`
-          <div class="pay-row">
-            <span>${p.tipo} — ${fmtMoney(p.importo)} — ${p.metodo} — ${fmtDate(p.data)}</span>
-            <button class="btn btn-outline btn-sm" onclick="openEditPaymentModal('${p.id}','${o.id}')">MODIFICA</button>
-          </div>`).join("") : `<p class="empty" style="padding:6px 0;">Nessun pagamento registrato.</p>`}
-      </div>
-      <div class="totals-box">
-        <div class="trow"><span>Incassato</span><span>${fmtMoney(incassato)}</span></div>
-        <div class="trow grand"><span>Saldo residuo</span><span style="${saldoResiduo>0.001?'color:var(--danger)':''}">${fmtMoney(saldoResiduo)}</span></div>
-      </div>
-    </div>
-
-
-    <div class="form-actions" style="justify-content:space-between;align-items:center;flex-wrap:wrap;">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-outline" onclick="window.print()">Stampa</button>
-        <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
-        <button class="btn btn-primary" onclick="saveJobCard('${o.id}')">Salva</button>
-        <button class="btn btn-outline" onclick="cancelJobCard('${o.id}')">Annulla</button>
-      </div>
-      <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteOrder('${o.id}')">Elimina ordine</button>
     </div>
   `;
+
   document.getElementById("modalBackdrop").classList.add("open");
 }
 function duplicateOrder(orderId){
