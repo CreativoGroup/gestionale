@@ -2016,6 +2016,28 @@
   .flow-summary{grid-template-columns:1fr 1fr;}
 }
 
+
+/* ===== PERSONALIZZAZIONI DATA / SERVIZI / RITIRO ESTERNO ===== */
+.job-v2-service-row .riga-categoria-select,
+.job-v2-service-row .job-v2-product input,
+.job-v2-service-row .job-v2-product textarea,
+.job-v2-service-row .job-v2-desc-toggle summary,
+.job-v2-service-row td.num,
+.job-v2-service-row td.num input{
+  color:#17643a !important;
+}
+.job-v2-service-row .job-v2-product input{font-weight:500 !important;}
+.job-v2-date-box.start input[type="date"]{
+  border:0;background:transparent;padding:0;font-size:18px;font-weight:900;color:inherit;width:100%;
+}
+.job-v2-date-reset{border:0;background:transparent;color:#2468d4;font-size:11.5px;font-weight:800;padding:5px 0;cursor:pointer;}
+.external-logistics-list{display:flex;flex-direction:column;gap:10px;margin-top:14px;}
+.external-logistics-row{border:1px solid #dfe5ec;border-radius:13px;background:#fff;padding:13px 14px;}
+.external-logistics-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;}
+.external-logistics-title{font-size:14px;font-weight:900;color:#253143;}
+.external-logistics-actions{display:flex;gap:16px;flex-wrap:wrap;align-items:center;}
+.external-logistics-add{margin-top:12px;}
+
 </style>
 
 <style id="whatsapp-refine-style">
@@ -5013,10 +5035,11 @@ async function cleanupOldNoteComunicazioni(){
 
 /* ============ DASHBOARD ============ */
 function orderPendingPickupRows(o){
-  return (o?.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE");
+  return getExternalLogisticsEntries(o).filter(e=>e.status==="DA RITIRARE");
 }
 function orderPendingPickupSuppliers(o){
-  return [...new Set(orderPendingPickupRows(o).map(r=>String(r.fornitore||"").trim()).filter(Boolean))];
+  if(!orderPendingPickupRows(o).length) return [];
+  return [...new Set((o?.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne").map(r=>String(r.fornitore||"").trim()).filter(Boolean))];
 }
 function orderCustomerStage(o){
   if(orderPendingPickupRows(o).length) return "DA RITIRARE";
@@ -5027,7 +5050,12 @@ async function segnaRitiroCompletato(orderId){
   if(!o) return;
   const pending=orderPendingPickupRows(o);
   if(!pending.length) return;
-  pending.forEach(r=>r.ritiroEsterno="RITIRATO");
+  const pendingIds=new Set(pending.map(x=>x.id));
+  let entries=(o.fasi||[]).filter(f=>f && f.key==="__ritiro_esterno__");
+  if(entries.length){
+    entries.forEach(e=>{ if(pendingIds.has(e.id)) e.status="RITIRATO"; });
+  }
+  (o.righe||[]).forEach(r=>{ if(r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE") r.ritiroEsterno="RITIRATO"; });
   await saveState('orders');
   renderDashboard();
   showToast("Ritiro completato: ora il cliente è da avvisare");
@@ -5081,7 +5109,7 @@ function renderDashboard(){
     if(sa!==sb) return sa-sb;
     return clientName(a.clientId).localeCompare(clientName(b.clientId));
   });
-  const ritiriDaFare = state.orders.filter(o=>o.stato==="Completato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"));
+  const ritiriDaFare = state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0);
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
   const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
@@ -5480,7 +5508,7 @@ function openDashboardList(type){
     fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato && (o.stato==="Completato" || o.stato==="Consegnato")), isFatturare:true},
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
     materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
-    ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato==="Completato" && (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE"))},
+    ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0)},
     avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato && orderPendingPickupRows(o).length===0)},
     scorte: {title:"Articoli sotto scorta", items: computeScorteMonitorate(), isStock:true}
   };
@@ -6584,7 +6612,7 @@ function linesEditor(collection, id, righe, options={}){
           </thead>
           <tbody>
             ${righe.map((r,idx)=>`
-              <tr>
+              <tr class="${r.categoria==='Servizio'?'job-v2-service-row':''}">
                 <td>
                   <select class="inline riga-categoria-select"
                     onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">
@@ -7382,7 +7410,7 @@ function renderFlusso(){
     .filter(o=>!!flowStageOf(o));
 
   const daIniziareOggi=activeAll.filter(o=>{
-    const recommended=typeof recommendedWorkStartDate==="function" ? recommendedWorkStartDate(o.dataConsegna,3) : "";
+    const recommended=typeof effectiveWorkStartDate==="function" ? effectiveWorkStartDate(o) : (typeof recommendedWorkStartDate==="function" ? recommendedWorkStartDate(o.dataConsegna,3) : "");
     return flowDateKey(recommended)===today && o.stato==="Da fare";
   }).length;
 
@@ -7509,10 +7537,11 @@ function renderRitiroEsternoSection(o){
   if(!righe.length) return "";
 
   const selectedSupplier=String(righe.find(r=>String(r.fornitore||"").trim())?.fornitore||"").trim();
+  const entries=getExternalLogisticsEntries(o);
 
   return `<div class="modal-section">
     <h3>Lavorazioni esterne — fornitore e ritiro</h3>
-    <p class="helptext" style="margin-top:-4px;">Il fornitore è unico per tutta la scheda, anche quando sono presenti più righe di lavorazioni esterne.</p>
+    <p class="helptext" style="margin-top:-4px;">Fornitore e gestione consegna/ritiro sono indipendenti dal numero di righe prodotto.</p>
 
     <div class="field" style="max-width:420px;margin:12px 0 16px;">
       <label>Fornitore unico</label>
@@ -7522,16 +7551,19 @@ function renderRitiroEsternoSection(o){
       </select>
     </div>
 
-    ${righe.map((r,idx)=>{
-      const val=r.ritiroEsterno||"";
-      const label=r.prodotto || r.descrizione || `Lavorazione esterna ${idx+1}`;
-      return `<div style="padding:12px 0;border-bottom:1px solid var(--border);">
-        <div style="font-weight:800;margin-bottom:8px;">${escapeHtml(label)}</div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;">
-          ${["CONSEGNA IN SEDE","DA RITIRARE","RITIRATO"].map(st=>`<label class="checkfield" style="font-weight:${val===st?'700':'500'};"><input type="radio" name="ritiro-${r.id}" ${val===st?'checked':''} onchange="updateRitiroEsterno('${o.id}','${r.id}','${st}')"> ${st}</label>`).join("")}
+    <div class="external-logistics-list">
+      ${entries.map((e,idx)=>`<div class="external-logistics-row">
+        <div class="external-logistics-head">
+          <div class="external-logistics-title">Consegna / ritiro ${idx+1}</div>
+          ${entries.length>1?`<button class="btn btn-ghost btn-sm" onclick="removeExternalLogisticsEntry('${o.id}','${e.id}')">Rimuovi</button>`:""}
         </div>
-      </div>`;
-    }).join("")}
+        <div class="external-logistics-actions">
+          ${["CONSEGNA IN SEDE","DA RITIRARE","RITIRATO"].map(st=>`<label class="checkfield" style="font-weight:${e.status===st?'800':'600'};"><input type="radio" name="ritiro-entry-${e.id}" ${e.status===st?'checked':''} onchange="updateExternalLogisticsStatus('${o.id}','${e.id}','${st}')"> ${st}</label>`).join("")}
+        </div>
+      </div>`).join("")}
+    </div>
+
+    <button class="btn btn-outline btn-sm external-logistics-add" onclick="addExternalLogisticsEntry('${o.id}')">+ AGGIUNGI CONSEGNA / RITIRO</button>
   </div>`;
 }
 function updateFornitoreEsternoUnico(orderId,value){
@@ -7543,16 +7575,6 @@ function updateFornitoreEsternoUnico(orderId,value){
   });
   saveState('orders');
   openJobCard(orderId);
-}
-
-function updateRitiroEsterno(orderId,rigaId,status){
-  const o=findItem('orders',orderId);
-  const r=(o.righe||[]).find(x=>x.id===rigaId);
-  if(!r) return;
-  r.ritiroEsterno=status;
-  saveState('orders');
-  openJobCard(orderId);
-  showToast(status==="DA RITIRARE" ? "Aggiunto agli ordini da ritirare" : `Stato ritiro: ${status}`);
 }
 
 let jobCardEditSnapshot = null;
@@ -7653,6 +7675,72 @@ function saveJobCard(orderId){
   showToast("Scheda salvata");
 }
 
+
+
+function getWorkStartMeta(order){
+  return (order?.fasi||[]).find(f=>f && f.key==="__inizio_lavoro__") || null;
+}
+function effectiveWorkStartDate(order){
+  const custom=String(getWorkStartMeta(order)?.date||"").trim();
+  return custom || recommendedWorkStartDate(order?.dataConsegna,3);
+}
+function setWorkStartDate(orderId,date){
+  const o=findItem("orders",orderId); if(!o) return;
+  const keep=(o.fasi||[]).filter(f=>!(f && f.key==="__inizio_lavoro__"));
+  const value=String(date||"").trim();
+  o.fasi=value ? [{key:"__inizio_lavoro__",date:value},...keep] : keep;
+  saveState("orders");
+  openJobCard(orderId);
+}
+function resetWorkStartDate(orderId){
+  setWorkStartDate(orderId,"");
+  showToast("Data inizio ripristinata al calcolo automatico");
+}
+
+function getExternalLogisticsEntries(order){
+  const stored=(order?.fasi||[]).filter(f=>f && f.key==="__ritiro_esterno__");
+  if(stored.length) return stored;
+  const legacy=(order?.righe||[]).find(r=>r.categoria==="Lavorazioni Esterne" && String(r.ritiroEsterno||"").trim());
+  return [{key:"__ritiro_esterno__",id:"default",status:String(legacy?.ritiroEsterno||"")}];
+}
+function updateExternalLogisticsStatus(orderId,entryId,status){
+  const o=findItem("orders",orderId); if(!o) return;
+  let entries=(o.fasi||[]).filter(f=>f && f.key==="__ritiro_esterno__");
+  if(!entries.length){
+    entries=[{key:"__ritiro_esterno__",id:uid(),status:""}];
+  }
+  let target=entries.find(e=>e.id===entryId);
+  if(!target && entryId==="default") target=entries[0];
+  if(target) target.status=status;
+  const others=(o.fasi||[]).filter(f=>!(f && f.key==="__ritiro_esterno__"));
+  o.fasi=[...others,...entries];
+  // Manteniamo i vecchi campi riga sincronizzati solo per compatibilità con dati storici.
+  (o.righe||[]).forEach(r=>{ if(r.categoria==="Lavorazioni Esterne") r.ritiroEsterno=status; });
+  saveState("orders");
+  openJobCard(orderId);
+  showToast(status==="DA RITIRARE" ? "Aggiunto agli ordini da ritirare" : `Stato ritiro: ${status}`);
+}
+function addExternalLogisticsEntry(orderId){
+  const o=findItem("orders",orderId); if(!o) return;
+  let entries=(o.fasi||[]).filter(f=>f && f.key==="__ritiro_esterno__");
+  if(!entries.length){
+    const legacy=(o.righe||[]).find(r=>r.categoria==="Lavorazioni Esterne" && String(r.ritiroEsterno||"").trim());
+    entries=[{key:"__ritiro_esterno__",id:uid(),status:String(legacy?.ritiroEsterno||"")}];
+  }
+  entries.push({key:"__ritiro_esterno__",id:uid(),status:""});
+  const others=(o.fasi||[]).filter(f=>!(f && f.key==="__ritiro_esterno__"));
+  o.fasi=[...others,...entries];
+  saveState("orders");
+  openJobCard(orderId);
+}
+function removeExternalLogisticsEntry(orderId,entryId){
+  const o=findItem("orders",orderId); if(!o) return;
+  const entries=(o.fasi||[]).filter(f=>f && f.key==="__ritiro_esterno__");
+  if(entries.length<=1){ showToast("Deve rimanere almeno una gestione consegna/ritiro"); return; }
+  o.fasi=(o.fasi||[]).filter(f=>!(f && f.key==="__ritiro_esterno__" && f.id===entryId));
+  saveState("orders");
+  openJobCard(orderId);
+}
 
 function recommendedWorkStartDate(deliveryDate, workingDays=3){
   if(!deliveryDate) return "";
@@ -8100,7 +8188,9 @@ function openJobCard(orderId){
   const pagamenti = state.payments.filter(p=>p.orderId===o.id);
   const incassato = pagamenti.reduce((s,p)=>s+Number(p.importo),0);
   const saldoResiduo = totale-incassato;
-  const startSuggested = fmtRecommendedStart(o.dataConsegna);
+  const startSuggestedDate = effectiveWorkStartDate(o);
+  const startSuggested = startSuggestedDate ? fmtDate(startSuggestedDate) : "—";
+  const hasCustomStart = !!getWorkStartMeta(o);
   const stateBg = (o.stato==="In produzione" && orderHasExternal(o)) ? "#2E9D57" : (STATUS_DOT[o.stato]||"#eef1f5");
   const stateColor = (o.stato==="In produzione" && orderHasExternal(o)) ? "#fff" : statusTextColor(o.stato);
 
@@ -8145,9 +8235,10 @@ function openJobCard(orderId){
             <label>Inizio lavoro consigliato</label>
             <div class="job-v2-date-box start">
               <span class="job-v2-date-icon">◫</span>
-              <span>${startSuggested}</span>
+              <input type="date" value="${startSuggestedDate||''}" onchange="setWorkStartDate('${o.id}',this.value)">
             </div>
-            <div class="job-v2-info-sub" style="margin-top:7px;">Calcolato automaticamente 3 giorni lavorativi prima della consegna.</div>
+            <div class="job-v2-info-sub" style="margin-top:7px;">${hasCustomStart?'Data scelta manualmente.':'Default automatico: 3 giorni lavorativi prima della consegna.'}</div>
+            ${hasCustomStart?`<button class="job-v2-date-reset" onclick="resetWorkStartDate('${o.id}')">Ripristina data automatica</button>`:""}
 
             <label style="margin-top:15px;">Consegna prevista</label>
             <div class="job-v2-date-box delivery">
