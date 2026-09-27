@@ -1723,6 +1723,47 @@
 .worker-chip input{position:absolute;opacity:0;pointer-events:none;}
 .worker-summary{margin-top:9px;font-size:11px;color:var(--muted);}
 
+
+/* ===== STATO SINGOLO / TIMELINE ===== */
+.job-stage-single-wrap{display:flex;flex-direction:column;gap:18px;}
+.job-stage-timeline{display:grid;grid-template-columns:repeat(5,1fr);align-items:start;gap:0;padding:2px 18px 4px;}
+.job-stage-point{position:relative;text-align:center;min-width:0;}
+.job-stage-point:not(:last-child):after{content:"";position:absolute;top:17px;left:56%;right:-44%;height:2px;background:#dce3eb;z-index:0;}
+.job-stage-point.done:not(:last-child):after{background:#35a866;}
+.job-stage-dot{position:relative;z-index:1;width:36px;height:36px;margin:0 auto 8px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #cad3de;background:#fff;color:#7b8796;font-size:14px;font-weight:900;}
+.job-stage-point.done .job-stage-dot{background:#20a857;border-color:#20a857;color:#fff;}
+.job-stage-point.current .job-stage-dot{background:#f5a900;border-color:#f5a900;color:#fff;box-shadow:0 0 0 5px rgba(245,169,0,.12);}
+.job-stage-label{font-size:13px;font-weight:800;color:#6b7787;white-space:normal;line-height:1.25;}
+.job-stage-point.current .job-stage-label{color:#202b3b;font-weight:900;}
+.job-stage-current-shell{display:grid;grid-template-columns:145px minmax(0,1fr) 145px;gap:18px;align-items:center;}
+.job-stage-arrow-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;min-height:190px;}
+.job-stage-arrow{appearance:none;width:52px;height:52px;border-radius:50%;border:1px solid #d9e1ea;background:#fff;color:#667487;font-size:28px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.16s ease;box-shadow:0 2px 8px rgba(20,30,45,.04);}
+.job-stage-arrow:hover{border-color:#f0a66c;color:#ef5b2f;transform:scale(1.04);}
+.job-stage-arrow:disabled{opacity:.25;cursor:not-allowed;transform:none;}
+.job-stage-arrow-caption{font-size:12px;font-weight:800;color:#526071;}
+.job-stage-arrow-sub{font-size:11px;color:var(--muted);line-height:1.25;}
+.job-stage-current-card{border:1px solid #f0cf8c;background:#fffaf0;border-radius:18px;padding:22px 24px;box-shadow:0 7px 20px rgba(60,45,15,.06);min-height:210px;}
+.job-stage-current-kicker{display:inline-flex;padding:5px 9px;border-radius:999px;background:#fff0c7;color:#a66c00;font-size:11px;font-weight:900;margin-bottom:8px;}
+.job-stage-current-title{font-size:22px;font-weight:900;color:#202b3b;margin-bottom:8px;}
+.job-stage-current-copy{font-size:15px;line-height:1.55;color:#657184;margin-bottom:16px;}
+.job-stage-current-card .job-v2-muted-label{font-size:13px;}
+.job-stage-current-card .job-v2-start{font-size:18px;}
+.job-stage-current-card select.inline{font-size:15px;padding:10px 12px;}
+.job-stage-current-actions{display:flex;flex-direction:column;gap:10px;}
+.job-stage-current-actions .btn{font-size:15px;padding:12px 16px;}
+.job-stage-note{font-size:13px;color:var(--muted);line-height:1.5;}
+.job-stage-final{display:flex;align-items:center;gap:14px;padding:14px 16px;background:#f4fbf6;border:1px solid #cae9d2;border-radius:13px;color:#267348;font-size:15px;font-weight:800;}
+.job-stage-final-icon{width:34px;height:34px;border-radius:50%;background:#20a857;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;flex:0 0 auto;}
+@media(max-width:900px){
+  .job-stage-current-shell{grid-template-columns:1fr;}
+  .job-stage-arrow-zone{min-height:auto;flex-direction:row;justify-content:center;padding:2px 0;}
+  .job-stage-arrow-caption,.job-stage-arrow-sub{display:none;}
+  .job-stage-timeline{padding-left:0;padding-right:0;}
+  .job-stage-label{font-size:11px;}
+  .job-stage-dot{width:30px;height:30px;}
+  .job-stage-point:not(:last-child):after{top:14px;}
+}
+
 </style>
 
 <style id="whatsapp-refine-style">
@@ -7412,30 +7453,31 @@ function jobStageFlowHtml(o,c){
   const channel=normalizedBozzaChannel(o);
   const meta=getBozzaMeta(o);
 
-  const orderIdx={
-    "Da fare":0,
-    "In preparazione grafica":1,
-    "In produzione":2,
-    "Completato":3,
-    "Consegnato":4
-  };
-  const idx=orderIdx[current] ?? 0;
+  const stages=[
+    {key:"Da fare", label:"Da fare"},
+    {key:"In preparazione grafica", label:"Preparazione grafica"},
+    {key:"In produzione", label:"In produzione"},
+    {key:"Completato", label:"Completato"},
+    {key:"Consegnato", label:"Consegnato"}
+  ];
 
-  const card=(step,title,copy,actions)=>{
-    const done=idx>step;
-    const active=idx===step;
-    return `<div class="job-v2-stage ${done?'done':''} ${active?'current':''}">
-      <div class="job-v2-stage-head">
-        <span class="job-v2-stage-num">${done?'✓':step+1}</span>
-        <span class="job-v2-stage-title">${title}</span>
-      </div>
-      <div class="job-v2-stage-copy">${copy}</div>
-      <div class="job-v2-stage-actions">${actions||""}</div>
+  let idx=stages.findIndex(s=>s.key===current);
+  if(idx<0) idx=0;
+
+  const prev=idx>0 ? stages[idx-1] : null;
+  const next=idx<stages.length-1 ? stages[idx+1] : null;
+
+  const timeline=`
+    <div class="job-stage-timeline">
+      ${stages.map((s,i)=>`
+        <div class="job-stage-point ${i<idx?'done':''} ${i===idx?'current':''}">
+          <div class="job-stage-dot">${i<idx?'✓':i+1}</div>
+          <div class="job-stage-label">${s.label}</div>
+        </div>`).join("")}
     </div>`;
-  };
 
   const bozzaChoice=`
-    <div style="margin-top:7px;">
+    <div style="margin-top:12px;">
       <div class="job-v2-muted-label">Invio bozza</div>
       <select class="inline" onchange="setBozzaChannel('${o.id}',this.value)">
         <option value="">— Scegli canale —</option>
@@ -7445,61 +7487,116 @@ function jobStageFlowHtml(o,c){
       </select>
     </div>`;
 
-  let prepAction="";
-  if(channel==="MAIL"){
-    prepAction=`
-      <button class="btn job-v2-mail-btn btn-sm" ${hasEmail?'':'disabled'} onclick="openBozzaMail('${o.id}')">✉ INVIA BOZZA VIA MAIL</button>
-      ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-v2-info-sub" style="color:#9a6700;font-weight:800;">IN ATTESA DI RISPOSTA</div>`:""}
-    `;
-  }else if(channel==="WHATSAPP"){
-    prepAction=`
-      <button class="btn job-v2-wa-btn btn-sm" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','bozza')">INVIA BOZZA VIA WHATSAPP</button>
-      ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-v2-info-sub" style="color:#9a6700;font-weight:800;">IN ATTESA DI RISPOSTA</div>`:""}
-    `;
-  }else if(channel==="ALTRO"){
-    prepAction=`
-      <button class="btn btn-outline btn-sm" onclick="segnaBozzaAltroInviata('${o.id}')">SEGNA BOZZA INVIATA · ALTRO</button>
-      ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-v2-info-sub" style="color:#9a6700;font-weight:800;">IN ATTESA DI RISPOSTA</div>`:""}
-    `;
-  }else{
-    prepAction=`<div class="job-v2-info-sub">Seleziona prima il canale bozza in “Da fare”.</div>`;
+  let title="";
+  let copy="";
+  let actions="";
+
+  if(current==="Da fare"){
+    title="Da fare";
+    copy=`Il lavoro non è ancora iniziato. Il giorno consigliato di inizio è <strong>${fmtRecommendedStart(o.dataConsegna)}</strong>.`;
+    actions=`
+      ${bozzaChoice}
+      <div class="job-stage-note" style="margin-top:10px;">
+        La scelta fatta qui determina il canale che verrà mostrato nella fase di preparazione grafica.
+      </div>`;
   }
 
-  let productionAction="";
-  if(channel==="MAIL"){
-    productionAction=`<button class="btn job-v2-mail-btn btn-sm" ${hasEmail?'':'disabled'} onclick="openOrderProductionMail('${o.id}')">✉ MAIL ORDINE IN PRODUZIONE</button>`;
-  }else if(channel==="WHATSAPP"){
-    productionAction=`<button class="btn job-v2-wa-btn btn-sm" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','produzione')">WHATSAPP IN PRODUZIONE</button>`;
-  }else if(channel==="ALTRO"){
-    productionAction=`<div class="job-v2-info-sub" style="font-weight:800;">Comunicazione produzione tramite altro canale.</div>`;
-  }else{
-    productionAction=`<div class="job-v2-info-sub">Canale comunicazione non ancora scelto.</div>`;
+  if(current==="In preparazione grafica"){
+    title="In preparazione grafica";
+    copy="Gestisci la bozza grafica e inviala al cliente per approvazione.";
+
+    if(channel==="MAIL"){
+      actions=`
+        <button class="btn job-v2-mail-btn" ${hasEmail?'':'disabled'} onclick="openBozzaMail('${o.id}')">✉ INVIA BOZZA VIA MAIL</button>
+        ${!hasEmail?`<div class="job-stage-note">Nessuna email presente nell'anagrafica cliente.</div>`:""}
+        ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-stage-final"><span class="job-stage-final-icon">✓</span><span>Bozza inviata · In attesa di risposta</span></div>`:""}`;
+    }else if(channel==="WHATSAPP"){
+      actions=`
+        <button class="btn job-v2-wa-btn" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','bozza')">INVIA BOZZA VIA WHATSAPP</button>
+        ${!hasPhone?`<div class="job-stage-note">Nessun numero WhatsApp valido nell'anagrafica cliente.</div>`:""}
+        ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-stage-final"><span class="job-stage-final-icon">✓</span><span>Bozza inviata · In attesa di risposta</span></div>`:""}`;
+    }else if(channel==="ALTRO"){
+      actions=`
+        <button class="btn btn-outline" onclick="segnaBozzaAltroInviata('${o.id}')">SEGNA BOZZA INVIATA · ALTRO</button>
+        ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-stage-final"><span class="job-stage-final-icon">✓</span><span>Bozza segnata come inviata</span></div>`:""}`;
+    }else{
+      actions=`<div class="job-stage-note">Torna allo stato “Da fare” e scegli prima Mail, WhatsApp oppure Altro.</div>`;
+    }
   }
 
-  return `<div class="job-v2-status-flow">
-    ${card(0,"DA FARE",
-      `Giorno consigliato di inizio<br><strong class="job-v2-start">${fmtRecommendedStart(o.dataConsegna)}</strong>${bozzaChoice}`,
-      `<div class="job-v2-stage-nav single-next"><button class="job-v2-nav-link next" onclick="updateOrderField('${o.id}','stato','In preparazione grafica')">Vai a preparazione grafica <span>→</span></button></div>`
-    )}
+  if(current==="In produzione"){
+    title="In produzione";
+    copy="Il lavoro è in produzione. Puoi avvisare il cliente che verrà ricontattato appena sarà pronto.";
 
-    ${card(1,"IN PREPARAZIONE GRAFICA",
-      `Gestisci la bozza secondo il canale scelto.`,
-      `${prepAction}
-       <div class="job-v2-stage-nav">
-         <button class="job-v2-nav-link back" onclick="updateOrderField('${o.id}','stato','Da fare')"><span>←</span> Torna a da fare</button>
-         <button class="job-v2-nav-link next" onclick="updateOrderField('${o.id}','stato','In produzione')">Vai a in produzione <span>→</span></button>
-       </div>`
-    )}
+    if(channel==="MAIL"){
+      actions=`
+        <button class="btn job-v2-mail-btn" ${hasEmail?'':'disabled'} onclick="openOrderProductionMail('${o.id}')">✉ MAIL ORDINE IN PRODUZIONE</button>
+        ${!hasEmail?`<div class="job-stage-note">Nessuna email presente nell'anagrafica cliente.</div>`:""}`;
+    }else if(channel==="WHATSAPP"){
+      actions=`
+        <button class="btn job-v2-wa-btn" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','produzione')">WHATSAPP ORDINE IN PRODUZIONE</button>
+        ${!hasPhone?`<div class="job-stage-note">Nessun numero WhatsApp valido nell'anagrafica cliente.</div>`:""}`;
+    }else if(channel==="ALTRO"){
+      actions=`<div class="job-stage-note" style="font-weight:800;">Comunicazione al cliente prevista tramite altro canale.</div>`;
+    }else{
+      actions=`<div class="job-stage-note">Nessun canale di comunicazione selezionato.</div>`;
+    }
+  }
 
-    ${card(2,"IN PRODUZIONE",
-      `Comunica al cliente che l'ordine è in produzione e che verrà avvisato quando sarà pronto.`,
-      `${productionAction}
-       <div class="job-v2-stage-nav">
-         <button class="job-v2-nav-link back" onclick="updateOrderField('${o.id}','stato','In preparazione grafica')"><span>←</span> Torna a preparazione grafica</button>
-         <button class="job-v2-nav-link complete" onclick="updateOrderField('${o.id}','stato','Completato')">Segna completato <span>→</span></button>
-       </div>`
-    )}
-  </div>`;
+  if(current==="Completato"){
+    title="Completato";
+    copy="Il lavoro è pronto. Avvisa il cliente per il ritiro o la spedizione.";
+    actions=`
+      <button class="btn job-v2-mail-btn" ${hasEmail?'':'disabled'} onclick="openAvvisoMail('${o.id}')">✉ MAIL AVVISO CLIENTE</button>
+      <button class="btn job-v2-wa-btn" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','completato')">WHATSAPP AVVISO CLIENTE</button>
+      ${o.clienteAvvisato?`
+        <div class="job-stage-final">
+          <span class="job-stage-final-icon">✓</span>
+          <span>Cliente avvisato${o.avvisoMetodo?` tramite ${escapeHtml(o.avvisoMetodo)}`:""}.</span>
+        </div>`:""}
+    `;
+  }
+
+  if(current==="Consegnato"){
+    title="Consegnato";
+    copy="L'ordine risulta consegnato al cliente. Il flusso operativo è concluso.";
+    actions=`
+      <div class="job-stage-final">
+        <span class="job-stage-final-icon">✓</span>
+        <span>Ordine consegnato</span>
+      </div>`;
+  }
+
+  const prevButton=prev ? `
+    <div class="job-stage-arrow-zone">
+      <button class="job-stage-arrow" title="Torna a ${prev.label}" onclick="updateOrderField('${o.id}','stato','${prev.key}')">‹</button>
+      <div class="job-stage-arrow-caption">Stato precedente</div>
+      <div class="job-stage-arrow-sub">${prev.label}</div>
+    </div>` : `<div class="job-stage-arrow-zone"></div>`;
+
+  const nextButton=next ? `
+    <div class="job-stage-arrow-zone">
+      <button class="job-stage-arrow" title="Passa a ${next.label}" onclick="updateOrderField('${o.id}','stato','${next.key}')">›</button>
+      <div class="job-stage-arrow-caption">Prossimo stato</div>
+      <div class="job-stage-arrow-sub">${next.label}</div>
+    </div>` : `<div class="job-stage-arrow-zone"></div>`;
+
+  return `
+    <div class="job-stage-single-wrap">
+      ${timeline}
+      <div class="job-stage-current-shell">
+        ${prevButton}
+
+        <div class="job-stage-current-card">
+          <div class="job-stage-current-kicker">STATO ATTUALE</div>
+          <div class="job-stage-current-title">${title}</div>
+          <div class="job-stage-current-copy">${copy}</div>
+          <div class="job-stage-current-actions">${actions}</div>
+        </div>
+
+        ${nextButton}
+      </div>
+    </div>`;
 }
 function jobProgressHtml(o){
   const delivered=o.stato==="Consegnato";
@@ -7624,7 +7721,7 @@ function openJobCard(orderId){
 
       <section class="job-v2-card" style="--job-accent:#f08a24;">
         <div class="job-v2-section-title">
-          <h3><span class="job-v2-num">4</span> Stato lavorazione e comunicazione cliente</h3>
+          <h3 style="font-size:19px;"><span class="job-v2-num">4</span> Stato lavorazione e comunicazione cliente</h3>
           <span class="job-v2-pill" style="background:${stateBg};color:${stateColor};">${(o.stato==="Produzione esterna"?"IN PRODUZIONE":o.stato).toUpperCase()}</span>
         </div>
         ${jobStageFlowHtml(o,c)}
