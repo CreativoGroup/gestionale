@@ -1680,7 +1680,7 @@
 
 
 /* ===== STATO LAVORAZIONE + COMUNICAZIONI ===== */
-.job-v2-status-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:stretch;}
+.job-v2-status-flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:stretch;}
 .job-v2-stage{border:1px solid #e7ebf0;border-radius:14px;background:#fff;padding:14px;min-height:170px;display:flex;flex-direction:column;gap:9px;position:relative;}
 .job-v2-stage.current{border-color:#f2b24a;background:#fffaf0;box-shadow:0 5px 16px rgba(242,178,74,.13);}
 .job-v2-stage.done{background:#f8fcf9;border-color:#cfe9d7;}
@@ -1703,6 +1703,17 @@
 .job-v2-admin-body{padding:0 18px 18px;}
 @media(max-width:1000px){.job-v2-status-flow{grid-template-columns:1fr 1fr;}}
 @media(max-width:620px){.job-v2-status-flow{grid-template-columns:1fr;}}
+
+
+/* ===== OPERATORI A CHIP ===== */
+.worker-chip-wrap{display:flex;flex-wrap:wrap;gap:8px;padding-top:4px;}
+.worker-chip{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border-radius:999px;border:1px solid #d9e0e8;background:#fff;color:#4f5b6b;font-size:12px;font-weight:800;cursor:pointer;transition:.16s ease;user-select:none;}
+.worker-chip:hover{border-color:#9fb7d9;background:#f7faff;transform:translateY(-1px);}
+.worker-chip.selected{background:#eef5ff;border-color:#7ca7e8;color:#2468d4;box-shadow:0 3px 10px rgba(36,104,212,.08);}
+.worker-chip-dot{width:8px;height:8px;border-radius:50%;background:#c3cad3;flex:0 0 auto;}
+.worker-chip.selected .worker-chip-dot{background:#2f80ed;}
+.worker-chip input{position:absolute;opacity:0;pointer-events:none;}
+.worker-summary{margin-top:9px;font-size:11px;color:var(--muted);}
 
 </style>
 
@@ -2862,7 +2873,19 @@ function toggleOrderWorker(orderId, worker, checked){
 }
 function workerMultiSelector(o){
   const selected=orderWorkersList(o);
-  return `<div style="display:flex;gap:10px 14px;flex-wrap:wrap;padding-top:5px;">${WORKERS.map(w=>`<label class="checkfield" style="margin:0;"><input type="checkbox" ${selected.includes(w)?'checked':''} onchange="toggleOrderWorker('${o.id}','${w}',this.checked)"> ${w}</label>`).join("")}</div>`;
+  return `
+    <div class="worker-chip-wrap">
+      ${WORKERS.map(w=>`
+        <label class="worker-chip ${selected.includes(w)?'selected':''}">
+          <span class="worker-chip-dot"></span>
+          <input type="checkbox" ${selected.includes(w)?'checked':''}
+            onchange="toggleOrderWorker('${o.id}','${w}',this.checked)">
+          <span>${w}</span>
+        </label>`).join("")}
+    </div>
+    <div class="worker-summary">
+      ${selected.length ? `Assegnato a: <strong>${selected.join(", ")}</strong>` : "Nessun operatore assegnato"}
+    </div>`;
 }
 
 function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, consegnaTipo){
@@ -7352,18 +7375,43 @@ async function sendOrderProductionMail(orderId){
   }
 }
 
+
+function normalizedBozzaChannel(order){
+  const raw=String(getBozzaMeta(order)?.scelta||"").trim().toUpperCase();
+  if(raw==="MAIL" || raw==="BOZZA DA INVIARE PER MAIL") return "MAIL";
+  if(raw==="WHATSAPP") return "WHATSAPP";
+  if(raw==="ALTRO" || raw==="BOZZA DA INVIARE A MATTIA" || raw==="NON SERVE BOZZA") return "ALTRO";
+  return "";
+}
+
+function setBozzaChannel(orderId, channel){
+  const allowed=["MAIL","WHATSAPP","ALTRO"];
+  setBozzaScelta(orderId,allowed.includes(channel)?channel:"");
+}
+
+function segnaBozzaAltroInviata(orderId){
+  const o=findItem("orders",orderId);
+  if(!o) return;
+  if(normalizedBozzaChannel(o)!=="ALTRO") return;
+  setBozzaInAttesa(orderId);
+  showToast("Bozza segnata come inviata tramite altro canale");
+}
+
 function jobStageFlowHtml(o,c){
-  const current = o.stato==="Produzione esterna" ? "In produzione" : o.stato;
-  const orderIdx = {
+  const current=o.stato==="Produzione esterna" ? "In produzione" : o.stato;
+  const hasEmail=!!String(c?.email||"").trim();
+  const hasPhone=!!normalizeWaPhone(c?.telefono||"");
+  const channel=normalizedBozzaChannel(o);
+  const meta=getBozzaMeta(o);
+
+  const orderIdx={
     "Da fare":0,
     "In preparazione grafica":1,
     "In produzione":2,
     "Completato":3,
     "Consegnato":4
   };
-  const idx = orderIdx[current] ?? 0;
-  const hasEmail=!!String(c?.email||"").trim();
-  const hasPhone=!!normalizeWaPhone(c?.telefono||"");
+  const idx=orderIdx[current] ?? 0;
 
   const card=(step,title,copy,actions)=>{
     const done=idx>step;
@@ -7378,32 +7426,69 @@ function jobStageFlowHtml(o,c){
     </div>`;
   };
 
+  const bozzaChoice=`
+    <div style="margin-top:7px;">
+      <div class="job-v2-muted-label">Invio bozza</div>
+      <select class="inline" onchange="setBozzaChannel('${o.id}',this.value)">
+        <option value="">— Scegli canale —</option>
+        <option value="MAIL" ${channel==="MAIL"?'selected':''}>Mail</option>
+        <option value="WHATSAPP" ${channel==="WHATSAPP"?'selected':''}>WhatsApp</option>
+        <option value="ALTRO" ${channel==="ALTRO"?'selected':''}>Altro</option>
+      </select>
+    </div>`;
+
+  let prepAction="";
+  if(channel==="MAIL"){
+    prepAction=`
+      <button class="btn job-v2-mail-btn btn-sm" ${hasEmail?'':'disabled'} onclick="openBozzaMail('${o.id}')">✉ INVIA BOZZA VIA MAIL</button>
+      ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-v2-info-sub" style="color:#9a6700;font-weight:800;">IN ATTESA DI RISPOSTA</div>`:""}
+    `;
+  }else if(channel==="WHATSAPP"){
+    prepAction=`
+      <button class="btn job-v2-wa-btn btn-sm" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','bozza')">INVIA BOZZA VIA WHATSAPP</button>
+      ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-v2-info-sub" style="color:#9a6700;font-weight:800;">IN ATTESA DI RISPOSTA</div>`:""}
+    `;
+  }else if(channel==="ALTRO"){
+    prepAction=`
+      <button class="btn btn-outline btn-sm" onclick="segnaBozzaAltroInviata('${o.id}')">SEGNA BOZZA INVIATA · ALTRO</button>
+      ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-v2-info-sub" style="color:#9a6700;font-weight:800;">IN ATTESA DI RISPOSTA</div>`:""}
+    `;
+  }else{
+    prepAction=`<div class="job-v2-info-sub">Seleziona prima il canale bozza in “Da fare”.</div>`;
+  }
+
+  let productionAction="";
+  if(channel==="MAIL"){
+    productionAction=`<button class="btn job-v2-mail-btn btn-sm" ${hasEmail?'':'disabled'} onclick="openOrderProductionMail('${o.id}')">✉ MAIL ORDINE IN PRODUZIONE</button>`;
+  }else if(channel==="WHATSAPP"){
+    productionAction=`<button class="btn job-v2-wa-btn btn-sm" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','produzione')">WHATSAPP IN PRODUZIONE</button>`;
+  }else if(channel==="ALTRO"){
+    productionAction=`<div class="job-v2-info-sub" style="font-weight:800;">Comunicazione produzione tramite altro canale.</div>`;
+  }else{
+    productionAction=`<div class="job-v2-info-sub">Canale comunicazione non ancora scelto.</div>`;
+  }
+
   return `<div class="job-v2-status-flow">
     ${card(0,"DA FARE",
-      `Giorno consigliato di inizio<br><strong class="job-v2-start">${fmtRecommendedStart(o.dataConsegna)}</strong>`,
-      `<button class="btn btn-outline btn-sm" onclick="updateOrderField('${o.id}','stato','In preparazione grafica')">AVVIA PREPARAZIONE GRAFICA</button>`
+      `Giorno consigliato di inizio<br><strong class="job-v2-start">${fmtRecommendedStart(o.dataConsegna)}</strong>${bozzaChoice}`,
+      `<button class="btn btn-primary btn-sm" onclick="updateOrderField('${o.id}','stato','In preparazione grafica')">PASSA A PREPARAZIONE GRAFICA</button>`
     )}
 
     ${card(1,"IN PREPARAZIONE GRAFICA",
-      `Invia la bozza grafica al cliente per approvazione.`,
-      `<button class="btn job-v2-mail-btn btn-sm" ${hasEmail?'':'disabled'} onclick="openBozzaMail('${o.id}')">✉ MAIL BOZZA GRAFICA</button>
-       <button class="btn job-v2-wa-btn btn-sm" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','bozza')">WHATSAPP BOZZA GRAFICA</button>`
+      `Gestisci la bozza secondo il canale scelto.`,
+      `${prepAction}
+       <button class="btn btn-outline btn-sm" onclick="updateOrderField('${o.id}','stato','Da fare')">← TORNA A DA FARE</button>
+       <button class="btn btn-primary btn-sm" onclick="updateOrderField('${o.id}','stato','In produzione')">PASSA A IN PRODUZIONE</button>`
     )}
 
     ${card(2,"IN PRODUZIONE",
-      `Comunica al cliente che l'ordine è in produzione e che verrà avvisato appena pronto.`,
-      `<button class="btn job-v2-mail-btn btn-sm" ${hasEmail?'':'disabled'} onclick="openOrderProductionMail('${o.id}')">✉ MAIL ORDINE IN PRODUZIONE</button>
-       <button class="btn job-v2-wa-btn btn-sm" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','produzione')">WHATSAPP IN PRODUZIONE</button>`
-    )}
-
-    ${card(3,"COMPLETATO",
-      `Avvisa il cliente che il lavoro è pronto per il ritiro o la spedizione.`,
-      `<button class="btn job-v2-mail-btn btn-sm" ${hasEmail?'':'disabled'} onclick="openAvvisoMail('${o.id}')">✉ MAIL AVVISO CLIENTE</button>
-       <button class="btn job-v2-wa-btn btn-sm" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','completato')">WHATSAPP AVVISO CLIENTE</button>`
+      `Comunica al cliente che l'ordine è in produzione e che verrà avvisato quando sarà pronto.`,
+      `${productionAction}
+       <button class="btn btn-outline btn-sm" onclick="updateOrderField('${o.id}','stato','In preparazione grafica')">← TORNA A PREPARAZIONE GRAFICA</button>
+       <button class="btn btn-primary btn-sm" onclick="updateOrderField('${o.id}','stato','Completato')">SEGNA COME COMPLETATO</button>`
     )}
   </div>`;
 }
-
 function jobProgressHtml(o){
   const delivered=o.stato==="Consegnato";
   const completed=delivered || o.stato==="Completato";
@@ -7620,9 +7705,8 @@ function openJobCard(orderId){
         </div>
 
         <div class="job-v2-card" style="--job-accent:#2979d8;">
-          <div class="job-v2-section-title"><h3>Allegati e comunicazioni</h3></div>
+          <div class="job-v2-section-title"><h3>Allegati</h3></div>
           ${renderOrderExternalAttachments(o)}
-          ${renderOrderCommunications(o,c)}
         </div>
       </section>
 
