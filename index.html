@@ -1822,6 +1822,48 @@
   .job-v2-table td:nth-child(1),.job-v2-table td:nth-child(2){min-width:unset;}
 }
 
+
+/* ===== FIX LAVORAZIONI: DESCRIZIONE 30, PREZZI, LAYOUT ===== */
+.job-v2-product input.desc-input{
+  font-weight:400 !important;
+  font-size:16px !important;
+}
+.job-v2-table{
+  min-width:0 !important;
+  table-layout:fixed;
+  width:100%;
+}
+.job-v2-table-wrap{
+  overflow-x:visible !important;
+}
+.job-v2-table th:nth-child(1){width:19% !important;}
+.job-v2-table th:nth-child(2){width:auto !important;}
+.job-v2-table th:nth-child(3){width:7% !important;}
+.job-v2-table th:nth-child(4){width:11% !important;}
+.job-v2-table th:nth-child(5){width:10% !important;}
+.job-v2-table th:nth-child(6){width:12% !important;}
+.job-v2-table th:last-child{width:4% !important;}
+.job-v2-table td:nth-child(1),
+.job-v2-table td:nth-child(2){
+  min-width:0 !important;
+}
+.job-v2-product{
+  min-width:0 !important;
+}
+.job-v2-table input,
+.job-v2-table select,
+.job-v2-table textarea{
+  min-width:0;
+}
+.job-v2-desc-toggle summary{
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+@media(max-width:1050px){
+  .job-v2-table-wrap{overflow-x:auto !important;}
+  .job-v2-table{min-width:900px !important;}
+}
+
 </style>
 
 <style id="whatsapp-refine-style">
@@ -6335,6 +6377,39 @@ function orderLinesWithWarehouse(o){
   const rows=o.righe||[];
   return linesEditor('orders',o.id,rows,{showAdd:true});
 }
+
+function workPriceInputValue(v){
+  const n=Number(String(v??0).replace(",","."));
+  return Number.isFinite(n) ? n.toFixed(2).replace(".",",") : "0,00";
+}
+
+function moveWorkDescriptionOverflow(orderId, lineId, inputEl){
+  const o=findItem("orders",orderId);
+  if(!o || !inputEl) return;
+  const r=(o.righe||[]).find(x=>x.id===lineId);
+  if(!r) return;
+
+  let value=String(inputEl.value||"");
+  if(value.length>30){
+    const extra=value.slice(30);
+    value=value.slice(0,30);
+    inputEl.value=value;
+
+    const oldDetail=String(r.descrizione||"");
+    r.descrizione=(oldDetail ? `${oldDetail} ${extra}` : extra).trim();
+
+    const detail=document.getElementById(`work-detail-${lineId}`);
+    if(detail) detail.value=r.descrizione;
+  }
+
+  r.prodotto=value;
+  saveState("orders");
+}
+
+function normalizeMoneyFieldValue(value){
+  return Number(String(value||"0").replace(",", ".")) || 0;
+}
+
 function linesEditor(collection, id, righe, options={}){
   const isOrder = collection === 'orders';
   const showDots = isOrder && (options.forceShowDots ?? (righe.length > 1));
@@ -6367,11 +6442,12 @@ function linesEditor(collection, id, righe, options={}){
                 <td class="job-v2-product">
                   <input class="desc-input"
                     value="${escapeHtml(r.prodotto||'')}"
-                    placeholder="Es. Targa in forex 50×30, Felpa ricamata, Volantini A5…"
-                    onchange="updateRigaField('${collection}','${id}','${r.id}','prodotto',this.value)">
+                    placeholder="Descrizione breve · max 30 caratteri"
+                    oninput="moveWorkDescriptionOverflow('${id}','${r.id}',this)"
+                    onchange="moveWorkDescriptionOverflow('${id}','${r.id}',this)">
                   <details class="job-v2-desc-toggle">
                     <summary>Dettagli lavorazione ${r.descrizione?`· ${escapeHtml(String(r.descrizione).slice(0,55))}${String(r.descrizione).length>55?'…':''}`:""}</summary>
-                    <textarea class="desc-input" rows="4"
+                    <textarea id="work-detail-${r.id}" class="desc-input" rows="4"
                       placeholder="Materiali, misure, colori, posizione stampa/ricamo, note operative…"
                       onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)">${escapeHtml(r.descrizione||'')}</textarea>
                   </details>
@@ -6381,8 +6457,8 @@ function linesEditor(collection, id, righe, options={}){
                     onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)">
                 </td>
                 <td class="num">
-                  <input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}"
-                    onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)">
+                  <input class="num" type="text" inputmode="decimal" value="${workPriceInputValue(r.prezzoUnitario)}"
+                    onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',normalizeMoneyFieldValue(this.value));this.value=workPriceInputValue(this.value)">
                 </td>
                 <td class="num" style="padding-top:15px;font-weight:800;">
                   ${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}
@@ -6413,7 +6489,7 @@ function linesEditor(collection, id, righe, options={}){
             <tr>
               <td><input class="desc-input" value="${escapeHtml(r.descrizione||'')}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>
               <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
-              <td class="num"><input class="num" type="number" min="0" step="0.01" value="${r.prezzoUnitario}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',this.value)"></td>
+              <td class="num"><input class="num" type="text" inputmode="decimal" value="${workPriceInputValue(r.prezzoUnitario)}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',normalizeMoneyFieldValue(this.value));this.value=workPriceInputValue(this.value)"></td>
               <td class="num">${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</td>
               <td><button class="btn btn-ghost btn-sm" onclick="removeRiga('${collection}','${id}','${r.id}')">✕</button></td>
             </tr>
