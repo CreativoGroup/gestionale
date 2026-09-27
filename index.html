@@ -1864,6 +1864,158 @@
   .job-v2-table{min-width:900px !important;}
 }
 
+
+/* ===== FLUSSO DI LAVORO RINNOVATO ===== */
+.flow-toolbar{
+  display:grid;
+  grid-template-columns:minmax(240px,1.5fr) minmax(180px,.8fr) minmax(170px,.8fr) auto auto;
+  gap:10px;
+  align-items:center;
+  margin-bottom:14px;
+}
+.flow-control{
+  width:100%;
+  min-height:44px;
+  border:1px solid #dce3eb;
+  border-radius:12px;
+  background:#fff;
+  color:#243142;
+  padding:10px 12px;
+  font-size:14px;
+  font-family:inherit;
+  box-sizing:border-box;
+}
+.flow-toggle{
+  min-height:44px;
+  border:1px solid #dce3eb;
+  border-radius:12px;
+  background:#fff;
+  color:#526071;
+  padding:9px 13px;
+  font-size:13px;
+  font-weight:800;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.flow-toggle.active{
+  background:#fff4df;
+  border-color:#efbd6a;
+  color:#a55b00;
+}
+.flow-summary{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:18px;
+}
+.flow-stat{
+  border:1px solid #e1e7ee;
+  border-radius:15px;
+  padding:15px 16px;
+  background:#fff;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-height:72px;
+  box-shadow:0 4px 14px rgba(20,32,50,.035);
+}
+.flow-stat-icon{
+  width:40px;height:40px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  flex:0 0 auto;font-weight:900;font-size:17px;
+}
+.flow-stat-label{font-size:12px;color:#687586;font-weight:800;margin-bottom:3px;}
+.flow-stat-value{font-size:24px;font-weight:900;color:#172033;line-height:1;}
+.flow-stat.start .flow-stat-icon{background:#eaf3ff;color:#2f80ed;}
+.flow-stat.deadline{background:#fff8f7;border-color:#f2d7d2;}
+.flow-stat.deadline .flow-stat-icon{background:#ffe3df;color:#df3d31;}
+.flow-stat.wait .flow-stat-icon{background:#f1eaff;color:#7950d5;}
+.flow-stat.external .flow-stat-icon{background:#e7f6ff;color:#2579ad;}
+
+.flow-board{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(270px,1fr));
+  gap:14px;
+  align-items:start;
+  overflow-x:auto;
+  padding:2px 1px 18px;
+}
+.flow-col{
+  border-radius:18px;
+  padding:12px;
+  min-width:265px;
+  border:1px solid #dfe5ec;
+  min-height:240px;
+}
+.flow-col[data-stage="todo"]{background:#f3f5f7;border-color:#e0e5eb;}
+.flow-col[data-stage="grafica"]{background:#fff0ee;border-color:#f2d2cc;}
+.flow-col[data-stage="production"]{background:#fff7cf;border-color:#eadc8a;}
+.flow-col[data-stage="external"]{background:#eaf7ff;border-color:#cfe7f5;}
+.flow-col-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:5px 4px 12px;
+}
+.flow-col-title{
+  font-size:14px;font-weight:900;color:#172033;letter-spacing:.1px;
+}
+.flow-col-count{
+  min-width:27px;height:27px;padding:0 8px;border-radius:999px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.82);border:1px solid rgba(100,115,135,.15);
+  font-size:12px;font-weight:900;color:#4d5969;
+}
+.flow-job{
+  background:#fff;
+  border:1px solid #dfe5ec;
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:10px;
+  box-shadow:0 4px 12px rgba(25,35,50,.055);
+  cursor:pointer;
+  transition:.16s ease;
+}
+.flow-job:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(25,35,50,.09);}
+.flow-job.important{border:2px solid #efb334;}
+.flow-job.overdue{border-color:#e25b52;box-shadow:0 0 0 1px rgba(226,91,82,.08);}
+.flow-job-top{display:flex;justify-content:space-between;gap:9px;align-items:flex-start;}
+.flow-job-client{font-size:15px;font-weight:900;color:#172033;line-height:1.25;}
+.flow-job-num{font-size:10px;color:#8995a5;font-weight:700;white-space:nowrap;}
+.flow-job-desc{font-size:13px;color:#536174;margin-top:5px;line-height:1.35;}
+.flow-job-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:11px;}
+.flow-worker{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11.5px;font-weight:800;color:#4d5968;
+  background:#f1f4f8;border-radius:999px;padding:5px 8px;
+}
+.flow-worker-dot{
+  width:22px;height:22px;border-radius:50%;background:#dce4ee;
+  display:flex;align-items:center;justify-content:center;
+  color:#425064;font-size:9px;font-weight:900;
+}
+.flow-date{font-size:11.5px;font-weight:800;color:#536174;}
+.flow-date.today,.flow-date.overdue{color:#d83a31;}
+.flow-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}
+.flow-badge{
+  display:inline-flex;align-items:center;border-radius:999px;
+  padding:5px 8px;font-size:10.5px;font-weight:900;
+}
+.flow-badge.external{background:#e6f4ff;color:#2375aa;}
+.flow-badge.wait{background:#f1e9ff;color:#7045ca;}
+.flow-badge.soon{background:#fff0b8;color:#906b00;}
+.flow-badge.overdue{background:#ffe0dd;color:#c9362e;}
+.flow-badge.important{background:#fff0c7;color:#9c6800;}
+.flow-empty{padding:28px 8px;text-align:center;color:#8793a3;font-size:13px;}
+
+@media(max-width:1180px){
+  .flow-toolbar{grid-template-columns:1fr 1fr 1fr;}
+  .flow-summary{grid-template-columns:1fr 1fr;}
+  .flow-board{grid-template-columns:repeat(4,315px);}
+}
+@media(max-width:720px){
+  .flow-toolbar{grid-template-columns:1fr;}
+  .flow-summary{grid-template-columns:1fr 1fr;}
+}
+
 </style>
 
 <style id="whatsapp-refine-style">
@@ -7118,101 +7270,230 @@ function deleteOrder(id){
   });
 }
 
-/* ============ FLUSSO DI LAVORO (Kanban) ============ */
-let flussoFilters = {categoria:"", worker:""};
-function bozzaCardMeta(o){
-  const m=getBozzaMeta(o);
-  if(m.scelta==="NON SERVE BOZZA") return {label:"NON SERVE BOZZA",cls:"jc-bozza-ok"};
-  if((o.stato==="In produzione" || o.stato==="Produzione esterna") && m.scelta) return {label:"CONFERMATA",cls:"jc-bozza-ok"};
-  if(m.stato==="IN ATTESA DI RISPOSTA") return {label:"IN ATTESA DI RISPOSTA",cls:"jc-bozza-wait"};
-  if(m.scelta==="BOZZA DA INVIARE PER MAIL") return {label:"DA INVIARE PER MAIL",cls:"jc-bozza-mail"};
-  if(m.scelta==="BOZZA DA INVIARE A MATTIA") return {label:"DA INVIARE A MATTIA",cls:"jc-bozza-mattia"};
-  return {label:"DA IMPOSTARE",cls:"jc-bozza-none"};
+/* ============ FLUSSO DI LAVORO RINNOVATO ============ */
+let flussoFilters = {
+  search:"",
+  worker:"",
+  delivery:"",
+  important:false,
+  external:false
+};
+
+function flowDateKey(date){
+  if(!date) return "";
+  return String(date).slice(0,10);
 }
+function flowTodayKey(){
+  const d=new Date();
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,"0");
+  const day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+function flowDaysFromToday(date){
+  const key=flowDateKey(date);
+  if(!key) return 99999;
+  const [y,m,d]=key.split("-").map(Number);
+  const target=new Date(y,m-1,d);
+  const now=new Date();
+  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  return Math.round((target-today)/86400000);
+}
+function flowWorkerInitials(name){
+  const parts=String(name||"").trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return "—";
+  return parts.slice(0,2).map(x=>x[0]?.toUpperCase()||"").join("");
+}
+function flowExternalSupplier(o){
+  const ext=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne");
+  const supplier=ext.map(r=>String(r.fornitore||"").trim()).find(Boolean);
+  return supplier||"da indicare";
+}
+function flowShortDescription(o){
+  const lines=(o.righe||[]).filter(r=>r && (r.prodotto||r.categoria));
+  if(!lines.length) return "Nessuna lavorazione";
+  const first=lines[0];
+  let label=String(first.prodotto||first.categoria||"").trim();
+  if(lines.length>1) label+=` · +${lines.length-1} lavorazion${lines.length-1===1?"e":"i"}`;
+  return label;
+}
+function flowBozzaWaiting(o){
+  const m=getBozzaMeta(o);
+  return m?.stato==="IN ATTESA DI RISPOSTA";
+}
+function flowStageOf(o){
+  const hasExternal=(o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne");
+  if(o.stato==="Da fare") return "Da fare";
+  if(o.stato==="In preparazione grafica") return "In preparazione grafica";
+  if((o.stato==="In produzione" || o.stato==="Produzione esterna") && hasExternal) return "Produzione esterna";
+  if(o.stato==="In produzione" || o.stato==="Produzione esterna") return "In produzione";
+  return "";
+}
+function setFlowFilter(field,value){
+  flussoFilters[field]=value;
+  renderFlusso();
+}
+function toggleFlowFilter(field){
+  flussoFilters[field]=!flussoFilters[field];
+  renderFlusso();
+}
+
 function renderFlusso(){
-  const f = flussoFilters;
-  const list = state.orders.filter(o => o.stato!=="Consegnato" && o.stato!=="Completato" && (!f.categoria || orderCategorie(o).includes(f.categoria)) && (!f.worker || orderWorkersList(o).includes(f.worker)))
-    .sort((a,b)=> (a.dataConsegna||"9999-99-99").localeCompare(b.dataConsegna||"9999-99-99"));
-  const hasExternal = o => (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne");
-  const produzioneEsterna = list.filter(o => o.stato==="In produzione" && hasExternal(o));
-  const externalSuppliers = o => {
-    const names=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne").map(r=>String(r.fornitore||"").trim()).filter(Boolean);
-    return [...new Set(names)];
-  };
-  const stageMeta = {
-    "Da fare":{key:"todo",label:"DA FARE"},
-    "In preparazione grafica":{key:"grafica",label:"IN PREPARAZIONE GRAFICA"},
-    "In produzione":{key:"production",label:"IN PRODUZIONE"},
-    "Produzione esterna":{key:"external",label:"PRODUZIONE ESTERNA"}
-  };
-  const jobCardCategoryGroup = (categoria) => {
-    const c = String(categoria || "").trim();
-    if(["Stampa","Allestimenti","Piccolo Formato","Stampante Xerox"].includes(c)) return "azzurro";
-    if(["Ricamo","Gadget"].includes(c)) return "rosa";
-    if(c === "Servizio") return "servizio";
-    if(c === "Lavorazioni Esterne") return "esterna";
-    return "";
-  };
+  const f=flussoFilters;
+  const today=flowTodayKey();
 
-  const jobCardCategoryClass = (o) => {
-    const righe = Array.isArray(o.righe) ? o.righe.filter(r=>r && r.categoria) : [];
-    if(!righe.length) return "";
+  let list=state.orders
+    .filter(o=>!["Completato","Consegnato"].includes(o.stato))
+    .filter(o=>!!flowStageOf(o));
 
-    const gruppi = [...new Set(
-      righe
-        .map(r=>jobCardCategoryGroup(r.categoria))
-        .filter(Boolean)
-    )];
+  if(f.search){
+    const q=String(f.search).trim().toLowerCase();
+    list=list.filter(o=>{
+      const c=findItem("clients",o.clientId);
+      const hay=[
+        clientDisplayName(c),
+        c?.email,
+        c?.telefono,
+        o.numero,
+        o.descrizione,
+        ...(o.righe||[]).flatMap(r=>[r.categoria,r.prodotto,r.descrizione,r.fornitore])
+      ].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  if(f.worker) list=list.filter(o=>orderWorkersList(o).includes(f.worker));
+  if(f.important) list=list.filter(o=>!!o.importante);
+  if(f.external) list=list.filter(o=>flowStageOf(o)==="Produzione esterna" || (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne"));
 
-    // Colora anche una scheda con più righe, ma solo quando TUTTE
-    // appartengono allo stesso gruppo-colore.
-    if(gruppi.length !== 1) return "";
-    if(righe.some(r=>jobCardCategoryGroup(r.categoria)!==gruppi[0])) return "";
+  if(f.delivery==="today") list=list.filter(o=>flowDateKey(o.dataConsegna)===today);
+  if(f.delivery==="soon") list=list.filter(o=>{
+    const days=flowDaysFromToday(o.dataConsegna);
+    return days>=0 && days<=2;
+  });
+  if(f.delivery==="overdue") list=list.filter(o=>flowDaysFromToday(o.dataConsegna)<0);
 
-    if(gruppi[0] === "azzurro") return "job-card-cat-stampa";
-    if(gruppi[0] === "rosa") return "job-card-cat-ricamo";
-    if(gruppi[0] === "servizio") return "job-card-cat-servizio";
-    if(gruppi[0] === "esterna") return "job-card-cat-esterna";
-    return "";
-  };
-  const renderCard = (o, external=false) => {
-    const cl = findItem('clients', o.clientId);
-    const tipoClass = cl && cl.tipo==="Family" ? "job-card-family" : "job-card-business";
-    const suppliers = external ? externalSuppliers(o) : [];
-    const catClass = jobCardCategoryClass(o);
-    return `<div class="job-card ${tipoClass} ${catClass} ${o.importante?'job-card-importante':''}" onclick="openJobCard('${o.id}')">
-      ${o.importante ? `<div class="jc-star">★ IMPORTANTE</div>` : ``}
-      <div class="jc-client">${clientName(o.clientId)} <span style="font-size:10px;font-weight:600;color:#94A3B8;">${o.numero?('#'+o.numero):''}</span></div>
-      <div class="jc-lines">
-        ${(o.righe||[]).filter(r=>r.categoria).map(r=>{
-          const catLabel = r.categoria==="Piccolo Formato" ? "Stampante Xerox" : r.categoria;
-          return `<div class="jc-line">${catLabel}${r.prodotto?' — '+r.prodotto:''} <span style="color:#64748B;font-weight:600;">×${r.quantita}</span></div>`;
-        }).join("") || `<div class="jc-line" style="color:#64748B">Nessuna categoria assegnata</div>`}
-        ${external ? `<div class="jc-line" style="margin-top:6px;color:#475569;font-weight:600;">Fornitore: <strong style="color:#172033;">${suppliers.length?suppliers.join(', '):'da indicare'}</strong></div>` : ``}
+  list.sort((a,b)=>{
+    if(!!a.importante!==!!b.importante) return a.importante ? -1 : 1;
+    return String(a.dataConsegna||"9999-99-99").localeCompare(String(b.dataConsegna||"9999-99-99"));
+  });
+
+  const activeAll=state.orders
+    .filter(o=>!["Completato","Consegnato"].includes(o.stato))
+    .filter(o=>!!flowStageOf(o));
+
+  const daIniziareOggi=activeAll.filter(o=>{
+    const recommended=typeof recommendedWorkStartDate==="function" ? recommendedWorkStartDate(o.dataConsegna,3) : "";
+    return flowDateKey(recommended)===today && o.stato==="Da fare";
+  }).length;
+
+  const inScadenza=activeAll.filter(o=>{
+    const days=flowDaysFromToday(o.dataConsegna);
+    return days>=0 && days<=2;
+  }).length;
+
+  const inAttesa=activeAll.filter(flowBozzaWaiting).length;
+  const esterne=activeAll.filter(o=>flowStageOf(o)==="Produzione esterna").length;
+
+  const stages=[
+    {name:"Da fare", key:"todo", label:"DA FARE"},
+    {name:"In preparazione grafica", key:"grafica", label:"PREPARAZIONE GRAFICA"},
+    {name:"In produzione", key:"production", label:"IN PRODUZIONE"},
+    {name:"Produzione esterna", key:"external", label:"PRODUZIONE ESTERNA"}
+  ];
+
+  const renderCard=o=>{
+    const c=findItem("clients",o.clientId);
+    const stage=flowStageOf(o);
+    const workers=orderWorkersList(o);
+    const days=flowDaysFromToday(o.dataConsegna);
+    const isToday=days===0;
+    const overdue=days<0;
+    const soon=days>=0 && days<=2;
+    const external=stage==="Produzione esterna";
+    const wait=flowBozzaWaiting(o);
+
+    const workerText=workers.length ? workers.join(", ") : "Non assegnato";
+    const initials=workers.length ? flowWorkerInitials(workers[0]) : "—";
+
+    return `<div class="flow-job ${o.importante?'important':''} ${overdue?'overdue':''}" onclick="openJobCard('${o.id}')">
+      <div class="flow-job-top">
+        <div>
+          <div class="flow-job-client">${escapeHtml(c?clientDisplayName(c):"Cliente")}</div>
+          <div class="flow-job-desc">${escapeHtml(flowShortDescription(o))}</div>
+        </div>
+        <div class="flow-job-num">${o.numero?`#${escapeHtml(String(o.numero))}`:""}</div>
       </div>
-      ${(()=>{const b=bozzaCardMeta(o);return `<div class="jc-bozza-wrap"><span class="jc-bozza-title">GESTIONE BOZZA</span><span class="jc-bozza-badge ${b.cls}">${b.label}</span></div>`;})()}
-      <div class="jc-meta"><span>${orderWorkersLabel(o)||'non assegnato'}</span><span>${fmtDate(o.dataConsegna)}</span></div>
+
+      <div class="flow-job-meta">
+        <span class="flow-worker">
+          <span class="flow-worker-dot">${escapeHtml(initials)}</span>
+          ${escapeHtml(workerText)}
+        </span>
+        <span class="flow-date ${isToday?'today':''} ${overdue?'overdue':''}">
+          ${o.dataConsegna?`▣ ${fmtDate(o.dataConsegna)}`:"Senza data"}
+        </span>
+      </div>
+
+      <div class="flow-badges">
+        ${o.importante?`<span class="flow-badge important">★ IMPORTANTE</span>`:""}
+        ${external?`<span class="flow-badge external">ESTERNA · ${escapeHtml(flowExternalSupplier(o))}</span>`:""}
+        ${wait?`<span class="flow-badge wait">BOZZA IN ATTESA CLIENTE</span>`:""}
+        ${overdue?`<span class="flow-badge overdue">IN RITARDO</span>`:(soon?`<span class="flow-badge soon">${isToday?"CONSEGNA OGGI":"IN SCADENZA"}</span>`:"")}
+      </div>
     </div>`;
   };
-  document.getElementById("view-flusso").innerHTML = `
-    <div class="section-header">
-      <div class="filters">
-        <select class="inline" onchange="flussoFilters.categoria=this.value; renderFlusso();"><option value="">Tutte le categorie</option>${CATEGORIES.map(c=>`<option ${c===f.categoria?'selected':''}>${c}</option>`).join("")}</select>
-        <select class="inline" onchange="flussoFilters.worker=this.value; renderFlusso();"><option value="">Tutti gli operatori</option>${WORKERS.map(w=>`<option ${w===f.worker?'selected':''}>${w}</option>`).join("")}</select>
+
+  document.getElementById("view-flusso").innerHTML=`
+    <div class="flow-toolbar">
+      <input class="flow-control" type="search" placeholder="Cerca cliente o lavorazione…"
+        value="${escapeHtml(f.search)}"
+        oninput="flussoFilters.search=this.value; clearTimeout(window.__flowSearchTimer); window.__flowSearchTimer=setTimeout(renderFlusso,180);">
+
+      <select class="flow-control" onchange="setFlowFilter('worker',this.value)">
+        <option value="">Tutti gli operatori</option>
+        ${WORKERS.map(w=>`<option value="${w}" ${f.worker===w?'selected':''}>${w}</option>`).join("")}
+      </select>
+
+      <select class="flow-control" onchange="setFlowFilter('delivery',this.value)">
+        <option value="">Tutte le consegne</option>
+        <option value="today" ${f.delivery==="today"?'selected':''}>Consegna oggi</option>
+        <option value="soon" ${f.delivery==="soon"?'selected':''}>Entro 2 giorni</option>
+        <option value="overdue" ${f.delivery==="overdue"?'selected':''}>In ritardo</option>
+      </select>
+
+      <button class="flow-toggle ${f.important?'active':''}" onclick="toggleFlowFilter('important')">★ Solo importanti</button>
+      <button class="flow-toggle ${f.external?'active':''}" onclick="toggleFlowFilter('external')">▣ Lavorazioni esterne</button>
+    </div>
+
+    <div class="flow-summary">
+      <div class="flow-stat start">
+        <div class="flow-stat-icon">≡</div>
+        <div><div class="flow-stat-label">Da iniziare oggi</div><div class="flow-stat-value">${daIniziareOggi}</div></div>
+      </div>
+      <div class="flow-stat deadline">
+        <div class="flow-stat-icon">!</div>
+        <div><div class="flow-stat-label">In scadenza</div><div class="flow-stat-value">${inScadenza}</div></div>
+      </div>
+      <div class="flow-stat wait">
+        <div class="flow-stat-icon">◌</div>
+        <div><div class="flow-stat-label">In attesa cliente</div><div class="flow-stat-value">${inAttesa}</div></div>
+      </div>
+      <div class="flow-stat external">
+        <div class="flow-stat-icon">↗</div>
+        <div><div class="flow-stat-label">Produzione esterna</div><div class="flow-stat-value">${esterne}</div></div>
       </div>
     </div>
-    <p class="helptext">Il flusso mostra solo i lavori ancora operativi. I lavori completati restano disponibili nella Dashboard e nell'elenco Ordini.</p>
-    <div class="kanban">
-      ${WORKFLOW_VISIBLE_STAGES.map(stage=>{
-        const meta=stageMeta[stage];
-        let items=[];
-        if(stage==="Produzione esterna") items=produzioneEsterna;
-        else if(stage==="In produzione") items=list.filter(o=>o.stato==="In produzione" && !hasExternal(o));
-        else items=list.filter(o=>o.stato===stage);
-        return `<div class="kanban-col" data-stage="${meta.key}">
-          <h4><span style="background:transparent;padding:0;font-size:14px;color:#243142;">${meta.label}</span><span>${items.length}</span></h4>
-          ${items.map(o=>renderCard(o, stage==="Produzione esterna")).join("") || `<p class="empty" style="padding:18px 6px;">Nessun lavoro</p>`}
-        </div>`;
+
+    <div class="flow-board">
+      ${stages.map(stage=>{
+        const items=list.filter(o=>flowStageOf(o)===stage.name);
+        return `<section class="flow-col" data-stage="${stage.key}">
+          <div class="flow-col-head">
+            <div class="flow-col-title">${stage.label}</div>
+            <div class="flow-col-count">${items.length}</div>
+          </div>
+          ${items.length ? items.map(renderCard).join("") : `<div class="flow-empty">Nessun lavoro</div>`}
+        </section>`;
       }).join("")}
     </div>
   `;
