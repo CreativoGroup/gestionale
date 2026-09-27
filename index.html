@@ -2979,7 +2979,25 @@ function toggleOrderWorker(orderId, worker, checked){
   if(!checked) list=list.filter(w=>w!==worker);
   o.worker=list.join(" | ");
   saveState('orders');
+
+  // Ridisegna la scheda ma mantiene aperto il menu operatori,
+  // così puoi selezionare più persone una dopo l'altra senza riaprire ogni volta.
   openJobCard(orderId);
+  setTimeout(()=>{
+    const el=document.getElementById(`worker-picker-${orderId}`);
+    if(el) el.classList.add("open");
+  },0);
+}
+function setAllOrderWorkers(orderId, checked){
+  const o=findItem('orders',orderId);
+  if(!o) return;
+  o.worker = checked ? WORKERS.join(" | ") : "";
+  saveState('orders');
+  openJobCard(orderId);
+  setTimeout(()=>{
+    const el=document.getElementById(`worker-picker-${orderId}`);
+    if(el) el.classList.add("open");
+  },0);
 }
 function toggleWorkerPicker(orderId){
   const el=document.getElementById(`worker-picker-${orderId}`);
@@ -2988,6 +3006,8 @@ function toggleWorkerPicker(orderId){
 }
 function workerMultiSelector(o){
   const selected=orderWorkersList(o);
+  const allSelected=WORKERS.length>0 && WORKERS.every(w=>selected.includes(w));
+
   return `
     <div id="worker-picker-${o.id}" class="worker-picker">
       <button type="button" class="worker-picker-summary" onclick="toggleWorkerPicker('${o.id}')">
@@ -2996,6 +3016,13 @@ function workerMultiSelector(o){
       </button>
 
       <div class="worker-picker-panel">
+        <div class="worker-option ${allSelected?'selected':''}"
+             style="border-bottom:1px solid #e8edf3;margin-bottom:5px;padding-bottom:11px;"
+             onclick="setAllOrderWorkers('${o.id}',${allSelected?'false':'true'})">
+          <span>${allSelected ? "DESELEZIONA TUTTI" : "SELEZIONA TUTTI GLI OPERATORI"}</span>
+          <span class="worker-option-mark">${allSelected?'✓':''}</span>
+        </div>
+
         ${WORKERS.map(w=>`
           <div class="worker-option ${selected.includes(w)?'selected':''}"
                onclick="toggleOrderWorker('${o.id}','${w}',${selected.includes(w)?'false':'true'})">
