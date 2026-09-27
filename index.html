@@ -1958,7 +1958,7 @@ const PRODOTTI_PER_CATEGORIA = {
   "Lavorazioni Esterne": ["Tipografia","Serigrafia","Grande Formato","Biglietti da visita","Volantini","Pieghevoli","Cartelline","Blocco appunti","Gadget","Altro"]
 };
 const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone"];
-const NOTE_OPERATORS = ["Mattia","Patrizio","Sara","Francess","Simone"];
+const NOTE_OPERATORS = [...WORKERS];
 const FAMILY_RICHIESTE = ["Felpe per reparti","Tessuti","Allestimenti","Poster ospedali","Gadget","Altro"];
 const STATUSES = ["Da fare","In preparazione grafica","In produzione","Completato","Consegnato"];
 const KANBAN_STATUSES = STATUSES.filter(s=>s!=="Consegnato");
@@ -2002,6 +2002,9 @@ const FORNITORI_PER_PRODOTTO_ESTERNO = {
   "Cartelline": FORNITORI_STANDARD_TIPOGRAFIA,
   "Blocco appunti": FORNITORI_STANDARD_TIPOGRAFIA
 };
+const FORNITORI_ESTERNI = [...new Set(Object.values(FORNITORI_PER_PRODOTTO_ESTERNO).flat())]
+  .filter(Boolean)
+  .sort((a,b)=>String(a).localeCompare(String(b),"it",{sensitivity:"base"}));
 const PAY_METHODS = ["Contanti","Carta di Pagamento","Bonifico"];
 
 function normalizePaymentMethod(v){
@@ -6438,8 +6441,16 @@ function updateRigaField(collection, id, rigaId, field, value){
   const item = findItem(collection, id);
   const riga = item.righe.find(r=>r.id===rigaId);
   riga[field] = (field==='quantita'||field==='prezzoUnitario') ? Number(value)||0 : value;
-  if(collection==='orders' && field==='categoria'){ recalcFasi(item); if(value!=="Lavorazioni Esterne"){ delete riga.ritiroEsterno; delete riga.fornitore; } }
-  if(collection==='orders' && field==='prodotto'){ riga.fornitore = ""; }
+  if(collection==='orders' && field==='categoria'){
+    recalcFasi(item);
+    if(value!=="Lavorazioni Esterne"){
+      delete riga.ritiroEsterno;
+      delete riga.fornitore;
+    }else{
+      const existingSupplier=(item.righe||[]).find(x=>x.id!==riga.id && x.categoria==="Lavorazioni Esterne" && String(x.fornitore||"").trim())?.fornitore||"";
+      if(existingSupplier) riga.fornitore=existingSupplier;
+    }
+  }
   saveState(collection);
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
 }
@@ -7131,24 +7142,26 @@ function toggleFasiSection(orderId){
 function renderRitiroEsternoSection(o){
   const righe=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne");
   if(!righe.length) return "";
+
+  const selectedSupplier=String(righe.find(r=>String(r.fornitore||"").trim())?.fornitore||"").trim();
+
   return `<div class="modal-section">
-    <h3>Lavorazioni esterne — ritiro</h3>
-    <p class="helptext" style="margin-top:-4px;">Imposta manualmente lo stato del materiale affidato all'esterno. Solo <strong>DA RITIRARE</strong> compare nel widget della dashboard.</p>
+    <h3>Lavorazioni esterne — fornitore e ritiro</h3>
+    <p class="helptext" style="margin-top:-4px;">Il fornitore è unico per tutta la scheda, anche quando sono presenti più righe di lavorazioni esterne.</p>
+
+    <div class="field" style="max-width:420px;margin:12px 0 16px;">
+      <label>Fornitore unico</label>
+      <select class="inline" style="font-size:15px;padding:10px 12px;" onchange="updateFornitoreEsternoUnico('${o.id}',this.value)">
+        <option value="">Seleziona fornitore…</option>
+        ${FORNITORI_ESTERNI.map(f=>`<option value="${escapeHtml(f)}" ${selectedSupplier===f?'selected':''}>${escapeHtml(f)}</option>`).join("")}
+      </select>
+    </div>
+
     ${righe.map((r,idx)=>{
       const val=r.ritiroEsterno||"";
       const label=r.prodotto || r.descrizione || `Lavorazione esterna ${idx+1}`;
-      const fornitoriSuggeriti = FORNITORI_PER_PRODOTTO_ESTERNO[r.prodotto];
       return `<div style="padding:12px 0;border-bottom:1px solid var(--border);">
-        <div style="font-weight:700;margin-bottom:8px;">${label}</div>
-        <div class="field" style="max-width:280px;margin-bottom:10px;">
-          <label>Fornitore</label>
-          ${fornitoriSuggeriti
-            ? `<select class="inline" onchange="updateFornitoreEsterno('${o.id}','${r.id}',this.value)">
-                <option value="">Seleziona fornitore…</option>
-                ${fornitoriSuggeriti.map(f=>`<option value="${f}" ${r.fornitore===f?'selected':''}>${f}</option>`).join("")}
-               </select>`
-            : `<input class="inline" placeholder="Inserisci fornitore…" value="${r.fornitore||''}" onchange="updateFornitoreEsterno('${o.id}','${r.id}',this.value)">`}
-        </div>
+        <div style="font-weight:800;margin-bottom:8px;">${escapeHtml(label)}</div>
         <div style="display:flex;gap:16px;flex-wrap:wrap;">
           ${["CONSEGNA IN SEDE","DA RITIRARE","RITIRATO"].map(st=>`<label class="checkfield" style="font-weight:${val===st?'700':'500'};"><input type="radio" name="ritiro-${r.id}" ${val===st?'checked':''} onchange="updateRitiroEsterno('${o.id}','${r.id}','${st}')"> ${st}</label>`).join("")}
         </div>
@@ -7156,13 +7169,17 @@ function renderRitiroEsternoSection(o){
     }).join("")}
   </div>`;
 }
-function updateFornitoreEsterno(orderId,rigaId,value){
+function updateFornitoreEsternoUnico(orderId,value){
   const o=findItem('orders',orderId);
-  const r=(o.righe||[]).find(x=>x.id===rigaId);
-  if(!r) return;
-  r.fornitore = value.trim();
+  if(!o) return;
+  const supplier=String(value||"").trim();
+  (o.righe||[]).forEach(r=>{
+    if(r.categoria==="Lavorazioni Esterne") r.fornitore=supplier;
+  });
   saveState('orders');
+  openJobCard(orderId);
 }
+
 function updateRitiroEsterno(orderId,rigaId,status){
   const o=findItem('orders',orderId);
   const r=(o.righe||[]).find(x=>x.id===rigaId);
@@ -7499,12 +7516,12 @@ function normalizedBozzaChannel(order){
   const raw=String(getBozzaMeta(order)?.scelta||"").trim().toUpperCase();
   if(raw==="MAIL" || raw==="BOZZA DA INVIARE PER MAIL") return "MAIL";
   if(raw==="WHATSAPP") return "WHATSAPP";
-  if(raw==="ALTRO" || raw==="BOZZA DA INVIARE A MATTIA" || raw==="NON SERVE BOZZA") return "ALTRO";
+  if(raw==="NON RICHIESTA" || raw==="ALTRO" || raw==="BOZZA DA INVIARE A MATTIA" || raw==="NON SERVE BOZZA") return "NON RICHIESTA";
   return "";
 }
 
 function setBozzaChannel(orderId, channel){
-  const allowed=["MAIL","WHATSAPP","ALTRO"];
+  const allowed=["MAIL","WHATSAPP","NON RICHIESTA"];
   setBozzaScelta(orderId,allowed.includes(channel)?channel:"");
 }
 
@@ -7553,7 +7570,7 @@ function jobStageFlowHtml(o,c){
         <option value="">— Scegli canale —</option>
         <option value="MAIL" ${channel==="MAIL"?'selected':''}>Mail</option>
         <option value="WHATSAPP" ${channel==="WHATSAPP"?'selected':''}>WhatsApp</option>
-        <option value="ALTRO" ${channel==="ALTRO"?'selected':''}>Altro</option>
+        <option value="NON RICHIESTA" ${channel==="NON RICHIESTA"?'selected':''}>NON RICHIESTA</option>
       </select>
     </div>`;
 
@@ -7585,10 +7602,12 @@ function jobStageFlowHtml(o,c){
         <button class="btn job-v2-wa-btn" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','bozza')">INVIA BOZZA VIA WHATSAPP</button>
         ${!hasPhone?`<div class="job-stage-note">Nessun numero WhatsApp valido nell'anagrafica cliente.</div>`:""}
         ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-stage-final"><span class="job-stage-final-icon">✓</span><span>Bozza inviata · In attesa di risposta</span></div>`:""}`;
-    }else if(channel==="ALTRO"){
+    }else if(channel==="NON RICHIESTA"){
       actions=`
-        <button class="btn btn-outline" onclick="segnaBozzaAltroInviata('${o.id}')">SEGNA BOZZA INVIATA · ALTRO</button>
-        ${meta.stato==="IN ATTESA DI RISPOSTA"?`<div class="job-stage-final"><span class="job-stage-final-icon">✓</span><span>Bozza segnata come inviata</span></div>`:""}`;
+        <div class="job-stage-final">
+          <span class="job-stage-final-icon">✓</span>
+          <span>Bozza non richiesta per questo ordine</span>
+        </div>`;
     }else{
       actions=`<div class="job-stage-note">Torna allo stato “Da fare” e scegli prima Mail, WhatsApp oppure Altro.</div>`;
     }
@@ -7606,8 +7625,11 @@ function jobStageFlowHtml(o,c){
       actions=`
         <button class="btn job-v2-wa-btn" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','produzione')">WHATSAPP ORDINE IN PRODUZIONE</button>
         ${!hasPhone?`<div class="job-stage-note">Nessun numero WhatsApp valido nell'anagrafica cliente.</div>`:""}`;
-    }else if(channel==="ALTRO"){
-      actions=`<div class="job-stage-note" style="font-weight:800;">Comunicazione al cliente prevista tramite altro canale.</div>`;
+    }else if(channel==="NON RICHIESTA"){
+      actions=`
+        <div class="job-stage-note" style="font-weight:800;margin-bottom:4px;">La bozza non era richiesta. Per l'aggiornamento di produzione puoi scegliere il canale:</div>
+        <button class="btn job-v2-mail-btn" ${hasEmail?'':'disabled'} onclick="openOrderProductionMail('${o.id}')">✉ MAIL ORDINE IN PRODUZIONE</button>
+        <button class="btn job-v2-wa-btn" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','produzione')">WHATSAPP ORDINE IN PRODUZIONE</button>`;
     }else{
       actions=`<div class="job-stage-note">Nessun canale di comunicazione selezionato.</div>`;
     }
@@ -7752,8 +7774,6 @@ function openJobCard(orderId){
           <div class="job-v2-info-cell">
             <label>Operatori</label>
             ${workerMultiSelector(o)}
-            <div class="job-v2-muted-label" style="margin-top:12px;">Priorità</div>
-            <label class="checkfield"><input type="checkbox" ${o.importante?'checked':''} onchange="updateOrderCheck('${o.id}','importante',this.checked)"> Importante</label>
           </div>
 
           <div class="job-v2-info-cell">
@@ -7777,6 +7797,9 @@ function openJobCard(orderId){
               onchange="updateOrderField('${o.id}','stato',this.value)">
               ${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${(s==="In produzione"&&orderHasExternal(o))?"IN PRODUZIONE ESTERNA":s.toUpperCase()}</option>`).join("")}
             </select>
+
+            <div class="job-v2-muted-label" style="margin-top:15px;">Priorità</div>
+            <label class="checkfield" style="font-size:14px;font-weight:800;"><input type="checkbox" ${o.importante?'checked':''} onchange="updateOrderCheck('${o.id}','importante',this.checked)"> IMPORTANTE</label>
 
             <label style="margin-top:15px;">Modalità consegna</label>
             <select class="inline job-v2-delivery-select" onchange="updateOrderField('${o.id}','consegnaTipo',this.value);openJobCard('${o.id}')">
