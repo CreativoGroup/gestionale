@@ -1764,6 +1764,64 @@
   .job-stage-point:not(:last-child):after{top:14px;}
 }
 
+
+/* ===== LAYOUT FINALE SCHEDA LAVORAZIONE ===== */
+.job-v2-info-grid{grid-template-columns:.9fr .85fr .95fr .9fr;}
+.job-v2-info-cell{padding:16px 18px;}
+.job-v2-info-cell label{font-size:12px;}
+.job-v2-info-main{font-size:18px;line-height:1.25;}
+.job-v2-info-sub{font-size:14px;line-height:1.4;}
+.job-v2-date-box{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;font-size:18px;font-weight:900;margin-top:6px;}
+.job-v2-date-box.start{background:#eef5ff;color:#2468d4;border:1px solid #d4e4fb;}
+.job-v2-date-box.delivery{background:#eefaf1;color:#267348;border:1px solid #d4edd9;}
+.job-v2-date-icon{font-size:18px;}
+.job-v2-state-select{font-size:15px!important;font-weight:900!important;padding:11px 12px!important;}
+.job-v2-delivery-select{font-size:15px!important;padding:10px 12px!important;}
+
+.job-v2-table th{font-size:13px;padding:13px 14px;}
+.job-v2-table td{padding:14px;}
+.job-v2-table select,.job-v2-table input,.job-v2-table textarea{font-size:16px;}
+.job-v2-product input.desc-input{font-size:17px;font-weight:700;padding:10px 12px;}
+.job-v2-desc-toggle{margin-top:9px;padding-top:8px;}
+.job-v2-desc-toggle summary{font-size:14px;}
+.job-v2-desc-toggle textarea{font-size:16px;line-height:1.5;min-height:120px;padding:12px;}
+.job-v2-table td.num input{font-size:16px;padding:10px;}
+.job-v2-table td.num{font-size:16px;}
+.job-v2-table td:nth-child(1){min-width:210px;}
+.job-v2-table td:nth-child(2){min-width:420px;}
+
+.worker-picker{position:relative;}
+.worker-picker-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:12px 14px;border:1px solid #d7dee8;border-radius:12px;background:#fff;font-size:15px;font-weight:800;cursor:pointer;color:#2c3747;}
+.worker-picker-summary:hover{border-color:#9fb7d9;background:#f8fbff;}
+.worker-picker-panel{display:none;position:absolute;z-index:30;top:calc(100% + 7px);left:0;right:0;background:#fff;border:1px solid #dbe2ea;border-radius:14px;padding:10px;box-shadow:0 10px 25px rgba(22,35,55,.12);}
+.worker-picker.open .worker-picker-panel{display:block;}
+.worker-option{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:800;color:#4f5b6b;}
+.worker-option:hover{background:#f5f8fc;}
+.worker-option.selected{background:#eef5ff;color:#2468d4;}
+.worker-option-mark{width:20px;height:20px;border-radius:50%;border:1px solid #cdd6e0;display:flex;align-items:center;justify-content:center;font-size:11px;background:#fff;}
+.worker-option.selected .worker-option-mark{background:#2f80ed;color:#fff;border-color:#2f80ed;}
+.worker-selected-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;}
+.worker-selected-tag{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:#f3f6fa;border:1px solid #dde4ec;font-size:12px;font-weight:800;color:#566172;}
+
+.job-stage-current-card.stage-da-fare{background:#f8fbf9;border-color:#d7e8dc;}
+.job-stage-current-card.stage-preparazione{background:#fff7eb;border-color:#efbd6a;}
+.job-stage-current-card.stage-produzione{background:#fff8cf;border-color:#e6c94d;}
+.job-stage-current-card.stage-completato{background:#eef9f1;border-color:#a9d6b3;}
+.job-stage-current-card.stage-consegnato{background:#f1f3f8;border-color:#c8cfdb;}
+
+.job-stage-current-card.stage-preparazione .job-stage-current-kicker{background:#ffe7c2;color:#b66000;}
+.job-stage-current-card.stage-produzione .job-stage-current-kicker{background:#fff0a6;color:#8b6d00;}
+.job-stage-current-card.stage-completato .job-stage-current-kicker{background:#dff2e4;color:#267348;}
+.job-stage-current-card.stage-consegnato .job-stage-current-kicker{background:#e7eaf1;color:#4d5870;}
+
+@media(max-width:1050px){
+  .job-v2-info-grid{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:700px){
+  .job-v2-info-grid{grid-template-columns:1fr;}
+  .job-v2-table td:nth-child(1),.job-v2-table td:nth-child(2){min-width:unset;}
+}
+
 </style>
 
 <style id="whatsapp-refine-style">
@@ -2920,23 +2978,35 @@ function toggleOrderWorker(orderId, worker, checked){
   saveState('orders');
   openJobCard(orderId);
 }
+function toggleWorkerPicker(orderId){
+  const el=document.getElementById(`worker-picker-${orderId}`);
+  if(!el) return;
+  el.classList.toggle("open");
+}
 function workerMultiSelector(o){
   const selected=orderWorkersList(o);
   return `
-    <div class="worker-chip-wrap">
-      ${WORKERS.map(w=>`
-        <label class="worker-chip ${selected.includes(w)?'selected':''}">
-          <span class="worker-chip-dot"></span>
-          <input type="checkbox" ${selected.includes(w)?'checked':''}
-            onchange="toggleOrderWorker('${o.id}','${w}',this.checked)">
-          <span>${w}</span>
-        </label>`).join("")}
-    </div>
-    <div class="worker-summary">
-      ${selected.length ? `Assegnato a: <strong>${selected.join(", ")}</strong>` : "Nessun operatore assegnato"}
+    <div id="worker-picker-${o.id}" class="worker-picker">
+      <button type="button" class="worker-picker-summary" onclick="toggleWorkerPicker('${o.id}')">
+        <span>${selected.length ? escapeHtml(selected.join(", ")) : "Seleziona operatori"}</span>
+        <span>⌄</span>
+      </button>
+
+      <div class="worker-picker-panel">
+        ${WORKERS.map(w=>`
+          <div class="worker-option ${selected.includes(w)?'selected':''}"
+               onclick="toggleOrderWorker('${o.id}','${w}',${selected.includes(w)?'false':'true'})">
+            <span>${w}</span>
+            <span class="worker-option-mark">${selected.includes(w)?'✓':''}</span>
+          </div>`).join("")}
+      </div>
+
+      ${selected.length ? `
+        <div class="worker-selected-tags">
+          ${selected.map(w=>`<span class="worker-selected-tag">${w}</span>`).join("")}
+        </div>` : `<div class="worker-summary">Nessun operatore assegnato</div>`}
     </div>`;
 }
-
 function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, consegnaTipo){
   const order = {id, clientId, descrizione, worker, stato, dataConsegna,
     righe: (righe && righe.length) ? righe : [emptyRiga(true)],
@@ -7587,7 +7657,13 @@ function jobStageFlowHtml(o,c){
       <div class="job-stage-current-shell">
         ${prevButton}
 
-        <div class="job-stage-current-card">
+        <div class="job-stage-current-card ${
+          current==="Da fare" ? "stage-da-fare" :
+          current==="In preparazione grafica" ? "stage-preparazione" :
+          current==="In produzione" ? "stage-produzione" :
+          current==="Completato" ? "stage-completato" :
+          "stage-consegnato"
+        }">
           <div class="job-stage-current-kicker">STATO ATTUALE</div>
           <div class="job-stage-current-title">${title}</div>
           <div class="job-stage-current-copy">${copy}</div>
@@ -7682,21 +7758,28 @@ function openJobCard(orderId){
 
           <div class="job-v2-info-cell">
             <label>Inizio lavoro consigliato</label>
-            <div class="job-v2-start">${startSuggested}</div>
-            <div class="job-v2-info-sub">Calcolato automaticamente 3 giorni lavorativi prima della consegna.</div>
-            <label style="margin-top:13px;">Consegna prevista</label>
-            <input class="inline" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value);openJobCard('${o.id}')">
+            <div class="job-v2-date-box start">
+              <span class="job-v2-date-icon">◫</span>
+              <span>${startSuggested}</span>
+            </div>
+            <div class="job-v2-info-sub" style="margin-top:7px;">Calcolato automaticamente 3 giorni lavorativi prima della consegna.</div>
+
+            <label style="margin-top:15px;">Consegna prevista</label>
+            <div class="job-v2-date-box delivery">
+              <span class="job-v2-date-icon">◫</span>
+              <input class="inline" style="border:0;background:transparent;padding:0;font-size:18px;font-weight:900;color:inherit;" type="date" value="${o.dataConsegna||''}" onchange="updateOrderField('${o.id}','dataConsegna',this.value);openJobCard('${o.id}')">
+            </div>
           </div>
 
           <div class="job-v2-info-cell">
             <label>Stato ordine</label>
-            <select class="inline status-select-big" style="background:${stateBg};color:${stateColor};border:${o.stato==="Da fare"?"1px solid #DDE2E5":"none"}"
+            <select class="inline status-select-big job-v2-state-select" style="background:${stateBg};color:${stateColor};border:${o.stato==="Da fare"?"1px solid #DDE2E5":"none"}"
               onchange="updateOrderField('${o.id}','stato',this.value)">
               ${STATUSES.map(s=>`<option value="${s}" ${s===o.stato?'selected':''}>${(s==="In produzione"&&orderHasExternal(o))?"IN PRODUZIONE ESTERNA":s.toUpperCase()}</option>`).join("")}
             </select>
 
-            <label style="margin-top:13px;">Modalità consegna</label>
-            <select class="inline" onchange="updateOrderField('${o.id}','consegnaTipo',this.value);openJobCard('${o.id}')">
+            <label style="margin-top:15px;">Modalità consegna</label>
+            <select class="inline job-v2-delivery-select" onchange="updateOrderField('${o.id}','consegnaTipo',this.value);openJobCard('${o.id}')">
               ${CONSEGNA_TIPI.map(t=>`<option ${t===o.consegnaTipo?'selected':''}>${t}</option>`).join("")}
             </select>
           </div>
