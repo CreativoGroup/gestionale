@@ -2078,6 +2078,19 @@
   min-width:125px;
 }
 
+
+/* ===== MAIL PRODUZIONE: STATO GIÀ INVIATA ===== */
+.job-production-mail-sent{
+  margin-bottom:10px;
+  background:#eef9f1;
+  border:1px solid #b9dfc3;
+  color:#1f6b3a;
+}
+.job-production-mail-sent small{
+  font-weight:700;
+  color:#587566;
+}
+
 </style>
 
 <style id="whatsapp-refine-style">
@@ -2892,9 +2905,8 @@ function getBozzaMeta(order){
 }
 function setBozzaScelta(orderId, scelta){
   const o=findItem('orders',orderId); if(!o) return;
-  const presaCarico=(o.fasi||[]).filter(f=>f && f.key==="__presa_carico__");
-  const allegati=(o.fasi||[]).filter(f=>f && f.key==="__allegato__");
-  o.fasi=[{key:"__bozza__", scelta, stato:""}, ...presaCarico, ...allegati];
+  const others=(o.fasi||[]).filter(f=>!(f && f.key==="__bozza__"));
+  o.fasi=[{key:"__bozza__", scelta, stato:""}, ...others];
   saveState('orders');
   openJobCard(orderId);
 }
@@ -2902,9 +2914,8 @@ function setBozzaInAttesa(orderId){
   const o=findItem('orders',orderId); if(!o) return;
   const m=getBozzaMeta(o);
   if(!m.scelta) return;
-  const presaCarico=(o.fasi||[]).filter(f=>f && f.key==="__presa_carico__");
-  const allegati=(o.fasi||[]).filter(f=>f && f.key==="__allegato__");
-  o.fasi=[{key:"__bozza__", scelta:m.scelta, stato:"IN ATTESA DI RISPOSTA"}, ...presaCarico, ...allegati];
+  const others=(o.fasi||[]).filter(f=>!(f && f.key==="__bozza__"));
+  o.fasi=[{key:"__bozza__", scelta:m.scelta, stato:"IN ATTESA DI RISPOSTA"}, ...others];
   saveState('orders');
   openJobCard(orderId);
   showToast("Bozza in attesa di conferma");
@@ -8023,7 +8034,12 @@ async function sendOrderProductionMail(orderId){
     let result={}; try{result=JSON.parse(raw)}catch(e){}
     if(!response.ok) throw new Error(result?.error||result?.message||raw||`Errore HTTP ${response.status}`);
 
-    showToast("Mail ordine in produzione inviata");
+    const tracked=await markProductionMailSent(orderId,to);
+    if(!tracked){
+      showToast("Mail inviata, ma non sono riuscito a registrare lo stato nella scheda");
+    }else{
+      showToast("Mail ordine in produzione inviata");
+    }
     openJobCard(orderId);
   }catch(err){
     console.error(err);
@@ -8047,6 +8063,50 @@ async function sendOrderProductionMail(orderId){
   }
 }
 
+
+
+function getProductionMailMeta(order){
+  return (order?.fasi||[]).find(f=>f && f.key==="__mail_produzione__") || null;
+}
+
+function formatProductionMailSentAt(value){
+  if(!value) return "";
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("it-IT",{
+    day:"2-digit",
+    month:"2-digit",
+    year:"numeric",
+    hour:"2-digit",
+    minute:"2-digit"
+  });
+}
+
+async function markProductionMailSent(orderId,to){
+  const o=findItem("orders",orderId);
+  if(!o) return false;
+
+  const others=(o.fasi||[]).filter(f=>!(f && f.key==="__mail_produzione__"));
+  const marker={
+    key:"__mail_produzione__",
+    sent:true,
+    sentAt:new Date().toISOString(),
+    to:String(to||"").trim()
+  };
+
+  const previous=o.fasi;
+  o.fasi=[...others,marker];
+
+  const saved=await upsertOneReturning("orders",o);
+  if(!saved){
+    o.fasi=previous;
+    return false;
+  }
+
+  const i=state.orders.findIndex(x=>x.id===orderId);
+  if(i>=0) state.orders[i]=saved;
+  return true;
+}
 
 function normalizedBozzaChannel(order){
   const raw=String(getBozzaMeta(order)?.scelta||"").trim().toUpperCase();
@@ -8154,17 +8214,41 @@ function jobStageFlowHtml(o,c){
     copy="Il lavoro è in produzione. Puoi avvisare il cliente che verrà ricontattato appena sarà pronto.";
 
     if(channel==="MAIL"){
+      const productionMail=getProductionMailMeta(o);
+      const productionMailSent=!!productionMail?.sent;
+      const productionMailWhen=formatProductionMailSentAt(productionMail?.sentAt);
       actions=`
-        <button class="btn job-v2-mail-btn" ${hasEmail?'':'disabled'} onclick="openOrderProductionMail('${o.id}')">✉ MAIL ORDINE IN PRODUZIONE</button>
+        ${productionMailSent?`
+          <div class="job-stage-final job-production-mail-sent">
+            <span class="job-stage-final-icon">✓</span>
+            <span>
+              <strong>Mail ordine in produzione già inviata</strong>
+              ${productionMailWhen?`<small> · ${escapeHtml(productionMailWhen)}</small>`:""}
+              ${productionMail?.to?`<small> · ${escapeHtml(productionMail.to)}</small>`:""}
+            </span>
+          </div>`:""}
+        <button class="btn job-v2-mail-btn" ${hasEmail?'':'disabled'} onclick="openOrderProductionMail('${o.id}')">${productionMailSent?'✉ INVIA DI NUOVO':'✉ MAIL ORDINE IN PRODUZIONE'}</button>
         ${!hasEmail?`<div class="job-stage-note">Nessuna email presente nell'anagrafica cliente.</div>`:""}`;
     }else if(channel==="WHATSAPP"){
       actions=`
         <button class="btn job-v2-wa-btn" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','produzione')">WHATSAPP ORDINE IN PRODUZIONE</button>
         ${!hasPhone?`<div class="job-stage-note">Nessun numero WhatsApp valido nell'anagrafica cliente.</div>`:""}`;
     }else if(channel==="NON RICHIESTA"){
+      const productionMail=getProductionMailMeta(o);
+      const productionMailSent=!!productionMail?.sent;
+      const productionMailWhen=formatProductionMailSentAt(productionMail?.sentAt);
       actions=`
+        ${productionMailSent?`
+          <div class="job-stage-final job-production-mail-sent">
+            <span class="job-stage-final-icon">✓</span>
+            <span>
+              <strong>Mail ordine in produzione già inviata</strong>
+              ${productionMailWhen?`<small> · ${escapeHtml(productionMailWhen)}</small>`:""}
+              ${productionMail?.to?`<small> · ${escapeHtml(productionMail.to)}</small>`:""}
+            </span>
+          </div>`:""}
         <div class="job-stage-note" style="font-weight:800;margin-bottom:4px;">La bozza non era richiesta. Per l'aggiornamento di produzione puoi scegliere il canale:</div>
-        <button class="btn job-v2-mail-btn" ${hasEmail?'':'disabled'} onclick="openOrderProductionMail('${o.id}')">✉ MAIL ORDINE IN PRODUZIONE</button>
+        <button class="btn job-v2-mail-btn" ${hasEmail?'':'disabled'} onclick="openOrderProductionMail('${o.id}')">${productionMailSent?'✉ INVIA DI NUOVO':'✉ MAIL ORDINE IN PRODUZIONE'}</button>
         <button class="btn job-v2-wa-btn" ${hasPhone?'':'disabled'} onclick="openOrderWhatsappStage('${o.id}','produzione')">WHATSAPP ORDINE IN PRODUZIONE</button>`;
     }else{
       actions=`<div class="job-stage-note">Nessun canale di comunicazione selezionato.</div>`;
