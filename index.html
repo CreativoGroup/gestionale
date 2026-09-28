@@ -2091,6 +2091,75 @@
   color:#587566;
 }
 
+
+/* ===== FIX DEFINITIVO SCHEDA LAVORAZIONE: QUANTITÀ + LAYOUT ===== */
+.job-v2-table-wrap{
+  overflow-x:auto !important;
+  overflow-y:visible !important;
+  -webkit-overflow-scrolling:touch;
+}
+.job-v2-table{
+  width:100% !important;
+  min-width:1040px !important;
+  table-layout:fixed !important;
+}
+.job-v2-table th:nth-child(1){width:190px !important;}
+.job-v2-table th:nth-child(2){width:auto !important;}
+.job-v2-table th:nth-child(3){width:130px !important;}
+.job-v2-table th:nth-child(4){width:145px !important;}
+.job-v2-table th:nth-child(5){width:130px !important;}
+.job-v2-table th:last-child{width:50px !important;}
+
+.job-v2-table td:nth-child(3),
+.job-v2-table th:nth-child(3){
+  min-width:130px !important;
+}
+.job-v2-table .job-v2-qty-input{
+  display:block;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  box-sizing:border-box !important;
+  font-size:18px !important;
+  font-weight:800 !important;
+  text-align:center !important;
+  padding:11px 8px !important;
+}
+.job-v2-table td.num{
+  overflow:visible;
+}
+.job-v2-table td:nth-child(4) input{
+  width:100% !important;
+  min-width:0 !important;
+}
+.job-v2-table td:nth-child(5){
+  white-space:nowrap;
+}
+@media(max-width:1100px){
+  .job-v2-table{min-width:1040px !important;}
+}
+
+
+/* ===== NOTE UNIFICATE E MODIFICABILI ===== */
+.note-edit-textarea{
+  width:100%;
+  min-height:76px;
+  resize:vertical;
+  box-sizing:border-box;
+  border:1px solid #dbe2ea;
+  border-radius:10px;
+  padding:10px 12px;
+  background:#fff;
+  color:#263142;
+  font:inherit;
+  line-height:1.45;
+}
+.note-edit-textarea:focus{
+  outline:none;
+  border-color:#ef7b5a;
+  box-shadow:0 0 0 3px rgba(239,91,47,.08);
+}
+
 </style>
 
 <style id="whatsapp-refine-style">
@@ -3302,7 +3371,7 @@ const NAV = [
   {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico"},
   {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico"},
 
-  {id:"note", label:"Note", icon:"✎", subtitle:"Chiamate e comunicazioni interne da gestire", group:"Info e richieste"},
+  {id:"note", label:"Note", icon:"✎", subtitle:"Note / Attività interne da gestire", group:"Info e richieste"},
   {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info e richieste"},
 
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Anagrafica"},
@@ -4928,11 +4997,9 @@ function renderMetaChannel(channel){
     <div class="card"><h3 style="margin-top:0;">Conversazioni</h3><p class="empty">Nessun canale ${label} collegato.</p></div>`;
 }
 
-/* ============ NOTE: CHIAMATE E COMUNICAZIONI ============ */
+/* ============ NOTE / ATTIVITÀ DA GESTIRE ============ */
 function noteTypePill(tipo){
-  return tipo==="Chiamata"
-    ? `<span class="pill pill-family">☎ Chiamata</span>`
-    : `<span class="pill pill-business">✉ Comunicazione</span>`;
+  return `<span class="pill pill-business">● Nota</span>`;
 }
 function noteDateLabel(iso){
   if(!iso) return "—";
@@ -4940,7 +5007,7 @@ function noteDateLabel(iso){
     return new Intl.DateTimeFormat("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(iso));
   }catch(e){ return "—"; }
 }
-let noteDraft = {tipo:"Chiamata", nomePersona:"", testo:"", operatore:""};
+let noteDraft = {nomePersona:"", testo:"", operatore:""};
 function updateNoteDraft(field,value){ noteDraft[field]=value; }
 function renderNote(){
   const attive=[...(state.noteComunicazioni||[])].filter(n=>!n.fatto).sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
@@ -4950,13 +5017,6 @@ function renderNote(){
     <div class="card" style="margin-bottom:18px;">
       <h3 style="margin-top:0;">Nuova nota</h3>
       <div class="form-grid">
-        <div class="field">
-          <label>Tipo</label>
-          <select id="nota-tipo" onchange="updateNoteDraft('tipo',this.value)">
-            <option value="Chiamata" ${noteDraft.tipo==="Chiamata"?'selected':''}>Chiamata</option>
-            <option value="Comunicazione" ${noteDraft.tipo==="Comunicazione"?'selected':''}>Comunicazione</option>
-          </select>
-        </div>
         <div class="field">
           <label>Nome persona</label>
           <input id="nota-persona" placeholder="Nome cliente / referente" value="${escapeHtml(noteDraft.nomePersona)}" oninput="updateNoteDraft('nomePersona',this.value)">
@@ -4971,7 +5031,7 @@ function renderNote(){
       </div>
       <div class="field" style="margin-top:12px;">
         <label>Testo</label>
-        <textarea id="nota-testo" rows="4" placeholder="Scrivi la chiamata, la richiesta o la comunicazione…" oninput="updateNoteDraft('testo',this.value)">${escapeHtml(noteDraft.testo)}</textarea>
+        <textarea id="nota-testo" rows="4" placeholder="Scrivi la nota / attività da gestire…" oninput="updateNoteDraft('testo',this.value)">${escapeHtml(noteDraft.testo)}</textarea>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" onclick="addNotaComunicazione()">Salva nota</button>
@@ -4988,14 +5048,20 @@ function renderNote(){
               <strong>${escapeHtml(n.nomePersona||"Senza nome")}</strong>
               <span class="lr-sub">· ${escapeHtml(n.operatore||"—")}</span>
             </div>
-            <div style="margin-top:8px;white-space:pre-wrap;">${escapeHtml(n.testo||"")}</div>
-            <div class="lr-sub" style="margin-top:7px;">${escapeHtml(noteDateLabel(n.creatoIl))}</div>
+            <div style="margin-top:8px;">
+              <label class="lr-sub" style="display:block;margin-bottom:5px;font-weight:700;">Descrizione lavoro</label>
+              <textarea id="nota-desc-${n.id}" class="note-edit-textarea" rows="2">${escapeHtml(n.testo||"")}</textarea>
+              <div style="margin-top:7px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-outline btn-sm" onclick="salvaDescrizioneNota('${n.id}')">SALVA NOTA</button>
+                <span class="lr-sub">${escapeHtml(noteDateLabel(n.creatoIl))}</span>
+              </div>
+            </div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
             <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">TRASFORMA IN LEAD</button>
             <button class="btn btn-primary btn-sm" onclick="markNotaFatta('${n.id}')">FATTO</button>
           </div>
-        </div>`).join("") : `<p class="empty">Nessuna chiamata o comunicazione da gestire.</p>`}
+        </div>`).join("") : `<p class="empty">Nessuna nota da gestire.</p>`}
     </div>
 
     <div class="card">
@@ -5022,14 +5088,12 @@ function trasformaNotaInLead(id){
   const n=findItem("noteComunicazioni",id);
   if(!n) return;
 
-  const tipoLabel=n.tipo==="Chiamata" ? "Chiamata" : "Comunicazione";
-
   openManualLeadForm({
     nome:n.nomePersona||"",
     azienda:"",
     email:"",
     telefono:"",
-    oggettoRichiesta:`${tipoLabel} - ${n.nomePersona||"Nuovo contatto"}`,
+    oggettoRichiesta:`Nota - ${n.nomePersona||"Nuovo contatto"}`,
     richiesta:n.testo||"",
     stato:"Nuovo",
     fonte:`nota:${n.id}`
@@ -5037,7 +5101,7 @@ function trasformaNotaInLead(id){
 }
 
 async function addNotaComunicazione(){
-  const tipo=String(noteDraft.tipo||document.getElementById("nota-tipo")?.value||"Chiamata");
+  const tipo="Comunicazione";
   const nomePersona=String(noteDraft.nomePersona||document.getElementById("nota-persona")?.value||"").trim();
   const testo=String(noteDraft.testo||document.getElementById("nota-testo")?.value||"").trim();
   const operatore=String(noteDraft.operatore||document.getElementById("nota-operatore")?.value||"").trim();
@@ -5054,10 +5118,39 @@ async function addNotaComunicazione(){
   if(!saved) return;
   const i=state.noteComunicazioni.findIndex(x=>x.id===saved.id);
   if(i>=0) state.noteComunicazioni[i]=saved; else state.noteComunicazioni.push(saved);
-  noteDraft={tipo:"Chiamata",nomePersona:"",testo:"",operatore:""};
+  noteDraft={nomePersona:"",testo:"",operatore:""};
   renderNote();
   showToast("Nota salvata");
 }
+
+async function salvaDescrizioneNota(id){
+  const n=findItem("noteComunicazioni",id);
+  if(!n) return;
+
+  const el=document.getElementById(`nota-desc-${id}`);
+  const testo=String(el?.value||"").trim();
+
+  if(!testo){
+    showToast("La descrizione non può essere vuota");
+    return;
+  }
+
+  const precedente=n.testo;
+  n.testo=testo;
+
+  const saved=await upsertOneReturning("noteComunicazioni",n);
+  if(!saved){
+    n.testo=precedente;
+    return;
+  }
+
+  const i=state.noteComunicazioni.findIndex(x=>x.id===id);
+  if(i>=0) state.noteComunicazioni[i]=saved;
+
+  renderNote();
+  showToast("Descrizione aggiornata");
+}
+
 async function markNotaFatta(id){
   const n=findItem("noteComunicazioni",id);
   if(!n) return;
