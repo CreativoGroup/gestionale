@@ -4931,7 +4931,8 @@ async function completeWhatsappMetaSignup(){
       hasAccessToken:!!whatsappMetaSignupState.accessToken,
       wabaId:whatsappMetaSignupState.wabaId||null,
       phoneNumberId:whatsappMetaSignupState.phoneNumberId||null,
-      event:whatsappMetaSignupState.event||null
+      event:whatsappMetaSignupState.event||null,
+      redirectUri:window.location.origin + window.location.pathname
     });
 
     const { data: result, error } = await sb.functions.invoke(
@@ -4942,7 +4943,8 @@ async function completeWhatsappMetaSignup(){
           accessToken: whatsappMetaSignupState.accessToken || null,
           wabaId: whatsappMetaSignupState.wabaId || null,
           phoneNumberId: whatsappMetaSignupState.phoneNumberId || null,
-          event: whatsappMetaSignupState.event || null
+          event: whatsappMetaSignupState.event || null,
+          redirectUri: window.location.origin + window.location.pathname
         }
       }
     );
@@ -5082,14 +5084,9 @@ function openWhatsappCoexistence(){
       response_type: "code",
       override_default_response_type: true,
 
-      // Forziamo un redirect stabile e identico a quello usato
-      // dal backend durante lo scambio del codice OAuth.
-      fallback_redirect_uri: "https://gestionale.creativogroup.it/",
-
       extras: {
         setup: {},
-        featureType: "whatsapp_business_app_onboarding",
-        sessionInfoVersion: "3"
+        featureType: "whatsapp_business_app_onboarding"
       }
     });
   }catch(error){
