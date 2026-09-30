@@ -2336,49 +2336,100 @@
     font-size:14px;
     font-weight:750;
   }
-  .completed-sheet-notes{
-    width:100%;
-    min-height:225px;
-    resize:vertical;
-    box-sizing:border-box;
-    border:1px solid #CCD6E2;
-    border-radius:14px;
-    padding:14px 15px;
-    background:#fff;
-    color:#263142;
-    font:inherit;
-    font-size:14px;
-    line-height:1.55;
+  .completed-note-editor{
+    border:1px solid #DDE5EE;
+    border-radius:16px;
+    overflow:hidden;
+    background:#FBFCFE;
   }
-  .completed-sheet-notes:focus{
-    outline:none;
-    border-color:#6E91F5;
-    box-shadow:0 0 0 4px rgba(59,110,245,.09);
-  }
-  .completed-sheet-note-footer{
+  .completed-note-toolbar{
     display:flex;
     justify-content:space-between;
     align-items:center;
-    gap:14px;
+    gap:12px;
+    padding:11px 13px;
+    border-bottom:1px solid #E5EAF0;
+    background:#F7F9FC;
+  }
+  .completed-note-toolbar-title{
+    font-size:12px;
+    color:#526173;
+    font-weight:850;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+  }
+  .completed-note-status{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    min-height:28px;
+    padding:5px 9px;
+    border-radius:999px;
+    font-size:11.5px;
+    font-weight:800;
+    color:#64748B;
+    background:#EEF2F6;
+  }
+  .completed-note-status::before{
+    content:"";
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:#94A3B8;
+  }
+  .completed-note-status.saving{
+    color:#8A6410;
+    background:#FFF7DB;
+  }
+  .completed-note-status.saving::before{background:#D79A14;}
+  .completed-note-status.saved{
+    color:#23734A;
+    background:#EAF7EF;
+  }
+  .completed-note-status.saved::before{background:#39A66C;}
+  .completed-note-status.error{
+    color:#A6352B;
+    background:#FFF0EE;
+  }
+  .completed-note-status.error::before{background:#D9534F;}
+  .completed-sheet-notes{
+    width:100%;
+    min-height:255px;
+    resize:vertical;
+    box-sizing:border-box;
+    border:0;
+    padding:18px;
+    background:#fff;
+    color:#263142;
+    font:inherit;
+    font-size:15px;
+    line-height:1.65;
+  }
+  .completed-sheet-notes:focus{
+    outline:none;
+    box-shadow:inset 0 0 0 2px rgba(59,110,245,.20);
+  }
+  .completed-note-hint{
+    padding:10px 13px;
+    border-top:1px solid #EEF2F6;
+    background:#FBFCFE;
+    color:#7A8796;
+    font-size:11.5px;
+    line-height:1.45;
+  }
+  .completed-sheet-note-footer{
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    gap:8px;
     margin-top:13px;
     flex-wrap:wrap;
-  }
-  .completed-sheet-save-state{
-    min-height:18px;
-    color:var(--muted);
-    font-size:11.5px;
-    line-height:1.35;
-  }
-  .completed-sheet-actions{
-    display:flex;
-    gap:8px;
-    margin-left:auto;
   }
   .completed-sheet-save{
     background:#2962E8 !important;
     color:#fff !important;
     border-color:#2962E8 !important;
-    min-width:108px;
+    min-width:118px;
     justify-content:center;
   }
   .completed-sheet-save:hover{background:#1F50C8 !important;}
@@ -2389,7 +2440,7 @@
     .completed-sheet-scroll{padding:14px 12px 22px;}
     .completed-sheet-section{border-radius:16px;padding:15px;}
     .completed-sheet-info-row{grid-template-columns:105px minmax(0,1fr);gap:10px;}
-    .completed-sheet-notes{min-height:190px;font-size:16px;}
+    .completed-sheet-notes{min-height:220px;font-size:16px;}
     .completed-sheet-actions{width:100%;}
     .completed-sheet-actions .btn{flex:1;justify-content:center;}
   }
@@ -12443,14 +12494,32 @@ function openCompletedOrderSheet(orderId){
 
     <section class="completed-sheet-section">
       <h3>Note di lavorazione</h3>
-      <p class="section-help">Modifica qui le note operative. Il pulsante <strong>Salva note</strong> le registra direttamente nell'ordine.</p>
-      <textarea id="completedSheetNotes" class="completed-sheet-notes" placeholder="Inserisci note, materiali, misure, indicazioni di consegna…">${escapeHtml(o.descrizione||"")}</textarea>
-      <div class="completed-sheet-note-footer">
-        <div id="completedSheetSaveState" class="completed-sheet-save-state">Nessuna modifica da salvare.</div>
-        <div class="completed-sheet-actions">
-          <button class="btn btn-outline" type="button" onclick="openCompletedOrderSheet('${o.id}')">Annulla</button>
-          <button id="completedSheetSaveBtn" class="btn btn-primary completed-sheet-save" type="button" onclick="saveCompletedOrderNotes('${o.id}')">Salva note</button>
+      <p class="section-help">Uno spazio unico per materiali, misure, indicazioni, modifiche e informazioni utili alla consegna.</p>
+
+      <div class="completed-note-editor">
+        <div class="completed-note-toolbar">
+          <div class="completed-note-toolbar-title">Note operative</div>
+          <div id="completedSheetSaveState" class="completed-note-status saved">Tutto salvato</div>
         </div>
+
+        <textarea id="completedSheetNotes"
+          class="completed-sheet-notes"
+          placeholder="Scrivi qui le note della lavorazione…
+
+Esempio:
+• Materiali consegnati dal cliente
+• Misure da verificare
+• Posizione logo / stampa
+• Indicazioni per la consegna">${escapeHtml(o.descrizione||"")}</textarea>
+
+        <div class="completed-note-hint">
+          Le modifiche vengono salvate automaticamente dopo pochi istanti. Puoi anche usare “Salva ora”.
+        </div>
+      </div>
+
+      <div class="completed-sheet-note-footer">
+        <button class="btn btn-outline" type="button" onclick="closeCompletedOrderSheet()">Chiudi</button>
+        <button id="completedSheetSaveBtn" class="btn btn-primary completed-sheet-save" type="button" onclick="saveCompletedOrderNotes('${o.id}',true)">Salva ora</button>
       </div>
     </section>
   `;
@@ -12458,7 +12527,17 @@ function openCompletedOrderSheet(orderId){
   const notes=document.getElementById("completedSheetNotes");
   const stateEl=document.getElementById("completedSheetSaveState");
   if(notes && stateEl){
-    notes.addEventListener("input",()=>{ stateEl.textContent="Modifiche non ancora salvate."; });
+    notes.dataset.lastSavedValue = notes.value;
+    notes.addEventListener("input",()=>{
+      markCompletedNoteDirty();
+      scheduleCompletedNoteAutosave(orderId);
+    });
+    notes.addEventListener("keydown",(event)=>{
+      if((event.ctrlKey || event.metaKey) && event.key.toLowerCase()==="s"){
+        event.preventDefault();
+        saveCompletedOrderNotes(orderId,true);
+      }
+    });
   }
 
   document.querySelectorAll("tr[data-completed-order]").forEach(tr=>{
@@ -12473,6 +12552,10 @@ function openCompletedOrderSheet(orderId){
 }
 
 function closeCompletedOrderSheet(){
+  const notes=document.getElementById("completedSheetNotes");
+  if(completedSheetOrderId && notes && notes.value!==(notes.dataset.lastSavedValue||"")){
+    saveCompletedOrderNotes(completedSheetOrderId,false);
+  }
   const backdrop=document.getElementById("completedSheetBackdrop");
   const drawer=document.getElementById("completedSheetDrawer");
   if(backdrop) backdrop.classList.remove("open");
@@ -12484,48 +12567,101 @@ function closeCompletedOrderSheet(){
   document.querySelectorAll("tr[data-completed-order]").forEach(tr=>tr.classList.remove("completed-sheet-selected"));
 }
 
-async function saveCompletedOrderNotes(orderId){
+let completedNoteAutosaveTimer = null;
+let completedNoteSaveInFlight = false;
+let completedNoteSaveQueued = false;
+
+function setCompletedNoteStatus(kind,textValue){
+  const el=document.getElementById("completedSheetSaveState");
+  if(!el) return;
+  el.className=`completed-note-status ${kind||""}`.trim();
+  el.textContent=textValue||"";
+}
+
+function markCompletedNoteDirty(){
+  setCompletedNoteStatus("saving","Da salvare");
+}
+
+function scheduleCompletedNoteAutosave(orderId){
+  if(completedNoteAutosaveTimer) clearTimeout(completedNoteAutosaveTimer);
+  completedNoteAutosaveTimer=setTimeout(()=>{
+    completedNoteAutosaveTimer=null;
+    saveCompletedOrderNotes(orderId,false);
+  },900);
+}
+
+async function saveCompletedOrderNotes(orderId,manual=false){
   const o=findItem("orders",orderId);
   const notesEl=document.getElementById("completedSheetNotes");
   const saveBtn=document.getElementById("completedSheetSaveBtn");
-  const stateEl=document.getElementById("completedSheetSaveState");
-  if(!o || !notesEl) return;
+  if(!o || !notesEl) return false;
 
-  const oldValue=o.descrizione||"";
-  const newValue=notesEl.value.trim();
+  if(completedNoteAutosaveTimer){
+    clearTimeout(completedNoteAutosaveTimer);
+    completedNoteAutosaveTimer=null;
+  }
 
+  const newValue=notesEl.value;
+  const lastSaved=notesEl.dataset.lastSavedValue ?? o.descrizione ?? "";
+
+  if(newValue===lastSaved && !manual){
+    setCompletedNoteStatus("saved","Tutto salvato");
+    return true;
+  }
+
+  if(completedNoteSaveInFlight){
+    completedNoteSaveQueued=true;
+    return false;
+  }
+
+  completedNoteSaveInFlight=true;
   if(saveBtn){
     saveBtn.disabled=true;
-    saveBtn.textContent="Salvataggio…";
+    saveBtn.textContent="Salvo…";
   }
-  if(stateEl) stateEl.textContent="Salvataggio in corso…";
+  setCompletedNoteStatus("saving","Salvataggio…");
 
-  o.descrizione=newValue;
+  const previousValue=o.descrizione||"";
+  const candidate={...o,descrizione:newValue};
 
   try{
-    const saved=await upsertOneReturning("orders",o);
+    const saved=await upsertOneReturning("orders",candidate);
     if(!saved) throw new Error("Salvataggio non riuscito");
 
     const i=state.orders.findIndex(x=>x.id===orderId);
     if(i>=0) state.orders[i]=saved;
 
-    // Se la scheda ordine completa era già stata aperta, allineiamo anche
-    // l'eventuale snapshot per evitare che una chiusura successiva ripristini note vecchie.
+    // Mantiene coerente anche la scheda completa se era stata aperta prima.
     if(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId){
       jobCardEditSnapshot.order=JSON.parse(JSON.stringify(saved));
     }
 
-    if(stateEl) stateEl.textContent="Note salvate correttamente.";
-    showToast("Note di lavorazione salvate");
+    notesEl.dataset.lastSavedValue=newValue;
+    const ora=new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"});
+    setCompletedNoteStatus("saved",`Salvato alle ${ora}`);
+
+    if(manual) showToast("Note salvate");
+    return true;
   }catch(err){
     console.error("Salvataggio note lavorazione",err);
-    o.descrizione=oldValue;
-    if(stateEl) stateEl.textContent="Errore nel salvataggio. Riprova.";
-    showToast("Note non salvate: riprova");
+    // Non cancelliamo ciò che l'utente ha scritto: resta nell'editor per un nuovo tentativo.
+    o.descrizione=previousValue;
+    setCompletedNoteStatus("error","Non salvato · riprova");
+    if(manual) showToast("Errore: note non salvate");
+    return false;
   }finally{
+    completedNoteSaveInFlight=false;
     if(saveBtn){
       saveBtn.disabled=false;
-      saveBtn.textContent="Salva note";
+      saveBtn.textContent="Salva ora";
+    }
+
+    if(completedNoteSaveQueued){
+      completedNoteSaveQueued=false;
+      const current=document.getElementById("completedSheetNotes");
+      if(current && current.value!==(current.dataset.lastSavedValue||"")){
+        scheduleCompletedNoteAutosave(orderId);
+      }
     }
   }
 }
