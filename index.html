@@ -2446,6 +2446,50 @@
   }
 </style>
 
+
+<style id="dropbox-integration-style">
+  .dropbox-grid{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.7fr);gap:16px;align-items:start;}
+  .dropbox-card{background:#fff;border:1px solid var(--border);border-radius:22px;padding:18px;box-shadow:var(--shadowTiny);}
+  .dropbox-card h3{margin:0 0 6px;}
+  .dropbox-sub{font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 16px;}
+  .dropbox-status{display:flex;align-items:center;gap:9px;padding:11px 13px;border-radius:14px;background:#F6F8FB;border:1px solid #E4E9EF;font-size:13px;font-weight:800;margin-bottom:14px;}
+  .dropbox-dot{width:9px;height:9px;border-radius:50%;background:#94A3B8;flex:0 0 auto;}
+  .dropbox-status.connected{background:#ECF8F1;color:#1E6A43;border-color:#CBEAD8;}
+  .dropbox-status.connected .dropbox-dot{background:#35A66F;}
+  .dropbox-status.error{background:#FFF1EF;color:#A13D31;border-color:#F1C9C3;}
+  .dropbox-status.error .dropbox-dot{background:#D9534F;}
+  .dropbox-field{margin-bottom:12px;}
+  .dropbox-field label{display:block;font-size:12px;font-weight:800;color:#64748B;margin-bottom:6px;}
+  .dropbox-field input{width:100%;min-height:46px;border:1px solid #DDE3EA;border-radius:14px;padding:10px 12px;font:inherit;background:#fff;}
+  .dropbox-field input:focus{outline:none;border-color:#6E91F5;box-shadow:0 0 0 4px rgba(59,110,245,.09);}
+  .dropbox-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .dropbox-connect{background:#0061FF!important;color:#fff!important;}
+  .dropbox-connect:hover{background:#0054DB!important;}
+  .dropbox-help{font-size:11.5px;color:#7B8794;line-height:1.5;margin-top:12px;}
+  .dropbox-help code{font-size:11px;background:#F3F5F8;border-radius:6px;padding:2px 5px;}
+  .dropbox-browser-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+  .dropbox-path{font-size:13px;font-weight:800;color:#334155;overflow-wrap:anywhere;}
+  .dropbox-toolbar{display:flex;gap:8px;flex-wrap:wrap;}
+  .dropbox-file-list{border:1px solid #E6EBF0;border-radius:16px;overflow:hidden;background:#fff;}
+  .dropbox-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 14px;border-bottom:1px solid #EDF1F5;cursor:pointer;}
+  .dropbox-row:last-child{border-bottom:0;}
+  .dropbox-row:hover{background:#F8FAFC;}
+  .dropbox-file-main{min-width:0;}
+  .dropbox-file-name{font-weight:800;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dropbox-file-meta{font-size:11.5px;color:var(--muted);margin-top:3px;}
+  .dropbox-file-actions{display:flex;gap:6px;align-items:center;}
+  .dropbox-empty{padding:34px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .dropbox-upload-box{display:none;}
+  .dropbox-upload-box.open{display:block;margin:12px 0;padding:14px;border:1px dashed #9FB8DF;border-radius:14px;background:#F7FAFF;}
+  .dropbox-upload-box input[type=file]{width:100%;}
+  @media(max-width:900px){.dropbox-grid{grid-template-columns:1fr;}}
+  @media(max-width:760px){
+    .dropbox-card{border-radius:18px;padding:14px;}
+    .dropbox-row{grid-template-columns:1fr;}
+    .dropbox-file-actions{justify-content:flex-start;}
+  }
+</style>
+
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -2498,6 +2542,7 @@
     <section class="view" id="view-flusso"></section>
     <section class="view" id="view-magazzino"></section>
     <section class="view" id="view-lavoriCompletati"></section>
+    <section class="view" id="view-dropbox"></section>
     <section class="view" id="view-incassi"></section>
     <section class="view" id="view-spese"></section>
     <section class="view" id="view-costiFissi"></section>
@@ -3621,6 +3666,8 @@ const NAV = [
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
   {id:"lavoriCompletati", label:"Lavori completati", icon:"✓", subtitle:"Da consegnare e completati recenti", group:"Operativa"},
 
+  {id:"dropbox", label:"Dropbox", icon:"☁", subtitle:"Archivio file collegato al gestionale", group:"Archivio"},
+
   {id:"incassi", label:"Incassi", icon:"€", subtitle:"Report pagamenti e crediti aperti", adminOnly:true, group:"Amministrazione"},
   {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine", group:"Amministrazione"},
   {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti", group:"Amministrazione"},
@@ -3630,7 +3677,7 @@ function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && cu
 function renderNav(){
   const items = visibleNav();
   const current = NAV.find(n=>n.id===currentView) || items[0];
-  const groups = ["Dashboard","Traffico","Info e richieste","Anagrafica","Operativa","Amministrazione"];
+  const groups = ["Dashboard","Traffico","Info e richieste","Anagrafica","Operativa","Archivio","Amministrazione"];
 
   const groupedButtons = groups.map(group=>{
     const groupItems = items.filter(n=>n.group===group);
@@ -3738,6 +3785,7 @@ function renderTopbarActions(){
     ordini: `<button class="btn btn-primary" onclick="pendingLeadOrderConversion=null;toggleForm('orderForm')">+ Nuovo ordine</button>`,
     magazzino: ``,
     lavoriCompletati: ``,
+    dropbox: `<button class="btn btn-outline" onclick="dropboxRefresh()">↻ Aggiorna</button>`,
     incassi: `<button class="btn btn-primary" onclick="toggleForm('paymentForm')">+ Registra incasso</button>`,
     spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
     costiFissi: currentUser&&currentUser.role==="admin" ? `<button class="btn btn-primary" onclick="toggleForm('fixedCostForm')">+ Nuovo costo fisso</button>` : ``,
@@ -3754,7 +3802,7 @@ function renderTopbarActions(){
 function renderCurrentView(){
   ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti,
     ordini:renderOrdini, flusso:renderFlusso,
-    magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
+    magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, dropbox:renderDropbox, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
     posta:renderPosta, whatsapp:renderWhatsapp, instagram:()=>renderMetaChannel("instagram"), leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
 }
 let clientFormOpen = false;
@@ -7482,6 +7530,401 @@ function openQuoteDetail(quoteId){
   document.getElementById("modalBackdrop").classList.add("open");
 }
 function updateQuoteField(id, field, value){ findItem('quotes',id)[field] = value; saveState('quotes'); }
+
+
+
+/* ============ DROPBOX ============ */
+const DROPBOX_APP_KEY_STORAGE = "gestionale_dropbox_app_key";
+const DROPBOX_TOKEN_STORAGE = "gestionale_dropbox_access_token";
+const DROPBOX_TOKEN_EXP_STORAGE = "gestionale_dropbox_access_token_exp";
+const DROPBOX_PKCE_VERIFIER = "gestionale_dropbox_pkce_verifier";
+const DROPBOX_OAUTH_STATE = "gestionale_dropbox_oauth_state";
+let dropboxCurrentPath = "";
+
+function dropboxRedirectUri(){
+  return "https://gestionale.creativogroup.it/";
+}
+function dropboxAppKey(){
+  const saved=(localStorage.getItem(DROPBOX_APP_KEY_STORAGE)||"").trim();
+  return saved || "b28z7gce12tgzid";
+}
+function dropboxToken(){
+  const token=sessionStorage.getItem(DROPBOX_TOKEN_STORAGE)||"";
+  const exp=Number(sessionStorage.getItem(DROPBOX_TOKEN_EXP_STORAGE)||0);
+  if(exp && Date.now()>exp){
+    sessionStorage.removeItem(DROPBOX_TOKEN_STORAGE);
+    sessionStorage.removeItem(DROPBOX_TOKEN_EXP_STORAGE);
+    return "";
+  }
+  return token;
+}
+function dropboxIsConnected(){ return !!dropboxToken(); }
+
+function dropboxBase64Url(bytes){
+  let binary="";
+  bytes.forEach(b=>binary+=String.fromCharCode(b));
+  return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function dropboxRandomString(length=64){
+  const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  const bytes=new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes,b=>alphabet[b%alphabet.length]).join("");
+}
+async function dropboxPkceChallenge(verifier){
+  const data=new TextEncoder().encode(verifier);
+  const digest=await crypto.subtle.digest("SHA-256",data);
+  return dropboxBase64Url(new Uint8Array(digest));
+}
+
+async function connectDropbox(){
+  const envWarning=dropboxEnvironmentWarning();
+  if(envWarning){ showToast(envWarning); return; }
+  const input=document.getElementById("dropboxAppKeyInput");
+  const key=(input?.value||dropboxAppKey()).trim();
+  const redirect=dropboxRedirectUri();
+
+  if(!key){ showToast("Inserisci prima la Dropbox App Key"); return; }
+  if(!redirect){
+    showToast("Dropbox richiede il gestionale aperto da HTTPS o localhost");
+    return;
+  }
+  if(!window.crypto?.subtle){
+    showToast("Il browser non supporta il collegamento sicuro Dropbox");
+    return;
+  }
+
+  localStorage.setItem(DROPBOX_APP_KEY_STORAGE,key || "b28z7gce12tgzid");
+
+  const verifier=dropboxRandomString(96);
+  const challenge=await dropboxPkceChallenge(verifier);
+  const state=dropboxRandomString(48);
+  sessionStorage.setItem(DROPBOX_PKCE_VERIFIER,verifier);
+  sessionStorage.setItem(DROPBOX_OAUTH_STATE,state);
+
+  const scopes=[
+    "account_info.read",
+    "files.metadata.read",
+    "files.content.read",
+    "files.content.write"
+  ].join(" ");
+
+  const url=new URL("https://www.dropbox.com/oauth2/authorize");
+  url.searchParams.set("client_id",key);
+  url.searchParams.set("response_type","code");
+  url.searchParams.set("redirect_uri",redirect);
+  url.searchParams.set("code_challenge",challenge);
+  url.searchParams.set("code_challenge_method","S256");
+  url.searchParams.set("token_access_type","online");
+  url.searchParams.set("scope",scopes);
+  url.searchParams.set("state",state);
+  location.href=url.toString();
+}
+
+async function handleDropboxOAuthCallback(){
+  const params=new URLSearchParams(location.search);
+  const code=params.get("code");
+  const state=params.get("state");
+  if(!code) return false;
+
+  const expected=sessionStorage.getItem(DROPBOX_OAUTH_STATE)||"";
+  const verifier=sessionStorage.getItem(DROPBOX_PKCE_VERIFIER)||"";
+  const key=dropboxAppKey();
+  const redirect=dropboxRedirectUri();
+
+  if(!expected || state!==expected || !verifier || !key || !redirect){
+    showToast("Collegamento Dropbox non valido o scaduto");
+    return false;
+  }
+
+  try{
+    const body=new URLSearchParams();
+    body.set("code",code);
+    body.set("grant_type","authorization_code");
+    body.set("client_id",key);
+    body.set("redirect_uri",redirect);
+    body.set("code_verifier",verifier);
+
+    const res=await fetch("https://api.dropboxapi.com/oauth2/token",{
+      method:"POST",
+      headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body
+    });
+    const data=await res.json();
+    if(!res.ok) throw new Error(data?.error_description||data?.error||"Errore OAuth Dropbox");
+
+    sessionStorage.setItem(DROPBOX_TOKEN_STORAGE,data.access_token||"");
+    if(data.expires_in){
+      sessionStorage.setItem(DROPBOX_TOKEN_EXP_STORAGE,String(Date.now()+(Number(data.expires_in)*1000)-30000));
+    }
+    sessionStorage.removeItem(DROPBOX_PKCE_VERIFIER);
+    sessionStorage.removeItem(DROPBOX_OAUTH_STATE);
+
+    const clean=location.origin+location.pathname;
+    history.replaceState({},document.title,clean);
+
+    currentView="dropbox";
+    document.querySelectorAll("section.view").forEach(s=>s.classList.remove("active"));
+    document.getElementById("view-dropbox")?.classList.add("active");
+    renderViewHeading(); renderNav(); renderTopbarActions(); renderDropbox();
+    showToast("Dropbox collegato");
+    return true;
+  }catch(err){
+    console.error("Dropbox OAuth",err);
+    showToast("Errore collegamento Dropbox");
+    return false;
+  }
+}
+
+function disconnectDropbox(){
+  sessionStorage.removeItem(DROPBOX_TOKEN_STORAGE);
+  sessionStorage.removeItem(DROPBOX_TOKEN_EXP_STORAGE);
+  dropboxCurrentPath="";
+  renderDropbox();
+  showToast("Dropbox scollegato da questa sessione");
+}
+
+async function dropboxApi(route, body={}){
+  const token=dropboxToken();
+  if(!token) throw new Error("Dropbox non collegato");
+  const res=await fetch("https://api.dropboxapi.com/2/"+route,{
+    method:"POST",
+    headers:{
+      "Authorization":"Bearer "+token,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify(body)
+  });
+  const raw=await res.text();
+  let data={};
+  try{ data=raw?JSON.parse(raw):{}; }catch(e){ data={raw}; }
+  if(!res.ok){
+    if(res.status===401){
+      sessionStorage.removeItem(DROPBOX_TOKEN_STORAGE);
+      sessionStorage.removeItem(DROPBOX_TOKEN_EXP_STORAGE);
+    }
+    throw new Error(data?.error_summary||data?.error?.[".tag"]||raw||("Errore Dropbox "+res.status));
+  }
+  return data;
+}
+
+function dropboxFormatBytes(n){
+  n=Number(n)||0;
+  if(n<1024) return n+" B";
+  if(n<1024*1024) return (n/1024).toFixed(1)+" KB";
+  if(n<1024*1024*1024) return (n/(1024*1024)).toFixed(1)+" MB";
+  return (n/(1024*1024*1024)).toFixed(1)+" GB";
+}
+
+
+function dropboxEnvironmentWarning(){
+  const expected="https://gestionale.creativogroup.it/";
+  const current=(location.origin && location.protocol!=="file:") ? (location.origin+"/") : location.href;
+  if(location.protocol==="file:") return "Stai aprendo il gestionale come file locale. Per collegare Dropbox devi usare https://gestionale.creativogroup.it/.";
+  if(location.origin!=="https://gestionale.creativogroup.it") return "Per questo collegamento Dropbox apri il gestionale da https://gestionale.creativogroup.it/.";
+  return "";
+}
+
+function renderDropbox(){
+  const root=document.getElementById("view-dropbox");
+  if(!root) return;
+
+  const redirect=dropboxRedirectUri();
+  const key=dropboxAppKey();
+  const connected=dropboxIsConnected();
+
+  root.innerHTML=`
+    <div class="dropbox-grid">
+      <div class="dropbox-card">
+        <h3>Collegamento Dropbox</h3>
+        <p class="dropbox-sub">Usiamo Dropbox come archivio documenti del gestionale. In questa prima fase puoi collegare l'account, navigare le cartelle, creare cartelle, caricare e scaricare file.</p>
+
+        <div class="dropbox-status ${connected?'connected':''}">
+          <span class="dropbox-dot"></span>
+          <span>${connected?'Dropbox collegato':'Pronto per collegare Dropbox'}</span>
+        </div>
+        ${dropboxEnvironmentWarning()?`<div class="dropbox-status error"><span class="dropbox-dot"></span><span>${escapeHtml(dropboxEnvironmentWarning())}</span></div>`:""}
+
+        <div class="dropbox-field">
+          <label>Dropbox App Key</label>
+          <input id="dropboxAppKeyInput" value="${escapeHtml(key)}" readonly>
+        </div>
+
+        <div class="dropbox-field">
+          <label>Redirect URI da registrare su Dropbox</label>
+          <input value="${escapeHtml(redirect||'Apri il gestionale da HTTPS o localhost')}" readonly>
+        </div>
+
+        <div class="dropbox-actions">
+          ${connected
+            ? `<button class="btn btn-outline" onclick="disconnectDropbox()">Scollega</button>`
+            : `<button class="btn dropbox-connect" onclick="connectDropbox()">Connetti Dropbox</button>`}
+        </div>
+
+        <div class="dropbox-help">
+          La connessione è già configurata per la tua app Dropbox <strong>Gestionale app</strong>.
+          Redirect URI: <code>https://gestionale.creativogroup.it/</code>.
+          Per motivi di sicurezza la App Secret non viene usata nel browser: il collegamento usa OAuth 2 con PKCE.
+        </div>
+      </div>
+
+      <div class="dropbox-card">
+        <div class="dropbox-browser-head">
+          <div>
+            <h3>Archivio Dropbox</h3>
+            <div id="dropboxPathLabel" class="dropbox-path">${connected ? (dropboxCurrentPath||"/") : "Collega Dropbox per vedere i file"}</div>
+          </div>
+          <div class="dropbox-toolbar">
+            ${connected?`
+              <button class="btn btn-outline btn-sm" onclick="dropboxGoUp()">↑ Su</button>
+              <button class="btn btn-outline btn-sm" onclick="dropboxPromptCreateFolder()">+ Cartella</button>
+              <button class="btn btn-primary btn-sm" onclick="document.getElementById('dropboxUploadBox')?.classList.toggle('open')">Carica file</button>
+            `:""}
+          </div>
+        </div>
+
+        <div id="dropboxUploadBox" class="dropbox-upload-box">
+          <input id="dropboxFileInput" type="file">
+          <div style="margin-top:10px;">
+            <button class="btn btn-primary btn-sm" onclick="dropboxUploadSelected()">Carica su Dropbox</button>
+          </div>
+        </div>
+
+        <div id="dropboxFileList" class="dropbox-file-list">
+          ${connected?`<div class="dropbox-empty">Caricamento archivio…</div>`:`<div class="dropbox-empty">Dropbox non è ancora collegato.</div>`}
+        </div>
+      </div>
+    </div>
+  `;
+
+  if(connected) dropboxLoadFolder(dropboxCurrentPath);
+}
+
+async function dropboxLoadFolder(path=""){
+  dropboxCurrentPath=path||"";
+  const label=document.getElementById("dropboxPathLabel");
+  const list=document.getElementById("dropboxFileList");
+  if(label) label.textContent=dropboxCurrentPath||"/";
+  if(list) list.innerHTML=`<div class="dropbox-empty">Caricamento…</div>`;
+
+  try{
+    const data=await dropboxApi("files/list_folder",{path:dropboxCurrentPath,recursive:false,include_deleted:false});
+    const entries=(data.entries||[]).sort((a,b)=>{
+      const af=a[".tag"]==="folder"?0:1, bf=b[".tag"]==="folder"?0:1;
+      return af-bf || String(a.name||"").localeCompare(String(b.name||""),"it");
+    });
+
+    if(!entries.length){
+      list.innerHTML=`<div class="dropbox-empty">Cartella vuota.</div>`;
+      return;
+    }
+
+    list.innerHTML=entries.map(item=>{
+      const isFolder=item[".tag"]==="folder";
+      const pathLower=item.path_lower||item.path_display||"";
+      return `
+        <div class="dropbox-row" ${isFolder?`onclick="dropboxOpenFolder('${escapeHtml(pathLower).replace(/'/g,"&#39;")}')"`:""}>
+          <div class="dropbox-file-main">
+            <div class="dropbox-file-name">${isFolder?'📁':'📄'} ${escapeHtml(item.name||"")}</div>
+            <div class="dropbox-file-meta">${isFolder?'Cartella':dropboxFormatBytes(item.size)}${item.client_modified?` · ${new Date(item.client_modified).toLocaleString("it-IT")}`:""}</div>
+          </div>
+          <div class="dropbox-file-actions">
+            ${isFolder
+              ? `<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();dropboxOpenFolder('${escapeHtml(pathLower).replace(/'/g,"&#39;")}')">Apri</button>`
+              : `<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();dropboxDownloadFile('${escapeHtml(pathLower).replace(/'/g,"&#39;")}','${escapeHtml(item.name||"").replace(/'/g,"&#39;")}')">Scarica</button>`}
+          </div>
+        </div>`;
+    }).join("");
+  }catch(err){
+    console.error("Dropbox list",err);
+    if(list) list.innerHTML=`<div class="dropbox-empty" style="color:var(--danger);">Errore: ${escapeHtml(err.message||"Impossibile caricare Dropbox")}</div>`;
+  }
+}
+
+function dropboxOpenFolder(path){ dropboxLoadFolder(path); }
+function dropboxGoUp(){
+  if(!dropboxCurrentPath){ return; }
+  const parts=dropboxCurrentPath.split("/").filter(Boolean);
+  parts.pop();
+  dropboxLoadFolder(parts.length?"/"+parts.join("/"):"");
+}
+function dropboxRefresh(){
+  if(currentView==="dropbox") dropboxLoadFolder(dropboxCurrentPath);
+}
+
+async function dropboxPromptCreateFolder(){
+  const name=prompt("Nome della nuova cartella:");
+  if(!name?.trim()) return;
+  const path=(dropboxCurrentPath?dropboxCurrentPath:"")+"/"+name.trim();
+  try{
+    await dropboxApi("files/create_folder_v2",{path,autorename:false});
+    showToast("Cartella Dropbox creata");
+    dropboxLoadFolder(dropboxCurrentPath);
+  }catch(err){
+    showToast("Errore creazione cartella");
+    console.error(err);
+  }
+}
+
+async function dropboxUploadSelected(){
+  const input=document.getElementById("dropboxFileInput");
+  const file=input?.files?.[0];
+  if(!file){ showToast("Scegli un file da caricare"); return; }
+
+  const token=dropboxToken();
+  if(!token){ showToast("Dropbox non collegato"); return; }
+  const path=(dropboxCurrentPath?dropboxCurrentPath:"")+"/"+file.name;
+
+  try{
+    const res=await fetch("https://content.dropboxapi.com/2/files/upload",{
+      method:"POST",
+      headers:{
+        "Authorization":"Bearer "+token,
+        "Content-Type":"application/octet-stream",
+        "Dropbox-API-Arg":JSON.stringify({path,mode:"add",autorename:true,mute:false,strict_conflict:false})
+      },
+      body:file
+    });
+    const raw=await res.text();
+    if(!res.ok) throw new Error(raw||"Upload non riuscito");
+    input.value="";
+    document.getElementById("dropboxUploadBox")?.classList.remove("open");
+    showToast("File caricato su Dropbox");
+    dropboxLoadFolder(dropboxCurrentPath);
+  }catch(err){
+    console.error("Dropbox upload",err);
+    showToast("Errore upload Dropbox");
+  }
+}
+
+async function dropboxDownloadFile(path,name){
+  const token=dropboxToken();
+  if(!token){ showToast("Dropbox non collegato"); return; }
+  try{
+    const res=await fetch("https://content.dropboxapi.com/2/files/download",{
+      method:"POST",
+      headers:{
+        "Authorization":"Bearer "+token,
+        "Dropbox-API-Arg":JSON.stringify({path})
+      }
+    });
+    if(!res.ok) throw new Error(await res.text());
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=name||"file";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+  }catch(err){
+    console.error("Dropbox download",err);
+    showToast("Errore download Dropbox");
+  }
+}
+
+setTimeout(()=>handleDropboxOAuthCallback(),0);
 
 
 /* ============ LAVORI COMPLETATI ============ */
