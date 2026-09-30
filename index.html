@@ -2490,6 +2490,143 @@
   }
 </style>
 
+
+<style id="job-dropbox-style">
+  .job-dropbox-shell{
+    border:1px solid #DDE6F0;
+    border-radius:16px;
+    overflow:hidden;
+    background:#FBFCFE;
+  }
+  .job-dropbox-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    padding:14px 15px;
+    border-bottom:1px solid #E7EDF4;
+    background:#F7FAFD;
+    flex-wrap:wrap;
+  }
+  .job-dropbox-path{
+    font-size:12px;
+    color:#64748B;
+    margin-top:4px;
+    overflow-wrap:anywhere;
+  }
+  .job-dropbox-actions{
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+  }
+  .job-dropbox-status{
+    padding:13px 15px;
+    font-size:13px;
+    color:#64748B;
+    border-bottom:1px solid #EDF1F5;
+    background:#fff;
+  }
+  .job-dropbox-status.ok{color:#24724A;background:#F1FAF5;}
+  .job-dropbox-status.error{color:#A63A2F;background:#FFF4F2;}
+  .job-dropbox-folders{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:8px;
+    padding:12px;
+    background:#fff;
+    border-bottom:1px solid #EDF1F5;
+  }
+  .job-dropbox-folder{
+    border:1px solid #DDE6F0;
+    background:#F8FAFC;
+    border-radius:12px;
+    padding:10px 9px;
+    font:inherit;
+    cursor:pointer;
+    text-align:left;
+    min-width:0;
+  }
+  .job-dropbox-folder:hover{border-color:#8EB0ED;background:#F4F8FF;}
+  .job-dropbox-folder.active{
+    border-color:#4D7DE8;
+    background:#EEF4FF;
+    box-shadow:0 0 0 2px rgba(77,125,232,.08);
+  }
+  .job-dropbox-folder strong{
+    display:block;
+    font-size:12.5px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .job-dropbox-folder span{
+    display:block;
+    font-size:10.5px;
+    color:#7B8794;
+    margin-top:3px;
+  }
+  .job-dropbox-files{
+    background:#fff;
+    min-height:86px;
+  }
+  .job-dropbox-file{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:10px;
+    align-items:center;
+    padding:11px 13px;
+    border-bottom:1px solid #EDF1F5;
+  }
+  .job-dropbox-file:last-child{border-bottom:0;}
+  .job-dropbox-file-name{
+    font-weight:800;
+    font-size:13px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .job-dropbox-file-meta{
+    color:#7B8794;
+    font-size:10.5px;
+    margin-top:3px;
+  }
+  .job-dropbox-empty{
+    padding:24px 14px;
+    text-align:center;
+    color:#7B8794;
+    font-size:12.5px;
+  }
+  .job-dropbox-upload{
+    display:none;
+    padding:12px 14px;
+    border-top:1px solid #EDF1F5;
+    background:#F8FAFC;
+  }
+  .job-dropbox-upload.open{display:block;}
+  .job-dropbox-upload-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 150px auto;
+    gap:8px;
+    align-items:center;
+  }
+  .job-dropbox-upload input,
+  .job-dropbox-upload select{
+    width:100%;
+    min-height:40px;
+    border:1px solid #DDE3EA;
+    border-radius:10px;
+    background:#fff;
+    font:inherit;
+    font-size:12.5px;
+    padding:7px 9px;
+  }
+  @media(max-width:760px){
+    .job-dropbox-folders{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .job-dropbox-upload-row{grid-template-columns:1fr;}
+    .job-dropbox-file{grid-template-columns:1fr;}
+  }
+</style>
+
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -3444,6 +3581,9 @@ Rif. ordine: ${riferimento}`;
   `;
 
   document.getElementById("modalBackdrop").classList.add("open");
+  if(dropboxIsConnected()){
+    setTimeout(()=>jobDropboxInit(o.id),0);
+  }
 }
 async function handleBozzaMailFiles(fileList){
   const files=Array.from(fileList||[]);
@@ -7927,6 +8067,230 @@ async function dropboxDownloadFile(path,name){
 setTimeout(()=>handleDropboxOAuthCallback(),0);
 
 
+
+/* ============ DROPBOX NELLA SCHEDA LAVORAZIONE ============ */
+const JOB_DROPBOX_SUBFOLDERS = ["Cliente","Bozze","Produzione","Definitivi"];
+const jobDropboxUiState = {};
+
+function dropboxSafePathPart(value){
+  return String(value||"")
+    .replace(/[\/\\<>:"|?*\x00-\x1F]/g," ")
+    .replace(/\s+/g," ")
+    .trim()
+    .replace(/[. ]+$/g,"")
+    .slice(0,120) || "Senza nome";
+}
+
+function jobDropboxBasePath(o){
+  const c=state.clients.find(x=>x.id===o.clientId);
+  const cliente=dropboxSafePathPart(c?clientDisplayName(c):"Cliente");
+  const numero=o.numero ? `Ordine ${dropboxSafePathPart(o.numero)}` : `Ordine ${dropboxSafePathPart(o.id)}`;
+  return `/Clienti/${cliente}/${numero}`;
+}
+
+function jobDropboxCurrentFolder(orderId){
+  return jobDropboxUiState[orderId]?.folder || "Cliente";
+}
+
+function renderJobDropboxBlock(o,c){
+  if(!dropboxIsConnected()){
+    return `
+      <div class="job-dropbox-shell">
+        <div class="job-dropbox-status error">
+          Dropbox non è collegato in questa sessione.
+          <button class="btn btn-outline btn-sm" style="margin-left:8px;" onclick="closeModal();goTo('dropbox')">Vai a Dropbox</button>
+        </div>
+      </div>`;
+  }
+
+  const base=jobDropboxBasePath(o);
+  return `
+    <div class="job-dropbox-shell" id="jobDropboxShell-${o.id}">
+      <div class="job-dropbox-head">
+        <div>
+          <strong>Cartella della lavorazione</strong>
+          <div class="job-dropbox-path">${escapeHtml(base)}</div>
+        </div>
+        <div class="job-dropbox-actions">
+          <button class="btn btn-outline btn-sm" onclick="jobDropboxRefresh('${o.id}')">↻ Aggiorna</button>
+          <button class="btn btn-primary btn-sm" onclick="jobDropboxToggleUpload('${o.id}')">+ Carica file</button>
+        </div>
+      </div>
+
+      <div id="jobDropboxStatus-${o.id}" class="job-dropbox-status">Preparazione cartella Dropbox…</div>
+
+      <div id="jobDropboxFolders-${o.id}" class="job-dropbox-folders">
+        ${JOB_DROPBOX_SUBFOLDERS.map((name,i)=>`
+          <button class="job-dropbox-folder ${i===0?'active':''}" data-job-dropbox-folder="${escapeHtml(name)}"
+            onclick="jobDropboxSelectFolder('${o.id}','${escapeHtml(name)}')">
+            <strong>📁 ${escapeHtml(name)}</strong>
+            <span>${name==="Cliente"?"File ricevuti":name==="Bozze"?"Prove e bozze":name==="Produzione"?"File operativi":"File finali"}</span>
+          </button>`).join("")}
+      </div>
+
+      <div id="jobDropboxFiles-${o.id}" class="job-dropbox-files">
+        <div class="job-dropbox-empty">Caricamento file…</div>
+      </div>
+
+      <div id="jobDropboxUpload-${o.id}" class="job-dropbox-upload">
+        <div class="job-dropbox-upload-row">
+          <input id="jobDropboxFile-${o.id}" type="file">
+          <select id="jobDropboxDest-${o.id}">
+            ${JOB_DROPBOX_SUBFOLDERS.map(name=>`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="jobDropboxUpload('${o.id}')">Carica</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function jobDropboxEnsureFolder(path){
+  try{
+    await dropboxApi("files/create_folder_v2",{path,autorename:false});
+  }catch(err){
+    const msg=String(err?.message||err||"");
+    if(!msg.includes("conflict")) throw err;
+  }
+}
+
+async function jobDropboxEnsureStructure(orderId){
+  const o=findItem("orders",orderId);
+  if(!o) throw new Error("Ordine non trovato");
+
+  const base=jobDropboxBasePath(o);
+  const c=state.clients.find(x=>x.id===o.clientId);
+  const clientBase=`/Clienti/${dropboxSafePathPart(c?clientDisplayName(c):"Cliente")}`;
+
+  await jobDropboxEnsureFolder("/Clienti");
+  await jobDropboxEnsureFolder(clientBase);
+  await jobDropboxEnsureFolder(base);
+  for(const sub of JOB_DROPBOX_SUBFOLDERS){
+    await jobDropboxEnsureFolder(`${base}/${sub}`);
+  }
+  return base;
+}
+
+async function jobDropboxInit(orderId){
+  const status=document.getElementById(`jobDropboxStatus-${orderId}`);
+  if(status){
+    status.className="job-dropbox-status";
+    status.textContent="Preparazione cartella Dropbox…";
+  }
+  try{
+    await jobDropboxEnsureStructure(orderId);
+    if(status){
+      status.className="job-dropbox-status ok";
+      status.textContent="Cartella Dropbox pronta.";
+    }
+    await jobDropboxLoad(orderId,jobDropboxCurrentFolder(orderId));
+  }catch(err){
+    console.error("Dropbox ordine init",err);
+    if(status){
+      status.className="job-dropbox-status error";
+      status.textContent="Errore Dropbox: "+(err?.message||"impossibile preparare la cartella");
+    }
+  }
+}
+
+function jobDropboxSelectFolder(orderId,folder){
+  jobDropboxUiState[orderId]={...(jobDropboxUiState[orderId]||{}),folder};
+  document.querySelectorAll(`#jobDropboxFolders-${CSS.escape(orderId)} .job-dropbox-folder`).forEach(btn=>{
+    btn.classList.toggle("active",btn.dataset.jobDropboxFolder===folder);
+  });
+  const dest=document.getElementById(`jobDropboxDest-${orderId}`);
+  if(dest) dest.value=folder;
+  jobDropboxLoad(orderId,folder);
+}
+
+async function jobDropboxLoad(orderId,folder){
+  const o=findItem("orders",orderId);
+  const box=document.getElementById(`jobDropboxFiles-${orderId}`);
+  if(!o || !box) return;
+
+  const selected=folder||"Cliente";
+  const path=`${jobDropboxBasePath(o)}/${selected}`;
+  box.innerHTML=`<div class="job-dropbox-empty">Caricamento…</div>`;
+
+  try{
+    const data=await dropboxApi("files/list_folder",{path,recursive:false,include_deleted:false});
+    const files=(data.entries||[]).filter(x=>x[".tag"]==="file")
+      .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"it"));
+
+    if(!files.length){
+      box.innerHTML=`<div class="job-dropbox-empty">Nessun file in “${escapeHtml(selected)}”.</div>`;
+      return;
+    }
+
+    box.innerHTML=files.map(file=>{
+      const pathLower=file.path_lower||file.path_display||"";
+      const safePath=encodeURIComponent(pathLower);
+      const safeName=encodeURIComponent(file.name||"file");
+      return `
+        <div class="job-dropbox-file">
+          <div style="min-width:0;">
+            <div class="job-dropbox-file-name">📄 ${escapeHtml(file.name||"")}</div>
+            <div class="job-dropbox-file-meta">${dropboxFormatBytes(file.size)}${file.client_modified?` · ${new Date(file.client_modified).toLocaleString("it-IT")}`:""}</div>
+          </div>
+          <div>
+            <button class="btn btn-outline btn-sm" onclick="jobDropboxDownloadEncoded('${safePath}','${safeName}')">Scarica</button>
+          </div>
+        </div>`;
+    }).join("");
+  }catch(err){
+    console.error("Dropbox ordine list",err);
+    box.innerHTML=`<div class="job-dropbox-empty" style="color:var(--danger);">Errore nel caricamento dei file.</div>`;
+  }
+}
+
+function jobDropboxRefresh(orderId){
+  jobDropboxLoad(orderId,jobDropboxCurrentFolder(orderId));
+}
+
+function jobDropboxToggleUpload(orderId){
+  document.getElementById(`jobDropboxUpload-${orderId}`)?.classList.toggle("open");
+}
+
+async function jobDropboxUpload(orderId){
+  const o=findItem("orders",orderId);
+  const input=document.getElementById(`jobDropboxFile-${orderId}`);
+  const dest=document.getElementById(`jobDropboxDest-${orderId}`);
+  const file=input?.files?.[0];
+  if(!o || !file){ showToast("Scegli un file da caricare"); return; }
+
+  const folder=dest?.value||"Cliente";
+  const token=dropboxToken();
+  if(!token){ showToast("Dropbox non collegato"); return; }
+
+  const path=`${jobDropboxBasePath(o)}/${folder}/${file.name}`;
+  try{
+    const res=await fetch("https://content.dropboxapi.com/2/files/upload",{
+      method:"POST",
+      headers:{
+        "Authorization":"Bearer "+token,
+        "Content-Type":"application/octet-stream",
+        "Dropbox-API-Arg":JSON.stringify({path,mode:"add",autorename:true,mute:false,strict_conflict:false})
+      },
+      body:file
+    });
+    const raw=await res.text();
+    if(!res.ok) throw new Error(raw||"Upload non riuscito");
+
+    input.value="";
+    jobDropboxUiState[orderId]={...(jobDropboxUiState[orderId]||{}),folder};
+    jobDropboxSelectFolder(orderId,folder);
+    showToast(`File caricato in ${folder}`);
+  }catch(err){
+    console.error("Dropbox ordine upload",err);
+    showToast("Errore upload Dropbox");
+  }
+}
+
+function jobDropboxDownloadEncoded(pathEncoded,nameEncoded){
+  dropboxDownloadFile(decodeURIComponent(pathEncoded),decodeURIComponent(nameEncoded));
+}
+
+
+
 /* ============ LAVORI COMPLETATI ============ */
 function orderRecentArchiveTime(o){
   // Per gli ordini già consegnati usiamo il dato temporale più vicino alla chiusura
@@ -9427,6 +9791,16 @@ function openJobCard(orderId){
           <div class="job-v2-section-title"><h3>Allegati</h3></div>
           ${renderOrderExternalAttachments(o)}
         </div>
+      </section>
+
+      <section class="job-v2-card" style="--job-accent:#0061FF;">
+        <div class="job-v2-section-title">
+          <h3>☁ File Dropbox</h3>
+          <span class="job-v2-pill" style="background:${dropboxIsConnected()?'#EAF8EF':'#F1F5F9'};color:${dropboxIsConnected()?'#187A44':'#64748B'};">
+            ${dropboxIsConnected()?'COLLEGATO':'NON COLLEGATO'}
+          </span>
+        </div>
+        ${renderJobDropboxBlock(o,c)}
       </section>
 
       <div class="job-v2-bottom-actions">
