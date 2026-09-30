@@ -2756,122 +2756,22 @@
 
 
 <style id="dropbox-preview-style">
-  .dropbox-preview-backdrop{
-    position:fixed;
-    inset:0;
-    background:rgba(15,23,42,.62);
-    display:none;
-    align-items:center;
-    justify-content:center;
-    padding:22px;
-    z-index:120000;
-  }
+  .dropbox-preview-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.62);display:none;align-items:center;justify-content:center;padding:22px;z-index:120000;}
   .dropbox-preview-backdrop.open{display:flex;}
-  .dropbox-preview-modal{
-    width:min(1180px,96vw);
-    height:min(860px,92vh);
-    background:#fff;
-    border-radius:20px;
-    overflow:hidden;
-    box-shadow:0 28px 80px rgba(15,23,42,.28);
-    display:flex;
-    flex-direction:column;
-  }
-  .dropbox-preview-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:12px;
-    padding:14px 16px;
-    border-bottom:1px solid #E5EAF0;
-    background:#fff;
-  }
+  .dropbox-preview-modal{width:min(1180px,96vw);height:min(860px,92vh);background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 28px 80px rgba(15,23,42,.28);display:flex;flex-direction:column;}
+  .dropbox-preview-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #E5EAF0;background:#fff;}
   .dropbox-preview-title-wrap{min-width:0;}
-  .dropbox-preview-title{
-    font-size:15px;
-    font-weight:850;
-    color:#1F2937;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-  }
-  .dropbox-preview-sub{
-    font-size:11.5px;
-    color:#7B8794;
-    margin-top:3px;
-  }
-  .dropbox-preview-actions{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    flex-shrink:0;
-  }
-  .dropbox-preview-close{
-    width:38px;
-    height:38px;
-    border-radius:999px;
-    border:1px solid #DDE3EA;
-    background:#F8FAFC;
-    cursor:pointer;
-    font-size:22px;
-    color:#475569;
-  }
-  .dropbox-preview-body{
-    flex:1;
-    min-height:0;
-    background:#F3F5F8;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    position:relative;
-    overflow:auto;
-  }
-  .dropbox-preview-image{
-    max-width:100%;
-    max-height:100%;
-    object-fit:contain;
-    display:block;
-    margin:auto;
-  }
-  .dropbox-preview-frame{
-    width:100%;
-    height:100%;
-    border:0;
-    background:#fff;
-  }
-  .dropbox-preview-text{
-    width:100%;
-    height:100%;
-    margin:0;
-    padding:22px;
-    overflow:auto;
-    white-space:pre-wrap;
-    word-break:break-word;
-    font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    color:#1F2937;
-    background:#fff;
-  }
-  .dropbox-preview-unsupported{
-    text-align:center;
-    padding:34px 24px;
-    color:#64748B;
-    max-width:520px;
-  }
-  .dropbox-preview-unsupported strong{
-    display:block;
-    color:#1F2937;
-    font-size:18px;
-    margin-bottom:8px;
-  }
-  @media(max-width:760px){
-    .dropbox-preview-backdrop{padding:0;}
-    .dropbox-preview-modal{
-      width:100vw;
-      height:100dvh;
-      border-radius:0;
-    }
-    .dropbox-preview-head{padding-top:max(14px,env(safe-area-inset-top));}
-  }
+  .dropbox-preview-title{font-size:15px;font-weight:850;color:#1F2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dropbox-preview-sub{font-size:11.5px;color:#7B8794;margin-top:3px;}
+  .dropbox-preview-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .dropbox-preview-close{width:38px;height:38px;border-radius:999px;border:1px solid #DDE3EA;background:#F8FAFC;cursor:pointer;font-size:22px;color:#475569;}
+  .dropbox-preview-body{flex:1;min-height:0;background:#F3F5F8;display:flex;align-items:center;justify-content:center;position:relative;overflow:auto;}
+  .dropbox-preview-image{max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;}
+  .dropbox-preview-frame{width:100%;height:100%;border:0;background:#fff;}
+  .dropbox-preview-text{width:100%;height:100%;margin:0;padding:22px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#1F2937;background:#fff;}
+  .dropbox-preview-unsupported{text-align:center;padding:34px 24px;color:#64748B;max-width:520px;}
+  .dropbox-preview-unsupported strong{display:block;color:#1F2937;font-size:18px;margin-bottom:8px;}
+  @media(max-width:760px){.dropbox-preview-backdrop{padding:0}.dropbox-preview-modal{width:100vw;height:100dvh;border-radius:0}.dropbox-preview-head{padding-top:max(14px,env(safe-area-inset-top));}}
 </style>
 
 </head>
@@ -13587,26 +13487,7 @@ async function copyGmailOrderAttachmentsToDropbox(order,ctx){
 async function openGmailAttachment(index){
   const previewWindow=window.open("","_blank");
   if(previewWindow){
-    try{ previewWindow.document.write('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Apertura allegato…</title><body style="font-family:system-ui;padding:28px">Apertura allegato…
-<div id="dropboxPreviewBackdrop" class="dropbox-preview-backdrop" onclick="if(event.target===this)closeDropboxPreview()">
-  <div class="dropbox-preview-modal">
-    <div class="dropbox-preview-head">
-      <div class="dropbox-preview-title-wrap">
-        <div id="dropboxPreviewTitle" class="dropbox-preview-title">Anteprima file</div>
-        <div id="dropboxPreviewSub" class="dropbox-preview-sub"></div>
-      </div>
-      <div class="dropbox-preview-actions">
-        <button id="dropboxPreviewDownloadBtn" class="btn btn-outline btn-sm" type="button">Scarica</button>
-        <button class="dropbox-preview-close" type="button" aria-label="Chiudi" onclick="closeDropboxPreview()">×</button>
-      </div>
-    </div>
-    <div id="dropboxPreviewBody" class="dropbox-preview-body">
-      <div class="dropbox-preview-unsupported">Caricamento anteprima…</div>
-    </div>
-  </div>
-</div>
-
-</body>'); }catch(e){}
+    try{ previewWindow.document.write('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Apertura allegato…</title><body style="font-family:system-ui;padding:28px">Apertura allegato…</body>'); }catch(e){}
   }
   try{
     const file=await fetchGmailAttachmentBlob(index);
@@ -14108,8 +13989,6 @@ async function completedSheetLoadDropboxFiles(orderId){
 }
 
 let currentDropboxPreviewUrl=null;
-let currentDropboxPreviewPath="";
-let currentDropboxPreviewName="";
 
 function dropboxPreviewExtension(name){
   const clean=String(name||"").toLowerCase().split("?")[0].split("#")[0];
@@ -14120,7 +13999,6 @@ function dropboxPreviewExtension(name){
 function dropboxPreviewKind(name,mimeType){
   const ext=dropboxPreviewExtension(name);
   const mime=String(mimeType||"").toLowerCase();
-
   if(mime.startsWith("image/") || ["jpg","jpeg","png","gif","webp","bmp","svg"].includes(ext)) return "image";
   if(mime==="application/pdf" || ext==="pdf") return "pdf";
   if(mime.startsWith("text/") || ["txt","csv","json","xml","md","log","html","css","js"].includes(ext)) return "text";
@@ -14136,8 +14014,6 @@ function closeDropboxPreview(){
     URL.revokeObjectURL(currentDropboxPreviewUrl);
     currentDropboxPreviewUrl=null;
   }
-  currentDropboxPreviewPath="";
-  currentDropboxPreviewName="";
 }
 
 async function completedSheetPreviewDropboxFile(pathEncoded,nameEncoded){
@@ -14151,7 +14027,6 @@ async function completedSheetPreviewDropboxFile(pathEncoded,nameEncoded){
   const title=document.getElementById("dropboxPreviewTitle");
   const sub=document.getElementById("dropboxPreviewSub");
   const downloadBtn=document.getElementById("dropboxPreviewDownloadBtn");
-
   if(!backdrop || !body) return;
 
   if(currentDropboxPreviewUrl){
@@ -14159,17 +14034,12 @@ async function completedSheetPreviewDropboxFile(pathEncoded,nameEncoded){
     currentDropboxPreviewUrl=null;
   }
 
-  currentDropboxPreviewPath=path;
-  currentDropboxPreviewName=name;
-
-  title.textContent=name||"Anteprima file";
-  sub.textContent="Dropbox · Anteprima nel gestionale";
+  if(title) title.textContent=name||"Anteprima file";
+  if(sub) sub.textContent="Dropbox · Anteprima nel gestionale";
   body.innerHTML=`<div class="dropbox-preview-unsupported">Caricamento anteprima…</div>`;
   backdrop.classList.add("open");
 
-  if(downloadBtn){
-    downloadBtn.onclick=()=>dropboxDownloadFile(path,name);
-  }
+  if(downloadBtn) downloadBtn.onclick=()=>dropboxDownloadFile(path,name);
 
   try{
     const res=await fetch("https://content.dropboxapi.com/2/files/download",{
@@ -14179,7 +14049,6 @@ async function completedSheetPreviewDropboxFile(pathEncoded,nameEncoded){
         "Dropbox-API-Arg":JSON.stringify({path})
       }
     });
-
     if(!res.ok) throw new Error(await res.text());
 
     const blob=await res.blob();
@@ -14217,19 +14086,10 @@ async function completedSheetPreviewDropboxFile(pathEncoded,nameEncoded){
       return;
     }
 
-    body.innerHTML=`
-      <div class="dropbox-preview-unsupported">
-        <strong>Anteprima non disponibile</strong>
-        Questo formato non può essere visualizzato direttamente nel browser.<br>
-        Puoi comunque scaricare il file con il pulsante “Scarica”.
-      </div>`;
+    body.innerHTML=`<div class="dropbox-preview-unsupported"><strong>Anteprima non disponibile</strong>Questo formato non può essere visualizzato direttamente nel browser.<br>Puoi comunque scaricare il file.</div>`;
   }catch(err){
     console.error("Anteprima Dropbox",err);
-    body.innerHTML=`
-      <div class="dropbox-preview-unsupported">
-        <strong>Impossibile aprire l'anteprima</strong>
-        Il file non è stato caricato correttamente. Puoi provare a scaricarlo.
-      </div>`;
+    body.innerHTML=`<div class="dropbox-preview-unsupported"><strong>Impossibile aprire l'anteprima</strong>Puoi provare a scaricare il file.</div>`;
   }
 }
 
@@ -14396,5 +14256,24 @@ document.addEventListener("keydown",(event)=>{
 });
 
 </script>
+
+<div id="dropboxPreviewBackdrop" class="dropbox-preview-backdrop" onclick="if(event.target===this)closeDropboxPreview()">
+  <div class="dropbox-preview-modal">
+    <div class="dropbox-preview-head">
+      <div class="dropbox-preview-title-wrap">
+        <div id="dropboxPreviewTitle" class="dropbox-preview-title">Anteprima file</div>
+        <div id="dropboxPreviewSub" class="dropbox-preview-sub"></div>
+      </div>
+      <div class="dropbox-preview-actions">
+        <button id="dropboxPreviewDownloadBtn" class="btn btn-outline btn-sm" type="button">Scarica</button>
+        <button class="dropbox-preview-close" type="button" aria-label="Chiudi" onclick="closeDropboxPreview()">×</button>
+      </div>
+    </div>
+    <div id="dropboxPreviewBody" class="dropbox-preview-body">
+      <div class="dropbox-preview-unsupported">Caricamento anteprima…</div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
