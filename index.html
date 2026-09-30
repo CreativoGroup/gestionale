@@ -4909,9 +4909,10 @@ window.fbAsyncInit = function(){
 async function maybeCompleteWhatsappMetaSignup(){
   if(whatsappMetaSignupState.completed || whatsappMetaSignupState.completing) return;
 
-  // Con Embedded Signup dobbiamo attendere SIA il codice OAuth
-  // SIA l'evento FINISH del flusso WhatsApp.
-  if(!whatsappMetaSignupState.finished) return;
+  // Il codice OAuth è già sufficiente per passare il controllo al backend.
+  // In alcune configurazioni Coexistence Meta chiude il popup senza inviare
+  // l'evento WA_EMBEDDED_SIGNUP/FINISH al parent. Aspettarlo bloccava per sempre
+  // la chiamata a Supabase.
   if(!whatsappMetaSignupState.code && !whatsappMetaSignupState.accessToken) return;
 
   await completeWhatsappMetaSignup();
@@ -4952,15 +4953,23 @@ async function completeWhatsappMetaSignup(){
     );
 
     let result={};
+    let rawText="";
 
     try{
-      result=await response.json();
+      rawText=await response.text();
+      result=rawText ? JSON.parse(rawText) : {};
     }catch(e){
-      result={ok:false,error:"Risposta non valida dal servizio Meta"};
+      result={ok:false,error:rawText || "Risposta non valida dal servizio Meta"};
     }
 
+    console.log("whatsapp-coexistence-complete HTTP",response.status,result);
+
     if(!response.ok || !result?.ok){
-      throw new Error(result?.error || "Collegamento WhatsApp non completato");
+      throw new Error(
+        result?.error ||
+        result?.message ||
+        `Collegamento WhatsApp non completato (HTTP ${response.status})`
+      );
     }
 
     whatsappMetaSignupState.completed = true;
@@ -5055,7 +5064,7 @@ function openWhatsappCoexistence(){
       if(response?.authResponse?.code){
         whatsappMetaSignupState.code=String(response.authResponse.code);
         console.log("Meta authorization code ricevuto");
-        showToast("Autorizzazione Meta ricevuta. Completa il collegamento nella finestra WhatsApp.");
+        showToast("Autorizzazione Meta ricevuta. Verifico il numero WhatsApp...");
         maybeCompleteWhatsappMetaSignup();
         return;
       }
@@ -5063,7 +5072,7 @@ function openWhatsappCoexistence(){
       if(response?.authResponse?.accessToken){
         whatsappMetaSignupState.accessToken=String(response.authResponse.accessToken);
         console.log("Meta access token ricevuto");
-        showToast("Autorizzazione Meta ricevuta. Completa il collegamento nella finestra WhatsApp.");
+        showToast("Autorizzazione Meta ricevuta. Verifico il numero WhatsApp...");
         maybeCompleteWhatsappMetaSignup();
         return;
       }
