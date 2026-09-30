@@ -8662,16 +8662,29 @@ async function addOrder(){
   renderOrdini();
 
   if(gmailDropboxResult?.uploaded>0){
-    showToast(`Ordine creato · ${gmailDropboxResult.uploaded} allegat${gmailDropboxResult.uploaded===1?'o':'i'} copiati in Dropbox > Bozze`);
+    const failed=(gmailDropboxResult.total||0)-gmailDropboxResult.uploaded;
+    showToast(
+      failed>0
+        ? `Ordine creato · ${gmailDropboxResult.uploaded}/${gmailDropboxResult.total} allegati copiati in Dropbox > Bozze`
+        : `Ordine creato · ${gmailDropboxResult.uploaded} allegat${gmailDropboxResult.uploaded===1?'o':'i'} copiati in Dropbox > Bozze`
+    );
   }else if(gmailDropboxResult?.reason==="dropbox_not_connected"){
     showToast("Ordine creato · Dropbox non collegato: allegati mail non copiati");
-  }else if(gmailDropboxResult?.error){
-    showToast("Ordine creato · errore nel salvataggio degli allegati in Dropbox");
+  }else if(gmailDropboxResult?.reason==="no_attachments"){
+    showToast("Ordine creato · nessun allegato trovato nella mail");
+  }else if(gmailDropboxResult?.error || gmailDropboxResult?.errors?.length){
+    showToast("Ordine creato · allegati mail non copiati: controlla Dropbox");
   }else{
     showToast(savedOrder.numero ? `Ordine #${savedOrder.numero} creato` : "Ordine creato");
   }
 
+  if(gmailDropboxResult?.uploaded>0){
+    jobDropboxUiState[savedOrder.id]={folder:"Bozze"};
+  }
   openJobCard(savedOrder.id);
+  if(gmailDropboxResult?.uploaded>0){
+    setTimeout(()=>jobDropboxSelectFolder(savedOrder.id,"Bozze"),450);
+  }
 }
 function deleteOrderFromCreditiCliente(orderId, clientId){
   askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati e la merce riservata verrà restituita al magazzino.", async ()=>{
@@ -13351,28 +13364,72 @@ async function uploadBlobToDropbox(path,blob){
   try{ return JSON.parse(raw); }catch(e){ return {}; }
 }
 
-async function copyGmailOrderAttachmentsToDropbox(order,ctx){
-  if(!order || !ctx?.messageId) return {uploaded:0,total:0,skipped:true};
+function gmailDropboxImportDebug(){
+  return {
+    pendingMessageId: pendingGmailOrderMessageId,
+    pendingContext: pendingGmailOrderContext,
+    dropboxConnected: dropboxIsConnected(),
+    selectedGmailMessageId: gmailSelectedMessage?.id||null,
+    selectedAttachments: Array.isArray(gmailSelectedMessage?.attachments)
+      ? gmailSelectedMessage.attachments.map(a=>({
+          filename:a?.filename||"",
+          attachmentId:a?.attachmentId||a?.id||"",
+          mimeType:a?.mimeType||"",
+          size:a?.size||0
+        }))
+      : []
+  };
+}
 
-  // Questa funzione viene chiamata esclusivamente dai flussi "Ordine" / "Crea + Ordine".
+async function copyGmailOrderAttachmentsToDropbox(order,ctx){
+  if(!order || !ctx?.messageId) return {uploaded:0,total:0,skipped:true,reason:"missing_message"};
+
+  // Deve valere SOLO per i flussi ordine provenienti da Gmail.
   if(!["gmail_order","gmail_lead_order"].includes(String(ctx.source||""))){
-    return {uploaded:0,total:0,skipped:true};
+    return {uploaded:0,total:0,skipped:true,reason:"wrong_source"};
   }
 
   if(!dropboxIsConnected()){
     return {uploaded:0,total:0,skipped:true,reason:"dropbox_not_connected"};
   }
 
-  let attachments=Array.isArray(ctx.attachments)?ctx.attachments:null;
+  let attachments=[];
+  let messageFetchError=null;
 
-  // Nei Lead Ordine salviamo l'ID Gmail, quindi recuperiamo la mail completa al momento della conversione.
-  if(!attachments){
-    const message=await fetchGmailMessageById(ctx.messageId);
-    attachments=Array.isArray(message?.attachments)?message.attachments:[];
+  // Recupera SEMPRE la mail completa nel momento in cui l'ordine viene realmente creato.
+  try{
+    const freshMessage=await fetchGmailMessageById(ctx.messageId);
+    if(Array.isArray(freshMessage?.attachments)){
+      attachments=freshMessage.attachments;
+    }
+  }catch(err){
+    messageFetchError=err;
+    console.error("Recupero mail originale per allegati ordine",err);
   }
 
-  attachments=attachments.filter(a=>String(a?.attachmentId||a?.id||"").trim());
-  if(!attachments.length) return {uploaded:0,total:0};
+  // Fallback: usa i metadati che erano già presenti nella mail aperta.
+  if(!attachments.length && Array.isArray(ctx.attachments)){
+    attachments=ctx.attachments;
+  }
+
+  attachments=attachments
+    .map(a=>({
+      attachmentId:String(a?.attachmentId||a?.id||"").trim(),
+      filename:String(a?.filename||"allegato").trim()||"allegato",
+      mimeType:String(a?.mimeType||"application/octet-stream"),
+      size:Number(a?.size)||0
+    }))
+    .filter(a=>a.attachmentId);
+
+  if(!attachments.length){
+    return {
+      uploaded:0,
+      total:0,
+      skipped:true,
+      reason:"no_attachments",
+      messageFetchError:messageFetchError ? String(messageFetchError?.message||messageFetchError) : ""
+    };
+  }
 
   await jobDropboxEnsureStructure(order.id);
   const targetBase=`${jobDropboxBasePath(order)}/Bozze`;
@@ -13383,16 +13440,27 @@ async function copyGmailOrderAttachmentsToDropbox(order,ctx){
   for(const a of attachments){
     try{
       const file=await fetchGmailAttachmentBlobByMeta(ctx.messageId,a);
-      const safeName=String(file.filename||"allegato").replace(/[\/\\\x00-\x1F]/g,"_");
+      const safeName=String(file.filename||a.filename||"allegato")
+        .replace(/[\/\\\u0000-\u001F]/g,"_")
+        .trim() || "allegato";
+
       await uploadBlobToDropbox(`${targetBase}/${safeName}`,file.blob);
       uploaded++;
     }catch(err){
-      console.error("Copia allegato Gmail -> Dropbox",a?.filename,err);
-      errors.push({filename:a?.filename||"allegato",error:String(err?.message||err)});
+      console.error("Copia allegato Gmail -> Dropbox",a.filename,err);
+      errors.push({
+        filename:a.filename||"allegato",
+        error:String(err?.message||err)
+      });
     }
   }
 
-  return {uploaded,total:attachments.length,errors};
+  return {
+    uploaded,
+    total:attachments.length,
+    errors,
+    targetFolder:"Bozze"
+  };
 }
 
 async function openGmailAttachment(index){
