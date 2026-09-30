@@ -2206,6 +2206,195 @@
   }
 </style>
 
+
+<style id="completed-sheet-drawer-style">
+  .completed-sheet-btn{
+    min-height:34px !important;
+    padding:6px 11px !important;
+    border-radius:10px !important;
+    color:#243142 !important;
+    border:1px solid #D9E1EA !important;
+    background:#fff !important;
+    gap:7px !important;
+    white-space:nowrap;
+  }
+  .completed-sheet-btn:hover{
+    color:#2357D9 !important;
+    border-color:#9AB4FF !important;
+    background:#F7FAFF !important;
+  }
+  .completed-sheet-btn .sheet-icon{
+    font-size:14px;
+    line-height:1;
+  }
+  tr.completed-sheet-selected{
+    background:#F3F7FF !important;
+    box-shadow:inset 3px 0 0 #3B6EF5;
+  }
+
+  .completed-sheet-backdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(15,23,42,.20);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .18s ease;
+    z-index:89990;
+  }
+  .completed-sheet-backdrop.open{
+    opacity:1;
+    pointer-events:auto;
+  }
+  .completed-sheet-drawer{
+    position:fixed;
+    top:0;
+    right:0;
+    bottom:0;
+    width:min(510px,94vw);
+    background:#fff;
+    border-left:1px solid #E4E9EF;
+    box-shadow:-18px 0 48px rgba(15,23,42,.16);
+    transform:translateX(102%);
+    transition:transform .22s ease;
+    z-index:90000;
+    display:flex;
+    flex-direction:column;
+  }
+  .completed-sheet-drawer.open{
+    transform:translateX(0);
+  }
+  .completed-sheet-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    padding:25px 26px 18px;
+    border-bottom:1px solid #E8EDF2;
+  }
+  .completed-sheet-head h2{
+    margin:0;
+    font-size:26px;
+    line-height:1.1;
+    color:#172033;
+  }
+  .completed-sheet-head p{
+    margin:7px 0 0;
+    font-size:13px;
+    color:var(--muted);
+  }
+  .completed-sheet-close{
+    width:38px;
+    height:38px;
+    flex:0 0 38px;
+    border:1px solid #E2E8F0;
+    border-radius:999px;
+    background:#F8FAFC;
+    color:#475569;
+    font-size:23px;
+    cursor:pointer;
+  }
+  .completed-sheet-scroll{
+    overflow:auto;
+    padding:18px 22px 26px;
+  }
+  .completed-sheet-section{
+    border:1px solid #E4EAF1;
+    border-radius:18px;
+    padding:18px;
+    background:#fff;
+    box-shadow:0 6px 20px rgba(15,23,42,.035);
+    margin-bottom:16px;
+  }
+  .completed-sheet-section h3{
+    margin:0 0 4px;
+    font-size:17px;
+    color:#172033;
+  }
+  .completed-sheet-section .section-help{
+    margin:0 0 15px;
+    color:var(--muted);
+    font-size:12.5px;
+    line-height:1.45;
+  }
+  .completed-sheet-info-row{
+    display:grid;
+    grid-template-columns:128px minmax(0,1fr);
+    gap:14px;
+    align-items:center;
+    padding:11px 0;
+    border-bottom:1px solid #EDF1F5;
+  }
+  .completed-sheet-info-row:last-child{border-bottom:0;}
+  .completed-sheet-info-label{
+    color:#64748B;
+    font-size:12.5px;
+    font-weight:700;
+  }
+  .completed-sheet-info-value{
+    min-width:0;
+    color:#1E293B;
+    font-size:14px;
+    font-weight:750;
+  }
+  .completed-sheet-notes{
+    width:100%;
+    min-height:225px;
+    resize:vertical;
+    box-sizing:border-box;
+    border:1px solid #CCD6E2;
+    border-radius:14px;
+    padding:14px 15px;
+    background:#fff;
+    color:#263142;
+    font:inherit;
+    font-size:14px;
+    line-height:1.55;
+  }
+  .completed-sheet-notes:focus{
+    outline:none;
+    border-color:#6E91F5;
+    box-shadow:0 0 0 4px rgba(59,110,245,.09);
+  }
+  .completed-sheet-note-footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:14px;
+    margin-top:13px;
+    flex-wrap:wrap;
+  }
+  .completed-sheet-save-state{
+    min-height:18px;
+    color:var(--muted);
+    font-size:11.5px;
+    line-height:1.35;
+  }
+  .completed-sheet-actions{
+    display:flex;
+    gap:8px;
+    margin-left:auto;
+  }
+  .completed-sheet-save{
+    background:#2962E8 !important;
+    color:#fff !important;
+    border-color:#2962E8 !important;
+    min-width:108px;
+    justify-content:center;
+  }
+  .completed-sheet-save:hover{background:#1F50C8 !important;}
+  @media(max-width:760px){
+    .completed-sheet-drawer{width:100vw;}
+    .completed-sheet-head{padding:20px 17px 15px;}
+    .completed-sheet-head h2{font-size:22px;}
+    .completed-sheet-scroll{padding:14px 12px 22px;}
+    .completed-sheet-section{border-radius:16px;padding:15px;}
+    .completed-sheet-info-row{grid-template-columns:105px minmax(0,1fr);gap:10px;}
+    .completed-sheet-notes{min-height:190px;font-size:16px;}
+    .completed-sheet-actions{width:100%;}
+    .completed-sheet-actions .btn{flex:1;justify-content:center;}
+  }
+</style>
+
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -5312,6 +5501,7 @@ function renderDashboard(){
             <td class="mobile-hide">${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : ""}</td>
             <td class="mobile-hide"><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">AGGIUNGI PAGAMENTO</button></td>
             <td>${completedOrderStageButton(o)}</td>
+            <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button></td>
           </tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`}
       </div>
@@ -7158,14 +7348,17 @@ function renderCompletedDeliveryRows(list){
   return list.length ? `
     <div class="table-wrap" style="box-shadow:none;">
       <table>
-        <thead><tr><th>Cliente</th><th>Lavorazione</th><th>Fornitore</th><th>Pagamento</th><th>Stato cliente</th></tr></thead>
+        <thead><tr><th>Cliente</th><th>Lavorazione</th><th>Fornitore</th><th>Pagamento</th><th>Stato cliente</th><th>Azioni</th></tr></thead>
         <tbody>${list.map(o=>`
-          <tr>
+          <tr data-completed-order="${o.id}">
             <td><strong>${clientName(o.clientId)}</strong></td>
             <td>${orderCategorieLabel(o)}</td>
             <td>${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : "—"}</td>
             <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">AGGIUNGI PAGAMENTO</button></td>
             <td>${completedOrderStageButton(o)}</td>
+            <td style="white-space:nowrap;">
+              <button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button>
+            </td>
           </tr>`).join("")}</tbody>
       </table>
     </div>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`;
@@ -7207,7 +7400,7 @@ function renderLavoriCompletati(){
                 <td>${orderCategorieLabel(o)}</td>
                 <td>${d}</td>
                 <td><span class="pill pill-delivered">CONSEGNATO</span></td>
-                <td><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">Scheda</button></td>
+                <td><button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button></td>
               </tr>`;
             }).join("")}</tbody>
           </table>
@@ -12162,6 +12355,186 @@ if("serviceWorker" in navigator){
     });
   });
 }
+
+
+/* ============ SCHEDA RAPIDA LAVORI COMPLETATI ============ */
+let completedSheetOrderId = null;
+
+function ensureCompletedSheetDrawer(){
+  let backdrop=document.getElementById("completedSheetBackdrop");
+  let drawer=document.getElementById("completedSheetDrawer");
+  if(backdrop && drawer) return {backdrop,drawer};
+
+  backdrop=document.createElement("div");
+  backdrop.id="completedSheetBackdrop";
+  backdrop.className="completed-sheet-backdrop";
+  backdrop.onclick=closeCompletedOrderSheet;
+
+  drawer=document.createElement("aside");
+  drawer.id="completedSheetDrawer";
+  drawer.className="completed-sheet-drawer";
+  drawer.setAttribute("aria-hidden","true");
+  drawer.innerHTML=`
+    <div class="completed-sheet-head">
+      <div>
+        <h2>Scheda di lavorazione</h2>
+        <p>Dettagli e note della lavorazione</p>
+      </div>
+      <button class="completed-sheet-close" type="button" aria-label="Chiudi" onclick="closeCompletedOrderSheet()">×</button>
+    </div>
+    <div id="completedSheetContent" class="completed-sheet-scroll"></div>
+  `;
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(drawer);
+  return {backdrop,drawer};
+}
+
+function completedSheetStatusHtml(o){
+  if(o.clienteAvvisato){
+    return `<span class="pill pill-done">AVVISATO</span>${o.avvisoMetodo?` <span style="font-size:12px;color:var(--muted);margin-left:5px;">${escapeHtml(o.avvisoMetodo)}</span>`:""}`;
+  }
+  if(orderPendingPickupRows(o).length){
+    return `<span class="pill pill-produzione">DA RITIRARE</span>`;
+  }
+  return `<span class="pill pill-open">DA AVVISARE</span>`;
+}
+
+function openCompletedOrderSheet(orderId){
+  const o=findItem("orders",orderId);
+  if(!o) return;
+
+  completedSheetOrderId=orderId;
+  const {backdrop,drawer}=ensureCompletedSheetDrawer();
+  const content=document.getElementById("completedSheetContent");
+  const client=clientName(o.clientId);
+  const categorie=orderCategorieLabel(o) || "—";
+
+  content.innerHTML=`
+    <section class="completed-sheet-section">
+      <h3>Informazioni generali</h3>
+      <p class="section-help">Riepilogo rapido della lavorazione completata.</p>
+
+      <div class="completed-sheet-info-row">
+        <div class="completed-sheet-info-label">Cliente</div>
+        <div class="completed-sheet-info-value">${escapeHtml(client)}</div>
+      </div>
+      <div class="completed-sheet-info-row">
+        <div class="completed-sheet-info-label">Lavorazione</div>
+        <div class="completed-sheet-info-value">${categorie}</div>
+      </div>
+      <div class="completed-sheet-info-row">
+        <div class="completed-sheet-info-label">Stato cliente</div>
+        <div class="completed-sheet-info-value">${completedSheetStatusHtml(o)}</div>
+      </div>
+      <div class="completed-sheet-info-row">
+        <div class="completed-sheet-info-label">Pagamento</div>
+        <div class="completed-sheet-info-value">
+          <button class="btn btn-outline btn-sm" onclick="closeCompletedOrderSheet();openCompletedOrderPayment('${o.id}')">AGGIUNGI PAGAMENTO</button>
+        </div>
+      </div>
+      <div class="completed-sheet-info-row">
+        <div class="completed-sheet-info-label">Scheda completa</div>
+        <div class="completed-sheet-info-value">
+          <button class="btn btn-outline btn-sm" onclick="closeCompletedOrderSheet();openJobCard('${o.id}')">Apri ordine completo</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="completed-sheet-section">
+      <h3>Note di lavorazione</h3>
+      <p class="section-help">Modifica qui le note operative. Il pulsante <strong>Salva note</strong> le registra direttamente nell'ordine.</p>
+      <textarea id="completedSheetNotes" class="completed-sheet-notes" placeholder="Inserisci note, materiali, misure, indicazioni di consegna…">${escapeHtml(o.descrizione||"")}</textarea>
+      <div class="completed-sheet-note-footer">
+        <div id="completedSheetSaveState" class="completed-sheet-save-state">Nessuna modifica da salvare.</div>
+        <div class="completed-sheet-actions">
+          <button class="btn btn-outline" type="button" onclick="openCompletedOrderSheet('${o.id}')">Annulla</button>
+          <button id="completedSheetSaveBtn" class="btn btn-primary completed-sheet-save" type="button" onclick="saveCompletedOrderNotes('${o.id}')">Salva note</button>
+        </div>
+      </div>
+    </section>
+  `;
+
+  const notes=document.getElementById("completedSheetNotes");
+  const stateEl=document.getElementById("completedSheetSaveState");
+  if(notes && stateEl){
+    notes.addEventListener("input",()=>{ stateEl.textContent="Modifiche non ancora salvate."; });
+  }
+
+  document.querySelectorAll("tr[data-completed-order]").forEach(tr=>{
+    tr.classList.toggle("completed-sheet-selected",tr.getAttribute("data-completed-order")===orderId);
+  });
+
+  requestAnimationFrame(()=>{
+    backdrop.classList.add("open");
+    drawer.classList.add("open");
+    drawer.setAttribute("aria-hidden","false");
+  });
+}
+
+function closeCompletedOrderSheet(){
+  const backdrop=document.getElementById("completedSheetBackdrop");
+  const drawer=document.getElementById("completedSheetDrawer");
+  if(backdrop) backdrop.classList.remove("open");
+  if(drawer){
+    drawer.classList.remove("open");
+    drawer.setAttribute("aria-hidden","true");
+  }
+  completedSheetOrderId=null;
+  document.querySelectorAll("tr[data-completed-order]").forEach(tr=>tr.classList.remove("completed-sheet-selected"));
+}
+
+async function saveCompletedOrderNotes(orderId){
+  const o=findItem("orders",orderId);
+  const notesEl=document.getElementById("completedSheetNotes");
+  const saveBtn=document.getElementById("completedSheetSaveBtn");
+  const stateEl=document.getElementById("completedSheetSaveState");
+  if(!o || !notesEl) return;
+
+  const oldValue=o.descrizione||"";
+  const newValue=notesEl.value.trim();
+
+  if(saveBtn){
+    saveBtn.disabled=true;
+    saveBtn.textContent="Salvataggio…";
+  }
+  if(stateEl) stateEl.textContent="Salvataggio in corso…";
+
+  o.descrizione=newValue;
+
+  try{
+    const saved=await upsertOneReturning("orders",o);
+    if(!saved) throw new Error("Salvataggio non riuscito");
+
+    const i=state.orders.findIndex(x=>x.id===orderId);
+    if(i>=0) state.orders[i]=saved;
+
+    // Se la scheda ordine completa era già stata aperta, allineiamo anche
+    // l'eventuale snapshot per evitare che una chiusura successiva ripristini note vecchie.
+    if(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId){
+      jobCardEditSnapshot.order=JSON.parse(JSON.stringify(saved));
+    }
+
+    if(stateEl) stateEl.textContent="Note salvate correttamente.";
+    showToast("Note di lavorazione salvate");
+  }catch(err){
+    console.error("Salvataggio note lavorazione",err);
+    o.descrizione=oldValue;
+    if(stateEl) stateEl.textContent="Errore nel salvataggio. Riprova.";
+    showToast("Note non salvate: riprova");
+  }finally{
+    if(saveBtn){
+      saveBtn.disabled=false;
+      saveBtn.textContent="Salva note";
+    }
+  }
+}
+
+document.addEventListener("keydown",(event)=>{
+  if(event.key==="Escape" && document.getElementById("completedSheetDrawer")?.classList.contains("open")){
+    closeCompletedOrderSheet();
+  }
+});
 
 </script>
 </body>
