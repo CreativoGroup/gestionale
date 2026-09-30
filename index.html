@@ -2648,6 +2648,112 @@
   }
 </style>
 
+
+<style id="completed-sheet-dropbox-style">
+  .completed-sheet-files-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:13px;
+    flex-wrap:wrap;
+  }
+  .completed-sheet-files-head h3{margin:0 0 4px;}
+  .completed-sheet-db-status{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    border-radius:999px;
+    padding:5px 9px;
+    font-size:11px;
+    font-weight:800;
+    background:#EEF2F6;
+    color:#64748B;
+  }
+  .completed-sheet-db-status.ok{background:#EAF8EF;color:#24724A;}
+  .completed-sheet-db-status.error{background:#FFF1EF;color:#A63A2F;}
+  .completed-sheet-db-grid{
+    display:grid;
+    gap:9px;
+  }
+  .completed-sheet-db-group{
+    border:1px solid #E4EAF1;
+    border-radius:13px;
+    overflow:hidden;
+    background:#fff;
+  }
+  .completed-sheet-db-group-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:9px 11px;
+    background:#F8FAFC;
+    border-bottom:1px solid #EDF1F5;
+    font-size:12px;
+    font-weight:850;
+    color:#334155;
+  }
+  .completed-sheet-db-count{
+    min-width:22px;
+    height:22px;
+    padding:0 7px;
+    border-radius:999px;
+    background:#E9EFF7;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    color:#526173;
+    font-size:10.5px;
+  }
+  .completed-sheet-db-file{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:9px;
+    align-items:center;
+    padding:10px 11px;
+    border-bottom:1px solid #EDF1F5;
+  }
+  .completed-sheet-db-file:last-child{border-bottom:0;}
+  .completed-sheet-db-file-name{
+    font-size:12.5px;
+    font-weight:800;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .completed-sheet-db-file-meta{
+    margin-top:3px;
+    color:#7B8794;
+    font-size:10.5px;
+  }
+  .completed-sheet-db-actions{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+  .completed-sheet-db-empty{
+    padding:13px 11px;
+    color:#7B8794;
+    font-size:11.5px;
+    text-align:center;
+  }
+  .completed-sheet-db-loading{
+    padding:20px 12px;
+    border:1px dashed #D7E0EA;
+    border-radius:13px;
+    background:#FAFCFE;
+    color:#64748B;
+    font-size:12px;
+    text-align:center;
+  }
+  @media(max-width:520px){
+    .completed-sheet-db-file{grid-template-columns:1fr;}
+    .completed-sheet-db-actions{justify-content:flex-start;}
+  }
+</style>
+
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -5798,7 +5904,6 @@ function renderDashboard(){
             <td>${clientName(o.clientId)}</td>
             <td class="mobile-hide">${orderCategorieLabel(o)}</td>
             <td class="mobile-hide">${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : ""}</td>
-            <td class="mobile-hide"><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">AGGIUNGI PAGAMENTO</button></td>
             <td>${completedOrderStageButton(o)}</td>
             <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button></td>
           </tr>
@@ -8327,13 +8432,12 @@ function renderCompletedDeliveryRows(list){
   return list.length ? `
     <div class="table-wrap" style="box-shadow:none;">
       <table>
-        <thead><tr><th>Cliente</th><th>Lavorazione</th><th>Fornitore</th><th>Pagamento</th><th>Stato cliente</th><th>Azioni</th></tr></thead>
+        <thead><tr><th>Cliente</th><th>Lavorazione</th><th>Fornitore</th><th>Stato cliente</th><th>Azioni</th></tr></thead>
         <tbody>${list.map(o=>`
           <tr data-completed-order="${o.id}">
             <td><strong>${clientName(o.clientId)}</strong></td>
             <td>${orderCategorieLabel(o)}</td>
             <td>${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : "—"}</td>
-            <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="openCompletedOrderPayment('${o.id}')">AGGIUNGI PAGAMENTO</button></td>
             <td>${completedOrderStageButton(o)}</td>
             <td style="white-space:nowrap;">
               <button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button>
@@ -13414,10 +13518,6 @@ function openCompletedOrderSheet(orderId){
         <div class="completed-sheet-info-value">${categorie}</div>
       </div>
       <div class="completed-sheet-info-row">
-        <div class="completed-sheet-info-label">Stato cliente</div>
-        <div class="completed-sheet-info-value">${completedSheetStatusHtml(o)}</div>
-      </div>
-      <div class="completed-sheet-info-row">
         <div class="completed-sheet-info-label">Pagamento</div>
         <div class="completed-sheet-info-value">
           <button class="btn btn-outline btn-sm" onclick="closeCompletedOrderSheet();openCompletedOrderPayment('${o.id}')">AGGIUNGI PAGAMENTO</button>
@@ -13428,6 +13528,24 @@ function openCompletedOrderSheet(orderId){
         <div class="completed-sheet-info-value">
           <button class="btn btn-outline btn-sm" onclick="closeCompletedOrderSheet();openJobCard('${o.id}')">Apri ordine completo</button>
         </div>
+      </div>
+    </section>
+
+    <section class="completed-sheet-section">
+      <div class="completed-sheet-files-head">
+        <div>
+          <h3>File Dropbox</h3>
+          <p class="section-help" style="margin-bottom:0;">File collegati a questa lavorazione, suddivisi per cartella.</p>
+        </div>
+        <span id="completedSheetDropboxStatus" class="completed-sheet-db-status ${dropboxIsConnected()?'ok':''}">
+          ${dropboxIsConnected()?'Dropbox collegato':'Dropbox non collegato'}
+        </span>
+      </div>
+
+      <div id="completedSheetDropboxFiles" class="completed-sheet-db-grid">
+        ${dropboxIsConnected()
+          ? `<div class="completed-sheet-db-loading">Caricamento file Dropbox…</div>`
+          : `<div class="completed-sheet-db-loading">Collega Dropbox dalla sezione Dropbox del gestionale.</div>`}
       </div>
     </section>
 
@@ -13490,6 +13608,137 @@ Esempio:
     drawer.classList.add("open");
     drawer.setAttribute("aria-hidden","false");
   });
+
+  if(dropboxIsConnected()){
+    setTimeout(()=>completedSheetLoadDropboxFiles(orderId),0);
+  }
+}
+
+
+
+async function completedSheetLoadDropboxFiles(orderId){
+  const o=findItem("orders",orderId);
+  const container=document.getElementById("completedSheetDropboxFiles");
+  const status=document.getElementById("completedSheetDropboxStatus");
+  if(!o || !container) return;
+
+  if(!dropboxIsConnected()){
+    if(status){
+      status.className="completed-sheet-db-status error";
+      status.textContent="Dropbox non collegato";
+    }
+    container.innerHTML=`<div class="completed-sheet-db-loading">Collega Dropbox dalla sezione Dropbox del gestionale.</div>`;
+    return;
+  }
+
+  try{
+    // Crea la struttura dell'ordine se non esiste ancora.
+    await jobDropboxEnsureStructure(orderId);
+
+    const base=jobDropboxBasePath(o);
+    const groups=[];
+
+    for(const folder of JOB_DROPBOX_SUBFOLDERS){
+      try{
+        const data=await dropboxApi("files/list_folder",{
+          path:`${base}/${folder}`,
+          recursive:false,
+          include_deleted:false
+        });
+        const files=(data.entries||[])
+          .filter(x=>x[".tag"]==="file")
+          .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"it"));
+        groups.push({folder,files});
+      }catch(err){
+        console.error("Dropbox scheda laterale folder",folder,err);
+        groups.push({folder,files:[]});
+      }
+    }
+
+    if(status){
+      status.className="completed-sheet-db-status ok";
+      status.textContent="Dropbox collegato";
+    }
+
+    const total=groups.reduce((sum,g)=>sum+g.files.length,0);
+    if(!total){
+      container.innerHTML=`
+        <div class="completed-sheet-db-loading">
+          Nessun file ancora presente per questa lavorazione.<br>
+          Puoi caricarli dalla scheda ordine completa.
+        </div>`;
+      return;
+    }
+
+    container.innerHTML=groups.map(group=>`
+      <div class="completed-sheet-db-group">
+        <div class="completed-sheet-db-group-title">
+          <span>📁 ${escapeHtml(group.folder)}</span>
+          <span class="completed-sheet-db-count">${group.files.length}</span>
+        </div>
+        ${group.files.length ? group.files.map(file=>{
+          const path=file.path_lower||file.path_display||"";
+          const encodedPath=encodeURIComponent(path);
+          const encodedName=encodeURIComponent(file.name||"file");
+          return `
+            <div class="completed-sheet-db-file">
+              <div style="min-width:0;">
+                <div class="completed-sheet-db-file-name">📄 ${escapeHtml(file.name||"")}</div>
+                <div class="completed-sheet-db-file-meta">
+                  ${dropboxFormatBytes(file.size)}
+                  ${file.client_modified?` · ${new Date(file.client_modified).toLocaleString("it-IT")}`:""}
+                </div>
+              </div>
+              <div class="completed-sheet-db-actions">
+                <button class="btn btn-outline btn-sm" type="button"
+                  onclick="completedSheetPreviewDropboxFile('${encodedPath}','${encodedName}')">Visualizza</button>
+                <button class="btn btn-outline btn-sm" type="button"
+                  onclick="jobDropboxDownloadEncoded('${encodedPath}','${encodedName}')">Scarica</button>
+              </div>
+            </div>`;
+        }).join("") : `<div class="completed-sheet-db-empty">Nessun file.</div>`}
+      </div>
+    `).join("");
+  }catch(err){
+    console.error("Caricamento Dropbox scheda laterale",err);
+    if(status){
+      status.className="completed-sheet-db-status error";
+      status.textContent="Errore Dropbox";
+    }
+    container.innerHTML=`<div class="completed-sheet-db-loading" style="color:var(--danger);">Impossibile caricare i file Dropbox.</div>`;
+  }
+}
+
+async function completedSheetPreviewDropboxFile(pathEncoded,nameEncoded){
+  const path=decodeURIComponent(pathEncoded);
+  const name=decodeURIComponent(nameEncoded);
+  const token=dropboxToken();
+  if(!token){ showToast("Dropbox non collegato"); return; }
+
+  try{
+    const res=await fetch("https://content.dropboxapi.com/2/files/download",{
+      method:"POST",
+      headers:{
+        "Authorization":"Bearer "+token,
+        "Dropbox-API-Arg":JSON.stringify({path})
+      }
+    });
+    if(!res.ok) throw new Error(await res.text());
+
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const win=window.open(url,"_blank","noopener");
+    if(!win){
+      URL.revokeObjectURL(url);
+      showToast("Consenti i popup per visualizzare il file");
+      return;
+    }
+    // Manteniamo il blob abbastanza a lungo da consentire al nuovo tab di caricarlo.
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }catch(err){
+    console.error("Anteprima Dropbox",err);
+    showToast(`Impossibile visualizzare ${name}`);
+  }
 }
 
 
