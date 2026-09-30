@@ -5085,9 +5085,15 @@ function openWhatsappCoexistence(){
       auth_type: "rerequest",
       response_type: "code",
       override_default_response_type: true,
+
+      // Forziamo un redirect stabile e identico a quello usato
+      // dal backend durante lo scambio del codice OAuth.
+      fallback_redirect_uri: "https://gestionale.creativogroup.it/",
+
       extras: {
         setup: {},
-        featureType: "whatsapp_business_app_onboarding"
+        featureType: "whatsapp_business_app_onboarding",
+        sessionInfoVersion: "3"
       }
     });
   }catch(error){
