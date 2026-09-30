@@ -2627,6 +2627,27 @@
   }
 </style>
 
+
+<style id="job-notes-fullwidth-style">
+  .job-v2-notes-full{
+    width:100%;
+  }
+  .job-v2-note-full{
+    width:100% !important;
+    min-height:260px !important;
+    resize:vertical;
+    font-size:15px !important;
+    line-height:1.6;
+    padding:16px !important;
+  }
+  @media(max-width:760px){
+    .job-v2-note-full{
+      min-height:220px !important;
+      font-size:16px !important;
+    }
+  }
+</style>
+
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -9686,6 +9707,16 @@ function openJobCard(orderId){
         ${renderRitiroEsternoSection(o)}
       </section>
 
+      <section class="job-v2-card" style="--job-accent:#0061FF;">
+        <div class="job-v2-section-title">
+          <h3>☁ File Dropbox</h3>
+          <span class="job-v2-pill" style="background:${dropboxIsConnected()?'#EAF8EF':'#F1F5F9'};color:${dropboxIsConnected()?'#187A44':'#64748B'};">
+            ${dropboxIsConnected()?'COLLEGATO':'NON COLLEGATO'}
+          </span>
+        </div>
+        ${renderJobDropboxBlock(o,c)}
+      </section>
+
       <section class="job-v2-card" style="--job-accent:#20a857;">
         <div class="job-v2-section-title">
           <h3><span class="job-v2-num">3</span> Magazzino / Materiali</h3>
@@ -9780,27 +9811,15 @@ function openJobCard(orderId){
           </section>
         </div>
       </details>
-
-      <section class="job-v2-two">
-        <div class="job-v2-card" style="--job-accent:#355db4;">
-          <div class="job-v2-section-title"><h3>Note operative</h3></div>
-          <textarea class="job-v2-note" placeholder="Note generali della commessa…" onchange="updateOrderField('${o.id}','descrizione',this.value)">${escapeHtml(o.descrizione||"")}</textarea>
-        </div>
-
-        <div class="job-v2-card" style="--job-accent:#2979d8;">
-          <div class="job-v2-section-title"><h3>Allegati</h3></div>
-          ${renderOrderExternalAttachments(o)}
-        </div>
-      </section>
-
-      <section class="job-v2-card" style="--job-accent:#0061FF;">
+      <section class="job-v2-card job-v2-notes-full" style="--job-accent:#355db4;">
         <div class="job-v2-section-title">
-          <h3>☁ File Dropbox</h3>
-          <span class="job-v2-pill" style="background:${dropboxIsConnected()?'#EAF8EF':'#F1F5F9'};color:${dropboxIsConnected()?'#187A44':'#64748B'};">
-            ${dropboxIsConnected()?'COLLEGATO':'NON COLLEGATO'}
-          </span>
+          <h3>Note integrative</h3>
+          <div class="job-v2-info-sub">Indicazioni aggiuntive, dettagli tecnici, richieste del cliente e informazioni utili alla lavorazione</div>
         </div>
-        ${renderJobDropboxBlock(o,c)}
+        <textarea
+          class="job-v2-note job-v2-note-full"
+          placeholder="Inserisci qui tutte le note integrative della commessa…"
+          onchange="updateOrderField('${o.id}','descrizione',this.value)">${escapeHtml(o.descrizione||"")}</textarea>
       </section>
 
       <div class="job-v2-bottom-actions">
@@ -9816,6 +9835,9 @@ function openJobCard(orderId){
   `;
 
   document.getElementById("modalBackdrop").classList.add("open");
+  if(dropboxIsConnected()){
+    setTimeout(()=>jobDropboxInit(o.id),0);
+  }
 }
 function duplicateOrder(orderId){
   const o = findItem('orders', orderId);
