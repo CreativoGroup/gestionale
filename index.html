@@ -4921,11 +4921,20 @@ window.fbAsyncInit = function(){
 async function maybeCompleteWhatsappMetaSignup(){
   if(whatsappMetaSignupState.completed || whatsappMetaSignupState.completing) return;
 
-  // Il codice OAuth è già sufficiente per passare il controllo al backend.
-  // In alcune configurazioni Coexistence Meta chiude il popup senza inviare
-  // l'evento WA_EMBEDDED_SIGNUP/FINISH al parent. Aspettarlo bloccava per sempre
-  // la chiamata a Supabase.
-  if(!whatsappMetaSignupState.code && !whatsappMetaSignupState.accessToken) return;
+  // Per Embedded Signup / Coexistence servono DUE informazioni distinte:
+  // 1) il code OAuth restituito dal callback FB.login;
+  // 2) il WABA ID restituito dal messaggio WA_EMBEDDED_SIGNUP.
+  // Non chiamiamo Supabase finché non sono arrivati entrambi, altrimenti il
+  // backend riceve wabaId:null e non può completare il collegamento.
+  if(!whatsappMetaSignupState.code && !whatsappMetaSignupState.accessToken){
+    waMetaDebug("ATTESA", "Attendo il codice OAuth Meta...");
+    return;
+  }
+
+  if(!whatsappMetaSignupState.wabaId){
+    waMetaDebug("ATTESA", "Codice OAuth ricevuto. Attendo WA_EMBEDDED_SIGNUP con WABA ID...");
+    return;
+  }
 
   await completeWhatsappMetaSignup();
 }
@@ -5224,7 +5233,8 @@ function openWhatsappCoexistence(){
 
       extras: {
         setup: {},
-        featureType: "whatsapp_business_app_onboarding"
+        featureType: "whatsapp_business_app_onboarding",
+        sessionInfoVersion: "3"
       }
     });
   }catch(error){
