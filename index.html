@@ -5290,9 +5290,11 @@ function renderNote(){
             </div>
             <div style="margin-top:8px;">
               <label class="lr-sub" style="display:block;margin-bottom:5px;font-weight:700;">Descrizione lavoro</label>
-              <textarea id="nota-desc-${n.id}" class="note-edit-textarea" rows="2">${escapeHtml(n.testo||"")}</textarea>
+              <textarea id="nota-desc-${n.id}" class="note-edit-textarea" rows="2" readonly>${escapeHtml(n.testo||"")}</textarea>
               <div style="margin-top:7px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <button class="btn btn-outline btn-sm" onclick="salvaDescrizioneNota('${n.id}')">SALVA NOTA</button>
+                <button id="nota-modifica-${n.id}" class="btn btn-outline btn-sm" onclick="modificaNotaComunicazione('${n.id}')">MODIFICA</button>
+                <button id="nota-salva-${n.id}" class="btn btn-primary btn-sm" style="display:none;" onclick="salvaDescrizioneNota('${n.id}')">SALVA MODIFICHE</button>
+                <button id="nota-annulla-${n.id}" class="btn btn-outline btn-sm" style="display:none;" onclick="annullaModificaNota('${n.id}')">ANNULLA</button>
                 <span class="lr-sub">${escapeHtml(noteDateLabel(n.creatoIl))}</span>
               </div>
             </div>
@@ -5363,6 +5365,39 @@ async function addNotaComunicazione(){
   showToast("Nota salvata");
 }
 
+
+function modificaNotaComunicazione(id){
+  const n=findItem("noteComunicazioni",id);
+  const el=document.getElementById(`nota-desc-${id}`);
+  if(!n || !el) return;
+
+  el.dataset.originalValue=el.value;
+  el.readOnly=false;
+  el.focus();
+  try{ el.setSelectionRange(el.value.length,el.value.length); }catch(e){}
+
+  const editBtn=document.getElementById(`nota-modifica-${id}`);
+  const saveBtn=document.getElementById(`nota-salva-${id}`);
+  const cancelBtn=document.getElementById(`nota-annulla-${id}`);
+  if(editBtn) editBtn.style.display="none";
+  if(saveBtn) saveBtn.style.display="";
+  if(cancelBtn) cancelBtn.style.display="";
+}
+
+function annullaModificaNota(id){
+  const el=document.getElementById(`nota-desc-${id}`);
+  if(!el) return;
+  if(el.dataset.originalValue!==undefined) el.value=el.dataset.originalValue;
+  el.readOnly=true;
+
+  const editBtn=document.getElementById(`nota-modifica-${id}`);
+  const saveBtn=document.getElementById(`nota-salva-${id}`);
+  const cancelBtn=document.getElementById(`nota-annulla-${id}`);
+  if(editBtn) editBtn.style.display="";
+  if(saveBtn) saveBtn.style.display="none";
+  if(cancelBtn) cancelBtn.style.display="none";
+}
+
 async function salvaDescrizioneNota(id){
   const n=findItem("noteComunicazioni",id);
   if(!n) return;
@@ -5417,6 +5452,8 @@ async function cleanupOldNoteComunicazioni(){
   state.noteComunicazioni=state.noteComunicazioni.filter(n=>!ids.includes(n.id));
   if(currentView==="note") renderNote();
 }
+
+let editingAppointmentId = null;
 
 /* ============ DASHBOARD ============ */
 function orderPendingPickupRows(o){
@@ -5516,6 +5553,7 @@ function renderDashboard(){
         <button class="btn btn-outline btn-sm" onclick="toggleForm('apptForm')">+ Nuovo appuntamento</button>
       </div>
       <div class="form-panel" id="apptForm" style="margin-bottom:14px;">
+        <h3 id="apptFormTitle" style="margin:0 0 14px;">Nuovo appuntamento</h3>
         <div class="form-grid">
           <div class="field"><label>Nome</label><input id="af-titolo" placeholder="Nome persona / appuntamento"></div>
           <div class="field"><label>Data</label><input id="af-data" type="date" value="${today()}"></div>
@@ -5524,8 +5562,8 @@ function renderDashboard(){
           <div class="field" style="grid-column:1/-1;"><label>Descrizione</label><textarea id="af-descrizione" rows="3" placeholder="Descrizione dell'appuntamento..."></textarea></div>
         </div>
         <div class="form-actions">
-          <button class="btn btn-primary" onclick="addAppuntamento()">Salva appuntamento</button>
-          <button class="btn btn-outline" onclick="toggleForm('apptForm')">Annulla</button>
+          <button id="apptSaveBtn" class="btn btn-primary" onclick="addAppuntamento()">Salva appuntamento</button>
+          <button class="btn btn-outline" onclick="annullaModificaAppuntamento()">Annulla</button>
         </div>
       </div>
       ${prossimiAppuntamenti.length ? prossimiAppuntamenti.map(a=>`
@@ -5537,6 +5575,7 @@ function renderDashboard(){
           </div>
           <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
             <div style="text-align:right;"><div class="lr-main">${fmtDate(a.data)}</div><div class="lr-sub">${a.ora}</div></div>
+            <button class="btn btn-outline btn-sm" onclick="modificaAppuntamento('${a.id}')">MODIFICA</button>
             <button class="btn btn-ghost btn-sm" onclick="deleteAppuntamento('${a.id}')">✕</button>
           </div>
         </div>`).join("") : `<p class="empty">Nessun appuntamento in programma.</p>`}
@@ -5868,21 +5907,82 @@ async function resetClienteDaAvvisare(orderId){
   showToast("Cliente rimesso DA AVVISARE");
 }
 
-function addAppuntamento(){
-  const titolo = document.getElementById("af-titolo").value.trim();
+async function addAppuntamento(){
+  const titolo = document.getElementById("af-titolo")?.value.trim() || "";
   if(!titolo){ showToast("Inserisci il nome dell'appuntamento"); return; }
-  state.appuntamenti.push({
-    id:uid(), titolo,
-    clientId: null,
-    data: document.getElementById("af-data").value || today(),
-    ora: document.getElementById("af-ora").value || "09:00",
-    luogo: document.getElementById("af-luogo").value.trim(),
-    note: document.getElementById("af-descrizione").value.trim()
-  });
-  saveState('appuntamenti'); toggleForm('apptForm'); renderDashboard(); showToast("Appuntamento salvato");
+
+  const existing = editingAppointmentId ? findItem("appuntamenti", editingAppointmentId) : null;
+  const record = {
+    id: existing?.id || uid(),
+    titolo,
+    clientId: existing?.clientId || null,
+    data: document.getElementById("af-data")?.value || today(),
+    ora: document.getElementById("af-ora")?.value || "09:00",
+    luogo: document.getElementById("af-luogo")?.value.trim() || "",
+    note: document.getElementById("af-descrizione")?.value.trim() || ""
+  };
+
+  const saved=await upsertOneReturning("appuntamenti",record);
+  if(!saved) return;
+
+  const i=state.appuntamenti.findIndex(a=>a.id===saved.id);
+  if(i>=0) state.appuntamenti[i]=saved;
+  else state.appuntamenti.push(saved);
+
+  const wasEditing=!!editingAppointmentId;
+  editingAppointmentId=null;
+  renderDashboard();
+  showToast(wasEditing ? "Appuntamento modificato" : "Appuntamento salvato");
 }
+
+function modificaAppuntamento(id){
+  const a=findItem("appuntamenti",id);
+  if(!a) return;
+  editingAppointmentId=id;
+
+  const form=document.getElementById("apptForm");
+  if(form && !form.classList.contains("open")) form.classList.add("open");
+
+  const title=document.getElementById("apptFormTitle");
+  const saveBtn=document.getElementById("apptSaveBtn");
+  if(title) title.textContent="Modifica appuntamento";
+  if(saveBtn) saveBtn.textContent="Salva modifiche";
+
+  const titolo=document.getElementById("af-titolo");
+  const data=document.getElementById("af-data");
+  const ora=document.getElementById("af-ora");
+  const luogo=document.getElementById("af-luogo");
+  const note=document.getElementById("af-descrizione");
+
+  if(titolo) titolo.value=a.titolo||"";
+  if(data) data.value=a.data||today();
+  if(ora) ora.value=a.ora||"09:00";
+  if(luogo) luogo.value=a.luogo||"";
+  if(note) note.value=a.note||"";
+
+  setTimeout(()=>titolo?.focus(),50);
+}
+
+function annullaModificaAppuntamento(){
+  editingAppointmentId=null;
+  const form=document.getElementById("apptForm");
+  if(form) form.classList.remove("open");
+
+  const titolo=document.getElementById("af-titolo");
+  const data=document.getElementById("af-data");
+  const ora=document.getElementById("af-ora");
+  const luogo=document.getElementById("af-luogo");
+  const note=document.getElementById("af-descrizione");
+  if(titolo) titolo.value="";
+  if(data) data.value=today();
+  if(ora) ora.value="09:00";
+  if(luogo) luogo.value="";
+  if(note) note.value="";
+}
+
 function deleteAppuntamento(id){
   askConfirm("Eliminare questo appuntamento?", ()=>{
+    if(editingAppointmentId===id) editingAppointmentId=null;
     state.appuntamenti = state.appuntamenti.filter(a=>a.id!==id); dbDelete('appuntamenti', id); renderDashboard();
   });
 }
@@ -12504,6 +12604,7 @@ function openCompletedOrderSheet(orderId){
 
         <textarea id="completedSheetNotes"
           class="completed-sheet-notes"
+          readonly
           placeholder="Scrivi qui le note della lavorazione…
 
 Esempio:
@@ -12513,13 +12614,15 @@ Esempio:
 • Indicazioni per la consegna">${escapeHtml(o.descrizione||"")}</textarea>
 
         <div class="completed-note-hint">
-          Le modifiche vengono salvate automaticamente dopo pochi istanti. Puoi anche usare “Salva ora”.
+          Premi “Modifica” per cambiare le note. Quando hai finito, usa “Salva modifiche”.
         </div>
       </div>
 
       <div class="completed-sheet-note-footer">
         <button class="btn btn-outline" type="button" onclick="closeCompletedOrderSheet()">Chiudi</button>
-        <button id="completedSheetSaveBtn" class="btn btn-primary completed-sheet-save" type="button" onclick="saveCompletedOrderNotes('${o.id}',true)">Salva ora</button>
+        <button id="completedSheetEditBtn" class="btn btn-outline" type="button" onclick="enableCompletedOrderNotesEdit()">Modifica</button>
+        <button id="completedSheetCancelEditBtn" class="btn btn-outline" type="button" style="display:none;" onclick="cancelCompletedOrderNotesEdit()">Annulla modifiche</button>
+        <button id="completedSheetSaveBtn" class="btn btn-primary completed-sheet-save" type="button" style="display:none;" onclick="saveCompletedOrderNotes('${o.id}',true)">Salva modifiche</button>
       </div>
     </section>
   `;
@@ -12530,7 +12633,6 @@ Esempio:
     notes.dataset.lastSavedValue = notes.value;
     notes.addEventListener("input",()=>{
       markCompletedNoteDirty();
-      scheduleCompletedNoteAutosave(orderId);
     });
     notes.addEventListener("keydown",(event)=>{
       if((event.ctrlKey || event.metaKey) && event.key.toLowerCase()==="s"){
@@ -12551,11 +12653,39 @@ Esempio:
   });
 }
 
-function closeCompletedOrderSheet(){
+
+function enableCompletedOrderNotesEdit(){
   const notes=document.getElementById("completedSheetNotes");
-  if(completedSheetOrderId && notes && notes.value!==(notes.dataset.lastSavedValue||"")){
-    saveCompletedOrderNotes(completedSheetOrderId,false);
-  }
+  if(!notes) return;
+  notes.dataset.editOriginal=notes.value;
+  notes.readOnly=false;
+  const editBtn=document.getElementById("completedSheetEditBtn");
+  const saveBtn=document.getElementById("completedSheetSaveBtn");
+  const cancelBtn=document.getElementById("completedSheetCancelEditBtn");
+  if(editBtn) editBtn.style.display="none";
+  if(saveBtn) saveBtn.style.display="";
+  if(cancelBtn) cancelBtn.style.display="";
+  setCompletedNoteStatus("saving","In modifica");
+  notes.focus();
+  try{ notes.setSelectionRange(notes.value.length,notes.value.length); }catch(e){}
+}
+
+function cancelCompletedOrderNotesEdit(){
+  const notes=document.getElementById("completedSheetNotes");
+  if(!notes) return;
+  if(notes.dataset.editOriginal!==undefined) notes.value=notes.dataset.editOriginal;
+  notes.readOnly=true;
+  notes.dataset.lastSavedValue=notes.value;
+  const editBtn=document.getElementById("completedSheetEditBtn");
+  const saveBtn=document.getElementById("completedSheetSaveBtn");
+  const cancelBtn=document.getElementById("completedSheetCancelEditBtn");
+  if(editBtn) editBtn.style.display="";
+  if(saveBtn) saveBtn.style.display="none";
+  if(cancelBtn) cancelBtn.style.display="none";
+  setCompletedNoteStatus("saved","Tutto salvato");
+}
+
+function closeCompletedOrderSheet(){
   const backdrop=document.getElementById("completedSheetBackdrop");
   const drawer=document.getElementById("completedSheetDrawer");
   if(backdrop) backdrop.classList.remove("open");
@@ -12640,7 +12770,16 @@ async function saveCompletedOrderNotes(orderId,manual=false){
     const ora=new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"});
     setCompletedNoteStatus("saved",`Salvato alle ${ora}`);
 
-    if(manual) showToast("Note salvate");
+    if(manual){
+      notesEl.readOnly=true;
+      const editBtn=document.getElementById("completedSheetEditBtn");
+      const saveBtn2=document.getElementById("completedSheetSaveBtn");
+      const cancelBtn=document.getElementById("completedSheetCancelEditBtn");
+      if(editBtn) editBtn.style.display="";
+      if(saveBtn2) saveBtn2.style.display="none";
+      if(cancelBtn) cancelBtn.style.display="none";
+      showToast("Note salvate");
+    }
     return true;
   }catch(err){
     console.error("Salvataggio note lavorazione",err);
@@ -12653,7 +12792,7 @@ async function saveCompletedOrderNotes(orderId,manual=false){
     completedNoteSaveInFlight=false;
     if(saveBtn){
       saveBtn.disabled=false;
-      saveBtn.textContent="Salva ora";
+      saveBtn.textContent="Salva modifiche";
     }
 
     if(completedNoteSaveQueued){
