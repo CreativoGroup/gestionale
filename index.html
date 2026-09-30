@@ -4921,84 +4921,80 @@ async function maybeCompleteWhatsappMetaSignup(){
 async function completeWhatsappMetaSignup(){
   if(whatsappMetaSignupState.completed || whatsappMetaSignupState.completing) return;
 
-  whatsappMetaSignupState.completing = true;
+  whatsappMetaSignupState.completing=true;
 
   try{
-    const {data:sessionData}=await sb.auth.getSession();
-    const session=sessionData?.session;
-
-    if(!session){
-      throw new Error("Sessione del gestionale scaduta");
-    }
-
     showToast("WhatsApp autorizzato. Completo il collegamento...");
 
-    const response=await fetch(
-      `${SUPABASE_URL}/functions/v1/whatsapp-coexistence-complete`,
+    console.log("whatsapp complete state",{
+      hasCode:!!whatsappMetaSignupState.code,
+      hasAccessToken:!!whatsappMetaSignupState.accessToken,
+      wabaId:whatsappMetaSignupState.wabaId||null,
+      phoneNumberId:whatsappMetaSignupState.phoneNumberId||null,
+      event:whatsappMetaSignupState.event||null
+    });
+
+    const { data: result, error } = await sb.functions.invoke(
+      "whatsapp-coexistence-complete",
       {
-        method:"POST",
-        headers:{
-          "Authorization":`Bearer ${session.access_token}`,
-          "apikey":SUPABASE_KEY,
-          "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-          code:whatsappMetaSignupState.code || null,
-          accessToken:whatsappMetaSignupState.accessToken || null,
-          wabaId:whatsappMetaSignupState.wabaId || null,
-          phoneNumberId:whatsappMetaSignupState.phoneNumberId || null,
-          event:whatsappMetaSignupState.event || null
-        })
+        body: {
+          code: whatsappMetaSignupState.code || null,
+          accessToken: whatsappMetaSignupState.accessToken || null,
+          wabaId: whatsappMetaSignupState.wabaId || null,
+          phoneNumberId: whatsappMetaSignupState.phoneNumberId || null,
+          event: whatsappMetaSignupState.event || null
+        }
       }
     );
 
-    let result={};
-    let rawText="";
+    console.log("whatsapp-coexistence-complete result",{
+      error,
+      result
+    });
 
-    try{
-      rawText=await response.text();
-      result=rawText ? JSON.parse(rawText) : {};
-    }catch(e){
-      result={ok:false,error:rawText || "Risposta non valida dal servizio Meta"};
+    if(error){
+      let message=error?.message||"Errore chiamata Supabase";
+      try{
+        const ctx=error?.context;
+        if(ctx && typeof ctx.json==="function"){
+          const parsed=await ctx.json();
+          message=parsed?.error||parsed?.message||message;
+        }
+      }catch(e){}
+      throw new Error(message);
     }
 
-    console.log("whatsapp-coexistence-complete HTTP",response.status,result);
-
-    if(!response.ok || !result?.ok){
+    if(!result?.ok){
       throw new Error(
         result?.error ||
         result?.message ||
-        `Collegamento WhatsApp non completato (HTTP ${response.status})`
+        "Collegamento WhatsApp non completato"
       );
     }
 
-    whatsappMetaSignupState.completed = true;
-
-    const statusParts = [
-      result.displayPhoneNumber || "",
-      result.platformType ? `• ${result.platformType}` : "",
-      result.codeVerificationStatus ? `• ${result.codeVerificationStatus}` : ""
-    ].filter(Boolean).join(" ");
-
-    console.log("WhatsApp Coexistence completata:",result);
+    whatsappMetaSignupState.completed=true;
 
     showToast(
-      statusParts
-        ? `WhatsApp collegato: ${statusParts}`
-        : "WhatsApp Business collegato correttamente"
+      result?.displayPhoneNumber
+        ? `WhatsApp collegato: ${result.displayPhoneNumber}`
+        : "WhatsApp collegato correttamente"
     );
 
-    setTimeout(()=>refreshWhatsappInbox(true),700);
+    try{
+      await loadWhatsappInbox();
+    }catch(e){
+      console.warn("Aggiornamento inbox WhatsApp dopo collegamento",e);
+    }
 
-  }catch(error){
-    console.error("Errore completamento WhatsApp Coexistence:",error);
+  }catch(err){
+    console.error("completeWhatsappMetaSignup",err);
     showToast(
-      error instanceof Error
-        ? error.message
-        : "Errore durante il collegamento WhatsApp"
+      err instanceof Error
+        ? err.message
+        : "Errore collegamento WhatsApp"
     );
   }finally{
-    whatsappMetaSignupState.completing = false;
+    whatsappMetaSignupState.completing=false;
   }
 }
 
