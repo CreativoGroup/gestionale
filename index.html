@@ -2774,6 +2774,18 @@
   @media(max-width:760px){.dropbox-preview-backdrop{padding:0}.dropbox-preview-modal{width:100vw;height:100dvh;border-radius:0}.dropbox-preview-head{padding-top:max(14px,env(safe-area-inset-top));}}
 </style>
 
+
+<style id="whatsapp-meta-debug-style">
+  .wa-meta-debug{position:fixed;right:18px;bottom:18px;width:min(520px,calc(100vw - 36px));max-height:46vh;z-index:130000;background:#0F172A;color:#E2E8F0;border:1px solid rgba(255,255,255,.12);border-radius:16px;box-shadow:0 18px 55px rgba(15,23,42,.35);overflow:hidden;display:none;}
+  .wa-meta-debug.open{display:block;}
+  .wa-meta-debug-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;background:#111C33;border-bottom:1px solid rgba(255,255,255,.1);}
+  .wa-meta-debug-title{font-size:12px;font-weight:850;letter-spacing:.02em;}
+  .wa-meta-debug-actions{display:flex;gap:6px;}
+  .wa-meta-debug-btn{border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#fff;border-radius:8px;padding:5px 8px;font:inherit;font-size:11px;cursor:pointer;}
+  .wa-meta-debug-body{padding:10px 12px;overflow:auto;max-height:36vh;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;}
+  .wa-meta-debug-line{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);}
+</style>
+
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -4932,6 +4944,19 @@ async function completeWhatsappMetaSignup(){
       wabaId:whatsappMetaSignupState.wabaId||null,
       phoneNumberId:whatsappMetaSignupState.phoneNumberId||null,
       event:whatsappMetaSignupState.event||null,
+      redirectUri:whatsappMetaExactRedirectUri || null
+    });
+
+    if(!whatsappMetaExactRedirectUri){
+      throw new Error("Non sono riuscito a catturare il redirect_uri reale usato da Meta. Riprova il collegamento.");
+    }
+
+    waMetaDebug("Invio a Supabase",{
+      code:whatsappMetaSignupState.code ? "[presente]" : null,
+      accessToken:whatsappMetaSignupState.accessToken ? "[presente]" : null,
+      wabaId:whatsappMetaSignupState.wabaId||null,
+      phoneNumberId:whatsappMetaSignupState.phoneNumberId||null,
+      event:whatsappMetaSignupState.event||null,
       redirectUri:window.location.origin + window.location.pathname
     });
 
@@ -4944,7 +4969,7 @@ async function completeWhatsappMetaSignup(){
           wabaId: whatsappMetaSignupState.wabaId || null,
           phoneNumberId: whatsappMetaSignupState.phoneNumberId || null,
           event: whatsappMetaSignupState.event || null,
-          redirectUri: window.location.origin + window.location.pathname
+          redirectUri: whatsappMetaExactRedirectUri || null
         }
       }
     );
@@ -4952,6 +4977,13 @@ async function completeWhatsappMetaSignup(){
     console.log("whatsapp-coexistence-complete result",{
       error,
       result
+    });
+    waMetaDebug("Risposta Supabase",{
+      error:error ? {
+        message:error?.message||String(error),
+        name:error?.name||null
+      } : null,
+      result:safeMetaObject(result)
     });
 
     if(error){
@@ -4990,6 +5022,10 @@ async function completeWhatsappMetaSignup(){
 
   }catch(err){
     console.error("completeWhatsappMetaSignup",err);
+    waMetaDebug("ERRORE",{
+      message:err instanceof Error ? err.message : String(err),
+      stack:err instanceof Error ? err.stack : null
+    });
     showToast(
       err instanceof Error
         ? err.message
@@ -5021,6 +5057,7 @@ window.addEventListener("message",(event)=>{
   if(!payload || payload.type!=="WA_EMBEDDED_SIGNUP") return;
 
   console.log("WA Embedded Signup:",payload);
+  waMetaDebug("WA_EMBEDDED_SIGNUP",safeMetaObject(payload));
 
   whatsappMetaSignupState.event=String(payload.event||"");
 
@@ -5047,7 +5084,100 @@ window.addEventListener("message",(event)=>{
   }
 });
 
+
+let whatsappMetaExactRedirectUri = "";
+
+const waMetaDebugLines = [];
+
+function waMetaDebug(label,data){
+  const entry={time:new Date().toLocaleTimeString("it-IT"),label,data};
+  waMetaDebugLines.push(entry);
+  if(waMetaDebugLines.length>120) waMetaDebugLines.shift();
+  try{ console.log("[WA META DEBUG]",label,data); }catch(e){}
+  const body=document.getElementById("waMetaDebugBody");
+  if(body){
+    const div=document.createElement("div");
+    div.className="wa-meta-debug-line";
+    let rendered="";
+    try{ rendered=typeof data==="string" ? data : JSON.stringify(data,null,2); }
+    catch(e){ rendered=String(data); }
+    div.textContent=`${entry.time} · ${label}\n${rendered}`;
+    body.appendChild(div);
+    body.scrollTop=body.scrollHeight;
+  }
+}
+
+function toggleWaMetaDebug(open=true){
+  document.getElementById("waMetaDebug")?.classList.toggle("open",!!open);
+}
+
+function clearWaMetaDebug(){
+  waMetaDebugLines.length=0;
+  const body=document.getElementById("waMetaDebugBody");
+  if(body) body.innerHTML="";
+}
+
+async function copyWaMetaDebug(){
+  const value=waMetaDebugLines.map(x=>{
+    let d="";
+    try{ d=typeof x.data==="string"?x.data:JSON.stringify(x.data,null,2); }
+    catch(e){ d=String(x.data); }
+    return `${x.time} · ${x.label}\n${d}`;
+  }).join("\n\n");
+  try{
+    await navigator.clipboard.writeText(value);
+    showToast("Log diagnostico copiato");
+  }catch(e){
+    showToast("Impossibile copiare il log");
+  }
+}
+
+
+function captureMetaRedirectFromPopupUrl(url){
+  try{
+    const raw=String(url||"");
+    const parsed=new URL(raw,window.location.href);
+    if(!parsed.hostname.includes("facebook.com")) return;
+
+    const redirect=parsed.searchParams.get("redirect_uri")||"";
+    if(redirect){
+      whatsappMetaExactRedirectUri=redirect;
+      waMetaDebug("redirect_uri META catturato",redirect);
+      console.log("META EXACT redirect_uri",redirect);
+    }
+
+    const fallback=parsed.searchParams.get("fallback_redirect_uri")||"";
+    if(fallback){
+      waMetaDebug("fallback_redirect_uri META",fallback);
+    }
+  }catch(err){
+    console.warn("captureMetaRedirectFromPopupUrl",err);
+  }
+}
+
+function safeMetaObject(value){
+  try{ return JSON.parse(JSON.stringify(value)); }
+  catch(e){ return String(value); }
+}
+
+window.addEventListener("message",(event)=>{
+  const origin=String(event.origin||"");
+  if(!origin.includes("facebook.com") && !origin.includes("meta.com")) return;
+  waMetaDebug("window.message",{origin,data:safeMetaObject(event.data)});
+});
+
 function openWhatsappCoexistence(){
+  toggleWaMetaDebug(true);
+  clearWaMetaDebug();
+  whatsappMetaExactRedirectUri="";
+  waMetaDebug("START",{
+    href:window.location.href,
+    origin:window.location.origin,
+    pathname:window.location.pathname,
+    configId:META_WHATSAPP_CONFIG_ID,
+    appId:META_APP_ID
+  });
+
   if(!metaFacebookSdkReady || typeof FB==="undefined"){
     showToast("Meta sta caricando. Riprova tra qualche secondo.");
     return;
@@ -5056,7 +5186,15 @@ function openWhatsappCoexistence(){
   resetWhatsappMetaSignupState();
 
   try{
+    const originalWindowOpen=window.open;
+    window.open=function(url,...args){
+      captureMetaRedirectFromPopupUrl(url);
+      return originalWindowOpen.call(window,url,...args);
+    };
+
     FB.login(function(response){
+      window.open=originalWindowOpen;
+      waMetaDebug("FB.login callback",safeMetaObject(response));
       console.log("Risposta Meta Coexistence:",response);
 
       if(response?.authResponse?.code){
@@ -14281,6 +14419,19 @@ document.addEventListener("keydown",(event)=>{
       <div class="dropbox-preview-unsupported">Caricamento anteprima…</div>
     </div>
   </div>
+</div>
+
+
+<div id="waMetaDebug" class="wa-meta-debug">
+  <div class="wa-meta-debug-head">
+    <div class="wa-meta-debug-title">Diagnostica Meta / WhatsApp</div>
+    <div class="wa-meta-debug-actions">
+      <button class="wa-meta-debug-btn" type="button" onclick="copyWaMetaDebug()">Copia log</button>
+      <button class="wa-meta-debug-btn" type="button" onclick="clearWaMetaDebug()">Pulisci</button>
+      <button class="wa-meta-debug-btn" type="button" onclick="toggleWaMetaDebug(false)">×</button>
+    </div>
+  </div>
+  <div id="waMetaDebugBody" class="wa-meta-debug-body"></div>
 </div>
 
 </body>
