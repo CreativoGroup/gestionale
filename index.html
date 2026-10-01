@@ -3959,7 +3959,7 @@ const NAV = [
   {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info e richieste"},
 
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Anagrafica"},
-  {id:"leadOrdine", label:"LEAD ORDINE", icon:"◆", subtitle:"Nuovi clienti che hanno già confermato un ordine", group:"Operativa"},
+  {id:"leadOrdine", label:"NUOVI CLIENTI CON ORDINE", icon:"◆", subtitle:"Ordini ricevuti da clienti non ancora presenti o da completare", group:"Operativa"},
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
@@ -4331,26 +4331,26 @@ function renderLeadOrdine(){
   const root=document.getElementById("view-leadOrdine");
   if(!root) return;
 
+  // Questi record non sono Lead commerciali: sono richieste d'ordine già confermate
+  // provenienti da nuovi clienti. Restano in questa coda finché l'ordine non viene
+  // effettivamente creato. Se il cliente è già stato creato/collegato, la voce resta
+  // qui e permette di completare soltanto l'ordine.
   const pending=[...(state.leads||[])]
-    .filter(l=>String(l.fonte||"")==="gmail_ordine" && !l.clientId && !l.convertedOrderId)
+    .filter(l=>String(l.fonte||"")==="gmail_ordine" && !l.convertedOrderId)
     .sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
-
-  const converted=[...(state.leads||[])]
-    .filter(l=>String(l.fonte||"")==="gmail_ordine" && (!!l.clientId || !!l.convertedOrderId))
-    .sort((a,b)=>String(b.convertedAt||b.aggiornatoIl||"").localeCompare(String(a.convertedAt||a.aggiornatoIl||"")));
 
   root.innerHTML=`
     <div class="card" style="margin-bottom:18px;">
       <div class="section-header" style="margin-bottom:8px;">
         <div>
-          <h3 style="margin:0;">LEAD ORDINE</h3>
+          <h3 style="margin:0;">NUOVI CLIENTI CON ORDINE</h3>
           <p class="helptext" style="margin:6px 0 0;">
-            Qui arrivano i <strong>nuovi clienti</strong> per i quali da Gmail è stato premuto
-            <strong>CREA LEAD + ORDINE</strong>. Sono già nello stato <strong>Accettato</strong>:
-            devi solo controllare l'anagrafica, creare il cliente e aprire la scheda ordine.
+            Qui trovi gli <strong>ordini già confermati</strong> arrivati da clienti nuovi.
+            Controlla l'anagrafica e crea l'ordine. Se il cliente è già stato creato,
+            devi soltanto completare l'ordine.
           </p>
         </div>
-        <span class="pill ${pending.length?'pill-open':'pill-done'}">${pending.length} da inserire</span>
+        <span class="pill ${pending.length?'pill-open':'pill-done'}">${pending.length} da completare</span>
       </div>
 
       <div class="lead-table-wrap">
@@ -4361,13 +4361,17 @@ function renderLeadOrdine(){
                 <th>Nome / Azienda</th>
                 <th>Email</th>
                 <th>Oggetto ordine</th>
-                <th>Stato</th>
+                <th>Cliente</th>
                 <th>Data</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              ${pending.map(l=>`
+              ${pending.map(l=>{
+                const linkedClient=l.clientId
+                  ? (state.clients||[]).find(c=>c.id===l.clientId)
+                  : findClientByEmail(l.email);
+                return `
                 <tr>
                   <td>
                     <strong>${escapeHtml(leadDisplayName(l))}</strong>
@@ -4375,46 +4379,20 @@ function renderLeadOrdine(){
                   </td>
                   <td>${escapeHtml(l.email||"—")}</td>
                   <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
-                  <td><span class="lead-status-pill lead-status-ok">Accettato</span></td>
+                  <td>${linkedClient
+                    ? `<span class="lead-status-pill lead-status-ok">Anagrafica presente</span>`
+                    : `<span class="pill pill-open">Da creare</span>`}</td>
                   <td>${fmtLeadDate(l.creatoIl)}</td>
                   <td>
                     <button class="btn btn-primary btn-sm" style="border-radius:999px;padding:9px 15px;font-weight:800;box-shadow:0 4px 10px rgba(240,91,55,.18);" onclick="openLeadDetail('${l.id}')">
-                      ✦ APRI E CREA ORDINE
+                      ✦ ${linkedClient?'CREA ORDINE':'APRI E CREA ORDINE'}
                     </button>
                   </td>
-                </tr>
-              `).join("")}
+                </tr>`;
+              }).join("")}
             </tbody>
           </table>
-        ` : `<p class="empty">Nessun Lead Ordine da trasformare in cliente.</p>`}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="section-header" style="margin-bottom:8px;">
-        <h3 style="margin:0;">Lead Ordine già trasformati</h3>
-        <span style="font-size:12px;color:var(--muted);">${converted.length} completati</span>
-      </div>
-      <p class="helptext" style="margin-top:0;">
-        Qui rimane lo storico dei Lead Ordine già trasformati o collegati a un cliente. Se l'ordine viene creato, resta collegato allo stesso Lead.
-      </p>
-      <div class="lead-table-wrap">
-        ${converted.length ? `
-          <table class="lead-table">
-            <thead><tr><th>Nome / Azienda</th><th>Email</th><th>Oggetto</th><th>Data</th><th></th></tr></thead>
-            <tbody>
-              ${converted.map(l=>`
-                <tr>
-                  <td><strong>${escapeHtml(leadDisplayName(l))}</strong></td>
-                  <td>${escapeHtml(l.email||"—")}</td>
-                  <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
-                  <td>${fmtLeadDate(l.convertedAt||l.aggiornatoIl)}</td>
-                  <td><button class="btn btn-outline btn-sm" style="border-radius:999px;padding:8px 14px;font-weight:700;" onclick="openLeadDetail('${l.id}')">VEDI DETTAGLI</button></td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        ` : `<p class="empty">Nessun Lead Ordine completato.</p>`}
+        ` : `<p class="empty">Nessun nuovo cliente con ordine da completare.</p>`}
       </div>
     </div>
   `;
@@ -4495,15 +4473,22 @@ function openLeadDetail(id){
   const l=(state.leads||[]).find(x=>x.id===id);
   if(!l) return;
 
+  const isNewCustomerOrder=String(l.fonte||"")==="gmail_ordine";
+  const linkedClient=l.clientId
+    ? (state.clients||[]).find(c=>c.id===l.clientId)
+    : (isNewCustomerOrder ? findClientByEmail(l.email) : null);
+
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>${escapeHtml(leadDisplayName(l))}</h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-      ${(l.clientId || l.convertedOrderId)
-        ? `<span class="lead-status-pill lead-status-ok">${escapeHtml(l.stato)}</span>`
-        : `<select class="inline" onchange="changeLeadStatusFromSelect('${l.id}',this.value,true)">
-            ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
-          </select>`}
+      ${isNewCustomerOrder
+        ? `<span class="lead-status-pill lead-status-ok">ORDINE CONFERMATO</span>`
+        : ((l.clientId || l.convertedOrderId)
+          ? `<span class="lead-status-pill lead-status-ok">${escapeHtml(l.stato)}</span>`
+          : `<select class="inline" onchange="changeLeadStatusFromSelect('${l.id}',this.value,true)">
+              ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
+            </select>`)}
       <span style="font-size:12px;color:var(--muted);">${fmtLeadDate(l.creatoIl)}</span>
     </div>
     <div class="lead-detail-grid">
@@ -4514,18 +4499,38 @@ function openLeadDetail(id){
       <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(l.richiesta||"—")}</div></div>
     </div>
     <div class="form-actions" style="margin-top:16px;">
-      <button class="btn btn-outline" style="${String(l.fonte||"")==="gmail_ordine" ? "border-radius:999px;padding:11px 18px;font-weight:800;" : ""}" onclick="openEditLead('${l.id}')">✎ MODIFICA LEAD</button>
-      ${l.stato==="Accettato" && !l.clientId && !l.convertedOrderId ? `
-        <button class="btn btn-primary" style="${String(l.fonte||"")==="gmail_ordine" ? "border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" : ""}" onclick="transformLeadToClient('${l.id}', true)">
-          ${["gmail_ordine","whatsapp_ordine"].includes(String(l.fonte||"")) ? "✓ TRASFORMA IN CLIENTE E CREA ORDINE" : "Trasforma in cliente ed effettua ordine"}
-        </button>
-        <button class="btn btn-outline" style="${String(l.fonte||"")==="gmail_ordine" ? "border-radius:999px;padding:11px 18px;font-weight:800;" : ""}" onclick="linkLeadToExistingClient('${l.id}')">↗ COLLEGA A CLIENTE ESISTENTE E CREA ORDINE</button>
-      ` : ""}
-      ${l.gmailMessageId && String(l.fonte||"")!=="gmail_ordine" ? `<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>` : ""}
-      <button class="btn btn-ghost" style="${String(l.fonte||"")==="gmail_ordine" ? "border-radius:999px;padding:10px 16px;color:var(--muted);font-weight:700;" : ""}" onclick="discardLead('${l.id}');closeModal();">SCARTA</button>
+      <button class="btn btn-outline" style="${isNewCustomerOrder ? "border-radius:999px;padding:11px 18px;font-weight:800;" : ""}" onclick="openEditLead('${l.id}')">✎ ${isNewCustomerOrder?'MODIFICA DATI':'MODIFICA LEAD'}</button>
+
+      ${isNewCustomerOrder && !l.convertedOrderId ? (
+        linkedClient
+          ? `<button class="btn btn-primary" style="border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" onclick="completeNewCustomerOrderWithClient('${l.id}','${linkedClient.id}')">✓ CREA ORDINE</button>`
+          : `<button class="btn btn-primary" style="border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" onclick="transformLeadToClient('${l.id}', true)">✓ CREA CLIENTE E ORDINE</button>
+             <button class="btn btn-outline" style="border-radius:999px;padding:11px 18px;font-weight:800;" onclick="linkLeadToExistingClient('${l.id}')">↗ USA CLIENTE ESISTENTE E CREA ORDINE</button>`
+      ) : (!isNewCustomerOrder && l.stato==="Accettato" && !l.clientId && !l.convertedOrderId ? `
+        <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">Trasforma in cliente ed effettua ordine</button>
+        <button class="btn btn-outline" onclick="linkLeadToExistingClient('${l.id}')">↗ COLLEGA A CLIENTE ESISTENTE E CREA ORDINE</button>
+      ` : "")}
+
+      ${l.gmailMessageId && !isNewCustomerOrder ? `<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>` : ""}
+      <button class="btn btn-ghost" style="${isNewCustomerOrder ? "border-radius:999px;padding:10px 16px;color:var(--muted);font-weight:700;" : ""}" onclick="discardLead('${l.id}');closeModal();">SCARTA</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function completeNewCustomerOrderWithClient(recordId, clientId){
+  const l=(state.leads||[]).find(x=>x.id===recordId);
+  if(!l || !clientId) return;
+
+  // Se il cliente è stato creato in precedenza ma il record non era stato collegato,
+  // salviamo ora il collegamento. La voce resta nella coda finché l'ordine non viene creato.
+  if(!l.clientId){
+    const linked=await markLeadLinkedToClient(recordId, clientId);
+    if(!linked) return;
+  }
+
+  closeModal();
+  newOrderForClient(clientId, recordId);
 }
 
 
@@ -4535,7 +4540,7 @@ function openEditLead(id){
 
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="openLeadDetail('${l.id}')">×</button>
-    <h2>Modifica Lead</h2>
+    <h2>${String(l.fonte||"")==="gmail_ordine" ? "Modifica dati ordine" : "Modifica Lead"}</h2>
 
     <div class="form-grid">
       <div class="field"><label>Nome</label><input id="edit-lead-nome" value="${escapeHtml(l.nome||'')}"></div>
@@ -4691,7 +4696,7 @@ function transformLeadToClient(id, inserisciOrdine=false){
         const linked=await markLeadLinkedToClient(id, existing.id);
         if(!linked) return;
         closeModal();
-        showToast("Lead trasformato: rimosso dai Lead attivi");
+        showToast(String(l.fonte||"")==="gmail_ordine" ? "Cliente collegato: completa ora l'ordine" : "Lead trasformato: rimosso dai Lead attivi");
         if(inserisciOrdine) newOrderForClient(existing.id, id);
       }
     );
@@ -4702,7 +4707,9 @@ function transformLeadToClient(id, inserisciOrdine=false){
 
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="closeModal()">×</button>
-    <h2>${inserisciOrdine ? "Trasforma Lead in cliente e ordine" : "Trasforma Lead in cliente"}</h2>
+    <h2>${String(l.fonte||"")==="gmail_ordine"
+      ? "Crea cliente e ordine"
+      : (inserisciOrdine ? "Trasforma Lead in cliente e ordine" : "Trasforma Lead in cliente")}</h2>
     <p style="color:var(--muted);margin-top:0;">
       ${inserisciOrdine
         ? `Controlla i dati anagrafici. Dopo il salvataggio si aprirà subito <strong>Nuovo ordine</strong> con il cliente già selezionato.`
@@ -4732,7 +4739,7 @@ async function saveLeadAsClient(leadId, inserisciOrdine=false){
   const linked=await markLeadLinkedToClient(leadId, clientId);
   if(!linked) return;
   closeModal();
-  showToast("Lead trasformato: rimosso dai Lead attivi");
+  showToast(String(l.fonte||"")==="gmail_ordine" ? "Cliente creato: completa ora l'ordine" : "Lead trasformato: rimosso dai Lead attivi");
 
   if(inserisciOrdine){
     newOrderForClient(clientId, leadId);
@@ -4783,8 +4790,8 @@ async function linkLeadToExistingClient(id){
 
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="closeModal()">×</button>
-    <h2>Collega Lead a cliente</h2>
-    <p style="color:var(--muted);">Scegli il cliente esistente. Il Lead verrà segnato come Accettato e si aprirà subito un nuovo ordine con il cliente già selezionato.</p>
+    <h2>${String(l.fonte||"")==="gmail_ordine" ? "Usa cliente esistente" : "Collega Lead a cliente"}</h2>
+    <p style="color:var(--muted);">${String(l.fonte||"")==="gmail_ordine" ? "Scegli il cliente esistente e apri subito il nuovo ordine." : "Scegli il cliente esistente. Il Lead verrà segnato come Accettato e si aprirà subito un nuovo ordine con il cliente già selezionato."}</p>
     <div class="field"><label>Cliente</label><select id="lead-client-link"><option value="">Seleziona cliente…</option>${options}</select></div>
     <div class="form-actions">
       <button class="btn btn-primary" onclick="finishLinkLeadToClient('${id}', true)">Collega cliente ed effettua ordine</button>
@@ -4801,7 +4808,7 @@ async function finishLinkLeadToClient(id, inserisciOrdine=false){
   const linked=await markLeadLinkedToClient(id, clientId);
   if(!linked) return;
   closeModal();
-  showToast("Lead collegato: rimosso dai Lead attivi");
+  showToast(String(l.fonte||"")==="gmail_ordine" ? "Cliente collegato: completa ora l'ordine" : "Lead collegato: rimosso dai Lead attivi");
 
   if(inserisciOrdine){
     setTimeout(()=>newOrderForClient(clientId, id),120);
@@ -5334,7 +5341,7 @@ function createOrderFromWhatsapp(waId){
   if(!conv) return;
   const client=findClientByWhatsappPhone(conv.phone||conv.waId);
   if(!client){
-    showToast("Cliente non trovato: usa CREA LEAD + ORDINE");
+    showToast("Cliente non trovato: usa NUOVO CLIENTE + ORDINE");
     return;
   }
   newOrderForClient(client.id);
@@ -5676,7 +5683,7 @@ function renderWhatsapp(){
 
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
               ${!existingClient?`<button class="btn btn-outline btn-sm" onclick="createLeadFromWhatsapp('${escapeHtml(active.waId)}',false)">CREA LEAD</button>`:""}
-              ${!existingClient?`<button class="btn btn-primary btn-sm" onclick="createLeadFromWhatsapp('${escapeHtml(active.waId)}',true)">LEAD + ORDINE</button>`:""}
+              ${!existingClient?`<button class="btn btn-primary btn-sm" onclick="createLeadFromWhatsapp('${escapeHtml(active.waId)}',true)">NUOVO CLIENTE + ORDINE</button>`:""}
               ${existingClient?`<button class="btn btn-outline btn-sm" onclick="createOrderFromWhatsapp('${escapeHtml(active.waId)}')">CREA ORDINE</button>`:""}
             </div>
           </div>
@@ -6977,7 +6984,7 @@ let pendingLeadOrderConversion = null;
 function newOrderForClient(clientId, leadId=null){
   pendingLeadOrderConversion = leadId ? {leadId, clientId} : null;
 
-  // Solo i Lead nati esplicitamente come "gmail_ordine" portano gli allegati
+  // Solo le richieste d'ordine nate da Gmail (fonte tecnica "gmail_ordine") portano gli allegati
   // nell'ordine. I Lead normali Gmail restano esclusi.
   if(leadId){
     const sourceLead=(state.leads||[]).find(x=>x.id===leadId);
@@ -8865,8 +8872,8 @@ async function markLeadConvertedToOrder(leadId, clientId, orderId){
   }).eq("id",leadId);
 
   if(error){
-    console.error("Errore archiviazione Lead dopo ordine",error);
-    showToast("Ordine creato, ma Lead non archiviato");
+    console.error("Errore chiusura richiesta dopo creazione ordine",error);
+    showToast("Ordine creato, ma la richiesta non è stata chiusa");
     return false;
   }
 
