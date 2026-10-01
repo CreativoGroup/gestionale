@@ -4331,13 +4331,38 @@ function renderLeadOrdine(){
   const root=document.getElementById("view-leadOrdine");
   if(!root) return;
 
-  // Questi record non sono Lead commerciali: sono richieste d'ordine già confermate
-  // provenienti da nuovi clienti. Restano in questa coda finché l'ordine non viene
-  // effettivamente creato. Se il cliente è già stato creato/collegato, la voce resta
-  // qui e permette di completare soltanto l'ordine.
-  const pending=[...(state.leads||[])]
-    .filter(l=>String(l.fonte||"")==="gmail_ordine" && !l.convertedOrderId)
+  // Questi record non sono Lead commerciali: sono ordini già confermati
+  // provenienti da nuovi clienti. Restano nella coda attiva finché l'ordine
+  // non viene effettivamente creato. Dopo la creazione passano nello storico
+  // "Ordini effettuati", chiuso di default.
+  const newCustomerOrders=[...(state.leads||[])]
+    .filter(l=>String(l.fonte||"")==="gmail_ordine");
+
+  const pending=newCustomerOrders
+    .filter(l=>!l.convertedOrderId)
     .sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
+
+  const completed=newCustomerOrders
+    .filter(l=>!!l.convertedOrderId)
+    .sort((a,b)=>String(b.convertedAt||b.aggiornatoIl||b.creatoIl||"").localeCompare(String(a.convertedAt||a.aggiornatoIl||a.creatoIl||"")));
+
+  const completedRows=completed.map(l=>{
+    const linkedClient=l.clientId
+      ? (state.clients||[]).find(c=>c.id===l.clientId)
+      : findClientByEmail(l.email);
+    const linkedOrder=(state.orders||[]).find(o=>o.id===l.convertedOrderId);
+    const orderLabel=linkedOrder?.numero ? `#${escapeHtml(String(linkedOrder.numero))}` : "Creato";
+    return `
+      <tr>
+        <td><strong>${escapeHtml(leadDisplayName(l))}</strong></td>
+        <td>${escapeHtml(l.email||"—")}</td>
+        <td>${escapeHtml(l.oggettoRichiesta||"—")}</td>
+        <td>${linkedClient ? escapeHtml(clientDisplayName(linkedClient)) : "—"}</td>
+        <td><span class="lead-status-pill lead-status-ok">Ordine ${orderLabel}</span></td>
+        <td>${fmtLeadDate(l.convertedAt||l.aggiornatoIl||l.creatoIl)}</td>
+        <td>${linkedOrder ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${linkedOrder.id}')">APRI ORDINE</button>` : ""}</td>
+      </tr>`;
+  }).join("");
 
   root.innerHTML=`
     <div class="card" style="margin-bottom:18px;">
@@ -4395,6 +4420,34 @@ function renderLeadOrdine(){
         ` : `<p class="empty">Nessun nuovo cliente con ordine da completare.</p>`}
       </div>
     </div>
+
+    <details class="card" style="padding:0;overflow:hidden;" ${completed.length ? "" : ""}>
+      <summary style="cursor:pointer;list-style:none;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:800;">
+        <span>ORDINI EFFETTUATI <span style="font-weight:500;color:var(--muted);font-size:12px;">— storico</span></span>
+        <span class="pill pill-done">${completed.length} effettuati</span>
+      </summary>
+      <div style="border-top:1px solid var(--border);padding:14px 20px 20px;">
+        <p class="helptext" style="margin:0 0 12px;">Storico degli ordini già creati da questa coda. Rimane nascosto finché non lo apri.</p>
+        <div class="lead-table-wrap">
+          ${completed.length ? `
+            <table class="lead-table">
+              <thead>
+                <tr>
+                  <th>Nome / Azienda</th>
+                  <th>Email</th>
+                  <th>Oggetto</th>
+                  <th>Cliente</th>
+                  <th>Ordine</th>
+                  <th>Effettuato il</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>${completedRows}</tbody>
+            </table>
+          ` : `<p class="empty">Nessun ordine effettuato nello storico.</p>`}
+        </div>
+      </div>
+    </details>
   `;
 }
 
@@ -8394,30 +8447,68 @@ async function dropboxUploadSelected(){
   }
 }
 
-async function dropboxDownloadFile(path,name){
-  const token=dropboxToken();
-  if(!token){ showToast("Dropbox non collegato"); return; }
+function dropboxApiArgHeader(arg){
+  // Dropbox riceve gli argomenti del Content API dentro un header HTTP.
+  // Rendiamo il JSON ASCII-safe: evita problemi con accenti, emoji e caratteri
+  // particolari presenti nei nomi dei file.
+  return JSON.stringify(arg).replace(/[^\x20-\x7E]/g,ch=>{
+    const code=ch.charCodeAt(0).toString(16).padStart(4,"0");
+    return "\\u"+code;
+  });
+}
+
+function dropboxFriendlyContentError(status,raw){
+  let msg=String(raw||"").trim();
   try{
-    const res=await fetch("https://content.dropboxapi.com/2/files/download",{
-      method:"POST",
-      headers:{
-        "Authorization":"Bearer "+token,
-        "Dropbox-API-Arg":JSON.stringify({path})
-      }
-    });
-    if(!res.ok) throw new Error(await res.text());
-    const blob=await res.blob();
+    const data=msg?JSON.parse(msg):{};
+    msg=data?.error_summary || data?.error?.[".tag"] || data?.error_description || msg;
+  }catch(e){}
+  if(status===401) return "Sessione Dropbox scaduta. Ricollega Dropbox.";
+  if(status===403 && /scope|permission|access/i.test(msg)) return "Dropbox non ha il permesso di leggere i file. Scollega e ricollega Dropbox una volta.";
+  if(status===409 && /not_found/i.test(msg)) return "Il file non è più disponibile nel percorso Dropbox salvato.";
+  return msg || ("Errore Dropbox "+status);
+}
+
+async function dropboxFetchContent(fileRef,route="files/download"){
+  const token=dropboxToken();
+  if(!token) throw new Error("Dropbox non collegato");
+  const res=await fetch("https://content.dropboxapi.com/2/"+route,{
+    method:"POST",
+    headers:{
+      "Authorization":"Bearer "+token,
+      "Dropbox-API-Arg":dropboxApiArgHeader({path:fileRef})
+    }
+  });
+  if(!res.ok){
+    const raw=await res.text();
+    if(res.status===401){
+      sessionStorage.removeItem(DROPBOX_TOKEN_STORAGE);
+      sessionStorage.removeItem(DROPBOX_TOKEN_EXP_STORAGE);
+    }
+    throw new Error(dropboxFriendlyContentError(res.status,raw));
+  }
+  return await res.blob();
+}
+
+async function dropboxDownloadFile(fileRef,name){
+  if(!dropboxToken()){ showToast("Dropbox non collegato"); return; }
+  try{
+    const blob=await dropboxFetchContent(fileRef,"files/download");
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
     a.href=url;
     a.download=name||"file";
+    a.style.display="none";
     document.body.appendChild(a);
     a.click();
-    a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),3000);
+    setTimeout(()=>{
+      try{ a.remove(); }catch(e){}
+      URL.revokeObjectURL(url);
+    },60000);
+    showToast("Download avviato");
   }catch(err){
     console.error("Dropbox download",err);
-    showToast("Errore download Dropbox");
+    showToast(err?.message||"Errore download Dropbox");
   }
 }
 
@@ -8630,7 +8721,8 @@ async function jobDropboxLoad(orderId,folder){
 
     box.innerHTML=files.map(file=>{
       const pathLower=file.path_lower||file.path_display||"";
-      const safePath=encodeURIComponent(pathLower);
+      const fileRef=file.id||pathLower;
+      const safePath=encodeURIComponent(fileRef);
       const safeName=encodeURIComponent(file.name||"file");
       return `
         <div class="job-dropbox-file">
@@ -12854,8 +12946,8 @@ function renderGmailActionButtons(messageId){
     </button>
 
     <button id="gmail-btn-order" class="btn btn-outline"
-      onclick="gmailOrderAction('${messageId}')" title="Gli allegati ricevuti verranno copiati automaticamente in Dropbox > Bozze">
-      ${f.orderGenerated?'ORDINE EFFETTUATO':'Rispondi e crea ordine'}
+      onclick="gmailOrderAction('${messageId}')" title="Gli allegati ricevuti verranno copiati automaticamente in Dropbox > FILE RICEVUTI">
+      ${f.orderGenerated?'ORDINE EFFETTUATO':'NUOVO CLIENTE + ORDINE'}
     </button>
   `;
 }
@@ -12935,7 +13027,7 @@ Via Giuseppe Taverna 43
   }catch(err){
     console.error("Rispondi e crea ordine",err);
     showToast(err?.message||"Invio risposta non riuscito");
-    if(btn){ btn.disabled=false; btn.textContent="Rispondi e crea ordine"; }
+    if(btn){ btn.disabled=false; btn.textContent="NUOVO CLIENTE + ORDINE"; }
   }
 }
 
@@ -14215,7 +14307,8 @@ async function completedSheetLoadDropboxFiles(orderId){
         </div>
         ${group.files.length ? group.files.map(file=>{
           const path=file.path_lower||file.path_display||"";
-          const encodedPath=encodeURIComponent(path);
+          const fileRef=file.id||path;
+          const encodedPath=encodeURIComponent(fileRef);
           const encodedName=encodeURIComponent(file.name||"file");
           return `
             <div class="completed-sheet-db-file">
@@ -14260,6 +14353,7 @@ function dropboxPreviewKind(name,mimeType){
   if(mime.startsWith("image/") || ["jpg","jpeg","png","gif","webp","bmp","svg"].includes(ext)) return "image";
   if(mime==="application/pdf" || ext==="pdf") return "pdf";
   if(mime.startsWith("text/") || ["txt","csv","json","xml","md","log","html","css","js"].includes(ext)) return "text";
+  if(["ai","eps","doc","docm","docx","odp","odt","pps","ppsm","ppsx","ppt","pptm","pptx","rtf"].includes(ext)) return "dropbox-pdf-preview";
   return "unsupported";
 }
 
@@ -14300,17 +14394,19 @@ async function completedSheetPreviewDropboxFile(pathEncoded,nameEncoded){
   if(downloadBtn) downloadBtn.onclick=()=>dropboxDownloadFile(path,name);
 
   try{
-    const res=await fetch("https://content.dropboxapi.com/2/files/download",{
-      method:"POST",
-      headers:{
-        "Authorization":"Bearer "+token,
-        "Dropbox-API-Arg":JSON.stringify({path})
-      }
-    });
-    if(!res.ok) throw new Error(await res.text());
+    const initialKind=dropboxPreviewKind(name,"");
+    let blob;
+    let kind=initialKind;
 
-    const blob=await res.blob();
-    const kind=dropboxPreviewKind(name,blob.type);
+    // AI/EPS e diversi formati Office possono essere trasformati da Dropbox in PDF
+    // per l'anteprima, mentre il pulsante Scarica continua a scaricare l'originale.
+    if(initialKind==="dropbox-pdf-preview"){
+      blob=await dropboxFetchContent(path,"files/get_preview");
+      kind="pdf";
+    }else{
+      blob=await dropboxFetchContent(path,"files/download");
+      kind=dropboxPreviewKind(name,blob.type);
+    }
 
     if(kind==="text"){
       const txt=await blob.text();
@@ -14329,6 +14425,8 @@ async function completedSheetPreviewDropboxFile(pathEncoded,nameEncoded){
       const img=document.createElement("img");
       img.className="dropbox-preview-image";
       img.alt=name||"Anteprima";
+      img.onload=()=>{ if(sub) sub.textContent="Dropbox · Anteprima pronta"; };
+      img.onerror=()=>{ body.innerHTML=`<div class="dropbox-preview-unsupported"><strong>Impossibile visualizzare l'immagine</strong>Il file è stato letto da Dropbox ma Safari non riesce a mostrarlo.<br>Puoi comunque scaricarlo.</div>`; };
       img.src=currentDropboxPreviewUrl;
       body.appendChild(img);
       return;
@@ -14341,13 +14439,15 @@ async function completedSheetPreviewDropboxFile(pathEncoded,nameEncoded){
       frame.title=name||"Anteprima PDF";
       frame.src=currentDropboxPreviewUrl;
       body.appendChild(frame);
+      if(sub) sub.textContent="Dropbox · Anteprima PDF";
       return;
     }
 
-    body.innerHTML=`<div class="dropbox-preview-unsupported"><strong>Anteprima non disponibile</strong>Questo formato non può essere visualizzato direttamente nel browser.<br>Puoi comunque scaricare il file.</div>`;
+    body.innerHTML=`<div class="dropbox-preview-unsupported"><strong>Anteprima non disponibile</strong>Questo formato non può essere visualizzato direttamente nel browser.<br>Il pulsante <b>Scarica</b> scarica comunque il file originale.</div>`;
   }catch(err){
     console.error("Anteprima Dropbox",err);
-    body.innerHTML=`<div class="dropbox-preview-unsupported"><strong>Impossibile aprire l'anteprima</strong>Puoi provare a scaricare il file.</div>`;
+    const detail=escapeHtml(err?.message||"Errore Dropbox");
+    body.innerHTML=`<div class="dropbox-preview-unsupported"><strong>Impossibile aprire l'anteprima</strong>${detail}<br><br>Prova il pulsante <b>Scarica</b>. Se Dropbox chiede di essere ricollegato, fallo una sola volta dalla sezione Dropbox.</div>`;
   }
 }
 
