@@ -6954,6 +6954,7 @@ function newOrderForClient(clientId, leadId=null){
       pendingGmailOrderContext={
         messageId:sourceLead.gmailMessageId,
         attachments:null,
+        descriptionHint:sourceLead.oggettoRichiesta||"",
         source:"gmail_lead_order"
       };
     }
@@ -8386,7 +8387,8 @@ setTimeout(()=>handleDropboxOAuthCallback(),0);
 
 
 /* ============ DROPBOX NELLA SCHEDA LAVORAZIONE ============ */
-const JOB_DROPBOX_SUBFOLDERS = ["Cliente","Bozze","Produzione","Definitivi"];
+const DROPBOX_ARCHIVE_START_DATE = "2026-10-01";
+const JOB_DROPBOX_SUBFOLDERS = ["FILE RICEVUTI","FILE DEFINITIVI","FILE DI STAMPA"];
 const jobDropboxUiState = {};
 
 function dropboxSafePathPart(value){
@@ -8398,15 +8400,44 @@ function dropboxSafePathPart(value){
     .slice(0,120) || "Senza nome";
 }
 
+function jobDropboxUsesChronologicalArchive(o){
+  const created=String(o?.createdAt||"").slice(0,10);
+  // Gli ordini storici restano dov'erano: il gestionale non crea nuove cartelle per loro.
+  return !created || created>=DROPBOX_ARCHIVE_START_DATE;
+}
+
+function jobDropboxArchiveDate(o){
+  const d=o?.createdAt ? new Date(o.createdAt) : new Date();
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+}
+
+function dropboxWorkYearFolderName(year){
+  // La struttura storica mostra 2024=7, 2025=8, 2026=9.
+  const progressive=Math.max(1,Number(year)-2017);
+  return `${progressive}. lavori per data - ${year}`;
+}
+
 function jobDropboxBasePath(o){
   const c=state.clients.find(x=>x.id===o.clientId);
   const cliente=dropboxSafePathPart(c?clientDisplayName(c):"Cliente");
-  const numero=o.numero ? `Ordine ${dropboxSafePathPart(o.numero)}` : `Ordine ${dropboxSafePathPart(o.id)}`;
-  return `/Clienti/${cliente}/${numero}`;
+  const d=jobDropboxArchiveDate(o);
+  const year=d.getFullYear();
+  const month=String(d.getMonth()+1).padStart(2,"0");
+  return `/${dropboxWorkYearFolderName(year)}/${year} - ${month}/CLIENTI/${cliente}`;
 }
 
 function jobDropboxCurrentFolder(orderId){
-  return jobDropboxUiState[orderId]?.folder || "Cliente";
+  return jobDropboxUiState[orderId]?.folder || "FILE RICEVUTI";
+}
+
+function jobDropboxFileName(o,originalName,descriptionHint=""){
+  const numero=dropboxSafePathPart(o?.numero||o?.id||"Ordine");
+  const categorie=typeof orderCategorie==="function" ? orderCategorie(o).join(" ") : "";
+  const descrizione=dropboxSafePathPart(o?.descrizione||descriptionHint||categorie||"Lavorazione").slice(0,80);
+  const originale=dropboxSafePathPart(originalName||"file");
+  const prefix=`${numero} - ${descrizione} - `;
+  const maxOriginal=Math.max(30,220-prefix.length);
+  return `${prefix}${originale.slice(0,maxOriginal)}`;
 }
 
 function renderJobDropboxBlock(o,c){
@@ -8416,6 +8447,16 @@ function renderJobDropboxBlock(o,c){
         <div class="job-dropbox-status error">
           Dropbox non è collegato in questa sessione.
           <button class="btn btn-outline btn-sm" style="margin-left:8px;" onclick="closeModal();goTo('dropbox')">Vai a Dropbox</button>
+        </div>
+      </div>`;
+  }
+
+  if(!jobDropboxUsesChronologicalArchive(o)){
+    return `
+      <div class="job-dropbox-shell">
+        <div class="job-dropbox-status">
+          Ordine storico precedente al 01/10/2026: il gestionale non crea nuove cartelle Dropbox. I file già archiviati restano nella struttura storica.
+          <button class="btn btn-outline btn-sm" style="margin-left:8px;" onclick="closeModal();goTo('dropbox')">Apri Dropbox</button>
         </div>
       </div>`;
   }
@@ -8441,7 +8482,7 @@ function renderJobDropboxBlock(o,c){
           <button class="job-dropbox-folder ${i===0?'active':''}" data-job-dropbox-folder="${escapeHtml(name)}"
             onclick="jobDropboxSelectFolder('${o.id}','${escapeHtml(name)}')">
             <strong>📁 ${escapeHtml(name)}</strong>
-            <span>${name==="Cliente"?"File ricevuti":name==="Bozze"?"Prove e bozze":name==="Produzione"?"File operativi":"File finali"}</span>
+            <span>${name==="FILE RICEVUTI"?"Allegati e materiali ricevuti":name==="FILE DEFINITIVI"?"File approvati e definitivi":"File pronti per stampa / macchina"}</span>
           </button>`).join("")}
       </div>
 
@@ -8474,12 +8515,21 @@ async function jobDropboxEnsureStructure(orderId){
   const o=findItem("orders",orderId);
   if(!o) throw new Error("Ordine non trovato");
 
-  const base=jobDropboxBasePath(o);
-  const c=state.clients.find(x=>x.id===o.clientId);
-  const clientBase=`/Clienti/${dropboxSafePathPart(c?clientDisplayName(c):"Cliente")}`;
+  if(!jobDropboxUsesChronologicalArchive(o)) return null;
 
-  await jobDropboxEnsureFolder("/Clienti");
-  await jobDropboxEnsureFolder(clientBase);
+  const c=state.clients.find(x=>x.id===o.clientId);
+  const cliente=dropboxSafePathPart(c?clientDisplayName(c):"Cliente");
+  const d=jobDropboxArchiveDate(o);
+  const year=d.getFullYear();
+  const month=String(d.getMonth()+1).padStart(2,"0");
+  const yearBase=`/${dropboxWorkYearFolderName(year)}`;
+  const monthBase=`${yearBase}/${year} - ${month}`;
+  const clientsBase=`${monthBase}/CLIENTI`;
+  const base=`${clientsBase}/${cliente}`;
+
+  await jobDropboxEnsureFolder(yearBase);
+  await jobDropboxEnsureFolder(monthBase);
+  await jobDropboxEnsureFolder(clientsBase);
   await jobDropboxEnsureFolder(base);
   for(const sub of JOB_DROPBOX_SUBFOLDERS){
     await jobDropboxEnsureFolder(`${base}/${sub}`);
@@ -8494,6 +8544,7 @@ async function jobDropboxInit(orderId){
     status.textContent="Preparazione cartella Dropbox…";
   }
   try{
+    if(!jobDropboxUsesChronologicalArchive(findItem("orders",orderId))) return;
     await jobDropboxEnsureStructure(orderId);
     if(status){
       status.className="job-dropbox-status ok";
@@ -8524,7 +8575,7 @@ async function jobDropboxLoad(orderId,folder){
   const box=document.getElementById(`jobDropboxFiles-${orderId}`);
   if(!o || !box) return;
 
-  const selected=folder||"Cliente";
+  const selected=folder||"FILE RICEVUTI";
   const path=`${jobDropboxBasePath(o)}/${selected}`;
   box.innerHTML=`<div class="job-dropbox-empty">Caricamento…</div>`;
 
@@ -8575,11 +8626,12 @@ async function jobDropboxUpload(orderId){
   const file=input?.files?.[0];
   if(!o || !file){ showToast("Scegli un file da caricare"); return; }
 
-  const folder=dest?.value||"Cliente";
+  const folder=dest?.value||"FILE RICEVUTI";
   const token=dropboxToken();
   if(!token){ showToast("Dropbox non collegato"); return; }
 
-  const path=`${jobDropboxBasePath(o)}/${folder}/${file.name}`;
+  const finalName=jobDropboxFileName(o,file.name);
+  const path=`${jobDropboxBasePath(o)}/${folder}/${finalName}`;
   try{
     const res=await fetch("https://content.dropboxapi.com/2/files/upload",{
       method:"POST",
@@ -8842,8 +8894,8 @@ async function addOrder(){
     const failed=(gmailDropboxResult.total||0)-gmailDropboxResult.uploaded;
     showToast(
       failed>0
-        ? `Ordine creato · ${gmailDropboxResult.uploaded}/${gmailDropboxResult.total} allegati copiati in Dropbox > Bozze`
-        : `Ordine creato · ${gmailDropboxResult.uploaded} allegat${gmailDropboxResult.uploaded===1?'o':'i'} copiati in Dropbox > Bozze`
+        ? `Ordine creato · ${gmailDropboxResult.uploaded}/${gmailDropboxResult.total} allegati copiati in Dropbox > FILE RICEVUTI`
+        : `Ordine creato · ${gmailDropboxResult.uploaded} allegat${gmailDropboxResult.uploaded===1?'o':'i'} copiati in Dropbox > FILE RICEVUTI`
     );
   }else if(gmailDropboxResult?.reason==="dropbox_not_connected"){
     showToast("Ordine creato · Dropbox non collegato: allegati mail non copiati");
@@ -8856,11 +8908,11 @@ async function addOrder(){
   }
 
   if(gmailDropboxResult?.uploaded>0){
-    jobDropboxUiState[savedOrder.id]={folder:"Bozze"};
+    jobDropboxUiState[savedOrder.id]={folder:"FILE RICEVUTI"};
   }
   openJobCard(savedOrder.id);
   if(gmailDropboxResult?.uploaded>0){
-    setTimeout(()=>jobDropboxSelectFolder(savedOrder.id,"Bozze"),450);
+    setTimeout(()=>jobDropboxSelectFolder(savedOrder.id,"FILE RICEVUTI"),450);
   }
 }
 function deleteOrderFromCreditiCliente(orderId, clientId){
@@ -13339,7 +13391,7 @@ function createOrderFromGmail(){
   }
 
   // Questo contesto viene consumato SOLO alla creazione dell'ordine.
-  // Serve per copiare gli allegati della mail in Dropbox > Bozze.
+  // Serve per copiare gli allegati della mail in Dropbox > FILE RICEVUTI.
   pendingGmailOrderMessageId = m.id || gmailSelectedId || null;
   pendingGmailOrderContext = {
     messageId: m.id || gmailSelectedId || null,
@@ -13349,6 +13401,7 @@ function createOrderFromGmail(){
       mimeType:a.mimeType||"application/octet-stream",
       size:Number(a.size)||0
     })) : [],
+    descriptionHint:m.subject||"",
     source:"gmail_order"
   };
 
@@ -13609,7 +13662,7 @@ async function copyGmailOrderAttachmentsToDropbox(order,ctx){
   }
 
   await jobDropboxEnsureStructure(order.id);
-  const targetBase=`${jobDropboxBasePath(order)}/Bozze`;
+  const targetBase=`${jobDropboxBasePath(order)}/FILE RICEVUTI`;
 
   let uploaded=0;
   const errors=[];
@@ -13621,7 +13674,8 @@ async function copyGmailOrderAttachmentsToDropbox(order,ctx){
         .replace(/[\/\\\u0000-\u001F]/g,"_")
         .trim() || "allegato";
 
-      await uploadBlobToDropbox(`${targetBase}/${safeName}`,file.blob);
+      const finalName=jobDropboxFileName(order,safeName,ctx.descriptionHint||"");
+      await uploadBlobToDropbox(`${targetBase}/${finalName}`,file.blob);
       uploaded++;
     }catch(err){
       console.error("Copia allegato Gmail -> Dropbox",a.filename,err);
@@ -13636,7 +13690,7 @@ async function copyGmailOrderAttachmentsToDropbox(order,ctx){
     uploaded,
     total:attachments.length,
     errors,
-    targetFolder:"Bozze"
+    targetFolder:"FILE RICEVUTI"
   };
 }
 
@@ -14067,7 +14121,16 @@ async function completedSheetLoadDropboxFiles(orderId){
   }
 
   try{
-    // Crea la struttura dell'ordine se non esiste ancora.
+    if(!jobDropboxUsesChronologicalArchive(o)){
+      if(status){
+        status.className="completed-sheet-db-status";
+        status.textContent="Archivio storico";
+      }
+      container.innerHTML=`<div class="completed-sheet-db-loading">Ordine precedente al 01/10/2026: nessuna nuova cartella viene creata automaticamente. I file storici restano nel vecchio archivio Dropbox.</div>`;
+      return;
+    }
+
+    // Per i nuovi ordini crea solo la struttura cronologica concordata.
     await jobDropboxEnsureStructure(orderId);
 
     const base=jobDropboxBasePath(o);
