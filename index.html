@@ -5024,8 +5024,7 @@ async function maybeCompleteWhatsappMetaSignup(){
   }
 
   if(!whatsappMetaSignupState.wabaId){
-    waMetaDebug("ATTESA", "Codice OAuth ricevuto. Attendo WA_EMBEDDED_SIGNUP con WABA ID...");
-    return;
+    waMetaDebug("WABA", "WABA ID non ricevuto dal browser. Procedo con il recupero server-side tramite Meta Graph API...");
   }
 
   await completeWhatsappMetaSignup();
