@@ -4239,8 +4239,10 @@ function renderLeads(){
   };
 
   const normalLeads=all.filter(l=>String(l.fonte||"")!=="gmail_ordine");
-  const attivi=normalLeads.filter(l=>!l.convertedOrderId && matchesFilters(l));
-  const archiviati=normalLeads.filter(l=>!!l.convertedOrderId && matchesFilters(l));
+  // Un Lead esce dall'elenco operativo non appena diventa/si collega a un cliente.
+  // convertedOrderId viene valorizzato successivamente, quando l'ordine viene davvero creato.
+  const attivi=normalLeads.filter(l=>!l.clientId && !l.convertedOrderId && matchesFilters(l));
+  const archiviati=normalLeads.filter(l=>(!!l.clientId || !!l.convertedOrderId) && matchesFilters(l));
 
   const nuovi=normalLeads.filter(l=>l.stato==="Nuovo").length;
   const inAttesa=normalLeads.filter(l=>l.stato==="In attesa di conferma").length;
@@ -4317,7 +4319,7 @@ function renderLeads(){
         <span style="font-size:12px;color:var(--muted);">${archiviati.length} archiviati</span>
       </div>
       <p style="margin-top:0;color:var(--muted);font-size:12px;">
-        Lead per i quali è stato effettivamente creato un ordine. Lo stato è bloccato.
+        Lead già trasformati in cliente o collegati a un cliente esistente. Non compaiono più tra i Lead da gestire.
       </p>
       <div class="lead-table-wrap">${rowsArchiviati}</div>
     </div>
@@ -4330,11 +4332,11 @@ function renderLeadOrdine(){
   if(!root) return;
 
   const pending=[...(state.leads||[])]
-    .filter(l=>String(l.fonte||"")==="gmail_ordine" && !l.convertedOrderId)
+    .filter(l=>String(l.fonte||"")==="gmail_ordine" && !l.clientId && !l.convertedOrderId)
     .sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
 
   const converted=[...(state.leads||[])]
-    .filter(l=>String(l.fonte||"")==="gmail_ordine" && !!l.convertedOrderId)
+    .filter(l=>String(l.fonte||"")==="gmail_ordine" && (!!l.clientId || !!l.convertedOrderId))
     .sort((a,b)=>String(b.convertedAt||b.aggiornatoIl||"").localeCompare(String(a.convertedAt||a.aggiornatoIl||"")));
 
   root.innerHTML=`
@@ -4394,7 +4396,7 @@ function renderLeadOrdine(){
         <span style="font-size:12px;color:var(--muted);">${converted.length} completati</span>
       </div>
       <p class="helptext" style="margin-top:0;">
-        Qui rimane lo storico dei Lead Ordine che sono già diventati cliente + ordine.
+        Qui rimane lo storico dei Lead Ordine già trasformati o collegati a un cliente. Se l'ordine viene creato, resta collegato allo stesso Lead.
       </p>
       <div class="lead-table-wrap">
         ${converted.length ? `
@@ -4497,7 +4499,7 @@ function openLeadDetail(id){
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>${escapeHtml(leadDisplayName(l))}</h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-      ${l.convertedOrderId
+      ${(l.clientId || l.convertedOrderId)
         ? `<span class="lead-status-pill lead-status-ok">${escapeHtml(l.stato)}</span>`
         : `<select class="inline" onchange="changeLeadStatusFromSelect('${l.id}',this.value,true)">
             ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
@@ -4513,7 +4515,7 @@ function openLeadDetail(id){
     </div>
     <div class="form-actions" style="margin-top:16px;">
       <button class="btn btn-outline" style="${String(l.fonte||"")==="gmail_ordine" ? "border-radius:999px;padding:11px 18px;font-weight:800;" : ""}" onclick="openEditLead('${l.id}')">✎ MODIFICA LEAD</button>
-      ${l.stato==="Accettato" && !l.convertedOrderId ? `
+      ${l.stato==="Accettato" && !l.clientId && !l.convertedOrderId ? `
         <button class="btn btn-primary" style="${String(l.fonte||"")==="gmail_ordine" ? "border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" : ""}" onclick="transformLeadToClient('${l.id}', true)">
           ${["gmail_ordine","whatsapp_ordine"].includes(String(l.fonte||"")) ? "✓ TRASFORMA IN CLIENTE E CREA ORDINE" : "Trasforma in cliente ed effettua ordine"}
         </button>
@@ -4543,7 +4545,7 @@ function openEditLead(id){
       <div class="field" style="grid-column:1/-1;"><label>Oggetto</label><input id="edit-lead-oggetto" value="${escapeHtml(l.oggettoRichiesta||'')}"></div>
       <div class="field">
         <label>Stato</label>
-        <select id="edit-lead-stato" ${l.convertedOrderId?'disabled':''}>
+        <select id="edit-lead-stato" ${(l.clientId || l.convertedOrderId)?'disabled':''}>
           ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
         </select>
       </div>
@@ -4570,7 +4572,7 @@ async function saveLeadEdit(id){
   l.oggettoRichiesta=String(document.getElementById("edit-lead-oggetto")?.value||"").trim();
   l.richiesta=String(document.getElementById("edit-lead-richiesta")?.value||"").trim();
 
-  if(!l.convertedOrderId){
+  if(!l.clientId && !l.convertedOrderId){
     l.stato=String(document.getElementById("edit-lead-stato")?.value||l.stato||"Nuovo");
   }
 
@@ -4646,6 +4648,33 @@ function leadClientPrefill(l){
   };
 }
 
+async function markLeadLinkedToClient(leadId, clientId){
+  const l=(state.leads||[]).find(x=>x.id===leadId);
+  if(!l) return false;
+
+  const nowIso=new Date().toISOString();
+  const {error}=await sb.from("leads").update({
+    stato:"Accettato",
+    client_id:clientId,
+    aggiornato_il:nowIso
+  }).eq("id",leadId);
+
+  if(error){
+    console.error("Errore collegamento Lead al cliente",error);
+    showToast("Cliente creato, ma Lead non archiviato");
+    return false;
+  }
+
+  l.stato="Accettato";
+  l.clientId=clientId;
+  l.aggiornatoIl=nowIso;
+
+  if(currentView==="leads") renderLeads();
+  if(currentView==="leadOrdine") renderLeadOrdine();
+  if(currentView==="dashboard") renderDashboard();
+  return true;
+}
+
 function transformLeadToClient(id, inserisciOrdine=false){
   const l=(state.leads||[]).find(x=>x.id===id);
   if(!l) return;
@@ -4659,9 +4688,10 @@ function transformLeadToClient(id, inserisciOrdine=false){
     askConfirm(
       msg,
       async ()=>{
-        await setLeadStatus(id,"Accettato");
+        const linked=await markLeadLinkedToClient(id, existing.id);
+        if(!linked) return;
         closeModal();
-        showToast("Lead collegato al cliente");
+        showToast("Lead trasformato: rimosso dai Lead attivi");
         if(inserisciOrdine) newOrderForClient(existing.id, id);
       }
     );
@@ -4699,9 +4729,10 @@ async function saveLeadAsClient(leadId, inserisciOrdine=false){
   const clientId=await createClientFromPrefix('leadclient');
   if(!clientId) return;
 
-  await setLeadStatus(leadId,"Accettato");
+  const linked=await markLeadLinkedToClient(leadId, clientId);
+  if(!linked) return;
   closeModal();
-  showToast("Lead trasformato in cliente");
+  showToast("Lead trasformato: rimosso dai Lead attivi");
 
   if(inserisciOrdine){
     newOrderForClient(clientId, leadId);
@@ -4767,9 +4798,10 @@ async function finishLinkLeadToClient(id, inserisciOrdine=false){
   const clientId=document.getElementById("lead-client-link")?.value;
   if(!clientId){ showToast("Seleziona un cliente"); return; }
 
-  await setLeadStatus(id,"Accettato");
+  const linked=await markLeadLinkedToClient(id, clientId);
+  if(!linked) return;
   closeModal();
-  showToast("Lead collegato al cliente");
+  showToast("Lead collegato: rimosso dai Lead attivi");
 
   if(inserisciOrdine){
     setTimeout(()=>newOrderForClient(clientId, id),120);
