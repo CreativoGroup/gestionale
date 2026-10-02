@@ -2787,6 +2787,124 @@
   .wa-meta-debug-line{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);}
 </style>
 
+<style id="mobile-v2-style">
+/* ===== MOBILE V2 — rifatto da zero (solo schermi stretti) ===== */
+.mob-bar,.mob-sheet,.mob-sheet-bg,.mob-modal-x,.mob-search-btn{display:none;}
+@media(max-width:760px){
+  html,body{overscroll-behavior-y:none;-webkit-text-size-adjust:100%;}
+  body{padding:0!important;background:var(--paper);}
+  #app{display:block!important;min-height:100dvh;}
+  aside.sidebar{display:none!important;}
+  main{padding:0 12px calc(86px + env(safe-area-inset-bottom))!important;width:100%;max-width:100%;overflow-x:hidden;}
+
+  /* barra superiore compatta */
+  .topbar.app-topbar{
+    position:sticky;top:0;z-index:50;display:flex!important;flex-direction:row!important;align-items:center;flex-wrap:wrap;
+    gap:8px;margin:0 -12px 12px!important;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;
+    background:var(--card);border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(20,29,43,.06);
+  }
+  .app-topbar #topbarHeading{flex:1;min-width:0;width:auto!important;}
+  .app-topbar #topbarHeading h1{font-size:19px!important;margin:0;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .app-topbar #topbarHeading p{display:none!important;}
+  .app-topbar .dashboard-heading-desktop{display:none!important;}
+  .app-topbar .dashboard-heading-mobile{display:flex!important;align-items:center;}
+  .app-topbar #dashboardHeaderLogo{height:30px!important;width:auto!important;max-width:170px;margin:0!important;}
+  .mob-search-btn{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:var(--paper);font-size:17px;color:var(--ink);cursor:pointer;}
+  .app-topbar .global-search{display:none!important;order:5;flex:0 0 100%;width:100%;max-width:none;position:relative;}
+  .app-topbar.search-open .global-search{display:block!important;}
+  .global-search input{height:44px;font-size:16px!important;border-radius:12px;width:100%;}
+
+  /* pulsante azione flottante */
+  #topbarActions{position:fixed;right:14px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:60;display:flex;flex-direction:column;gap:8px;width:auto!important;align-items:flex-end;}
+  #topbarActions:empty{display:none;}
+  #topbarActions .btn{flex:0 0 auto!important;min-width:0!important;width:auto;border-radius:999px;padding:0 18px;min-height:46px;font-size:14px;box-shadow:0 6px 18px rgba(20,29,43,.28);}
+
+  /* barra di navigazione in basso */
+  .mob-bar{
+    display:flex;position:fixed;left:0;right:0;bottom:0;z-index:70;background:var(--card);border-top:1px solid var(--border);
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(20,29,43,.08);
+  }
+  .mob-bar button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:none;padding:6px 2px;border-radius:12px;font:inherit;font-size:11px;font-weight:600;color:var(--muted);min-height:50px;cursor:pointer;}
+  .mob-bar button .ic{font-size:19px;line-height:1;}
+  .mob-bar button.active{color:var(--accent);background:rgba(232,85,47,.09);}
+  .mob-sheet-bg{display:block;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:80;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .mob-sheet{
+    display:block;position:fixed;left:0;right:0;bottom:0;z-index:90;max-height:82dvh;overflow-y:auto;background:var(--card);
+    border-radius:20px 20px 0 0;padding:10px 14px calc(18px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .25s ease;
+    box-shadow:0 -10px 40px rgba(0,0,0,.25);-webkit-overflow-scrolling:touch;
+  }
+  body.mob-sheet-open .mob-sheet{transform:none;}
+  body.mob-sheet-open .mob-sheet-bg{opacity:1;pointer-events:auto;}
+  body.mob-sheet-open #topbarActions{display:none;}
+  .mob-sheet .grab{width:42px;height:4px;border-radius:4px;background:var(--border);margin:0 auto 12px;}
+  .mob-sheet h4{margin:14px 4px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+  .mob-sheet .mob-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .mob-sheet .mob-grid button{display:flex;align-items:center;gap:10px;text-align:left;padding:12px;min-height:50px;border:1px solid var(--border);background:var(--paper);border-radius:12px;font:inherit;font-size:14px;font-weight:600;color:var(--text);}
+  .mob-sheet .mob-grid button.active{border-color:var(--accent);color:var(--accent);background:rgba(232,85,47,.08);}
+  .mob-sheet .mob-grid .ic{width:22px;text-align:center;font-size:17px;flex:0 0 22px;}
+  .mob-sheet .mob-grid button.sys{color:var(--muted);}
+
+  /* schede al posto delle tabelle */
+  .table-wrap{overflow:visible!important;border:none!important;background:none!important;box-shadow:none!important;padding:0!important;}
+  table.mcards{min-width:0!important;width:100%;display:block;border:none;}
+  table.mcards thead{display:none;}
+  table.mcards tbody,table.mcards tfoot{display:block;}
+  table.mcards tr{display:block;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin:0 0 10px;box-shadow:0 1px 4px rgba(20,29,43,.05);}
+  table.mcards td{display:flex;justify-content:space-between;align-items:baseline;gap:14px;border:none!important;padding:5px 0!important;text-align:right;font-size:14px;min-width:0;word-break:break-word;}
+  table.mcards td::before{content:attr(data-label);flex:0 0 38%;max-width:42%;text-align:left;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+  table.mcards td[data-label=""]::before,table.mcards td:not([data-label])::before{display:none;}
+  table.mcards td:empty{display:none;}
+  table.mcards td:first-child{font-weight:700;font-size:15px;}
+  table.mcards td:last-child:not([data-label=""]){}
+  table.mcards td .btn{min-height:40px;}
+
+  /* contenuti */
+  .card{padding:14px;border-radius:16px;}
+  .grid,.grid-2,.grid-auto{grid-template-columns:1fr!important;gap:12px!important;}
+  .stat-row,.stats,.kpis{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;}
+  .form-grid{grid-template-columns:1fr!important;}
+  .field input,.field select,.field textarea,input.inline,select.inline,.modal input,.modal select,.modal textarea{font-size:16px!important;min-height:44px;}
+  .modal textarea{min-height:90px;}
+  .btn{min-height:44px;}
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom))!important;}
+
+  /* finestre a tutto schermo */
+  .modal-backdrop{padding:0!important;align-items:stretch!important;background:var(--card);}
+  .modal{width:100%!important;max-width:none!important;min-height:100dvh;margin:0!important;border-radius:0!important;box-shadow:none!important;padding:calc(58px + env(safe-area-inset-top)) 14px calc(30px + env(safe-area-inset-bottom))!important;}
+  .modal h2{font-size:21px!important;padding-right:0!important;}
+  .mob-modal-x{position:fixed;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:100;width:44px;height:44px;border-radius:999px;border:1px solid var(--border);background:var(--paper);font-size:20px;color:var(--ink);align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+  .modal-backdrop.open .mob-modal-x{display:flex;}
+  .modal-backdrop.open ~ .mob-bar,.modal-backdrop.open ~ #topbarActions{display:none;}
+
+  /* via i contenitori "a scheda" del vecchio mobile */
+  .topbar.app-topbar{border-radius:0!important;border-left:none!important;border-right:none!important;border-top:none!important;margin-top:0!important;}
+  section.view.active{background:transparent!important;border:none!important;border-radius:0!important;padding:0!important;box-shadow:none!important;overflow:visible!important;}
+  .section-header{flex-direction:column;align-items:stretch!important;gap:10px;}
+  .filters{display:grid!important;grid-template-columns:1fr 1fr;gap:8px;width:100%;}
+  .filters input,.filters select{width:100%!important;min-width:0!important;}
+  .filters input:first-child{grid-column:1/-1;}
+  .section-header h2,.section-header h3{font-size:18px;}
+
+  /* dashboard compatta */
+  #view-dashboard .grid-auto{grid-template-columns:1fr 1fr!important;gap:10px!important;}
+  #view-dashboard .stat{min-height:0!important;padding:12px 13px!important;border-radius:16px!important;}
+  #view-dashboard .stat .stat-label{font-size:12px!important;margin:0 0 4px!important;line-height:1.25;}
+  #view-dashboard .stat .stat-value{font-size:28px!important;margin:0 0 2px!important;line-height:1.1;}
+  #view-dashboard .stat .stat-sub{font-size:11px!important;margin:0!important;line-height:1.3;}
+
+  /* schede ordine: numero + stella in testa */
+  table.mcards tr{display:grid;grid-template-columns:1fr auto;column-gap:10px;}
+  table.mcards td{grid-column:1/-1;}
+  table.mcards td:first-child{grid-column:1;}
+  table.mcards td:first-child::before{display:none;}
+  table.mcards td:first-child,table.mcards td:first-child *{color:var(--ink)!important;opacity:1!important;}
+  table.mcards td:nth-child(2):not([data-label]),table.mcards td[data-label=""]:nth-child(2){grid-column:2;grid-row:1;}
+  table.mcards td[data-label=""]{justify-content:flex-start;}
+  .topbar.app-topbar{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;transform:none!important;filter:none!important;contain:none!important;}
+  .topbar.app-topbar::before,.topbar.app-topbar::after{display:none!important;}
+  #view-leads input[type=text],#view-leads input[type=search],#view-note input[type=text]{width:100%!important;max-width:none!important;}
+}
+</style>
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -2829,6 +2947,7 @@
         <input type="text" id="globalClientSearch" placeholder="🔎 Cerca cliente…" oninput="updateGlobalClientSuggestions(this.value)" onkeydown="globalSearchKeydown(event,this)" onblur="setTimeout(()=>document.getElementById('globalSearchDropdown').style.display='none',150)" autocomplete="off">
         <div id="globalSearchDropdown" class="global-search-dropdown"></div>
       </div>
+      <button class="mob-search-btn" id="mobSearchBtn" onclick="toggleMobSearch()" aria-label="Cerca">🔎</button>
       <div id="topbarActions"></div>
     </div>
     <section class="view" id="view-dashboard"></section>
@@ -2850,7 +2969,10 @@
     <section class="view" id="view-leadOrdine"></section>
   </main>
 </div>
-<div class="modal-backdrop" id="modalBackdrop"><div class="modal" id="modalBody"></div></div>
+<div class="modal-backdrop" id="modalBackdrop"><button class="mob-modal-x" onclick="closeModal()" aria-label="Chiudi">✕</button><div class="modal" id="modalBody"></div></div>
+<nav class="mob-bar" id="mobBar"></nav>
+<div class="mob-sheet-bg" onclick="closeMobSheet()"></div>
+<div class="mob-sheet" id="mobSheet"></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -4111,7 +4233,61 @@ function renderNav(){
       </div>
     </div>
   `;
+  renderMobBar();
 }
+
+/* ===== MOBILE V2: barra in basso, scheda "Altro", tabelle a schede ===== */
+const MOB_TABS=[{id:"dashboard",l:"Home",i:"⌂"},{id:"note",l:"Note",i:"✎"},{id:"ordini",l:"Ordini",i:"▣"},{id:"clienti",l:"Clienti",i:"☺"},{id:"leads",l:"Lead",i:"✉"}];
+function mobLabel(n){ return typeof n.label==="function"?n.label():n.label; }
+function renderMobBar(){
+  const bar=document.getElementById("mobBar"), sh=document.getElementById("mobSheet");
+  if(!bar||!sh) return;
+  const items=visibleNav();
+  const tabs=MOB_TABS.filter(t=>items.some(n=>n.id===t.id));
+  const inTabs=tabs.some(t=>t.id===currentView);
+  bar.innerHTML=tabs.map(t=>`<button class="${t.id===currentView?'active':''}" onclick="mobGo('${t.id}')"><span class="ic">${t.i}</span>${t.l}</button>`).join("")
+    +`<button class="${!inTabs?'active':''}" onclick="openMobSheet()"><span class="ic">☰</span>Altro</button>`;
+  const groups=["Traffico","Info e richieste","Anagrafica","Operativa","Archivio","Amministrazione"];
+  const rest=items.filter(n=>n.id!=="dashboard");
+  const html=groups.map(g=>{
+    const gi=rest.filter(n=>n.group===g);
+    if(!gi.length) return "";
+    return `<h4>${g}</h4><div class="mob-grid">${gi.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="mobGo('${n.id}')"><span class="ic">${n.icon}</span><span>${mobLabel(n)}</span></button>`).join("")}</div>`;
+  }).join("");
+  sh.innerHTML=`<div class="grab"></div><div class="mob-grid"><button class="${currentView==='dashboard'?'active':''}" onclick="mobGo('dashboard')"><span class="ic">⌂</span><span>Dashboard</span></button></div>${html}
+    <h4>Sistema</h4><div class="mob-grid"><button class="sys" onclick="closeMobSheet();exportBackup()"><span class="ic">↧</span><span>Esporta backup</span></button><button class="sys" onclick="closeMobSheet();signOut()"><span class="ic">↪</span><span>Esci</span></button></div>`;
+}
+function openMobSheet(){ document.body.classList.add("mob-sheet-open"); }
+function closeMobSheet(){ document.body.classList.remove("mob-sheet-open"); }
+function mobGo(id){ closeMobSheet(); const bar=document.querySelector(".app-topbar"); if(bar) bar.classList.remove("search-open"); goTo(id); window.scrollTo(0,0); }
+function toggleMobSearch(){
+  const bar=document.querySelector(".app-topbar"); if(!bar) return;
+  bar.classList.toggle("search-open");
+  if(bar.classList.contains("search-open")){ const i=document.getElementById("globalClientSearch"); if(i) setTimeout(()=>i.focus(),50); }
+}
+function mobileizeTables(){
+  if(!window.matchMedia("(max-width:760px)").matches) return;
+  document.querySelectorAll("main table").forEach(t=>{
+    if(t.classList.contains("lines-table")||t.dataset.keep!==undefined||t.closest("#modalBody .lines-wrap")) return;
+    const ths=[...t.querySelectorAll("thead th")];
+    if(!ths.length) return;
+    const labels=ths.map(th=>(th.textContent||"").trim());
+    t.classList.add("mcards");
+    t.querySelectorAll("tbody tr").forEach(tr=>{
+      [...tr.children].forEach((td,i)=>{ if(td.tagName==="TD" && td.getAttribute("data-label")===null){ td.setAttribute("data-label", labels[i]||""); } });
+    });
+  });
+}
+(function(){
+  let tm=null;
+  const run=()=>{ tm=null; try{ mobileizeTables(); }catch(e){} };
+  const start=()=>{
+    const m=document.querySelector("#app > main"); if(!m) return;
+    new MutationObserver(()=>{ if(!tm) tm=setTimeout(run,60); }).observe(m,{childList:true,subtree:true});
+  };
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",start); else start();
+  window.addEventListener("resize",()=>{ if(!tm) tm=setTimeout(run,100); });
+})();
 function toggleMobileNavDropdown(event){
   if(event) event.stopPropagation();
   const dd = document.getElementById("mobileNavDropdown");
@@ -4132,7 +4308,7 @@ function syncMobileDashboardHeaderOrder(){
 
   const isMobile=window.matchMedia("(max-width:760px)").matches;
 
-  if(isMobile && currentView==="dashboard"){
+  if(false && isMobile && currentView==="dashboard"){
     if(topbar.parentElement!==app || topbar.nextElementSibling!==sidebar){
       app.insertBefore(topbar, sidebar);
     }
