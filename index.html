@@ -4029,8 +4029,8 @@ function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, 
 const NAV = [
   {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard"},
 
-  {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico"},
-  {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico"},
+  {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico", hidden:true},
+  {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico", hidden:true},
 
   {id:"note", label:"Note", icon:"✎", subtitle:"Note / Attività interne da gestire", group:"Info e richieste"},
   {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info e richieste"},
@@ -4049,7 +4049,7 @@ const NAV = [
   {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti", group:"Amministrazione"},
   {id:"costiFissi", label:"Costi fissi", icon:"▦", subtitle:"F24, bollette, abbonamenti e costi ricorrenti", adminOnly:true, group:"Amministrazione"}
 ];
-function visibleNav(){ return NAV.filter(n => !n.adminOnly || (currentUser && currentUser.role==="admin")); }
+function visibleNav(){ return NAV.filter(n => !n.hidden).filter(n => !n.adminOnly || (currentUser && currentUser.role==="admin")); }
 function renderNav(){
   const items = visibleNav();
   const current = NAV.find(n=>n.id===currentView) || items[0];
