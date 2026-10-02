@@ -3239,6 +3239,8 @@ function subscribeRealtime(){
   Object.keys(TABLES).forEach(name=>{
     sb.channel(`${name}-changes`)
       .on("postgres_changes", {event:"*", schema:"public", table:TABLES[name]}, payload => {
+        let before="";
+        try{ before=JSON.stringify(state[name]); }catch(e){ before=String(Math.random()); }
         if(payload.eventType === "DELETE"){
           state[name] = state[name].filter(x=>x.id !== payload.old.id);
         } else {
@@ -3255,13 +3257,16 @@ function subscribeRealtime(){
           if(actual) syncSnapshots[name].set(row.id,rowFingerprint(name,actual));
         }
         if(payload.eventType === "DELETE") syncSnapshots[name]?.delete(payload.old.id);
-        requestSafeCurrentViewRender();
+        let after="";
+        try{ after=JSON.stringify(state[name]); }catch(e){ after=String(Math.random()); }
+        if(before!==after){ delete rawSyncSignatures[name]; requestSafeCurrentViewRender(); }
       })
       .subscribe();
   });
 }
 
 /* Sincronizzazione di sicurezza: funziona anche se Realtime non è abilitato nel progetto Supabase. */
+const rawSyncSignatures = {};
 async function refreshSharedDataFromSupabase(render=true){
   if(!currentUser || dataSyncBusy || activeDbWrites>0) return;
   dataSyncBusy=true;
@@ -3270,14 +3275,19 @@ async function refreshSharedDataFromSupabase(render=true){
       ? Object.keys(TABLES)
       : Object.keys(TABLES).filter(c=>!["expenses","fixedCosts","entrate"].includes(c));
     const results = await Promise.all(collections.map(c => c==="warehouse" ? sb.from(TABLES[c]).select("*").gt("quantita",0) : sb.from(TABLES[c]).select("*")));
+    let anyChange=false;
     collections.forEach((c,i)=>{
       const {data,error}=results[i];
       if(error){ console.warn("Sync lettura",c,error); return; }
+      let sig="";
+      try{ sig=JSON.stringify(data||[]); }catch(e){ sig=String(Math.random()); }
+      if(rawSyncSignatures[c]!==sig){ rawSyncSignatures[c]=sig; anyChange=true; }
       state[c]=(data||[]).map(r=>fromDbRow(c,r));
       if(c==="orders") state[c].forEach(o=>recalcFasi(o));
       snapshotCollection(c);
     });
-    if(render){
+    // Ridisegna la pagina solo se qualcosa è davvero cambiato: evita sfarfallii e il ritorno dello scroll a sinistra.
+    if(render && anyChange){
       const modalOpen=document.getElementById("modalBackdrop")?.classList.contains("open");
       if(!modalOpen) requestSafeCurrentViewRender();
     }
@@ -4223,13 +4233,24 @@ function shouldDeferCurrentViewRender(){
   if(currentView==="magazzino" && quickWarehouseDraftHasData()) return true;
   return userIsEditingAnyField();
 }
+/* Ridisegna la vista corrente senza perdere la posizione di scorrimento (pagina e tabelle larghe) */
+function renderCurrentViewKeepScroll(){
+  const root = document.scrollingElement || document.documentElement;
+  const px = root.scrollLeft, py = root.scrollTop;
+  const sel = '.view.active .table-wrap, .view.active .lead-table-wrap, .view.active [style*="overflow"], .view.active .note-board, .view.active .lead-board';
+  const saved = [...document.querySelectorAll(sel)].map(e => [e.scrollLeft, e.scrollTop]);
+  renderCurrentView();
+  const els = [...document.querySelectorAll(sel)];
+  els.forEach((e, i) => { if(saved[i]){ e.scrollLeft = saved[i][0]; e.scrollTop = saved[i][1]; } });
+  root.scrollLeft = px; root.scrollTop = py;
+}
 function requestSafeCurrentViewRender(){
   if(shouldDeferCurrentViewRender()){
     deferredViewRenderPending = true;
     return;
   }
   deferredViewRenderPending = false;
-  renderCurrentView();
+  renderCurrentViewKeepScroll();
 }
 if(!window._globalEditingRenderGuardInstalled){
   window._globalEditingRenderGuardInstalled=true;
@@ -4237,7 +4258,7 @@ if(!window._globalEditingRenderGuardInstalled){
     setTimeout(()=>{
       if(deferredViewRenderPending && !shouldDeferCurrentViewRender()){
         deferredViewRenderPending=false;
-        renderCurrentView();
+        renderCurrentViewKeepScroll();
       }
     },80);
   },true);
@@ -12479,7 +12500,7 @@ function drawMonthlyChart(rows){
     data: {
       labels: rows.map(r=>r.mese.slice(0,3)),
       datasets: [
-        {label:"Differenziale", data: rows.map(r=>r.differenza), backgroundColor:"#2ECC71"},
+        {label:"Totale complessivo", data: rows.map(r=>r.differenza), backgroundColor:"#2ECC71"},
         {label:"Ordini", data: rows.map(r=>r.totaleOrdini), backgroundColor:"#1F7A8C"}
       ]
     },
@@ -12580,7 +12601,7 @@ function renderIncassi(){
       <div class="card" style="margin-bottom:18px;"><canvas id="monthlyChart" height="90"></canvas></div>
       <div class="table-wrap" style="margin-bottom:20px;overflow-x:auto;">
         <table>
-          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta di Pagamento</th><th>Bonifico</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Totale pagamenti NON fatturati</th><th>Pagamenti fatturati</th><th>Differenza</th></tr></thead>
+          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta di Pagamento</th><th>Bonifico</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Totale pagamenti NON fatturati</th><th>Pagamenti fatturati</th><th>Totale complessivo</th></tr></thead>
           <tbody>
             ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td>${fmtMoney(r.costiFissi)}</td><td style="font-weight:700;">${fmtMoney(r.soldiIncassati)}</td><td style="font-weight:700;">${fmtMoney(r.pagamentiFatturati)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
             <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.costiFissi)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.pagamentiFatturati)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
@@ -12594,7 +12615,7 @@ function renderIncassi(){
           <strong>Totale pagamenti NON fatturati</strong> = incassi registrati nel mese collegati a schede non fatturate.<br>
           <strong>Pagamenti fatturati</strong> = incassi registrati nel mese collegati a schede già fatturate.<br>
           <strong>Entrate</strong> = entrate extra non collegate agli ordini.<br>
-          <strong>Differenza</strong> = pagamenti non fatturati + pagamenti fatturati + entrate − spese − costi fissi.<br>
+          <strong>Totale complessivo</strong> = pagamenti non fatturati + pagamenti fatturati + entrate − spese − costi fissi.<br>
           Clicca sull'importo di <strong>Totale Ordini</strong> di un mese per vedere tutte le schede che lo compongono.
         </p>
       </div>`;
