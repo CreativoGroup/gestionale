@@ -6095,7 +6095,7 @@ function completedOrderStageButton(o){
 }
 function completedOrderInvoiceButton(o){
   if(o.fatturato){
-    return `<button class="btn btn-outline btn-sm" style="border-color:#176B3A;color:#176B3A;font-weight:900;cursor:default;" onclick="event.stopPropagation()">FATTURATO</button>`;
+    return `<button class="btn btn-sm" style="background:#0B4F2F;border:1px solid #0B4F2F;color:#FFFFFF;font-weight:900;cursor:default;" onclick="event.stopPropagation()">FATTURATO</button>`;
   }
   if(!o.daFatturare) return ``;
   return `<button class="btn btn-outline btn-sm" style="border-color:#C62828;color:#C62828;font-weight:900;" onclick="segnaFatturatoDaCompletati('${o.id}')">DA FATTURARE</button>`;
@@ -6205,8 +6205,8 @@ function renderDashboard(){
             <td>${clientName(o.clientId)}</td>
             <td class="mobile-hide">${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : ""}</td>
             <td style="white-space:nowrap;">${completedOrderInvoiceButton(o)}</td>
-            <td>${completedOrderStageButton(o)}</td>
             <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button></td>
+            <td>${completedOrderStageButton(o)}</td>
             <td style="white-space:nowrap;">${completedOrderAmountButton(o)}</td>
           </tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`}
@@ -8841,16 +8841,16 @@ function renderCompletedDeliveryRows(list){
   return list.length ? `
     <div class="table-wrap" style="box-shadow:none;">
       <table>
-        <thead><tr><th>Cliente</th><th>Fornitore</th><th>Fatturazione</th><th>Stato cliente</th><th>Azioni</th><th>Importo</th></tr></thead>
+        <thead><tr><th>Cliente</th><th>Fornitore</th><th>Fatturazione</th><th>Scheda</th><th>Stato cliente</th><th>Importo</th></tr></thead>
         <tbody>${list.map(o=>`
           <tr data-completed-order="${o.id}">
             <td><strong>${clientName(o.clientId)}</strong></td>
             <td>${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : "—"}</td>
             <td style="white-space:nowrap;">${completedOrderInvoiceButton(o)}</td>
-            <td>${completedOrderStageButton(o)}</td>
             <td style="white-space:nowrap;">
               <button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button>
             </td>
+            <td>${completedOrderStageButton(o)}</td>
             <td style="white-space:nowrap;">${completedOrderAmountButton(o)}</td>
           </tr>`).join("")}</tbody>
       </table>
