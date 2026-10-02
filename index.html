@@ -3465,7 +3465,9 @@ function recalcFasi(order){
   const marker = (order.fasi||[]).find(f=>f && f.key==="__bozza__");
   const presaCarico = (order.fasi||[]).find(f=>f && f.key==="__presa_carico__");
   const allegati = (order.fasi||[]).filter(f=>f && f.key==="__allegato__");
-  order.fasi = [...(marker ? [marker] : []), ...(presaCarico ? [presaCarico] : []), ...allegati];
+  const extraKeys = ["__ritiro_esterno__","__inizio_lavoro__","__mail_produzione__"];
+  const extra = (order.fasi||[]).filter(f=>f && extraKeys.includes(f.key));
+  order.fasi = [...(marker ? [marker] : []), ...(presaCarico ? [presaCarico] : []), ...allegati, ...extra];
 }
 
 function getOrderExternalAttachments(order){
@@ -4933,6 +4935,7 @@ async function finishLinkLeadToClient(id, inserisciOrdine=false){
   const clientId=document.getElementById("lead-client-link")?.value;
   if(!clientId){ showToast("Seleziona un cliente"); return; }
 
+  const l=(state.leads||[]).find(x=>x.id===id)||{};
   const linked=await markLeadLinkedToClient(id, clientId);
   if(!linked) return;
   closeModal();
@@ -5016,6 +5019,23 @@ function normalizeWaPhone(v){
   let s=String(v||"").replace(/\D/g,"");
   if(s.startsWith("00")) s=s.slice(2);
   return s;
+}
+function waMePhone(v){
+  let s=normalizeWaPhone(v);
+  if(!s) return "";
+  if(s.length<=11) s="39"+s;
+  return s;
+}
+function waMeUrl(phone,text){
+  const n=waMePhone(phone);
+  return n ? `https://wa.me/${n}`+(text?`?text=${encodeURIComponent(text)}`:"") : "";
+}
+function openClientWhatsapp(clientId){
+  const c=state.clients.find(x=>x.id===clientId);
+  if(!c) return;
+  const url=waMeUrl(c.telefono,"");
+  if(!url){ showToast("Il cliente non ha un numero WhatsApp valido"); return; }
+  window.open(url,"_blank","noopener");
 }
 function localWaPhone(v){
   let s=normalizeWaPhone(v);
@@ -7121,6 +7141,7 @@ function openClientHistory(clientId){
     <div class="form-actions" style="margin-bottom:18px;flex-wrap:wrap;">
       <button class="btn btn-primary btn-sm" onclick="newOrderForClient('${c.id}')">+ NUOVO ORDINE</button>
       <button class="btn btn-outline btn-sm" onclick="openEditClient('${c.id}')">Modifica anagrafica</button>
+      ${waMePhone(c.telefono)?`<button class="btn btn-outline btn-sm" onclick="openClientWhatsapp('${c.id}')">WHATSAPP</button>`:""}
       ${c.dropboxFolderUrl
         ? `<button class="btn btn-outline btn-sm" onclick="openClientDropbox('${c.id}')">APRI DROPBOX</button><button class="btn btn-outline btn-sm" onclick="setClientDropboxFolder('${c.id}')">Modifica Dropbox</button>`
         : `<button class="btn btn-outline btn-sm" onclick="setClientDropboxFolder('${c.id}')">COLLEGA DROPBOX</button>`}
@@ -8105,13 +8126,15 @@ function openQuoteMail(quoteId){
     <div class="field"><label>A</label><input id="quote-mail-to" value="${escapeHtml(c.email||'')}" readonly></div>
     <div class="field"><label>Oggetto</label><input id="quote-mail-subject" value="${escapeHtml('Preventivo - '+clientDisplayName(c))}"></div>
     <div class="field"><label>Messaggio</label><textarea id="quote-mail-body" rows="12">${escapeHtml(quoteMailText(q,c))}</textarea></div>
-    <div class="field"><label>Allegati</label><input id="quote-mail-files" type="file" multiple onchange="handleQuoteMailFiles(this.files)" style="padding:9px;background:#fff;"><div class="helptext">I file vengono usati solo per l'invio.</div><div id="quote-mail-attachments"></div></div>
+    <div class="field"><label>Allegati</label><input id="quote-mail-files" type="file" multiple onchange="handleQuoteMailFiles(this.files)" style="padding:9px;background:#fff;"><div class="helptext">Massimo 10 file e 15 MB complessivi. I file vengono usati solo per l'invio.</div><div id="quote-mail-attachments"></div></div>
     <div id="quote-mail-status" class="helptext"></div>
     <div class="form-actions"><button id="quote-mail-send" class="btn btn-primary" onclick="sendQuoteMail('${q.id}')">Invia mail</button><button class="btn btn-outline" onclick="openQuoteDetail('${q.id}')">Indietro</button></div>`;
 }
 async function handleQuoteMailFiles(fileList){
   const files=Array.from(fileList||[]);
   if(quoteMailAttachments.length+files.length>10){showToast('Puoi allegare al massimo 10 file');return;}
+  const qTot=quoteMailAttachments.reduce((t,a)=>t+(Number(a?.size)||0),0)+files.reduce((t,f)=>t+(f.size||0),0);
+  if(qTot>BOZZA_MAIL_MAX_TOTAL_BYTES){showToast(bozzaMailSizeLimitMessage());return;}
   try{
     for(const file of files){quoteMailAttachments.push({filename:file.name,mimeType:file.type||'application/octet-stream',size:file.size||0,dataBase64:await fileToBase64(file)});}
     renderQuoteMailAttachments();
@@ -9569,7 +9592,7 @@ function openOrderWhatsappStage(orderId, kind){
   if(!c) return;
 
   const phone=String(c.telefono||"").trim();
-  if(!normalizeWaPhone(phone)){
+  if(!waMePhone(phone)){
     showToast("Il cliente non ha un numero WhatsApp valido");
     return;
   }
@@ -9579,13 +9602,12 @@ function openOrderWhatsappStage(orderId, kind){
     : kind==="produzione"
       ? "WhatsApp · Ordine in produzione"
       : "WhatsApp · Avviso cliente";
+  const needsMark = (kind==="bozza"||kind==="completato");
 
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="openJobCard('${orderId}')">×</button>
     <h2>${title}</h2>
-    <p class="helptext" style="margin-top:0;">Messaggio già compilato. Puoi modificarlo e allegare un file prima dell'invio.</p>
-
-    <input id="waNewClient" type="hidden" value="${escapeHtml(c.id)}">
+    <p class="helptext" style="margin-top:0;">Messaggio già compilato. Modificalo, poi apri WhatsApp Web: la chat si apre con il testo pronto. Eventuali allegati vanno aggiunti a mano in WhatsApp.</p>
 
     <div class="field">
       <label>Cliente</label>
@@ -9602,60 +9624,34 @@ function openOrderWhatsappStage(orderId, kind){
       <textarea id="waNewText" rows="8">${escapeHtml(orderStageMessage(kind,orderId))}</textarea>
     </div>
 
-    <div class="field">
-      <label>Allegato facoltativo</label>
-      <input id="waNewFile" type="file"
-        accept=".jpg,.jpeg,.png,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/jpeg,image/png,application/pdf">
-    </div>
-
-    <div class="notice" style="margin-top:12px;">
-      L'invio WhatsApp dipende dal collegamento del numero reale e dalle regole Meta sulla finestra di conversazione.
-    </div>
-
     <div class="form-actions">
-      <button id="waNewSendBtn" class="btn btn-primary" onclick="sendOrderWhatsappStage('${orderId}','${kind}')">INVIA WHATSAPP</button>
+      <button class="btn btn-primary" onclick="openWaMeStage('${orderId}')">APRI WHATSAPP</button>
+      ${needsMark?`<button class="btn btn-outline" onclick="markWaStageSent('${orderId}','${kind}')">SEGNA COME INVIATO</button>`:""}
       <button class="btn btn-outline" onclick="openJobCard('${orderId}')">Annulla</button>
     </div>
   `;
 }
 
-async function sendOrderWhatsappStage(orderId, kind){
-  const o=findItem("orders",orderId);
-  if(!o) return;
-  const c=state.clients.find(x=>x.id===o.clientId);
-  if(!c) return;
-
-  const btn=document.getElementById("waNewSendBtn");
-  const phone=String(document.getElementById("waNewPhone")?.value||c.telefono||"").trim();
+function openWaMeStage(orderId){
+  const phone=String(document.getElementById("waNewPhone")?.value||"").trim();
   const message=String(document.getElementById("waNewText")?.value||"").trim();
-  const file=document.getElementById("waNewFile")?.files?.[0]||null;
+  const url=waMeUrl(phone,message);
+  if(!url){ showToast("Numero WhatsApp non valido"); return; }
+  window.open(url,"_blank","noopener");
+}
 
-  if(!message && !file){
-    showToast("Scrivi un messaggio oppure allega un file");
-    return;
-  }
-
+async function markWaStageSent(orderId, kind){
   try{
-    if(btn){btn.disabled=true;btn.textContent="INVIO...";}
-    await sendWhatsappRequest({
-      to:phone,
-      message,
-      contactName:clientDisplayName(c),
-      file
-    });
-
     if(kind==="bozza"){
       setBozzaInAttesa(orderId);
     }else if(kind==="completato"){
       await markClienteAvvisato(orderId,"WhatsApp");
     }
-
-    showToast("Messaggio WhatsApp inviato");
+    showToast("Segnato come inviato");
     openJobCard(orderId);
   }catch(error){
     console.error(error);
-    showToast(error?.message||"Errore durante l'invio WhatsApp");
-    if(btn){btn.disabled=false;btn.textContent="INVIA WHATSAPP";}
+    showToast(error?.message||"Errore durante l'aggiornamento");
   }
 }
 
@@ -10117,7 +10113,7 @@ function openJobCard(orderId){
             <div class="job-v2-info-main">${c?escapeHtml(clientDisplayName(c)):"—"}</div>
             ${c?.email?`<div class="job-v2-info-sub">${escapeHtml(c.email)}</div>`:""}
             ${c?.telefono?`<div class="job-v2-info-sub">${escapeHtml(c.telefono)}</div>`:""}
-            ${c?`<button class="btn btn-outline btn-sm" style="margin-top:9px;" onclick="openClientHistory('${c.id}')">ANAGRAFICA CLIENTE</button>`:""}
+            ${c?`<button class="btn btn-outline btn-sm" style="margin-top:9px;" onclick="openClientHistory('${c.id}')">ANAGRAFICA CLIENTE</button>${waMePhone(c.telefono)?`<button class="btn btn-outline btn-sm" style="margin-top:9px;margin-left:6px;" onclick="openClientWhatsapp('${c.id}')">WHATSAPP</button>`:""}`:""}
           </div>
 
           <div class="job-v2-info-cell">
@@ -13116,7 +13112,7 @@ function renderGmailReplyComposer(m){
             <label>Allegati</label>
             <input id="gmail-reply-file-input" type="file" multiple onchange="handleGmailReplyFiles(this.files)" style="padding:9px;background:#fff;">
             <div style="font-size:11.5px;color:var(--muted);margin-top:5px;">
-              Puoi selezionare fino a 10 file.
+              Puoi selezionare fino a 10 file e 15 MB complessivi.
             </div>
             ${gmailReplyAttachments.length ? `
               <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
@@ -13161,6 +13157,13 @@ async function handleGmailReplyFiles(fileList){
 
   if(gmailReplyAttachments.length + files.length > 10){
     showToast("Puoi allegare al massimo 10 file");
+    const input=document.getElementById("gmail-reply-file-input");
+    if(input) input.value="";
+    return;
+  }
+  const gTot=gmailReplyAttachments.reduce((t,a)=>t+(Number(a?.size)||0),0)+files.reduce((t,f)=>t+(f.size||0),0);
+  if(gTot>BOZZA_MAIL_MAX_TOTAL_BYTES){
+    showToast(bozzaMailSizeLimitMessage());
     const input=document.getElementById("gmail-reply-file-input");
     if(input) input.value="";
     return;
