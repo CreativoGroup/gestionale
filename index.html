@@ -12242,6 +12242,19 @@ function renderIncassi(){
       </div>
     </div>
 
+    <div class="section-header">
+      <h3 style="margin:0;">Report</h3>
+      <div class="filters">
+        <select class="inline" onchange="incassiFilters.view=this.value; renderIncassi();">
+          <option value="giorno" ${f.view==='giorno'?'selected':''}>Giornaliero</option>
+          <option value="settimana" ${f.view==='settimana'?'selected':''}>Settimanale</option>
+          <option value="mese" ${f.view==='mese'?'selected':''}>Mensile</option>
+        </select>
+      </div>
+    </div>
+    ${reportHtml}
+
+
     <div class="card" style="margin-bottom:22px;">
       <div class="section-header" style="margin-bottom:10px;">
         <div>
@@ -12298,18 +12311,6 @@ function renderIncassi(){
         </table>
       </div>
     </div>
-
-    <div class="section-header">
-      <h3 style="margin:0;">Report</h3>
-      <div class="filters">
-        <select class="inline" onchange="incassiFilters.view=this.value; renderIncassi();">
-          <option value="giorno" ${f.view==='giorno'?'selected':''}>Giornaliero</option>
-          <option value="settimana" ${f.view==='settimana'?'selected':''}>Settimanale</option>
-          <option value="mese" ${f.view==='mese'?'selected':''}>Mensile</option>
-        </select>
-      </div>
-    </div>
-    ${reportHtml}
 
     <div class="section-header">
       <h3 style="margin:0;">Storico pagamenti</h3>
