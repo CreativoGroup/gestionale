@@ -6093,6 +6093,39 @@ function completedOrderStageButton(o){
   if(stage==="DA AVVISARE") return `<button class="btn btn-primary btn-sm" style="background:var(--warn);color:#fff;" onclick="openAvvisaCliente('${o.id}')">DA AVVISARE</button>`;
   return `<button class="btn btn-outline btn-sm" style="border-color:var(--ok);color:var(--ok);" onclick="openAvvisaCliente('${o.id}')">AVVISATO</button>${o.avvisoMetodo ? `<div class="lr-sub" style="margin-top:4px;text-align:center;">${escapeHtml(o.avvisoMetodo)}</div>` : ``}`;
 }
+function completedOrderInvoiceButton(o){
+  if(o.fatturato){
+    return `<button class="btn btn-outline btn-sm" style="border-color:var(--ok);color:var(--ok);cursor:default;" onclick="event.stopPropagation()">FATTURATO</button>`;
+  }
+  return `<button class="btn btn-outline btn-sm" style="border-color:var(--accent);color:var(--accent);" onclick="segnaFatturatoDaCompletati('${o.id}')">DA FATTURARE</button>`;
+}
+function completedOrderAmountButton(o){
+  return `<button class="btn btn-outline btn-sm" style="font-weight:850;white-space:nowrap;" title="Aggiungi pagamento" onclick="openCompletedOrderPayment('${o.id}')">${fmtMoney(orderTotale(o))}</button>`;
+}
+async function segnaFatturatoDaCompletati(orderId){
+  const o=findItem('orders',orderId);
+  if(!o) return;
+
+  const oldDaFatturare=!!o.daFatturare;
+  const oldFatturato=!!o.fatturato;
+
+  o.daFatturare=true;
+  o.fatturato=true;
+
+  const saved=await upsertOneReturning('orders',o);
+  if(!saved){
+    o.daFatturare=oldDaFatturare;
+    o.fatturato=oldFatturato;
+    showToast("Modifica non salvata: riprova");
+    return;
+  }
+
+  const i=state.orders.findIndex(x=>x.id===orderId);
+  if(i>=0) state.orders[i]=saved;
+
+  renderCurrentView();
+  showToast("Ordine segnato come FATTURATO");
+}
 function renderDashboard(){
   const activeOrders = state.orders.filter(o=>o.stato!=="Consegnato");
   const ordiniInLavorazione = state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato");
@@ -6169,10 +6202,11 @@ function renderDashboard(){
         ${completatiDaConsegnare.length ? `<table><tbody>${completatiDaConsegnare.map(o=>`
           <tr>
             <td>${clientName(o.clientId)}</td>
-            <td class="mobile-hide">${orderCategorieLabel(o)}</td>
             <td class="mobile-hide">${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : ""}</td>
+            <td style="white-space:nowrap;">${completedOrderInvoiceButton(o)}</td>
             <td>${completedOrderStageButton(o)}</td>
             <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button></td>
+            <td style="white-space:nowrap;">${completedOrderAmountButton(o)}</td>
           </tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`}
       </div>
@@ -8806,16 +8840,17 @@ function renderCompletedDeliveryRows(list){
   return list.length ? `
     <div class="table-wrap" style="box-shadow:none;">
       <table>
-        <thead><tr><th>Cliente</th><th>Lavorazione</th><th>Fornitore</th><th>Stato cliente</th><th>Azioni</th></tr></thead>
+        <thead><tr><th>Cliente</th><th>Fornitore</th><th>Fatturazione</th><th>Stato cliente</th><th>Azioni</th><th>Importo</th></tr></thead>
         <tbody>${list.map(o=>`
           <tr data-completed-order="${o.id}">
             <td><strong>${clientName(o.clientId)}</strong></td>
-            <td>${orderCategorieLabel(o)}</td>
             <td>${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : "—"}</td>
+            <td style="white-space:nowrap;">${completedOrderInvoiceButton(o)}</td>
             <td>${completedOrderStageButton(o)}</td>
             <td style="white-space:nowrap;">
               <button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button>
             </td>
+            <td style="white-space:nowrap;">${completedOrderAmountButton(o)}</td>
           </tr>`).join("")}</tbody>
       </table>
     </div>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`;
