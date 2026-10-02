@@ -1668,6 +1668,7 @@
 .job-v2-pay-table td{border-top:1px solid #edf0f4;padding:8px 7px;}
 .job-v2-bottom-actions{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding-top:2px;}
 .job-v2-pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:900;}
+.job-v2-admin-residuo-pill{font-size:15px!important;padding:8px 14px!important;line-height:1.1;white-space:nowrap;}
 .job-v2-muted-label{font-size:11px;color:var(--muted);font-weight:800;margin-bottom:6px;}
 .job-v2-start{font-weight:900;color:#1e6bb8;}
 .job-v2-note{width:100%;min-height:110px;resize:vertical;}
@@ -10057,6 +10058,12 @@ function jobProgressHtml(o){
   }).join("")}</div>`;
 }
 
+let jobAdminPanelOpenOrderId=null;
+function setJobAdminPanelOpen(orderId,isOpen){
+  if(isOpen) jobAdminPanelOpenOrderId=orderId;
+  else if(jobAdminPanelOpenOrderId===orderId) jobAdminPanelOpenOrderId=null;
+}
+
 function openJobCard(orderId){
   const o = findItem('orders', orderId);
   if(!o) return;
@@ -10186,10 +10193,10 @@ function openJobCard(orderId){
         ${jobStageFlowHtml(o,c)}
       </section>
 
-      <details class="job-v2-admin-details">
+      <details class="job-v2-admin-details" ${jobAdminPanelOpenOrderId===o.id?'open':''} ontoggle="setJobAdminPanelOpen('${o.id}',this.open)">
         <summary>
           <span><strong>5. Amministrazione</strong> <span style="font-weight:500;color:var(--muted);margin-left:8px;">Fatturazione, pagamenti, sconti e consegna</span></span>
-          <span class="job-v2-pill" style="background:#fff1ef;color:#c94230;">${fmtMoney(saldoResiduo)} residuo</span>
+          <span class="job-v2-pill job-v2-admin-residuo-pill" style="background:#fff1ef;color:#c94230;">${fmtMoney(saldoResiduo)} residuo</span>
         </summary>
         <div class="job-v2-admin-body">
           <section class="job-v2-card" style="--job-accent:#ef5b4a;box-shadow:none;border-radius:13px;">
