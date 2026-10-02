@@ -4419,6 +4419,36 @@ function renderLeads(){
 }
 
 
+let leadOrdineHistoryOpen=false;
+function toggleLeadOrdineHistory(){ leadOrdineHistoryOpen=!leadOrdineHistoryOpen; renderLeadOrdine(); }
+/* Un "nuovo cliente con ordine" è completato se l'ordine è stato creato da qui, se è stato chiuso a mano,
+   oppure se per quel cliente esiste già un ordine creato dopo l'arrivo della richiesta. */
+function leadOrderStatus(l){
+  const linkedClient=l.clientId
+    ? (state.clients||[]).find(c=>c.id===l.clientId)
+    : findClientByEmail(l.email);
+  if(l.convertedOrderId || l.convertedAt){
+    return {done:true, client:linkedClient, order:(state.orders||[]).find(o=>o.id===l.convertedOrderId)||null};
+  }
+  if(linkedClient && l.creatoIl){
+    const since=new Date(l.creatoIl).getTime()-24*60*60*1000;
+    const found=(state.orders||[])
+      .filter(o=>o.clientId===linkedClient.id && o.createdAt && new Date(o.createdAt).getTime()>=since)
+      .sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)))[0];
+    if(found) return {done:true, client:linkedClient, order:found, auto:true};
+  }
+  return {done:false, client:linkedClient, order:null};
+}
+async function markLeadOrderDone(id){
+  const l=findItem("leads",id); if(!l) return;
+  const nowIso=new Date().toISOString();
+  const prev={convertedAt:l.convertedAt, aggiornatoIl:l.aggiornatoIl};
+  l.convertedAt=nowIso; l.aggiornatoIl=nowIso;
+  const ok=await upsertOne("leads",l);
+  if(!ok){ l.convertedAt=prev.convertedAt; l.aggiornatoIl=prev.aggiornatoIl; return; }
+  renderLeadOrdine();
+  showToast("Spostato in Ordini effettuati");
+}
 function renderLeadOrdine(){
   const root=document.getElementById("view-leadOrdine");
   if(!root) return;
@@ -4431,18 +4461,17 @@ function renderLeadOrdine(){
     .filter(l=>String(l.fonte||"")==="gmail_ordine");
 
   const pending=newCustomerOrders
-    .filter(l=>!l.convertedOrderId)
+    .filter(l=>!leadOrderStatus(l).done)
     .sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
 
   const completed=newCustomerOrders
-    .filter(l=>!!l.convertedOrderId)
+    .filter(l=>leadOrderStatus(l).done)
     .sort((a,b)=>String(b.convertedAt||b.aggiornatoIl||b.creatoIl||"").localeCompare(String(a.convertedAt||a.aggiornatoIl||a.creatoIl||"")));
 
   const completedRows=completed.map(l=>{
-    const linkedClient=l.clientId
-      ? (state.clients||[]).find(c=>c.id===l.clientId)
-      : findClientByEmail(l.email);
-    const linkedOrder=(state.orders||[]).find(o=>o.id===l.convertedOrderId);
+    const st=leadOrderStatus(l);
+    const linkedClient=st.client;
+    const linkedOrder=st.order;
     const orderLabel=linkedOrder?.numero ? `#${escapeHtml(String(linkedOrder.numero))}` : "Creato";
     return `
       <tr>
@@ -4500,10 +4529,11 @@ function renderLeadOrdine(){
                     ? `<span class="lead-status-pill lead-status-ok">Anagrafica presente</span>`
                     : `<span class="pill pill-open">Da creare</span>`}</td>
                   <td>${fmtLeadDate(l.creatoIl)}</td>
-                  <td>
+                  <td style="white-space:nowrap;">
                     <button class="btn btn-primary btn-sm" style="border-radius:999px;padding:9px 15px;font-weight:800;box-shadow:0 4px 10px rgba(240,91,55,.18);" onclick="openLeadDetail('${l.id}')">
                       ✦ ${linkedClient?'CREA ORDINE':'APRI E CREA ORDINE'}
                     </button>
+                    <button class="btn btn-outline btn-sm" title="L'ordine è già stato fatto: sposta nello storico" onclick="markLeadOrderDone('${l.id}')">GIÀ FATTO</button>
                   </td>
                 </tr>`;
               }).join("")}
@@ -4513,12 +4543,12 @@ function renderLeadOrdine(){
       </div>
     </div>
 
-    <details class="card" style="padding:0;overflow:hidden;" ${completed.length ? "" : ""}>
-      <summary style="cursor:pointer;list-style:none;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:800;">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div role="button" tabindex="0" onclick="toggleLeadOrdineHistory()" style="cursor:pointer;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:800;">
         <span>ORDINI EFFETTUATI <span style="font-weight:500;color:var(--muted);font-size:12px;">— storico</span></span>
-        <span class="pill pill-done">${completed.length} effettuati</span>
-      </summary>
-      <div style="border-top:1px solid var(--border);padding:14px 20px 20px;">
+        <span><span class="pill pill-done">${completed.length} effettuati</span> <span style="margin-left:8px;">${leadOrdineHistoryOpen?"▲":"▼"}</span></span>
+      </div>
+      <div style="${leadOrdineHistoryOpen?"":"display:none;"}border-top:1px solid var(--border);padding:14px 20px 20px;">
         <p class="helptext" style="margin:0 0 12px;">Storico degli ordini già creati da questa coda. Rimane nascosto finché non lo apri.</p>
         <div class="lead-table-wrap">
           ${completed.length ? `
@@ -4539,7 +4569,7 @@ function renderLeadOrdine(){
           ` : `<p class="empty">Nessun ordine effettuato nello storico.</p>`}
         </div>
       </div>
-    </details>
+    </div>
   `;
 }
 
