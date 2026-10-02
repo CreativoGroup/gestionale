@@ -3046,6 +3046,15 @@ function computeScorteMonitorate(){
 /* ============ STATO ============ */
 let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[], leads:[], gmailActionStatus:[], noteComunicazioni:[], whatsappMessages:[]};
 let currentView = "dashboard";
+/* Colonne "extra" (jsonb) per dati aggiuntivi di preventivi e note: servono una colonna su Supabase (script SQL mostrato nell'app). */
+const DB_EXTRA = {quotes:false, noteComunicazioni:false};
+const DB_EXTRA_SQL = "alter table public.quotes add column if not exists extra jsonb default '{}'::jsonb;\nalter table public.note_comunicazioni add column if not exists extra jsonb default '{}'::jsonb;";
+async function probeDbExtraColumns(){
+  for(const [coll, table] of [["quotes","quotes"],["noteComunicazioni","note_comunicazioni"]]){
+    try{ const {error} = await sb.from(table).select("id,extra").limit(1); DB_EXTRA[coll] = !error; }
+    catch(e){ DB_EXTRA[coll] = false; }
+  }
+}
 const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads", gmailActionStatus:"gmail_action_status", noteComunicazioni:"note_comunicazioni", whatsappMessages:"whatsapp_messages"};
 
 /* Sincronizzazione multi-dispositivo: salva solo le righe davvero cambiate e rilegge periodicamente Supabase. */
@@ -3078,7 +3087,7 @@ function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toIS
 function toDbRow(collection, o){
   switch(collection){
     case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, nome_commerciale:o.nomeCommerciale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, richiesta:o.richiesta||null, carattere:o.carattere||null, archiviato_recenti:!!o.archiviatoRecenti, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null, dropbox_folder_url:o.dropboxFolderUrl||null};
-    case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito};
+    case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito, ...(DB_EXTRA.quotes?{extra:o.extra||{}}:{})};
     case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, avviso_metodo:o.avvisoMetodo||null, avvisato_il:o.avvisatoIl||null, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
     case "warehouse": return {id:o.id, codice:o.codice||null, nome:o.nome||null, categoria:o.categoria||null, colore:o.colore||null, taglia:o.taglia||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
@@ -3087,7 +3096,7 @@ function toDbRow(collection, o){
     case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, luogo:o.luogo||null, note:o.note||null};
     case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, client_id:o.clientId||null, converted_order_id:o.convertedOrderId||null, converted_at:o.convertedAt||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
-    case "noteComunicazioni": return {id:o.id, tipo:o.tipo||"Chiamata", nome_persona:o.nomePersona||null, testo:o.testo||null, operatore:o.operatore||null, fatto:!!o.fatto, creato_il:o.creatoIl||new Date().toISOString(), fatto_il:o.fattoIl||null};
+    case "noteComunicazioni": return {id:o.id, tipo:o.tipo||"Chiamata", nome_persona:o.nomePersona||null, testo:o.testo||null, operatore:o.operatore||null, fatto:!!o.fatto, creato_il:o.creatoIl||new Date().toISOString(), fatto_il:o.fattoIl||null, ...(DB_EXTRA.noteComunicazioni?{extra:o.extra||{}}:{})};
     case "gmailActionStatus": return {id:o.id, gmail_message_id:o.gmailMessageId, replied:!!o.replied, lead_generated:!!o.leadGenerated, order_generated:!!o.orderGenerated, updated_at:o.updatedAt||new Date().toISOString()};
     case "whatsappMessages": return {id:o.id, whatsapp_message_id:o.whatsappMessageId||null, wa_id:o.waId||null, contact_name:o.contactName||null, from_number:o.fromNumber||null, phone_number_id:o.phoneNumberId||null, display_phone_number:o.displayPhoneNumber||null, direction:o.direction||"inbound", message_type:o.messageType||null, body:o.body||null, message_timestamp:o.messageTimestamp||null, status:o.status||null, raw_payload:o.rawPayload||null, created_at:o.createdAt||null};
   }
@@ -3095,7 +3104,7 @@ function toDbRow(collection, o){
 function fromDbRow(collection, r){
   switch(collection){
     case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", nomeCommerciale:r.nome_commerciale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", richiesta:r.richiesta||"", carattere:r.carattere||"", archiviatoRecenti:!!r.archiviato_recenti, creatoIl:r.creato_il||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||"", dropboxFolderUrl:r.dropbox_folder_url||""};
-    case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito};
+    case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito, extra:r.extra||{}};
     case "orders": {
       const normalizedStatus = r.stato==="In lavorazione" ? "In preparazione grafica" : r.stato;
       const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
@@ -3116,7 +3125,7 @@ function fromDbRow(collection, r){
     case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:normalizePaymentMethod(r.metodo), data:r.data};
     case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, luogo:r.luogo||"", note:r.note||""};
     case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
-    case "noteComunicazioni": return {id:r.id, tipo:r.tipo||"Chiamata", nomePersona:r.nome_persona||"", testo:r.testo||"", operatore:r.operatore||"", fatto:!!r.fatto, creatoIl:r.creato_il||"", fattoIl:r.fatto_il||""};
+    case "noteComunicazioni": return {id:r.id, tipo:r.tipo||"Chiamata", nomePersona:r.nome_persona||"", testo:r.testo||"", operatore:r.operatore||"", fatto:!!r.fatto, creatoIl:r.creato_il||"", fattoIl:r.fatto_il||"", extra:r.extra||{}};
     case "gmailActionStatus": return {id:r.id, gmailMessageId:r.gmail_message_id||"", replied:!!r.replied, leadGenerated:!!r.lead_generated, orderGenerated:!!r.order_generated, updatedAt:r.updated_at||""};
     case "whatsappMessages": return {id:r.id, whatsappMessageId:r.whatsapp_message_id||"", waId:r.wa_id||"", contactName:r.contact_name||"", fromNumber:r.from_number||"", phoneNumberId:r.phone_number_id||"", displayPhoneNumber:r.display_phone_number||"", direction:r.direction||"inbound", messageType:r.message_type||"", body:r.body||"", messageTimestamp:r.message_timestamp||r.created_at||"", status:r.status||"", rawPayload:r.raw_payload||null, createdAt:r.created_at||""};
   }
@@ -3131,6 +3140,7 @@ async function loadAllFromSupabase(){
     if(error){ console.error("Errore caricamento", c, error); state[c] = []; return; }
     state[c] = (data||[]).map(r => fromDbRow(c, r));
   });
+  await probeDbExtraColumns();
   // Le fasi vanno ricalcolate se qualche categoria non ha più il template previsto, preservando le spunte già fatte
   state.orders.forEach(o => recalcFasi(o));
   // Le scorte minime vengono lette dal database e possono essere modificate manualmente.
@@ -3456,7 +3466,7 @@ function costiFissiTotaleMese(mese){ return (state.fixedCosts||[]).filter(e=>e.d
 /* ============ SEED DEMO ============ */
 function emptyRiga(isOrder){
   return isOrder ? {id:uid(), descrizione:"", categoria:"", prodotto:"", articoloId:"", stato:"Da fare", quantita:1, prezzoUnitario:0}
-                 : {id:uid(), descrizione:"", quantita:1, prezzoUnitario:0};
+                 : {id:uid(), descrizione:"", um:"pz", iva:22, quantita:1, prezzoUnitario:0};
 }
 /* Ricalcola le fasi di lavorazione in base alle categorie presenti nelle righe, preservando lo stato delle spunte già fatte */
 function recalcFasi(order){
@@ -4035,6 +4045,7 @@ const NAV = [
 
   {id:"note", label:"Note", icon:"✎", subtitle:"Note / Attività interne da gestire", group:"Info e richieste"},
   {id:"leads", label:"Lead", icon:"◎", subtitle:"Richieste commerciali da qualificare e seguire", group:"Info e richieste"},
+  {id:"preventivi", label:"Preventivi", icon:"▤", subtitle:"Preventivi numerati, PDF e invio al cliente", group:"Info e richieste"},
 
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Anagrafica"},
   {id:"leadOrdine", label:"NUOVI CLIENTI CON ORDINE", icon:"◆", subtitle:"Ordini ricevuti da clienti non ancora presenti o da completare", group:"Operativa"},
@@ -4159,7 +4170,8 @@ function goTo(id){
 }
 function renderTopbarActions(){
   const map = {
-    note: `<button class="btn btn-primary" onclick="document.getElementById('nota-persona')?.focus()">+ Nuova nota</button>`,
+    note: `<button class="btn btn-primary" onclick="openNoteForm()">+ Nuova nota</button>`,
+    preventivi: `<button class="btn btn-primary" onclick="toggleForm('quoteForm')">+ Nuovo preventivo</button>`,
     clienti: `<button class="btn btn-primary" onclick="toggleForm('clientForm')">+ Nuovo cliente</button>`,
     ordini: `<button class="btn btn-primary" onclick="pendingLeadOrderConversion=null;toggleForm('orderForm')">+ Nuovo ordine</button>`,
     magazzino: ``,
@@ -4182,7 +4194,7 @@ function renderCurrentView(){
   ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti,
     ordini:renderOrdini, flusso:renderFlusso,
     magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, dropbox:renderDropbox, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
-    posta:renderPosta, whatsapp:renderWhatsapp, instagram:()=>renderMetaChannel("instagram"), leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
+    posta:renderPosta, preventivi:renderPreventivi, whatsapp:renderWhatsapp, instagram:()=>renderMetaChannel("instagram"), leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
 }
 let clientFormOpen = false;
 let quoteFormOpen = false;
@@ -5924,92 +5936,193 @@ function renderMetaChannel(channel){
 }
 
 /* ============ NOTE / ATTIVITÀ DA GESTIRE ============ */
-function noteTypePill(tipo){
-  return `<span class="pill pill-business">● Nota</span>`;
-}
 function noteDateLabel(iso){
   if(!iso) return "—";
   try{
     return new Intl.DateTimeFormat("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(iso));
   }catch(e){ return "—"; }
 }
-let noteDraft = {nomePersona:"", testo:"", operatore:""};
-function updateNoteDraft(field,value){ noteDraft[field]=value; }
+function noteExtra(n){
+  const e = (n && n.extra) || {};
+  return {clientId:e.clientId || "", scadenza:e.scadenza || "", priorita:e.priorita === "urgente" ? "urgente" : "normale", stato:e.stato === "in_corso" ? "in_corso" : "da_fare"};
+}
+let noteFilter = {op:"", q:""};
+function ensureNoteStyles(){
+  if(document.getElementById("noteBoardStyles")) return;
+  document.head.insertAdjacentHTML("beforeend", `<style id="noteBoardStyles">
+    .note-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+    .note-toolbar input{max-width:260px;padding:9px 14px;border:1px solid var(--border);border-radius:999px;font:inherit;font-size:14px;background:#fff;outline:none;}
+    .note-toolbar input:focus{border-color:var(--accent);}
+    .note-col{min-width:0;}
+    .note-chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:7px 14px;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);}
+    .note-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+    .note-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start;}
+    @media(max-width:980px){.note-board{grid-template-columns:1fr;}}
+    .note-col{background:#EEF1F3;border-radius:16px;padding:14px;min-height:120px;}
+    .note-col h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;}
+    .note-col h3 .pill{font-size:12px;}
+    .nota-card{background:#fff;border:1px solid var(--border);border-left:5px solid var(--teal);border-radius:12px;padding:13px 14px;margin-bottom:11px;box-shadow:0 1px 2px rgba(20,33,61,.05);}
+    .nota-card.urgente{border-left-color:var(--accent);}
+    .nota-card.scaduta{border-left-color:var(--danger);}
+    .nota-card.fatta{opacity:.78;border-left-color:var(--ok);}
+    .nota-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .nota-top strong{font-size:15px;}
+    .nota-link{background:none;border:0;padding:0;font:inherit;font-weight:800;cursor:pointer;text-align:left;color:var(--text);text-decoration:underline;text-decoration-color:var(--border);}
+    .nota-badge{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;background:#EEF1F3;color:var(--muted);}
+    .nota-badge.urg{background:#FDE7E0;color:var(--accent-dark);}
+    .nota-badge.late{background:#FADBD8;color:var(--danger);}
+    .nota-badge.today{background:#FFF1CC;color:var(--warn);}
+    .nota-text{white-space:pre-wrap;margin:9px 0 8px;font-size:14px;line-height:1.45;word-break:break-word;}
+    .nota-foot{font-size:12px;color:var(--muted);}
+    .nota-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;}
+  </style>`);
+}
+function noteSortKey(a, b){
+  const ea = noteExtra(a), eb = noteExtra(b);
+  if(ea.priorita !== eb.priorita) return ea.priorita === "urgente" ? -1 : 1;
+  const sa = ea.scadenza || "9999-99-99", sb = eb.scadenza || "9999-99-99";
+  if(sa !== sb) return sa.localeCompare(sb);
+  return String(b.creatoIl||"").localeCompare(String(a.creatoIl||""));
+}
+function noteCardHTML(n, col){
+  const e = noteExtra(n), c = e.clientId ? state.clients.find(x => x.id === e.clientId) : null;
+  const nome = c ? clientDisplayName(c) : (n.nomePersona || "Senza nome");
+  const todayIso = today();
+  const late = !n.fatto && e.scadenza && e.scadenza < todayIso;
+  const isToday = !n.fatto && e.scadenza === todayIso;
+  const hasPhone = c && waMePhone(c.telefono);
+  const classes = ["nota-card", n.fatto ? "fatta" : late ? "scaduta" : e.priorita === "urgente" ? "urgente" : ""].join(" ");
+  const ex = DB_EXTRA.noteComunicazioni;
+  const actions = n.fatto
+    ? `<button class="btn btn-outline btn-sm" onclick="riapriNota('${n.id}')">RIAPRI</button>`
+    : `<button class="btn btn-primary btn-sm" onclick="markNotaFatta('${n.id}')">FATTO</button>
+       ${ex ? (col === "in_corso"
+          ? `<button class="btn btn-outline btn-sm" onclick="setNotaStato('${n.id}','da_fare')">← DA FARE</button>`
+          : `<button class="btn btn-outline btn-sm" onclick="setNotaStato('${n.id}','in_corso')">IN CORSO →</button>`) : ""}
+       ${hasPhone ? `<button class="btn btn-outline btn-sm" onclick="openClientWhatsapp('${c.id}')">WHATSAPP</button>` : ""}
+       <button class="btn btn-outline btn-sm" onclick="openNoteForm('${n.id}')">MODIFICA</button>
+       <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">LEAD</button>`;
+  return `<div class="${classes}">
+    <div class="nota-top">
+      ${c ? `<button class="nota-link" onclick="openClientHistory('${c.id}')">${escapeHtml(nome)}</button>` : `<strong>${escapeHtml(nome)}</strong>`}
+      ${e.priorita === "urgente" && !n.fatto ? `<span class="nota-badge urg">URGENTE</span>` : ""}
+      ${late ? `<span class="nota-badge late">SCADUTA ${escapeHtml(fmtDate(e.scadenza))}</span>` : isToday ? `<span class="nota-badge today">OGGI</span>` : (e.scadenza && !n.fatto ? `<span class="nota-badge">entro ${escapeHtml(fmtDate(e.scadenza))}</span>` : "")}
+    </div>
+    <div class="nota-text">${escapeHtml(n.testo || "")}</div>
+    <div class="nota-foot">${escapeHtml(n.operatore || "—")} · ${escapeHtml(noteDateLabel(n.creatoIl))}${n.fatto ? ` · fatta ${escapeHtml(noteDateLabel(n.fattoIl))}` : ""}</div>
+    <div class="nota-actions">${actions}</div>
+  </div>`;
+}
 function renderNote(){
-  const attive=[...(state.noteComunicazioni||[])].filter(n=>!n.fatto).sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
-  const archivio=[...(state.noteComunicazioni||[])].filter(n=>n.fatto).sort((a,b)=>String(b.fattoIl||"").localeCompare(String(a.fattoIl||"")));
-
-  document.getElementById("view-note").innerHTML=`
-    <div class="card" style="margin-bottom:18px;">
-      <h3 style="margin-top:0;">Nuova nota</h3>
-      <div class="form-grid">
-        <div class="field">
-          <label>Nome persona</label>
-          <input id="nota-persona" placeholder="Nome cliente / referente" value="${escapeHtml(noteDraft.nomePersona)}" oninput="updateNoteDraft('nomePersona',this.value)">
-        </div>
-        <div class="field">
-          <label>Operatore</label>
-          <select id="nota-operatore" onchange="updateNoteDraft('operatore',this.value)">
-            <option value="">Seleziona operatore…</option>
-            ${NOTE_OPERATORS.map(o=>`<option value="${o}" ${noteDraft.operatore===o?'selected':''}>${o}</option>`).join("")}
-          </select>
-        </div>
-      </div>
-      <div class="field" style="margin-top:12px;">
-        <label>Testo</label>
-        <textarea id="nota-testo" rows="4" placeholder="Scrivi la nota / attività da gestire…" oninput="updateNoteDraft('testo',this.value)">${escapeHtml(noteDraft.testo)}</textarea>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" onclick="addNotaComunicazione()">Salva nota</button>
-      </div>
+  ensureNoteStyles();
+  const all = state.noteComunicazioni || [];
+  const needle = String(noteFilter.q || "").trim().toLowerCase();
+  const match = n => {
+    if(noteFilter.op && n.operatore !== noteFilter.op) return false;
+    if(!needle) return true;
+    const e = noteExtra(n), c = e.clientId ? state.clients.find(x => x.id === e.clientId) : null;
+    return `${n.nomePersona||""} ${n.testo||""} ${c ? clientDisplayName(c) : ""}`.toLowerCase().includes(needle);
+  };
+  const aperte = all.filter(n => !n.fatto && match(n));
+  const daFare = aperte.filter(n => noteExtra(n).stato !== "in_corso").sort(noteSortKey);
+  const inCorso = aperte.filter(n => noteExtra(n).stato === "in_corso").sort(noteSortKey);
+  const fatte = all.filter(n => n.fatto && match(n)).sort((a,b) => String(b.fattoIl||"").localeCompare(String(a.fattoIl||"")));
+  const col = (titolo, arr, key, vuoto) => `<div class="note-col"><h3>${titolo} <span class="pill">${arr.length}</span></h3>${arr.length ? arr.map(n => noteCardHTML(n, key)).join("") : `<p class="empty" style="margin:6px 2px;">${vuoto}</p>`}</div>`;
+  document.getElementById("view-note").innerHTML = `
+    ${dbExtraBanner("noteComunicazioni")}
+    <div class="note-toolbar">
+      <input id="nota-search" type="search" placeholder="Cerca nota o cliente…" value="${escapeHtml(noteFilter.q)}" oninput="noteFilter.q=this.value;rerenderKeepingFocus(renderNote)">
+      <button class="note-chip ${!noteFilter.op ? 'active' : ''}" onclick="noteFilter.op='';renderNote()">Tutti</button>
+      ${NOTE_OPERATORS.map(o => `<button class="note-chip ${noteFilter.op === o ? 'active' : ''}" onclick="noteFilter.op='${escapeHtml(o)}';renderNote()">${escapeHtml(o)}</button>`).join("")}
     </div>
-
-    <div class="card" style="margin-bottom:18px;">
-      <h3 style="margin-top:0;">Da gestire <span class="pill">${attive.length}</span></h3>
-      ${attive.length ? attive.map(n=>`
-        <div class="list-row" style="cursor:default;align-items:flex-start;">
-          <div style="min-width:0;flex:1;">
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              ${noteTypePill(n.tipo)}
-              <strong>${escapeHtml(n.nomePersona||"Senza nome")}</strong>
-              <span class="lr-sub">· ${escapeHtml(n.operatore||"—")}</span>
-            </div>
-            <div style="margin-top:8px;">
-              <label class="lr-sub" style="display:block;margin-bottom:5px;font-weight:700;">Descrizione lavoro</label>
-              <textarea id="nota-desc-${n.id}" class="note-edit-textarea" rows="2" readonly>${escapeHtml(n.testo||"")}</textarea>
-              <div style="margin-top:7px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <button id="nota-modifica-${n.id}" class="btn btn-outline btn-sm" onclick="modificaNotaComunicazione('${n.id}')">MODIFICA</button>
-                <button id="nota-salva-${n.id}" class="btn btn-primary btn-sm" style="display:none;" onclick="salvaDescrizioneNota('${n.id}')">SALVA MODIFICHE</button>
-                <button id="nota-annulla-${n.id}" class="btn btn-outline btn-sm" style="display:none;" onclick="annullaModificaNota('${n.id}')">ANNULLA</button>
-                <span class="lr-sub">${escapeHtml(noteDateLabel(n.creatoIl))}</span>
-              </div>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-            <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">TRASFORMA IN LEAD</button>
-            <button class="btn btn-primary btn-sm" onclick="markNotaFatta('${n.id}')">FATTO</button>
-          </div>
-        </div>`).join("") : `<p class="empty">Nessuna nota da gestire.</p>`}
-    </div>
-
-    <div class="card">
-      <h3 style="margin-top:0;">Archivio note completate</h3>
-      <p class="helptext">Le note completate restano qui per 4 giorni, poi vengono eliminate definitivamente dal gestionale.</p>
-      ${archivio.length ? archivio.map(n=>`
-        <div class="list-row" style="cursor:default;opacity:.88;">
-          <div style="min-width:0;flex:1;">
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              ${noteTypePill(n.tipo)}
-              <strong>${escapeHtml(n.nomePersona||"Senza nome")}</strong>
-              <span class="lr-sub">· ${escapeHtml(n.operatore||"—")}</span>
-            </div>
-            <div style="margin-top:6px;white-space:pre-wrap;">${escapeHtml(n.testo||"")}</div>
-            <div class="lr-sub" style="margin-top:6px;">Fatto: ${escapeHtml(noteDateLabel(n.fattoIl))}</div>
-          </div>
-          <span class="pill pill-accepted">FATTO</span>
-        </div>`).join("") : `<p class="empty">Archivio vuoto.</p>`}
+    <div class="note-board">
+      ${col("Da fare", daFare, "da_fare", "Nessuna nota da fare.")}
+      ${DB_EXTRA.noteComunicazioni ? col("In corso", inCorso, "in_corso", "Nessuna nota in corso.") : ""}
+      ${col("Fatte <span style=\"font-weight:500;font-size:12px;color:var(--muted);\">(restano 4 giorni)</span>", fatte, "fatta", "Nessuna nota completata di recente.")}
     </div>
   `;
+}
+function openNoteForm(id){
+  const n = id ? findItem("noteComunicazioni", id) : null;
+  const e = noteExtra(n), ex = DB_EXTRA.noteComunicazioni;
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>${n ? "Modifica nota" : "Nuova nota"}</h2>
+    <div class="form-grid">
+      ${ex ? `<div class="field"><label>Cliente</label>
+        <select id="nota-f-cliente" onchange="document.getElementById('nota-f-nome-wrap').style.display=this.value?'none':'block'">
+          <option value="">— Altro / nome libero —</option>${clientOptions(e.clientId,false)}
+        </select></div>` : ""}
+      <div class="field" id="nota-f-nome-wrap" style="${ex && e.clientId ? 'display:none;' : ''}"><label>Nome persona</label>
+        <input id="nota-f-nome" placeholder="Nome cliente / referente" value="${escapeHtml(n ? (n.nomePersona||'') : '')}"></div>
+      <div class="field"><label>Operatore</label>
+        <select id="nota-f-op"><option value="">Seleziona operatore…</option>${NOTE_OPERATORS.map(o => `<option value="${escapeHtml(o)}" ${n && n.operatore === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join("")}</select></div>
+      ${ex ? `<div class="field"><label>Scadenza <span style="font-weight:500;color:var(--muted);">(facoltativa)</span></label>
+        <input id="nota-f-scad" type="date" value="${escapeHtml(e.scadenza)}"></div>
+      <div class="field"><label>Priorità</label>
+        <select id="nota-f-prio"><option value="normale" ${e.priorita==='normale'?'selected':''}>Normale</option><option value="urgente" ${e.priorita==='urgente'?'selected':''}>Urgente</option></select></div>` : ""}
+    </div>
+    <div class="field"><label>Testo</label>
+      <textarea id="nota-f-testo" rows="5" placeholder="Scrivi la nota / attività da gestire…">${escapeHtml(n ? (n.testo||'') : '')}</textarea></div>
+    <div class="form-actions" style="justify-content:space-between;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-primary" onclick="saveNoteForm('${n ? n.id : ''}')">Salva nota</button>
+        <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+      </div>
+      ${n ? `<button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteNota('${n.id}')">Elimina</button>` : ""}
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+  setTimeout(() => document.getElementById("nota-f-testo")?.focus(), 50);
+}
+async function saveNoteForm(id){
+  const ex = DB_EXTRA.noteComunicazioni;
+  const clientId = ex ? String(document.getElementById("nota-f-cliente")?.value || "") : "";
+  const c = clientId ? state.clients.find(x => x.id === clientId) : null;
+  const nomePersona = c ? clientDisplayName(c) : String(document.getElementById("nota-f-nome")?.value || "").trim();
+  const operatore = String(document.getElementById("nota-f-op")?.value || "").trim();
+  const testo = String(document.getElementById("nota-f-testo")?.value || "").trim();
+  if(!nomePersona){ showToast("Scegli un cliente o scrivi il nome della persona"); return; }
+  if(!operatore){ showToast("Seleziona l'operatore"); return; }
+  if(!testo){ showToast("Inserisci il testo della nota"); return; }
+  const prev = id ? findItem("noteComunicazioni", id) : null;
+  const note = prev ? Object.assign({}, prev) : {id:uid(), tipo:"Comunicazione", fatto:false, creatoIl:new Date().toISOString(), fattoIl:""};
+  note.nomePersona = nomePersona; note.operatore = operatore; note.testo = testo;
+  if(ex){
+    note.extra = Object.assign({}, (prev && prev.extra) || {}, {
+      clientId, scadenza:String(document.getElementById("nota-f-scad")?.value || ""),
+      priorita:document.getElementById("nota-f-prio")?.value === "urgente" ? "urgente" : "normale"
+    });
+  }
+  const saved = await upsertOneReturning("noteComunicazioni", note);
+  if(!saved) return;
+  const i = state.noteComunicazioni.findIndex(x => x.id === saved.id);
+  if(i >= 0) state.noteComunicazioni[i] = saved; else state.noteComunicazioni.push(saved);
+  closeModal();
+  showToast(prev ? "Nota aggiornata" : "Nota salvata");
+}
+async function setNotaStato(id, stato){
+  const n = findItem("noteComunicazioni", id); if(!n) return;
+  const upd = Object.assign({}, n, {extra:Object.assign({}, n.extra || {}, {stato})});
+  const saved = await upsertOneReturning("noteComunicazioni", upd); if(!saved) return;
+  const i = state.noteComunicazioni.findIndex(x => x.id === id); if(i >= 0) state.noteComunicazioni[i] = saved;
+  renderNote();
+}
+async function riapriNota(id){
+  const n = findItem("noteComunicazioni", id); if(!n) return;
+  const upd = Object.assign({}, n, {fatto:false, fattoIl:""});
+  const saved = await upsertOneReturning("noteComunicazioni", upd); if(!saved) return;
+  const i = state.noteComunicazioni.findIndex(x => x.id === id); if(i >= 0) state.noteComunicazioni[i] = saved;
+  renderNote();
+  showToast("Nota riaperta");
+}
+function deleteNota(id){
+  askConfirm("Eliminare questa nota?", async () => {
+    await dbDelete("noteComunicazioni", id);
+    state.noteComunicazioni = state.noteComunicazioni.filter(n => n.id !== id);
+    closeModal();
+    showToast("Nota eliminata");
+  });
 }
 
 function trasformaNotaInLead(id){
@@ -6026,90 +6139,6 @@ function trasformaNotaInLead(id){
     stato:"Nuovo",
     fonte:`nota:${n.id}`
   });
-}
-
-async function addNotaComunicazione(){
-  const tipo="Comunicazione";
-  const nomePersona=String(noteDraft.nomePersona||document.getElementById("nota-persona")?.value||"").trim();
-  const testo=String(noteDraft.testo||document.getElementById("nota-testo")?.value||"").trim();
-  const operatore=String(noteDraft.operatore||document.getElementById("nota-operatore")?.value||"").trim();
-
-  if(!nomePersona){ showToast("Inserisci il nome della persona"); return; }
-  if(!testo){ showToast("Inserisci il testo della nota"); return; }
-  if(!operatore){ showToast("Seleziona l'operatore"); return; }
-
-  const note={
-    id:uid(), tipo, nomePersona, testo, operatore,
-    fatto:false, creatoIl:new Date().toISOString(), fattoIl:""
-  };
-  const saved=await upsertOneReturning("noteComunicazioni",note);
-  if(!saved) return;
-  const i=state.noteComunicazioni.findIndex(x=>x.id===saved.id);
-  if(i>=0) state.noteComunicazioni[i]=saved; else state.noteComunicazioni.push(saved);
-  noteDraft={nomePersona:"",testo:"",operatore:""};
-  renderNote();
-  showToast("Nota salvata");
-}
-
-
-function modificaNotaComunicazione(id){
-  const n=findItem("noteComunicazioni",id);
-  const el=document.getElementById(`nota-desc-${id}`);
-  if(!n || !el) return;
-
-  el.dataset.originalValue=el.value;
-  el.readOnly=false;
-  el.focus();
-  try{ el.setSelectionRange(el.value.length,el.value.length); }catch(e){}
-
-  const editBtn=document.getElementById(`nota-modifica-${id}`);
-  const saveBtn=document.getElementById(`nota-salva-${id}`);
-  const cancelBtn=document.getElementById(`nota-annulla-${id}`);
-  if(editBtn) editBtn.style.display="none";
-  if(saveBtn) saveBtn.style.display="";
-  if(cancelBtn) cancelBtn.style.display="";
-}
-
-function annullaModificaNota(id){
-  const el=document.getElementById(`nota-desc-${id}`);
-  if(!el) return;
-  if(el.dataset.originalValue!==undefined) el.value=el.dataset.originalValue;
-  el.readOnly=true;
-
-  const editBtn=document.getElementById(`nota-modifica-${id}`);
-  const saveBtn=document.getElementById(`nota-salva-${id}`);
-  const cancelBtn=document.getElementById(`nota-annulla-${id}`);
-  if(editBtn) editBtn.style.display="";
-  if(saveBtn) saveBtn.style.display="none";
-  if(cancelBtn) cancelBtn.style.display="none";
-}
-
-async function salvaDescrizioneNota(id){
-  const n=findItem("noteComunicazioni",id);
-  if(!n) return;
-
-  const el=document.getElementById(`nota-desc-${id}`);
-  const testo=String(el?.value||"").trim();
-
-  if(!testo){
-    showToast("La descrizione non può essere vuota");
-    return;
-  }
-
-  const precedente=n.testo;
-  n.testo=testo;
-
-  const saved=await upsertOneReturning("noteComunicazioni",n);
-  if(!saved){
-    n.testo=precedente;
-    return;
-  }
-
-  const i=state.noteComunicazioni.findIndex(x=>x.id===id);
-  if(i>=0) state.noteComunicazioni[i]=saved;
-
-  renderNote();
-  showToast("Descrizione aggiornata");
 }
 
 async function markNotaFatta(id){
@@ -7149,6 +7178,7 @@ function openClientHistory(clientId){
     </div>
     <div class="form-actions" style="margin-bottom:18px;flex-wrap:wrap;">
       <button class="btn btn-primary btn-sm" onclick="newOrderForClient('${c.id}')">+ NUOVO ORDINE</button>
+      <button class="btn btn-outline btn-sm" onclick="newQuoteForClient('${c.id}')">+ PREVENTIVO</button>
       <button class="btn btn-outline btn-sm" onclick="openEditClient('${c.id}')">Modifica anagrafica</button>
       ${waMePhone(c.telefono)?`<button class="btn btn-outline btn-sm" onclick="openClientWhatsapp('${c.id}')">WHATSAPP</button>`:""}
       ${c.dropboxFolderUrl
@@ -7883,21 +7913,23 @@ function linesEditor(collection, id, righe, options={}){
   return `
     <div style="overflow-x:auto;">
       <table class="lines-table">
-        <thead><tr><th>Descrizione</th><th class="num">Quantità</th><th class="num">Prezzo unit. €</th><th class="num">Totale</th><th></th></tr></thead>
+        <thead><tr><th>Descrizione</th><th class="num" style="width:96px;">Quantità</th><th style="width:78px;">U.M.</th><th class="num" style="width:104px;">Importo €</th><th style="width:78px;">IVA</th><th class="num" style="width:104px;">Totale</th><th style="width:44px;"></th></tr></thead>
         <tbody>
           ${righe.map(r=>`
             <tr>
-              <td><input class="desc-input" value="${escapeHtml(r.descrizione||'')}" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)"></td>
-              <td class="num"><input class="num" type="number" min="0" step="1" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
+              <td><textarea class="desc-input" rows="3" style="min-width:280px;width:100%;font-family:inherit;font-size:14px;resize:vertical;" onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)">${escapeHtml(r.descrizione||'')}</textarea></td>
+              <td class="num"><input class="num" type="number" min="0" step="any" value="${r.quantita}" onchange="updateRigaField('${collection}','${id}','${r.id}','quantita',this.value)"></td>
+              <td><select class="inline" onchange="updateRigaField('${collection}','${id}','${r.id}','um',this.value)">${[...new Set([...QUOTE_UM, r.um||'pz'])].map(u=>`<option ${u===(r.um||'pz')?'selected':''}>${escapeHtml(u)}</option>`).join('')}</select></td>
               <td class="num"><input class="num" type="text" inputmode="decimal" value="${workPriceInputValue(r.prezzoUnitario)}" onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',normalizeMoneyFieldValue(this.value));this.value=workPriceInputValue(this.value)"></td>
-              <td class="num">${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</td>
+              <td><select class="inline" onchange="updateRigaField('${collection}','${id}','${r.id}','iva',this.value)">${[...new Set([...QUOTE_IVA_RATES, quoteRigaIva(r)])].map(v=>`<option value="${v}" ${v===quoteRigaIva(r)?'selected':''}>${v}%</option>`).join('')}</select></td>
+              <td class="num" id="qrt-${r.id}">${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}</td>
               <td><button class="btn btn-ghost btn-sm" onclick="removeRiga('${collection}','${id}','${r.id}')">✕</button></td>
             </tr>
-          `).join("") || `<tr><td colspan="5" class="empty">Nessuna riga.</td></tr>`}
+          `).join("") || `<tr><td colspan="7" class="empty">Nessuna riga.</td></tr>`}
         </tbody>
       </table>
     </div>
-    ${showAdd ? `<button class="btn btn-outline btn-sm" onclick="addRiga('${collection}','${id}')">+ Aggiungi riga</button>` : ''}
+    ${showAdd ? `<button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="addRiga('${collection}','${id}')">+ Aggiungi riga</button>` : ''}
   `;
 }
 function findItem(collection, id){ return state[collection].find(x=>x.id===id); }
@@ -7924,7 +7956,7 @@ function adjustWarehouseQty(articoloId, delta){
 function updateRigaField(collection, id, rigaId, field, value){
   const item = findItem(collection, id);
   const riga = item.righe.find(r=>r.id===rigaId);
-  riga[field] = (field==='quantita'||field==='prezzoUnitario') ? Number(value)||0 : value;
+  riga[field] = (field==='quantita'||field==='prezzoUnitario'||field==='iva') ? Number(value)||0 : value;
   if(collection==='orders' && field==='categoria'){
     recalcFasi(item);
     if(value!=="Lavorazioni Esterne"){
@@ -7936,13 +7968,312 @@ function updateRigaField(collection, id, rigaId, field, value){
     }
   }
   saveState(collection);
+  if(collection==='quotes'){ refreshQuoteLive(id); return; }
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
 }
 
 
-/* ============ PREVENTIVI ============ */
+/* ============ PREVENTIVI · DATI, NUMERAZIONE, TOTALI, PDF ============ */
+const QUOTE_COMPANY = {
+  ragione:"CREATIVO' GROUP SRLS",
+  indirizzo:"VIA GIUSEPPE TAVERNA 43, 00100 Roma (RM)",
+  telefono:"0645665328", web:"www.creativogroup.it", email:"creativogroupsrls@gmail.com",
+  pec:"creativogroupsrls@legalmail.it", cf:"14578781008", piva:"14578781008", rea:"RM 1531591"
+};
+const QUOTE_PAY_DEFAULT = {modalita:"Bonifico", scadenza:"Vista fattura", banca:"BNL Gruppo Bnp Pribas", iban:"IT88J0100503234000000001943", bic:"BNLIITRR"};
+const QUOTE_FIRST_NUMBER = 450;
+const QUOTE_SERIE = "A";
+const QUOTE_UM = ["pz","mq","ml","kg","h","forf."];
+const QUOTE_IVA_RATES = [22,10,4,0];
+const QUOTE_LOGO_DATAURL = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAgEASABIAAD/7QAsUGhvdG9zaG9wIDMuMAA4QklNA+0AAAAAABAASAAAAAEAAQBIAAAAAQAB/+FLmGh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8APD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNS42LWMxNDMgNzkuMTYxMjEwLCAyMDE3LzA4LzExLTEwOjI4OjM2ICAgICAgICAiPgogICA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgogICAgICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgICAgICAgICB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iCiAgICAgICAgICAgIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIKICAgICAgICAgICAgeG1sbnM6eG1wR0ltZz0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL2cvaW1nLyIKICAgICAgICAgICAgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iCiAgICAgICAgICAgIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIgogICAgICAgICAgICB4bWxuczpzdEV2dD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3NUeXBlL1Jlc291cmNlRXZlbnQjIgogICAgICAgICAgICB4bWxuczppbGx1c3RyYXRvcj0iaHR0cDovL25zLmFkb2JlLmNvbS9pbGx1c3RyYXRvci8xLjAvIgogICAgICAgICAgICB4bWxuczpwZGY9Imh0dHA6Ly9ucy5hZG9iZS5jb20vcGRmLzEuMy8iPgogICAgICAgICA8ZGM6Zm9ybWF0PmltYWdlL2pwZWc8L2RjOmZvcm1hdD4KICAgICAgICAgPGRjOnRpdGxlPgogICAgICAgICAgICA8cmRmOkFsdD4KICAgICAgICAgICAgICAgPHJkZjpsaSB4bWw6bGFuZz0ieC1kZWZhdWx0Ij5sb2dvIGNyZWF0aXZvPC9yZGY6bGk+CiAgICAgICAgICAgIDwvcmRmOkFsdD4KICAgICAgICAgPC9kYzp0aXRsZT4KICAgICAgICAgPHhtcDpNZXRhZGF0YURhdGU+MjAyMC0wMi0wNFQxODozNDo0NyswMTowMDwveG1wOk1ldGFkYXRhRGF0ZT4KICAgICAgICAgPHhtcDpNb2RpZnlEYXRlPjIwMjAtMDItMDRUMTc6MzQ6NTNaPC94bXA6TW9kaWZ5RGF0ZT4KICAgICAgICAgPHhtcDpDcmVhdGVEYXRlPjIwMjAtMDItMDRUMTg6MzQ6NDcrMDE6MDA8L3htcDpDcmVhdGVEYXRlPgogICAgICAgICA8eG1wOkNyZWF0b3JUb29sPkFkb2JlIElsbHVzdHJhdG9yIENDIDIyLjAgKFdpbmRvd3MpPC94bXA6Q3JlYXRvclRvb2w+CiAgICAgICAgIDx4bXA6VGh1bWJuYWlscz4KICAgICAgICAgICAgPHJkZjpBbHQ+CiAgICAgICAgICAgICAgIDxyZGY6bGkgcmRmOnBhcnNlVHlwZT0iUmVzb3VyY2UiPgogICAgICAgICAgICAgICAgICA8eG1wR0ltZzp3aWR0aD4yNTY8L3htcEdJbWc6d2lkdGg+CiAgICAgICAgICAgICAgICAgIDx4bXBHSW1nOmhlaWdodD4xNjQ8L3htcEdJbWc6aGVpZ2h0PgogICAgICAgICAgICAgICAgICA8eG1wR0ltZzpmb3JtYXQ+SlBFRzwveG1wR0ltZzpmb3JtYXQ+CiAgICAgICAgICAgICAgICAgIDx4bXBHSW1nOmltYWdlPi85ai80QUFRU2taSlJnQUJBZ0VBbGdDV0FBRC83UUFzVUdodmRHOXphRzl3SURNdU1BQTRRa2xOQSswQUFBQUFBQkFBbGdBQUFBRUEmI3hBO0FRQ1dBQUFBQVFBQi8rNEFEa0ZrYjJKbEFHVEFBQUFBQWYvYkFJUUFCZ1FFQkFVRUJnVUZCZ2tHQlFZSkN3Z0dCZ2dMREFvS0N3b0smI3hBO0RCQU1EQXdNREF3UURBNFBFQThPREJNVEZCUVRFeHdiR3hzY0h4OGZIeDhmSHg4Zkh3RUhCd2NOREEwWUVCQVlHaFVSRlJvZkh4OGYmI3hBO0h4OGZIeDhmSHg4Zkh4OGZIeDhmSHg4Zkh4OGZIeDhmSHg4Zkh4OGZIeDhmSHg4Zkh4OGZIeDhmSHg4Zi84QUFFUWdBcEFFQUF3RVImI3hBO0FBSVJBUU1SQWYvRUFhSUFBQUFIQVFFQkFRRUFBQUFBQUFBQUFBUUZBd0lHQVFBSENBa0tDd0VBQWdJREFRRUJBUUVBQUFBQUFBQUEmI3hBO0FRQUNBd1FGQmdjSUNRb0xFQUFDQVFNREFnUUNCZ2NEQkFJR0FuTUJBZ01SQkFBRklSSXhRVkVHRTJFaWNZRVVNcEdoQnhXeFFpUEImI3hBO1V0SGhNeFppOENSeWd2RWxRelJUa3FLeVkzUENOVVFuazZPek5oZFVaSFREMHVJSUpvTUpDaGdaaEpSRlJxUzBWdE5WS0JyeTQvUEUmI3hBOzFPVDBaWFdGbGFXMXhkWGw5V1oyaHBhbXRzYlc1dlkzUjFkbmQ0ZVhwN2ZIMStmM09FaFlhSGlJbUtpNHlOam8rQ2s1U1ZscGVZbVomI3hBO3FibkoyZW41S2pwS1dtcDZpcHFxdXNyYTZ2b1JBQUlDQVFJREJRVUVCUVlFQ0FNRGJRRUFBaEVEQkNFU01VRUZVUk5oSWdaeGdaRXkmI3hBO29iSHdGTUhSNFNOQ0ZWSmljdkV6SkRSRGdoYVNVeVdpWTdMQ0IzUFNOZUpFZ3hkVWt3Z0pDaGdaSmpaRkdpZGtkRlUzOHFPend5Z3AmI3hBOzArUHpoSlNrdE1UVTVQUmxkWVdWcGJYRjFlWDFSbFptZG9hV3ByYkcxdWIyUjFkbmQ0ZVhwN2ZIMStmM09FaFlhSGlJbUtpNHlOam8mI3hBOytEbEpXV2w1aVptcHVjblo2ZmtxT2twYWFucUttcXE2eXRycSt2L2FBQXdEQVFBQ0VRTVJBRDhBN3BCcFhrcURSNy9XdGV0TE5VUysmI3hBO3Z6Y1hseEdwTzE5TWlBa2lwSjJWUjFPd0daK2ZVNUlrQVNJSERIL2NoMUdsMEdESkV5bENKa1o1TnlQNmNrSWx4K1c2aUdTODh1U2EmI3hBO2RhenVJNHJ5OTAxNEllVEdpK296Sis1REhvWlFvNkRxY3h6cWNoL2lQemNuK1ROTi9xY1A5S0ZlNy81VjFhNnBkYWF2bDlybTdzdlQmI3hBOyt0QzAwMlc0VkRLZ2tRRjRvMldwVTE2NVdjc2p6SlNPemRPUDhuRC9BRW9iaXZ2eXpOcGZ6L281SVpOTFZIdnJPV3hraHVrV1VsWTImI3hBOzlDU05aR1Z5Q0ZLZ2c1VVlnODIwYVRFT1VZL0pjTDd5WU9ubHErLzdoRjEvMVN5bzZiR2VjUTJEREFkQXlQWC9BRExvdWdSV3N1cTMmI3hBO0F0MHZibU96dHlRVzVUUzFJRkZCb0FGTE0zUlFDVHRsN1lpTGpTTkx1SmpOUGF4U3ltZ0xzb0pOTmh1Y3c4M1orbnl5NHB3aktYZVEmI3hBO0NrRXBSL3pyMmxlV290VzFDQ05JSUxlS1dlWVI4bTNWZDZLQ1R1YzF2WnZaZWxscDhVampnWkdFVGZDT2RCbktadm1tK242dFk2ZzkmI3hBOzVIYk9Xa3NMaHJXNlJsS2xKVlZYcFEwNm82c0QzQnJtK2EwTmYrWjlDMCs1dXJlOXUwdDJzYlpMMjdlVDRVaWhsZG80Mlp6c0M3eHMmI3hBO0ZIVTB4VkpVODcrV29CSGVYT24zdW0yVG40ZFR1N0dhM2dYbHNHbGQxQmhVMSsxSUZIam1CaTdMMHVPZkhISENNKzhSRnRoeXlJb2wmI3hBO2x5c0dBWlRVSGNFZENNejJ0Mkt1eFY1OXBPbWVRdE84azZWcW10V05vRFBCQ3ZOb1JMTk5OSWxRa2FLclNTeU52UlZCSnpaYTNWWlImI3hBO2xrQkkxWjZ1azdPN08wOHRQQW1FU1RFZEFyVy8vS3VXdXJXMnZQTC9BT2pKTDF4Rlp0ZjJCZ2psa2JkWXhJVktDUnYyVVloajJCekQmI3hBO09weUgrSS9OemY1TTAzK3B3LzBvYmtmOHZJN3E1dG92TGt0dzlwSzBFMGx0cGMwMFlrV25KUTZSbFRTdlk1QTVKSG1VanM3VGpsamgmI3hBOy9wUTIycGZsa21udmVycDZFUjNVZGhMYWl4bEYwbHpMVGhFMXNZeE1DM0lFZkRRamNiWlVZQTh3MmpTWWh5akg1SW15dS9LVDNrQ1EmI3hBOytYcnlHVnBFV09WOUx1WTFSaXdBWm5hTUJRRHVXUFRLL3dBdGp1K0VOZ3hSSElCUGRVOHlhUHBlb2FicDk3UDZWM3EwalJXVWZGbTUmI3hBO01nRmFrQWhSVjFXcmJjbVVkU011YkZtdGFUcGhzTDY1TnJFYmowWkg5WGlPWElJYUd2am1sN1cwR0E0TXVRd2p4OEVqZEM3NFN5aWQmI3hBOzNUUjZEcGNWdGNUUVJ4R1dhR0NKMVNwOVdkeEhIMEcxV1liNWs0T3k5TkNwUnh3RWgxNFFwbWU5RmFUcTFqcXRuOWNzbkx3K3BMQTMmI3hBO0pTckxMYnl0REtqSzFDQ3NrYktjMkxGQmFoNXY4dTJJMUFYbDJJeHB6eFEzUTRzeDlhNFFQRkRHcWdtU1YxWlNFUUZ0eHR2Z0lCRkYmI3hBO1VCYmVjZkwwRjFCSGRXVjNwSDFwaEZiM043YVNXOEx5T2FMR1pTT0tPMzdLdVFUMEcrWWVuN04wK0dYRmp4eGhMdkFBWnl5U094TEsmI3hBO016V0RzVmRpcnNWZGlyc1ZkaXJ6OTFpbDFieXhCZFUrcG5XOVpsUldORmE3aGx1bWdCRktOUWVvNjFQVlFlMjJScXZySDlXSCs0RGgmI3hBOzZIKzdQOWZKL3dCTkpNejF1TFM1ZEd2NHRXVlgwdDdlVmI5SlBzR0FvUktHcDI0VnJtTzVqQnZMMm9hd3ZtcnpJK2c2YkZlMk1vMDEmI3hBOzBlNXVudG5WVFl4OEFWYUdaajhQWGthNHFsL21DNzFPOGs4eXk2clpwcCt1VzFoYVIyVmlzbnF3UGF2ZU1SUDlaVUtYNXlKeFpURXAmI3hBO2pwKzF5cmlyTjRwL1B4a1FTMldsQ0xrT1pXN3VTd1d1OUFiWUFtbnZpckZQTUdzYUhxM25EVk5QMWEzdjduU2RNc1gwd0xaNmRmM3MmI3hBO2JYT29JR3VpWkxTQ1pGYU8zOUpWcTFSemJiRldTL2wzcjArcytWcmFTN01oMUt6TFdXbyt0SEpCS1o3YzhUSThNcXBKSDZ5Y1pRcksmI3hBO0RSaGlxWGVlL3dEeVU5NS96QXcvOGFaZ2RsLzRyaS80WEQvY2hsTG1VZEpUU1BQcXlrOExMekpiZW05U0FvdjdGUzZmN0tXMUxWOW8mI3hBO2htZXhZdGJvbW82bjVmMXUrM3MvTWV1eVhjS3Nhb1liU3luR2xJZGlPTENFWEtpdjk0M2ppcjA2ZUdHZUNTR2RGa2dsVXBMRzRCVmsmI3hBO1lVWldCMklJNjRxeDM4dG41K1NOTDR1WklFUjQ3U1Fua1d0bzVYUzJia1MxYXdxaHJYRldTNHE3RlhuWGxkSVpkYThuSmRiaURRSjUmI3hBOzlQUnZzK3VYdDQ1WEcvMjBpZmlOdnNzMlpXdS92NS8xaTRQWmYrTFkvd0NvUHVaaDVxR2gvb0c3ZlhFTDZaRUZsbVVjeTFZM0R4bFAmI3hBO1QrUG1KQXZIanZYTVZ6bU9hRGZlYUliclhVMDdTYmU3dGhxdHlWbWx2VEF4UHcxSEFRUzlQOWJGV01hcGNhdmN5VDN0emFSMm5tWC8mI3hBO0FCRHBFRXVuU01mcThjY1ZHdDZYQ2MvVlYvVVltVGdwL1o0RGp1cTlFc3B2T3pYVVl2YlBUWTdRbjk4OE56TzhnWC9KVnJkRkorYkQmI3hBO0ZXQTZ2cStsYTlxSG1lV2VQVVRKR0JwZWdYVnRwV28zc01VbGhKNnpYS1MyOXZMR1Q5ZlVWQWIvQUhVdUtzMzB6WGsxL3dBaUxxNGomI3hBO01EM2RsSWJpM1lGV2huVkdTZUZnZHcwVXFzakE5eG1CMnAvaXVYL2hjLzhBY2xsSG1Gdm5ML2psNlYvMjFkTC9BT291TE0ySDBoaWcmI3hBOzdlOXRmTFBtYlg0Ynh4RHBWN2JOcjhEbm9yUUtzV29BZXkwaGw2OVhiSktrdmwvVFpZL05QbG1YV0U0M21vMnVyYTI4VGdmRHFNOGwmI3hBO3Fxb1R0OGR0YVN0Q20xZUFiZmJGV2ErYTdiVGJueXhxMEdwOGYwZTlwUDhBV2krd1dNUmtzMWUzR2xhOXNWZDVUbnZyanlybzArb1YmI3hBOyt2eTJOczkzVWtuMW1oVXlWSnArMVhGVTF4VjJLdXhWMktwVHJ2bWZUTkVDbTk5U2pLWEFpUXlFZ0dob28rSTByMkdHdHJZOFc5SVQmI3hBOy9IZmw4V3FYTE5Nc01qZW1oTVQxOVFVSlFnRFpnR3J2NytHUTR0NnBraHJYUzlKMWp5L2NXRis1UURVcitXS1NPUXhUUlN4NmhNMGMmI3hBO3NUcVF5T3AzQkg2c3pOVkU4US9xdy8zSWNIUXlBZ2QvNDhuL0FFMGtweStWSnIrRkxQWFBNaytwNllwQm1zaWx0QUxsUWFoTGw0a1UmI3hBO3VuOHlwd0RkR3FEVE1haTVuR085T05QMHpUckhWZFQxR0s0ckpxalF2TEdXWGlub1JDRlFsUEZWNzRFOFE3MEZyM2xmUzlZdUxtNGEmI3hBOzlhM211ck1XTFBFWXlRcVRDZEhITU44U3RYcnR2Z3RlSUxmMExydi9BRk45MS95STAvOEE2b1k4UVcwZDViMGl5MFBTbHNZN28zTWgmI3hBO2tsdUxtN2xLZXBOUGNTTkxMSS9FS3RXZHpzQlFEYkJ4anZTdnN0SnNiUFdkUzFTQ2NodFVFQnViZXErbjZzQ21QMWh0eTVQSHdSdCsmI3hBO2lMNzFlT1BlcUd1ZEV0OWM4bkpwTnhJOFVGM2F3bzhrZE9RQVZXMnFDTzJZWFpmK0s0ditGdy8zSVpTNWxVODIrVjdUekxvejZaY3omI3hBO3pXdFhXU0s3dG1DVHhNdXhNYk1HQTVJV1E3ZEdPWjdGWDFUeTdwT3BhUU5KdUllTm1ucG1BUXNZbmhhQWhvWGhkQ0dSbzJVRlNPbUsmI3hBO3BOUDVNMWU5dHYwZnF2bVc5dk5MWUZMbUJZN2UybXVJeUtGSlo0RVJ3ckQ3WHBjQ2ZIRldVVzl2QmJ3UjI5dkdzVUVLckhGRWdDcXEmI3hBO0tLS3FnZEFBTVZYNHE3RldGNlJvMmw2ejVKMEJKcnA3TzlzN2VLYXh2N2FSVXVMZWIwdUJaQ3daVFZXS3NqcVZZYkVITXpYUlBqVC8mI3hBO0FLeGRmMlpNZmxzZS93REFQdVJTK1dHdTdpMWsxN1hwTldnczVGbmhzaWtFRURUUnNHamxsV0pRMGpSc09TZ3R4Qm9lTlFNeEtMbmMmI3hBO1k3MDUwdXpzTlA4QXJmcFhBZjY1Y3lYVDhtWFpwYVZBcFRiYkFuaUNUYTM1UDAvVTd1NHUwMVNXMHVKNTdLNlI0akN3amxzQ3hqWlYmI3hBO2tWMStMbDhWUjJ3V3ZFRjhtaDYreU1xK2NMcFNRUUdFR243RTkvN2pIaUMybXVnNmRwMmk2TFphVGFTOHJleGhTQkhkZ1hiZ0tGM1AmI3hBO2RtUHhNZTV3Y1k3MG9IOUVXV2w2ZHI3VzA1YUxVV252VGJrcndpbGtoQ3lpT2dCcEk2bVExcjhUTjQ1Z2RxVEg1WEx2L2s1Lzdrc28mI3hBOzh3bUdvNlREcWRwYXhUT3lMYnoyMTJwU2xTOXRJc3FnMUIySlhmTStIMGhpZy9OUGxIVHZNYVdLM2p5Ui9VcmdUZ3hGUjZrZENzbHYmI3hBO0p5RFZpbFhaeDdESktpUE1IbDJ4MXUyaWp1SGxndUxXUVhGamZXN2NKN2VZS1ZFa2JVSXJ4WXFWWUZXQklZRUdtS3BWTjVMdjlSRWQmI3hBO3Y1ZzEyNDFUVEVJYVRUeEZCYlJ6bFRWZnJCaFVPNitLQXFyZnRBamJGV1U0cTdGWFlxN0ZYWXF0ZUtKeUM2S3hIUWtBL3J3MmdnRkwmI3hBOzM4dGFDNElhd2hJWnpJUnhvQ3pkVHQ4c0ZKWFNlWFBMMHNyelNhWGFQTEl4ZVNSb0lpek14cVNTVnFTVGx3MU9RQ3VLVmU4dUlkQnAmI3hBO3lTVGpoWi9vajlUaDVjOHZEcHBkb1BsQkYvelRrVG1tZVpQelpEUjRSeWhIL1NoY05BMElkTk90ZitSTWYvTk9RTWlXWTArUCtiSDUmI3hBO0J2OEFRZWlqcHA5dC93QWlZLzZaRXhCWkRERHVIeWIvQUVOby93RHl3Mi8vQUNLVCttUU9HQjZENU11Q1BjMk5IMGtkTEszL0FPUlMmI3hBO2YweUIwdUkvd3grUVRRWERTOU5IUzBoSC9QTlA2Wkg4bmgvbVIvMG9aV2lGVlZVS29DcW9vcWpZQURzTXlJeEFGRGtodkNyc1ZkaXImI3hBO3NWZGlyc1ZTd2VWL0xRNmFUWkQ1VzhYL0FEVGw1MVdVL3dBVXZtWERIWjJuSExIRC9TajlTOGVYZkw0NmFaYUQ1UVIvODA1QTVwbm0mI3hBO1Q4MlkwZUVjb1IvMG9YRFFkREhUVHJVZjg4WS8rYWNnWkVzeHA4ZjgyUHlEWTBUUlIwc0xiL2tUSC9USUdJUFJrTVVPNGZKRGFyb04mI3hBO3ZMcGwzRnB0dmEyK29QQzYyazdReGxVbEtrSXhCUnhRTi9rbklIREEvd0FJK1RMZ2ozTUxuOGxmbUExdGJXaTNHbnNyT0pMMjlWbGcmI3hBO2xxV1ZpaUt0ay93VkJBNHVob2V1Uk9seGZ6WS9JTXFaTHBYbC9XWXRDYUM5a3MyMVgwNVZqdUJDa2dXUS93QjB6TUk0RllMM0hwRHcmI3hBO3J0VXgvSjRmNWtmOUtFMmtseG9mNXdKcHNscFo2M1ltNGYwaEhlU0FxWWdzS2lYakdiZVVzSGw1RWNwQ1FLZkVlbVpLRTUxelNQT04mI3hBO3hvMWxaNmRxS1EzRWJRaTdsRHRHN0lpcnovZWxKMmJrNnQwQ0VnL2FGRHlWU0xUOUYvTlM0dDQ1cm5VUmFTeW5oZDIwOHlPd2pSSkYmI3hBO0JScmVIaXJNeFJxb1JzTjZtdFZVV3VqZm1kY1hEM0VtcnBhSXNrNGh0dVVMZ3hOSURHVzQyb29lQ1VIeE1RR1B4RnFjVldZYVpEZHcmI3hBOzZiYVEza25yWGNjTWFYRXRlWE9SVkFkcTBTdFczK3lQbGlxSnhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3UmI3hBO3hWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3ZNWWY4QW5JUHlaTkRIUEhaYWswVXEmI3hBO3E4YmVsQUtxd3FEUXpWNkhNc2FIS1FEV3g5enJNbmJPbGhJeE05d2FPMHVud1hmOHIvOEFKLzhBeXc2ai93QWk0UDhBcXZrVHBNZzYmI3hBO2ZjeC9sdlNmei9zbCtwdy9QL3llZWxqcVAvSXVEL3F2bFVzTWh6RE9QYSttUEtYMlMvVXFMK2UvbFZ1bW42ai9BTWk3Zi9xdmxNcGcmI3hBO2MyK092d25sTDdEK3BVWDg4UExUZE5PMUgvZ0xiL3F2bFIxT1B2YkJxWUhxeDcvb2JEOHJQNWRSL3dDa2RQOEFxcGw3ZW4yay9ucjUmI3hBO1cxZXlTOTAvVDlSbnRaQ3dTVGhicFVxU3AyZWRUMUhobU5sMWVQR2FrYVB4UmFQYjgyZEtVTVcwalVnRnJ5cUxUYW5YL2o0eXFQYWUmI3hBO0NWVkxuNUg5VEtpeEwvb2JEOHJQNWRSLzZSMC82cVpuSWQvME5oK1ZuOHVvL3dEU09uL1ZURldVYWwrY2VoNlpwa3VwMzJsNmpEWXcmI3hBO3FIbG00MnJVVWtBSGl0d3pkL0RNTEgyaGhuUGdqTDFlNC9xWm5ISUMwNzhpZWU5RDg3NkdkYTBVVEN6RXoyLytrSUkzNXhnRTdBdHQmI3hBOzhXWnJCa1dLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWK2U5bjVidS9NR3VyYVFTeFcwRUYmI3hBO2hiM1Y5ZlhCS3cyOXZGYXhjNVpDb1pxQ29BQUJKSkFHNXpJMVgxaityRC9jUmNQUS93QjJmNitUL3BwSkcyZmxEeWRxMTZOSzBQekomI3hBO1BOcTh4RWRqSGZhZXRwYlhNeDJXS09kYm1kbFp6c25xUktLOVNNeG5NY1BKT2cyV2c2WnFldjYxUHAwK3FHNUNXY1ZqOVlNZjFXZG8mI3hBO0hEc1o0YUhrdlRqaXFJcy95MXN0U24wdWZTZGJXNzBYVWJpU3ptdkRidEZQYlR4UW1jcEpiczVyeWpXcUZaQ0R2MHBpcVhmb1g4dS8mI3hBOytwb3ZQKzRWL3dCbldLclBJM2thNjgyWEY3RkZkUjJTMnNTK2xMTUtyTGR6dUlyVzFXaEZIbmtOQWV3Qk9Lc2FaV1JpckFxeW1qS2QmI3hBO2lDT3h4Vm1NL2wxL01uNXI2am9pVGkyYTkxUzlRVGxlWVhqSkk5ZU5WcjlueHpBN0wveFhGL3d1SCs1REtYTXBKcm5sNXRNc05IdjQmI3hBOzV4YzJtc1dwdUlwQXZEaExISTBVMEIzUHhSdW5YdUNEM3pQWXByb241ZDZqcStsMk45RmN4VzV2cExwdjlJcXNVTmxZb3JYRjdOS08mI3hBO1hHTlhmZ0J4cXpBZ1ZPMktxdHY1VjhpWDk0ZE8wM3pYTCtrSElTMWx2dFArcTJNc2g2TDlZRnpOSkdHT3dhU0VEeHBpcjZlLzV4ZnMmI3hBO0x6VC9BTXVydXd2WWpCZVdtclhjRnhDMzJra2pFYXVwcDRFWVZldllxN0ZYWXE3RlhZcTdGWFlxN0ZYWXE3RlhZcTdGWFlxN0ZYWXEmI3hBOzdGWFlxN0ZYWXE3Rlh3cG9jVWw5b1BtM1NMTmVlcDNHbGFYZFF3ajdjc0ZtSVpiaEVIY2hTSktEZWlITWpWZlVQNnNQOXhGdzlEL2QmI3hBO24rdmsvd0Nta21IK1c5RzFEV3Rlc05MMC9rTHU2bVNPTjFyKzdxZDVDUjBWQjhSUFlDdVl6bVBRZk1sMTVWc1BKZmxTSFZMS2ZYZUwmI3hBO2FxdHZmUTNmMVFPaTZnNDVsVEZjY3VmMnZ0WXFtM2xPYlNidGZLZW82SFlIVGRHaDFPL3Q3M1NwWlduZVM3RmdyK3UxeFJHWlhpK0gmI3hBO2lGWGhRMCswVGlyejJYek41U2FKMVR5Zlp4dXlrTElMdlVDVkpHeG9aeU52ZkZXVG14MFBSL0plaWFUZWErZEYxZTdsVHpCZUt0dEwmI3hBO080NXJ4MDhjNHl2SGhEeWxBTy83ekZVay9OYXhzUDhBRWE2OXBjZ20wbnpIRitrYmFaRU1hZXN6dEhkb0ZiZGVOd2owVTlGSXhWT3YmI3hBO0tQOEE1UDhBUC9iWHZ2MXpaZ2RsZjRyaS93Q0Z3LzNJWlM1bEovTGR0YytaZkplb2VYTGVNM0dxYVZjUjZwcEVLaXJ0SE95V3Q3RXQmI3hBO2ZFbUNTbitTeHpQWXNtdUpvcjUvTm5sRFIyRTh1bDZMQnB1a0NMcmNycHQ1RmRhaDZZcjhSbWtXYTRBSFZSVEZYbGVuMkY3cU45QlkmI3hBO1dNTFhGNWRTTEZid0lLczd1YUtvSHVjVmZkbjVSM01OeHBXc3RGS0ovUzFTUzNsblUxRHpXOXRid3pPRDM1U3hzYTRWWjFpcnNWZGkmI3hBO3JzVmRpcnNWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZmbngranZNU1g5bnEya3NZWllvTFI3YTZpblNLUkhTM2omI3hBO1dxbm1yS1FSbVhueG1SQkJGY01mNGgvTkhtNnpUYW1PT0pqSVN2am4vQk04NXlJNVI3azJ2OWYvQUROdmJlNWdsa2doRjRucDNrdHImI3hBO0ZwMXBOT2g2ck5OYnJGTElHN2htTmUrWTV4SHkrWS9XNUg1M0gzVC9BTkpQL2lVa3VkTTgyM2RoWldFNEQybW5DUmJLSXl3QVJpWi8mI3hBO1Vrb1F3SjVPYTc1RXhJN3ZtRWpXUVA4QU8vMGsvd0RpVWJvNmVmZElTRk5OZElGZ3VQcmtRTWxvL0dmMHpGei9BSGhicWpFRWRENFomI3hBO0FtbXdhaUo3L3dEU3kvVW1vMTM4enoyMDcvcEcwYi9xbmtQRkhuOGl5OFVlZnlLUzZ6b25uVFc5VG4xUFV6RmNYMXlRWnBUY1dhVjQmI3hBO3FGVUJWZFZVS3FnQUFVQXdlTVBQNUg5VExqRHBmTHZuU2ZUTGJTNVRBOWpaeVN6V3NMWGRsKzdlY0lKU3JlcHlvM3BMdFdtRHg0LzAmI3hBO3Y5TEw5U2VJS090NjNlNmIrWUdxNnRwTno2VnpGcU4zSmEzTWZGeDhVcmprdFF5a0ZXeWpzMkpqcHNZSW9pRWY5eUdVdWFWNkZyK3MmI3hBO2FCcWtXcWFQZFBaNmhBSEVWd2xDeWlSQ2pmYUJHNnNjelVJYTB2Ynl6dTRyeTBua3Q3dUZ4SkRjUk1Va1J3YWhsWVVJT0tzbG4vTkgmI3hBO3p2TWs0K3ZSUXpYS0dPNHZMYXpzN2E3a1VnZ2g3cUdHT2R1UUpyVjk2NzRxK25mK2NULy9BQ1ZqZjl0RzQvNGhIaFY3TGlyc1ZkaXImI3hBO3NWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZkaXJzVlVQMGZZZjhzMFgvQUwvQUV4VjM2UHNQK1dhTC9nRi9waXImI3hBO3YwZllmOHMwWC9BTC9URlhmbyt3L3dDV2FML2dGL3BpcnYwZllmOEFMTkYvd0MvMHhWMzZQc1ArV2FML0FJQmY2WXE3OUgySC9MTkYmI3hBOy93QUF2OU1WZCtqN0QvbG1pLzRCZjZZcTc5SDJIL0xORi93Qy93Qk1WZCtqN0QvbG1pLzRCZjZZcTc5SDJIL0xORi93Qy8weFZWaWgmI3hBO2lpWGpFaXhyMTRxQUJYNk1WWFlxN0ZYWXE3RlhZcTdGWFlxN0ZYWXE3RlhZcTdGWFlxN0ZYWXE3RlhZcTdGWFlxN0ZYWXE3RlhZcTcmI3hBO0ZYWXE3RlhZcTdGWFlxN0ZYWXE3RlhZcTdGWFlxN0ZYWXE3RlhZcTdGWFlxN0ZYWXE3RlhZcTdGWFlxN0ZYWXE3RlhZcTdGV0RwNS8mI3hBOzgxWFUxMmRLOGxYbW9XTnZkM1ZuSGVwZTZmRXNyV2R3OXRJeXBOTWtnSHFSTjlwY1ZYZjR6OC8vQVBsdnI3L3VJYVgvQU5sR0t1L3gmI3hBO241Ly9BUExmWDMvY1Ewdi9BTEtNVmQvalB6Ly9BT1crdnY4QXVJYVgvd0JsR0t1L3huNS8vd0RMZlgzL0FIRU5MLzdLTVZadGlyR2QmI3hBO2M4eWViYkhVWHR0TzhvM1dyMmloU2w5RGVXTUtNU0trY0o1bzVCeE8yNHhWS05IL0FERDgzNnRZV1dvMmZrVytiVDlRaWl1TGU1TjkmI3hBO3BvQmhtVU9qOERPSEh3dFdoRmNWWjdpcnNWWXZwbm1iemRkYXJIYVhuays2c0xKMlpYMUdTOHNKSTBVQWtNWTRwbmxQSWdEWmUrS3MmI3hBO294VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWNTdvMnVYK24rWFVzdEtpam0xblZ2TUcmI3hBO3VXMWtzM0wwWXd1clhzc3M4dkhjcEZHaFBFRWNqUmFpdGNWVFc4MDN6M3BsakxmMld0SFdyMkJUSWRLdXJhM2hobkNpclJRdkFxU1ImI3hBO093SHdNN3VLOVFSaXJyQysxM1YvTWV1V2tkKzloYTZjMW9zRUloaVovd0IvYkxNM3FGdys0WnUyS29EVmZNUG1uUjVOWDAyYTdndkomI3hBO0lMT0M5czlRU0VSeVJldGNlZ1k1NHVUSTFhRm8yRkswSXB0VXFzay9SR3UvOVgyYi9rUmJmODBZcWxQbnZ6SHIybnkyZGw1ZWlTNDEmI3hBO0VKTnFWNUM2OHVWalpLREpFbTZoWlo1SkVqakpQY245bkZXVVdWNWJYMWxiM3RxNGx0cnFOSm9KQjBhT1JReXNQbURpckE5SjFpODAmI3hBO2I4aWRGMU95S2k2dGRCMDU0aTQ1TFg2dkVOeDlPS3NtMFhWN3lYWDliMGEvSyt0WlBGYzJKVVVMMk4wbjd0ajdyTkZNaCtROGNWU1gmI3hBO1Z2T21yUjY3ZDZmcFVVTTdHZTIwalRvNWVRUnRRa2llN3VwSkhXcDlLMnRBckVMMWFxMUJ4VkZTNkw1OXRJR3ZMWHpDTlN2a0hJNmImI3hBO2RXdHZEYVNrYm1OSGhWWjR1WFFNMGowMnFEdlZWUGRBMW1EV3RGczlWZ1I0bzd1SlpQUmtGSGpZN05HNC9tUnFxY1ZSK0t1eFYyS3UmI3hBO3hWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjVucHkzVm5wdGo1aGh0NUxxSFNkZjh4TGZ3UXEwa3YxVzUmI3hBOzFTOGplU09OUXpPWTNDTVZBcng1VTMyS3FmYWgrWmZsbDlPYi9EK29XMnRhemNJeTZacHRsSXM4MGt4Mlhta1pabzQxYis4ZHdBZzYmI3hBOzRxbEdqZVY3ZlZmTi9tZDlWdWIzNjVDZFBTVjdDL3ZyQ05uK3BKemIwN1dhQlRWdW5JVnhWSy9NdW1XUGw1Zk1tanBJdzBhOTAyMzEmI3hBO0NSN3lacHBWa1M3OUtjdGN6TTA3cDZiSi9lT2VIWWdHbUtwckhxbjVGeFNKSW12Nk1IUWhsUDZWak5DRFVkWjhWVlBMMXQ1aTE3VXQmI3hBO1Q4M2FacWx2YTJXcE9MVFRCTGFHNUxXTmt6cEhLamllTDRacFdrbFhiZFdYRlV3L0x4YnJTaHFQbEsrbFdXNTBhVVMya2lKNlN2WVgmI3hBO2hhU0FwSFZ1S3h5Q1dBQ3BvSXh2aXJINWYvV2RkTi84Qi9UditURU9LcC81N3ZvL0xsM1llY1hSMnRiRlpiTFZFakJaMnRycWhpSVUmI3hBO0NyTXQxSEVxK0Fkc1ZTK1hSZFYwVFJQTHVzdmJ2ZVgrbVhrdW82L2J3QnBKWE9veHlyZU5DdTdQNk1sd0dWUnVVVGl2WVlxbTl4K1omI3hBOzNra1dnbHNkVnQ5VXU1QVJhNlpZeUxQZVRTRGIwMXQwcklHcnMzSlFGL2FvTVZURHlacFY1cGZsbXh0TDBLdDd4ZWE3UkR5VlpyaVImI3hBO3A1RVZxTFVLOGhVR20rS3AxaXJzVmRpcnNWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZkaXJzVllib1MrYmRFdHImI3hBO3V4R2lMZHh0cU9wWGNWd3QzRWdhTzl2NTdxUDRXRlFRa3dCOThWUjY2cjVwUm1aZkxJVm4zY2k4Z0JKOS9oeFZmK212TnY4QTFMZi8mI3hBO0FFK3cvd0JNVmQrbXZOdi9BRkxmL1Q3RC9URlhmcHJ6Yi8xTGYvVDdEL1RGWGZwcnpiLzFMZjhBMCt3LzB4VjM2YTgyL3dEVXQvOEEmI3hBO1Q3RC9BRXhWWDhsYVZkNlA1TjBIU2J3S0x2VHRPdExTNUNIa3ZxUVFKRy9FOXh5WEZVNXhWMktyRmhoV1JwRlJSSTMybkFBWS9NNHEmI3hBO3Z4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3UmI3hBO3hWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VkwvOFJlWC9BUHE1Mm4vSStQOEEmI3hBOzVxeFYzK0l2TC84QTFjN1Qva2ZIL3dBMVlxNy9BQkY1Zi82dWRwL3lQai81cXhWMytJdkwvd0QxYzdUL0FKSHgvd0ROV0t1L3hGNWYmI3hBOy93Q3JuYWY4ajQvK2FzVmQvaUx5L3dEOVhPMC81SHgvODFZcTcvRVhsLzhBNnVkcC93QWo0LzhBbXJGWGY0aTh2LzhBVnp0UCtSOGYmI3hBOy9OV0t1L3hGNWY4QStybmFmOGo0L3dEbXJGWGY0aTh2L3dEVnp0UCtSOGYvQURWaXJ2OEFFWGwvL3E1Mm4vSStQL21yRlVYYTNscGQmI3hBO3grcmF6eDNFVmVQT0psZGFqdFZTUmlxcmlyc1ZkaXJzVmRpcnNWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZmRVcmI3hBO3MrZVBQVmhxMmxlWC9McnFVT2xhS0xTeWlzcldlUnBKOUx0cEdweWhlUjJlUjJQVTRGUmwzcW41OFdzRnhNN1cwMzFSREpkd1cwZWomI3hBOzNVOFNMOXBwWUlGa2xRTCsxeVhidmlxQ3N2TmY1MFh1bndhakJOYi9BRks2NS9WcHBJTkxpRW5wc1VmaUpFUW5pd3BpcTY1OHpmbmomI3hBO2JhalphZk9uQzYxRU1iQUd4MDhwTUVGWDlPVVJlbTNIOXFqYmQ4Vlgvd0NJL3dBNi93RGxwcy8rQjBiL0FKcHhWNXpwR2hheHJNdHgmI3hBO0ZwZHBKZVMyc0VsM2NKRU9SU0NFVmtrSThGcmlxZWFEK2FIblRRZE1pMHpTN3UzaXNvU3hqU1N4c1oyQmRpelZrbWhra081N3Rpck4mI3hBO2ZOZjVqZm1USitZZXUrV2REZTJkSTlUdmJPd3NrMDdUbWIwb1pwRlZBendjanhSZXBhdUt2S2I3VEwrd0Z1YnVGb1Jkd3BkV3hhbEgmI3hBO2hrcUZkYWRpVkl4VlZ0dEMxaTZ0WWJxMnM1WjRMaTUrcFc3UnFYTWx6eEQra2lyVm1iaXdOQU80eFY2SnJsditkbDNvMTNZWDhjRnomI3hBO2FyRi9wbGpiRFNwTHRJNHlDUzhOdFc2VGp4MytFZStLdmR2K2NULy9BQ1ZqZjl0RzQvNGhIaFY3TGlyc1ZkaXJzVmRpcnNWZGlyc1YmI3hBO2RpcnNWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZkaXJzVmZGZDNQTHA5cjVsMWl5WXg2cGJlVy9MVnJienFTSGlodk5Qc283aVJDUHNrcUImI3hBO0hYd2M0RmViK1hkUzFmVE5lc0wvQUVkbVhWTGVkR3MrRlNXazVVQ1VIMmc5ZUpYdURURldlZWE5R2luOGwrVTAxTFViTFJicUE2cWsmI3hBO3RyUEhkVURqVUhEcWd0WUxoUXFOdFFrWXFubmxTenR0TGo4cTZiWWFpbXNhVGQ2bGZYY3VyUUs2d3hUcFkrazF1a1VvU1pXQ01IZm0mI3hBO3E4dmg0N0N1S3ZOWk5LOG5pTmltdnpPNEJLcWJCaFUwMkZmVzJ4Vm5Qa25SZk9laWVTN0hYUEwybHozdC9yV294M0RHTmVTQ3cweVEmI3hBO0ZZbi9BTW00dWE4aHZVUmp4eFZodjVrZVdQOEFEZm5DKzArT0o0cktRcmRhZWtpbFdGdGNxSllsYXY3VVliZzMrVXB4Vm1lay93RHImI3hBO1MxLy9BTnQvVS84QWs1UGlyRlpUK212eTJoaysxZStWTGt3djRuVDlRWXZHZmxGZEJ4L3oxR0tzeU04bmwvUk5XMHl3WXg2dDVUMEomI3hBO0FaRjJraXZ0WXU0RjFHWlNBQ3J3d3lyYTE3VXhWNU5wMm8zMm0zMEYvWVR2YlhscTRsdDU0enhaSFUxQkJ4VjkxL2xIYXdXMmxheXMmI3hBO01LMndsMVdTNGt0MEhGWTViaTJnbWxRRGVnV1NSaFRDck9zVmRpcnNWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZkaXJzVmRpcnNWZGlyc1YmI3hBO2RpcnNWZGlyNFAxenpMZCtYL04wRnhERkhkVzF6b0dpMnVvV0U0Smh1TGVUUnJQbkZKeEt0MUFZRlNDckFFZE1Db2F6ODNlVHRGdkImI3hBO3F2bDNRTG1MV1VxMW5KcUY2bDNiMmt2N01zVVNXOERTT25WREk1Q25xR3hWSnRhOHp5YXJvV2lhWkxDUkpwQXVnOTAwaGRwMnVwek8mI3hBO1dJS2ppUnlwMU5ldUtwcjVTL01DUFFkUHM3S2JUMnZJN1RVbjFHcVRpRXNzdHExckpIdkZMUTdxd2JlbFBzbXV5cUUvU0g1YS93RFYmI3hBO2gxbi9BTGpGci8zaThWUW5tN3pHTmYxWmJxRzJObFkyMXZCWjZmWTgvVjlHM3Q0eEdpOCtNZklrZ3V4NGlyRW5GV3RVOHgvcEx5L28mI3hBOyttVDIvd0RwV2ordkRGZmM2bDdXWnhMSEN5Y2Y5MVNOSVZibDBhbE5zVlpOcm5tUC9EZjU0YTlybjFmNjM5UzF6VW4rcjgvVDU4cDUmI3hBO1VwejR2VDdYaGlxUmVSZk55K1Y5Yk45TllwcWxqTkUwRjdwc2orbWt5VkVrWVp1TDA0VFJvL1Q5bW1LcVdrK2NkVzAvekRkYTIzQzgmI3hBO20xRDExMU8zdUFXaHVvN3FwbmpsQUtraHlhN0dvTkNOeGlxYlcvbWI4dmRQdUYxUFRmTFYwK3BvZWR2Ylg5OHR4WVF5Q3BWdlRTM2gmI3hBO2xsQ21oQ3ZKOCtXS3ZwMy9BSnhoMUc5MUw4dkx2VUw2VnA3eTcxYTdudUptM1o1SkJHek1mbVRoVjY3aXJzVmRpcnNWZGlyc1ZkaXImI3hBO3NWZGlyc1ZkaXJzVmRpcnNWZGlyc1ZkaXJzVmRpcnNWZUwydi9LbmZxVnA2SDZZK3EvVjRQcWRmMGhUNnY2UytoeDViOGZTNDhmYW0mI3hBO0txbi9BQ0NIL3RiL0FQVC9BSXE3L2tFUC9hMy9BT24vQUJWMy9JSWYrMXYvQU5QK0t1LzVCRC8ydC84QXAveFYzL0lJZisxdi93QlAmI3hBOytLdS81QkQvQU5yZi9wL3hWaE90ZjlDb2ZwaS8vUy8xL3dEUzMxaVg5SWV2K2svVitzY3o2dnFWMzVjNjh2ZkFxRC82dzcvNWV2OEEmI3hBO3VaNHE3L3JEdi9sNi93QzVuaXJ2K3NPLytYci9BTG1lS3ZidnllLzVWNy9oRS80QzlUOUJmV3BhK3I2M0wxK0s4LzcvQU9QcHg5c0smI3hBO3M0eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3V4VjJLdXhWMkt1eFYyS3YvOWs9PC94bXBHSW1nOmltYWdlPgogICAgICAgICAgICAgICA8L3JkZjpsaT4KICAgICAgICAgICAgPC9yZGY6QWx0PgogICAgICAgICA8L3htcDpUaHVtYm5haWxzPgogICAgICAgICA8eG1wTU06SW5zdGFuY2VJRD54bXAuaWlkOjgwMTA1ZGY4LTc3MzYtNjA0My04OGYyLTliNzNlNzFlNmM1ZjwveG1wTU06SW5zdGFuY2VJRD4KICAgICAgICAgPHhtcE1NOkRvY3VtZW50SUQ+eG1wLmRpZDo4MDEwNWRmOC03NzM2LTYwNDMtODhmMi05YjczZTcxZTZjNWY8L3htcE1NOkRvY3VtZW50SUQ+CiAgICAgICAgIDx4bXBNTTpPcmlnaW5hbERvY3VtZW50SUQ+dXVpZDo1RDIwODkyNDkzQkZEQjExOTE0QTg1OTBEMzE1MDhDODwveG1wTU06T3JpZ2luYWxEb2N1bWVudElEPgogICAgICAgICA8eG1wTU06UmVuZGl0aW9uQ2xhc3M+cHJvb2Y6cGRmPC94bXBNTTpSZW5kaXRpb25DbGFzcz4KICAgICAgICAgPHhtcE1NOkRlcml2ZWRGcm9tIHJkZjpwYXJzZVR5cGU9IlJlc291cmNlIj4KICAgICAgICAgICAgPHN0UmVmOmluc3RhbmNlSUQ+dXVpZDoxMTNlZWVkMC1mZjcwLTQzMWMtYTIyZi0zMjhiZmFmYzk2YmU8L3N0UmVmOmluc3RhbmNlSUQ+CiAgICAgICAgICAgIDxzdFJlZjpkb2N1bWVudElEPnhtcC5kaWQ6MTk3OGFhZTctNDM5My1hYTRkLTgxYTgtZmNiMjMzOGU2NTllPC9zdFJlZjpkb2N1bWVudElEPgogICAgICAgICAgICA8c3RSZWY6b3JpZ2luYWxEb2N1bWVudElEPnV1aWQ6NUQyMDg5MjQ5M0JGREIxMTkxNEE4NTkwRDMxNTA4Qzg8L3N0UmVmOm9yaWdpbmFsRG9jdW1lbnRJRD4KICAgICAgICAgICAgPHN0UmVmOnJlbmRpdGlvbkNsYXNzPnByb29mOnBkZjwvc3RSZWY6cmVuZGl0aW9uQ2xhc3M+CiAgICAgICAgIDwveG1wTU06RGVyaXZlZEZyb20+CiAgICAgICAgIDx4bXBNTTpIaXN0b3J5PgogICAgICAgICAgICA8cmRmOlNlcT4KICAgICAgICAgICAgICAgPHJkZjpsaSByZGY6cGFyc2VUeXBlPSJSZXNvdXJjZSI+CiAgICAgICAgICAgICAgICAgIDxzdEV2dDphY3Rpb24+c2F2ZWQ8L3N0RXZ0OmFjdGlvbj4KICAgICAgICAgICAgICAgICAgPHN0RXZ0Omluc3RhbmNlSUQ+eG1wLmlpZDoxOTc4YWFlNy00MzkzLWFhNGQtODFhOC1mY2IyMzM4ZTY1OWU8L3N0RXZ0Omluc3RhbmNlSUQ+CiAgICAgICAgICAgICAgICAgIDxzdEV2dDp3aGVuPjIwMjAtMDEtMjRUMTE6MjA6MTQrMDE6MDA8L3N0RXZ0OndoZW4+CiAgICAgICAgICAgICAgICAgIDxzdEV2dDpzb2Z0d2FyZUFnZW50PkFkb2JlIElsbHVzdHJhdG9yIENDIDIyLjAgKFdpbmRvd3MpPC9zdEV2dDpzb2Z0d2FyZUFnZW50PgogICAgICAgICAgICAgICAgICA8c3RFdnQ6Y2hhbmdlZD4vPC9zdEV2dDpjaGFuZ2VkPgogICAgICAgICAgICAgICA8L3JkZjpsaT4KICAgICAgICAgICAgICAgPHJkZjpsaSByZGY6cGFyc2VUeXBlPSJSZXNvdXJjZSI+CiAgICAgICAgICAgICAgICAgIDxzdEV2dDphY3Rpb24+c2F2ZWQ8L3N0RXZ0OmFjdGlvbj4KICAgICAgICAgICAgICAgICAgPHN0RXZ0Omluc3RhbmNlSUQ+eG1wLmlpZDo4MDEwNWRmOC03NzM2LTYwNDMtODhmMi05YjczZTcxZTZjNWY8L3N0RXZ0Omluc3RhbmNlSUQ+CiAgICAgICAgICAgICAgICAgIDxzdEV2dDp3aGVuPjIwMjAtMDItMDRUMTg6MzQ6NDcrMDE6MDA8L3N0RXZ0OndoZW4+CiAgICAgICAgICAgICAgICAgIDxzdEV2dDpzb2Z0d2FyZUFnZW50PkFkb2JlIElsbHVzdHJhdG9yIENDIDIyLjAgKFdpbmRvd3MpPC9zdEV2dDpzb2Z0d2FyZUFnZW50PgogICAgICAgICAgICAgICAgICA8c3RFdnQ6Y2hhbmdlZD4vPC9zdEV2dDpjaGFuZ2VkPgogICAgICAgICAgICAgICA8L3JkZjpsaT4KICAgICAgICAgICAgPC9yZGY6U2VxPgogICAgICAgICA8L3htcE1NOkhpc3Rvcnk+CiAgICAgICAgIDxpbGx1c3RyYXRvcjpTdGFydHVwUHJvZmlsZT5QcmludDwvaWxsdXN0cmF0b3I6U3RhcnR1cFByb2ZpbGU+CiAgICAgICAgIDxwZGY6UHJvZHVjZXI+QWRvYmUgUERGIGxpYnJhcnkgMTUuMDA8L3BkZjpQcm9kdWNlcj4KICAgICAgPC9yZGY6RGVzY3JpcHRpb24+CiAgIDwvcmRmOlJERj4KPC94OnhtcG1ldGE+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAKPD94cGFja2V0IGVuZD0idyI/Pv/uAA5BZG9iZQBkwAAAAAH/2wCEAAICAgICAgICAgIDAgICAwQDAgIDBAUEBAQEBAUGBQUFBQUFBgYHBwgHBwYJCQoKCQkMDAwMDAwMDAwMDAwMDAwBAwMDBQQFCQYGCQ0LCQsNDw4ODg4PDwwMDAwMDw8MDAwMDAwPDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDP/AABEIAIkBiQMBEQACEQEDEQH/xADSAAEAAgIDAQEBAAAAAAAAAAAACAkGBwMECgUBAgEBAAIDAQEBAAAAAAAAAAAAAAMHBAUIAgYBEAAABQMCAgQFDAkQCAcAAAABAgMEBQAGBxEIIRIxExQJQSLUFThRMoIjk7TVFpa2F1dhQtN0lFU2WBlxUmKSg7OFlXaGptY3dxhZgZHRM1MkJcWhQ2M0NXW1EQEAAQEDBgcOBAUFAAAAAAAAAQIDBAURQYGz0wYxkRLSkzYH8CFRoeEyUnKSVJQVNRYi4hNTYdFCgmNxscEj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";
+
+function quoteExtra(q){
+  const e = (q && q.extra) || {};
+  return {
+    numero: e.numero || null,
+    serie: e.serie || QUOTE_SERIE,
+    sconto: Number(e.sconto) || 0,
+    validita: e.validita || "",
+    note: e.note || "",
+    pagamento: Object.assign({}, QUOTE_PAY_DEFAULT, e.pagamento || {})
+  };
+}
+function quoteNumberLabel(q){ const e = quoteExtra(q); return e.numero ? `${e.numero}/${e.serie}` : "—"; }
+function nextQuoteNumber(){
+  const nums = (state.quotes||[]).map(q => Number(q.extra && q.extra.numero) || 0);
+  return Math.max(QUOTE_FIRST_NUMBER - 1, ...nums) + 1;
+}
+function quoteRigaIva(r){ return (r.iva === undefined || r.iva === null || r.iva === "") ? 22 : (Number(r.iva) || 0); }
+function round2(n){ return Math.round((Number(n)||0) * 100) / 100; }
+function quoteTotals(q){
+  const righe = q.righe || [];
+  const lordo = righe.reduce((s,r) => s + (Number(r.quantita)||0) * (Number(r.prezzoUnitario)||0), 0);
+  const sconto = Math.min(Math.max(quoteExtra(q).sconto, 0), lordo);
+  const f = lordo > 0 ? (lordo - sconto) / lordo : 1;
+  const byRate = {};
+  righe.forEach(r => {
+    const rate = quoteRigaIva(r);
+    byRate[rate] = (byRate[rate] || 0) + (Number(r.quantita)||0) * (Number(r.prezzoUnitario)||0) * f;
+  });
+  const iva = Object.keys(byRate).map(k => ({rate:Number(k), base:round2(byRate[k]), imposta:round2(byRate[k] * Number(k) / 100)})).sort((a,b) => b.rate - a.rate);
+  const imposta = round2(iva.reduce((s,x) => s + x.imposta, 0));
+  const imponibile = round2(lordo - sconto);
+  return {lordo:round2(lordo), sconto:round2(sconto), imponibile, iva, imposta, totale:round2(imponibile + imposta)};
+}
+function pdfNum(n, dec){
+  const v = (Number(n)||0).toFixed(dec); const neg = v[0] === "-"; const p = (neg ? v.slice(1) : v).split(".");
+  return (neg ? "-" : "") + p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".") + (p[1] ? "," + p[1] : "");
+}
+function pdfEur(n, dec=2){ return pdfNum(n, dec) + " €"; }
+
+function quotePdfClientBlock(c){
+  if(!c) return {nome:"", via:"", citta:"", cf:"", piva:"", pec:""};
+  const nome = c.tipo === "Business"
+    ? (String(c.ragioneSociale||"").trim() || String(c.nomeCommerciale||"").trim())
+    : `${c.nome||""} ${c.cognome||""}`.trim();
+  const citta = [c.cap, c.citta].filter(Boolean).join(" ") + (c.provincia ? ` (${c.provincia})` : "");
+  return {nome, via:c.indirizzo||"", citta:citta.trim(), cf:c.codiceFiscale||"", piva:c.partitaIva||"", pec:c.pec||""};
+}
+
+
+/* ---- Mini generatore PDF (nessuna libreria esterna): Helvetica standard + logo JPEG ---- */
+const MINIPDF_W = {"n":[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,761,556,556,222,556,333,1000,556,556,333,1000,667,333,1000,556,611,556,556,222,222,333,333,350,556,1000,333,1000,500,333,944,556,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500],"b":[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,761,556,611,278,556,500,1000,556,556,333,1000,667,333,1000,611,611,611,611,278,278,500,500,350,556,1000,333,1000,556,333,944,611,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556],"i":[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,761,556,556,222,556,333,1000,556,556,333,1000,667,333,1000,556,611,556,556,222,222,333,333,350,556,1000,333,1000,500,333,944,556,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500]};
+const MINIPDF_CP1252 = {8364:0x80,8218:0x82,402:0x83,8222:0x84,8230:0x85,8224:0x86,8225:0x87,710:0x88,8240:0x89,352:0x8A,8249:0x8B,338:0x8C,381:0x8E,8216:0x91,8217:0x92,8220:0x93,8221:0x94,8226:0x95,8211:0x96,8212:0x97,732:0x98,8482:0x99,353:0x9A,8250:0x9B,339:0x9C,382:0x9E,376:0x9F};
+function miniPdfCode(ch){
+  const u = ch.charCodeAt(0);
+  if(u >= 32 && u < 127) return u;
+  if(u >= 0xA0 && u <= 0xFF) return u;
+  if(MINIPDF_CP1252[u]) return MINIPDF_CP1252[u];
+  if(u === 9 || u === 160) return 32;
+  return 63;
+}
+class MiniPdf{
+  constructor(){ this.pages = []; this.images = []; this.cur = null; this.addPage(); }
+  addPage(){ this.cur = {ops:[], imgs:[]}; this.pages.push(this.cur); }
+  _pt(mm){ return mm * 72 / 25.4; }
+  _num(n){ return (Math.round(n * 100) / 100).toString(); }
+  _col(c, stroke){ const k = (c || [0,0,0]).map(v => this._num(v/255)).join(" "); return k + (stroke ? " RG" : " rg"); }
+  widthMm(s, font, size){
+    const tab = MINIPDF_W[font] || MINIPDF_W.n; let w = 0;
+    for(const ch of String(s)){ const code = miniPdfCode(ch); w += tab[code - 32] || 0; }
+    return w * size / 1000 * 25.4 / 72;
+  }
+  wrap(s, font, size, maxMm){
+    const out = [];
+    String(s == null ? "" : s).split(/\r?\n/).forEach(par => {
+      const words = par.split(/\s+/).filter(Boolean);
+      if(!words.length){ out.push(""); return; }
+      let line = "";
+      words.forEach(w => {
+        let cand = line ? line + " " + w : w;
+        if(this.widthMm(cand, font, size) <= maxMm){ line = cand; return; }
+        if(line){ out.push(line); line = ""; }
+        while(this.widthMm(w, font, size) > maxMm && w.length > 1){
+          let k = w.length - 1; while(k > 1 && this.widthMm(w.slice(0,k), font, size) > maxMm) k--;
+          out.push(w.slice(0,k)); w = w.slice(k);
+        }
+        line = w;
+      });
+      if(line) out.push(line);
+    });
+    return out;
+  }
+  text(s, x, y, o){
+    o = o || {}; const font = o.font || "n", size = o.size || 8.5; s = String(s == null ? "" : s);
+    let px = x; const w = this.widthMm(s, font, size);
+    if(o.align === "right") px = x - w; else if(o.align === "center") px = x - w/2;
+    let enc = ""; for(const ch of s){ const c = miniPdfCode(ch); enc += (c === 40 || c === 41 || c === 92) ? "\\" + String.fromCharCode(c) : String.fromCharCode(c); }
+    this.cur.ops.push(`${this._col(o.color)} BT /F${font} ${this._num(size)} Tf ${this._num(this._pt(px))} ${this._num(this._pt(297 - y))} Td (${enc}) Tj ET`);
+  }
+  line(x1, y1, x2, y2, color, w){
+    this.cur.ops.push(`${this._col(color || [190,190,190], true)} ${this._num(w || 0.3)} w ${this._num(this._pt(x1))} ${this._num(this._pt(297 - y1))} m ${this._num(this._pt(x2))} ${this._num(this._pt(297 - y2))} l S`);
+  }
+  image(jpegBytes, pxW, pxH, x, y, wMm, hMm){
+    const idx = this.images.push({bytes:jpegBytes, w:pxW, h:pxH}) - 1;
+    this.cur.imgs.push(idx);
+    this.cur.ops.push(`q ${this._num(this._pt(wMm))} 0 0 ${this._num(this._pt(hMm))} ${this._num(this._pt(x))} ${this._num(this._pt(297 - y - hMm))} cm /Im${idx} Do Q`);
+  }
+  output(){
+    const chunks = []; let offset = 0; const offsets = [];
+    const enc = s => { const a = new Uint8Array(s.length); for(let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i) & 255; return a; };
+    const push = a => { chunks.push(a); offset += a.length; };
+    const obj = (n, parts) => { offsets[n] = offset; push(enc(`${n} 0 obj\n`)); parts.forEach(p => push(typeof p === "string" ? enc(p) : p)); push(enc("\nendobj\n")); };
+    const nPages = this.pages.length, nImg = this.images.length;
+    // numerazione: 1 catalog, 2 pages, 3-5 font, 6.. immagini, poi per ogni pagina (page, content)
+    const firstImg = 6, firstPage = firstImg + nImg;
+    push(enc("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"));
+    obj(1, ["<< /Type /Catalog /Pages 2 0 R >>"]);
+    const kids = this.pages.map((_, i) => `${firstPage + i*2} 0 R`).join(" ");
+    obj(2, [`<< /Type /Pages /Kids [${kids}] /Count ${nPages} >>`]);
+    ["Helvetica","Helvetica-Bold","Helvetica-Oblique"].forEach((f, i) => obj(3 + i, [`<< /Type /Font /Subtype /Type1 /BaseFont /${f} /Encoding /WinAnsiEncoding >>`]));
+    this.images.forEach((im, i) => obj(firstImg + i, [`<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`, im.bytes, "\nendstream"]));
+    this.pages.forEach((p, i) => {
+      const pn = firstPage + i*2, cn = pn + 1;
+      const xo = p.imgs.length ? ` /XObject << ${[...new Set(p.imgs)].map(k => `/Im${k} ${firstImg + k} 0 R`).join(" ")} >>` : "";
+      obj(pn, [`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /Fn 3 0 R /Fb 4 0 R /Fi 5 0 R >>${xo} >> /Contents ${cn} 0 R >>`]);
+      const content = enc(p.ops.join("\n"));
+      obj(cn, [`<< /Length ${content.length} >>\nstream\n`, content, "\nendstream"]);
+    });
+    const total = firstPage + nPages*2;
+    const xrefPos = offset;
+    let xref = `xref\n0 ${total}\n0000000000 65535 f \n`;
+    for(let n = 1; n < total; n++) xref += String(offsets[n]).padStart(10, "0") + " 00000 n \n";
+    push(enc(xref + `trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF\n`));
+    const out = new Uint8Array(offset); let p = 0; chunks.forEach(c => { out.set(c, p); p += c.length; });
+    return out;
+  }
+}
+function quotePdfBytesToBase64(bytes){
+  let bin = ""; const step = 0x8000;
+  for(let i = 0; i < bytes.length; i += step) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
+  return btoa(bin);
+}
+function quoteLogoBytes(){
+  const b64 = QUOTE_LOGO_DATAURL.split(",")[1] || "";
+  const bin = atob(b64); const a = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a;
+}
+
+function buildQuotePdf(q){
+  const c = (state.clients||[]).find(x => x.id === q.clientId) || null;
+  const cb = quotePdfClientBlock(c);
+  const e = quoteExtra(q), t = quoteTotals(q), P = e.pagamento;
+  const pdf = new MiniPdf();
+  const GRAY = [190,190,190], INK = [25,25,25], MUTE = [90,90,90];
+  const txt = (s, x, y, o) => pdf.text(s, x, y, o);
+  const hline = (x1, x2, y, col, w) => pdf.line(x1, y, x2, y, col, w);
+  const dateIt = iso => { if(!iso) return ""; const p = String(iso).slice(0,10).split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
+
+  const header = () => {
+    pdf.image(quoteLogoBytes(), 393, 137, 8, 9, 76, 26.5);
+    txt(`Preventivo n. ${quoteNumberLabel(q)}   del ${dateIt(q.data)}`, 201, 13, {font:"b", size:11.5, align:"right", color:INK});
+    hline(8, 202, 38.6, GRAY, 0.5);
+  };
+  const tableHead = y => {
+    txt("DESCRIZIONE", 9, y, {size:8, color:INK});
+    txt("QUANTITÀ", 124, y, {size:8, align:"right", color:INK});
+    txt("IMPORTO", 151, y, {size:8, align:"right", color:INK});
+    txt("IVA", 175, y, {size:8, align:"right", color:INK});
+    txt("TOTALE", 201, y, {size:8, align:"right", color:INK});
+    hline(9, 202, y + 2.8, [120,120,120], 0.3);
+  };
+
+  header();
+  txt(QUOTE_COMPANY.ragione, 9, 45, {size:11.5, color:INK});
+  txt(QUOTE_COMPANY.indirizzo, 9, 50.5, {size:7, color:MUTE});
+  [["Telefono",QUOTE_COMPANY.telefono],["Web",QUOTE_COMPANY.web],["Email",QUOTE_COMPANY.email],["PEC",QUOTE_COMPANY.pec]]
+    .forEach((r,i) => { txt(r[0], 9.5, 55.6 + i*4.8, {size:7, color:MUTE}); txt(r[1], 24, 55.6 + i*4.8, {size:7, color:MUTE}); });
+  txt("C.F.", 9.5, 76, {size:6.5, color:MUTE}); txt(QUOTE_COMPANY.cf, 23.5, 76, {size:6.5, color:MUTE});
+  txt("P.IVA", 54, 76, {size:6.5, color:MUTE}); txt(QUOTE_COMPANY.piva, 69, 76, {size:6.5, color:MUTE});
+  txt("CCIAA e Numero REA:", 9.5, 80.5, {size:6.5, color:MUTE}); txt(QUOTE_COMPANY.rea, 54, 80.5, {size:6.5, color:MUTE});
+
+  txt("Spettabile", 120, 43.7, {font:"i", size:9, color:INK});
+  const nameLines = pdf.wrap(cb.nome || "—", "n", 12, 80);
+  nameLines.slice(0,2).forEach((ln,i) => txt(ln, 120, 51 + i*5, {size:12, color:INK}));
+  const off = (Math.min(nameLines.length,2) - 1) * 5;
+  if(cb.via) txt(cb.via, 120, 57 + off, {size:9.5, color:INK});
+  if(cb.citta) txt(cb.citta, 120, 63.5 + off, {size:9.5, color:INK});
+  let ry = 70 + off;
+  [["C.F.",cb.cf],["P.IVA",cb.piva],["PEC",cb.pec]].forEach(r => { if(r[1]){ txt(r[0], 121, ry, {size:6.8, color:MUTE}); txt(r[1], 142, ry, {size:6.8, color:MUTE}); ry += 4.8; } });
+
+  let y = 88.5;
+  tableHead(y); y += 7;
+  const LH = 4.3;
+  (q.righe || []).forEach(r => {
+    const lines = pdf.wrap(String(r.descrizione || r.prodotto || ""), "n", 8.5, 84);
+    const rowH = Math.max(1, lines.length) * LH + 3;
+    if(y + rowH > 240){ pdf.addPage(); header(); y = 46; tableHead(y); y += 7; }
+    lines.forEach((ln, i) => txt(ln, 9, y + i*LH, {size:8.5, color:INK}));
+    const by = y + (Math.max(1, lines.length) - 1) * LH;
+    const qty = Number(r.quantita)||0, pr = Number(r.prezzoUnitario)||0;
+    txt(pdfNum(qty,4), 111, by, {size:8.5, align:"right", color:INK});
+    txt(r.um || "pz", 121, by, {size:8.5, color:MUTE});
+    txt(pdfEur(pr,4), 151, by, {size:8.5, align:"right", color:INK});
+    txt(`${quoteRigaIva(r)}%`, 175, by, {size:7.5, align:"right", color:MUTE});
+    txt(pdfEur(qty*pr), 201, by, {size:8.5, align:"right", color:INK});
+    y += rowH;
+    hline(9, 202, y - 4.4, [215,215,215], 0.2);
+  });
+  y += 3;
+
+  if(y > 222){ pdf.addPage(); header(); y = 46; }
+  const top = y;
+  txt("Termini di pagamento", 9, top + 3, {font:"i", size:10, color:INK});
+  hline(9, 109, top + 5, GRAY, 0.3);
+  txt("Modalità:", 9.5, top + 10.5, {size:7.5, color:MUTE}); txt(P.modalita, 28, top + 10.5, {size:7.5, color:INK});
+  txt("Scadenze:", 9.5, top + 15.5, {size:7.5, color:MUTE}); txt(P.scadenza, 28, top + 15.5, {size:7.5, color:INK});
+  txt("Banca mittente", 9.5, top + 20.5, {font:"i", size:7.5, color:MUTE}); hline(9, 31, top + 21.8, GRAY, 0.3);
+  txt("Banca:", 13, top + 26, {size:7.5, color:MUTE}); txt(P.banca, 34, top + 26, {size:7.5, color:INK});
+  txt("IBAN:", 13, top + 31, {size:7.5, color:MUTE}); txt(P.iban, 34, top + 31, {size:7.5, color:INK});
+  if(P.bic){ txt("BIC:", 92, top + 31, {size:7.5, color:MUTE}); txt(P.bic, 101, top + 31, {size:7.5, color:INK}); }
+
+  let ty = top + 3;
+  const trow = (label, val, bold) => { const o = {size:8.5, font:bold ? "b" : "n", color:INK}; txt(label, 174, ty, Object.assign({align:"right"}, o)); txt(val, 201, ty, Object.assign({align:"right"}, o)); ty += 5.4; };
+  if(t.sconto > 0){ trow("Importo righe", pdfEur(t.lordo)); trow("Sconto", "-" + pdfEur(t.sconto)); }
+  trow("Imponibile", pdfEur(t.imponibile));
+  t.iva.forEach(x => trow(`Imposta ${x.rate}%`, pdfEur(x.imposta)));
+  hline(131, 202, ty - 3.4, [120,120,120], 0.3);
+  ty += 1;
+  trow("Totale", pdfEur(t.totale), true);
+  y = Math.max(top + 36, ty + 2);
+
+  if(e.note){
+    const nl = pdf.wrap(e.note, "n", 8, 190);
+    if(y + 6 + nl.length*4 > 248){ pdf.addPage(); header(); y = 46; }
+    txt("Note", 9, y + 3, {font:"i", size:9, color:INK}); hline(9, 31, y + 4.6, GRAY, 0.3);
+    nl.forEach((ln,i) => txt(ln, 9, y + 9.5 + i*4, {size:8, color:INK}));
+    y += 9.5 + nl.length*4;
+  }
+
+  if(y + 14 > 250){ pdf.addPage(); header(); y = 46; }
+  const fy = Math.max(y + 12, 205);
+  txt("Il presente preventivo non costituisce documento valido ai fini fiscali. RingraziandoVi per l’attenzione, rimaniamo in attesa di un gentile riscontro.", 9, fy, {font:"i", size:6.8, color:MUTE});
+  txt("Data fine validità:", 9, 259, {font:"b", size:7.5, color:INK});
+  if(e.validita) txt(dateIt(e.validita), 38, 259, {size:7.5, color:INK});
+  hline(9, 202, 266, GRAY, 0.3);
+  pdf.wrap("Trattiamo i Vostri dati per finalità amministrative e contabili. Specifiche misure di sicurezza sono osservate per prevenire la perdita dei dati, usi illeciti, o non corretti, e accessi non autorizzati. A richiesta forniamo Informativa completa ai sensi e per gli effetti di cui all’art. 13 e ss. del Regolamento UE n. 679/2016 del 27 aprile 2016.", "i", 6.3, 193)
+    .forEach((ln,i) => txt(ln, 9, 270 + i*3.3, {font:"i", size:6.3, color:MUTE}));
+  return pdf.output();
+}
+function quotePdfFileName(q){
+  const c = (state.clients||[]).find(x => x.id === q.clientId);
+  const nome = quotePdfClientBlock(c).nome.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_");
+  return `Preventivo_${String(quoteExtra(q).numero||"bozza")}_${quoteExtra(q).serie}${nome ? "_" + nome : ""}.pdf`;
+}
+function downloadQuotePdf(quoteId){
+  const q = findItem("quotes", quoteId); if(!q) return;
+  try{
+    const blob = new Blob([buildQuotePdf(q)], {type:"application/pdf"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = quotePdfFileName(q);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }catch(err){ console.error(err); showToast((err && err.message) || "Errore creazione PDF"); }
+}
+function quotePdfAttachment(q){
+  const bytes = buildQuotePdf(q);
+  return {filename:quotePdfFileName(q), mimeType:"application/pdf", size:bytes.length, dataBase64:quotePdfBytesToBase64(bytes)};
+}
+
+/* ============ PREVENTIVI · INTERFACCIA ============ */
+function dbExtraBanner(kind){
+  if(DB_EXTRA[kind]) return "";
+  const what = kind === "quotes" ? "numerazione, IVA e termini di pagamento dei preventivi" : "scadenza, priorità, cliente collegato e stato \"In corso\" delle note";
+  return `<div style="background:#FFF6E5;border:1px solid #F0D9A8;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+    <strong>Serve una modifica una tantum al database</strong>
+    <p style="margin:6px 0 10px;color:#6B5A2A;">Per salvare ${what} aggiungi una colonna su Supabase: apri <b>SQL Editor</b>, incolla lo script e premi <b>Run</b>. Poi ricarica il gestionale.</p>
+    <button class="btn btn-outline btn-sm" onclick="copyDbExtraSql()">COPIA SCRIPT SQL</button>
+  </div>`;
+}
+function copyDbExtraSql(){
+  const done = () => showToast("Script SQL copiato");
+  try{ navigator.clipboard.writeText(DB_EXTRA_SQL).then(done, () => prompt("Copia lo script SQL:", DB_EXTRA_SQL)); }
+  catch(e){ prompt("Copia lo script SQL:", DB_EXTRA_SQL); }
+}
+
 function renderPreventivi(){
+  const list = [...(state.quotes||[])].sort((a,b) => (Number(b.extra && b.extra.numero)||0) - (Number(a.extra && a.extra.numero)||0) || String(b.data||"").localeCompare(String(a.data||"")));
   document.getElementById("view-preventivi").innerHTML = `
+    ${dbExtraBanner("quotes")}
     <div class="form-panel ${quoteFormOpen?'open':''}" id="quoteForm">
       <h3>Nuovo preventivo</h3>
       <div class="form-grid">
@@ -7963,58 +8294,69 @@ function renderPreventivi(){
         <button class="btn btn-primary" onclick="addQuote()">Crea preventivo</button>
         <button class="btn btn-outline" onclick="toggleForm('quoteForm')">Annulla</button>
       </div>
-      <p class="helptext" style="margin-top:10px;">Dopo aver creato il preventivo, apri "Dettagli" per inserire le righe con quantità e prezzo.</p>
+      <p class="helptext" style="margin-top:10px;">Il numero viene assegnato in automatico (prossimo: <b>${nextQuoteNumber()}/${QUOTE_SERIE}</b>). Dopo la creazione si apre la scheda per inserire le righe.</p>
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Cliente</th><th>Categoria</th><th>Importo</th><th>Data</th><th>Stato</th><th></th></tr></thead>
+        <thead><tr><th>N°</th><th>Cliente</th><th>Categoria</th><th>Totale (IVA incl.)</th><th>Data</th><th>Stato</th><th></th></tr></thead>
         <tbody>
-          ${state.quotes.length ? state.quotes.map(q=>`
+          ${list.length ? list.map(q=>`
             <tr>
-              <td>${q.clientId ? clientName(q.clientId) : `<span style="color:var(--muted);font-style:italic;">Senza cliente</span>`}</td>
-              <td>${q.categoria}</td>
-              <td>${fmtMoney(quoteImponibile(q))}</td>
+              <td><strong>${quoteNumberLabel(q)}</strong></td>
+              <td>${q.clientId ? escapeHtml(clientName(q.clientId)) : `<span style="color:var(--muted);font-style:italic;">Senza cliente</span>`}</td>
+              <td>${escapeHtml(q.categoria||"")}</td>
+              <td>${fmtMoney(quoteTotals(q).totale)}</td>
               <td>${fmtDate(q.data)}</td>
               <td><select class="inline" onchange="setQuoteStatus('${q.id}', this.value)">${QUOTE_STATUSES.map(s=>`<option ${s===q.stato?'selected':''}>${s}</option>`).join("")}</select></td>
               <td style="white-space:nowrap;">
                 <button class="btn btn-outline btn-sm" onclick="openQuoteDetail('${q.id}')">Dettagli</button>
+                <button class="btn btn-outline btn-sm" onclick="downloadQuotePdf('${q.id}')">PDF</button>
                 ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-outline btn-sm" onclick="convertToOrder('${q.id}')">→ Ordine</button>` : (q.convertito?`<span class="pill pill-done">Convertito</span>`:"")}
                 <button class="btn btn-ghost btn-sm" onclick="deleteQuote('${q.id}')">Elimina</button>
               </td>
-            </tr>`).join("") : `<tr><td colspan="6" class="empty">Nessun preventivo registrato.</td></tr>`}
+            </tr>`).join("") : `<tr><td colspan="7" class="empty">Nessun preventivo registrato.</td></tr>`}
         </tbody>
       </table>
     </div>
   `;
 }
+async function createQuote(clientId, categoria){
+  if(!DB_EXTRA.quotes){
+    showToast("Prima esegui lo script SQL (avviso nella pagina Preventivi)");
+    return null;
+  }
+  const id = uid();
+  const quote = {
+    id, clientId: clientId || null, categoria: categoria || CATEGORIES[0], descrizione:"",
+    righe:[emptyRiga(false)], stato:"Bozza", data:today(),
+    extra:{numero:nextQuoteNumber(), serie:QUOTE_SERIE}
+  };
+  const ok = await upsertOne('quotes', quote);
+  if(!ok) return null;
+  if(!state.quotes.some(q=>q.id===id)) state.quotes.push(quote);
+  return id;
+}
 async function addQuote(){
+  if(!DB_EXTRA.quotes){ showToast("Prima esegui lo script SQL (avviso in alto nella pagina)"); return; }
   const sel = document.getElementById("qf-cliente");
   let clientId = null;
-
   if(sel.value === "__new__"){
     clientId = await createClientFromPrefix("qfnc");
     if(!clientId) return;
   } else if(sel.value){
     clientId = sel.value;
   }
-
-  const id = uid();
-  const quote = {
-    id,
-    clientId: clientId || null,
-    categoria:document.getElementById("qf-categoria").value,
-    descrizione:"",
-    righe:[],
-    stato:"Bozza",
-    data:today()
-  };
-  const ok = await upsertOne('quotes', quote);
-  if(!ok) return;
-
-  if(!state.quotes.some(q=>q.id===id)) state.quotes.push(quote);
+  const id = await createQuote(clientId, document.getElementById("qf-categoria").value);
+  if(!id) return;
   toggleForm('quoteForm');
   renderPreventivi();
   showToast(clientId ? "Preventivo creato" : "Preventivo creato senza cliente");
+  openQuoteDetail(id);
+}
+async function newQuoteForClient(clientId){
+  const id = await createQuote(clientId, CATEGORIES[0]);
+  if(!id){ if(!DB_EXTRA.quotes) goTo("preventivi"); return; }
+  showToast("Preventivo creato");
   openQuoteDetail(id);
 }
 function setQuoteStatus(id, stato){ findItem('quotes',id).stato = stato; saveState('quotes'); renderPreventivi(); }
@@ -8097,6 +8439,9 @@ async function finalizeQuoteToOrder(quoteId, clientId){
   }));
 
   const order = mkOrder(uid(), clientId, q.descrizione, "", "Da fare", "", righe);
+  const qt = quoteTotals(q);
+  order.ivaApplicata = qt.imposta > 0;
+  order.sconto = Math.max(0, round2(qt.lordo * (order.ivaApplicata ? 1.22 : 1) - qt.totale));
   const okOrder = await upsertOne('orders', order);
   if(!okOrder) return;
 
@@ -8114,11 +8459,8 @@ async function finalizeQuoteToOrder(quoteId, clientId){
 
 let quoteMailAttachments=[];
 function quoteMailText(q,c){
-  const righe=(q.righe||[]).map(r=>{
-    const desc=r.descrizione||r.prodotto||q.categoria||'Voce';
-    return `- ${desc} — ${Number(r.quantita||0)} x ${fmtMoney(Number(r.prezzoUnitario||0))}`;
-  }).join('\n');
-  return `Gentile ${c?clientDisplayName(c):'cliente'},\n\nle inviamo il preventivo relativo a ${q.categoria||'quanto richiesto'}.\n\n${q.descrizione?q.descrizione+'\n\n':''}${righe?righe+'\n\n':''}Totale preventivo: ${fmtMoney(quoteImponibile(q))}\n\nPer qualsiasi necessità può rispondere direttamente a questa mail.\n\nCordiali saluti\nTeam Creativò`;
+  const t=quoteTotals(q);
+  return `Gentile ${c?clientDisplayName(c):'cliente'},\n\nin allegato trova il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)} relativo a ${q.categoria||'quanto richiesto'}.\n\n${q.descrizione?q.descrizione+'\n\n':''}Totale: ${fmtMoney(t.totale)} (IVA inclusa)\n\nPer qualsiasi necessità può rispondere direttamente a questa mail.\n\nCordiali saluti\nTeam Creativò`;
 }
 function openQuoteMail(quoteId){
   const q=findItem('quotes',quoteId); if(!q) return;
@@ -8133,11 +8475,13 @@ function openQuoteMail(quoteId){
     <h2>Invia preventivo via Mail</h2>
     <p style="margin-top:0;color:var(--muted);">La mail parte direttamente dal Gmail collegato al gestionale. Gli allegati non vengono salvati nel gestionale.</p>
     <div class="field"><label>A</label><input id="quote-mail-to" value="${escapeHtml(c.email||'')}" readonly></div>
-    <div class="field"><label>Oggetto</label><input id="quote-mail-subject" value="${escapeHtml('Preventivo - '+clientDisplayName(c))}"></div>
+    <div class="field"><label>Oggetto</label><input id="quote-mail-subject" value="${escapeHtml('Preventivo n. '+quoteNumberLabel(q)+' - '+clientDisplayName(c))}"></div>
     <div class="field"><label>Messaggio</label><textarea id="quote-mail-body" rows="12">${escapeHtml(quoteMailText(q,c))}</textarea></div>
     <div class="field"><label>Allegati</label><input id="quote-mail-files" type="file" multiple onchange="handleQuoteMailFiles(this.files)" style="padding:9px;background:#fff;"><div class="helptext">Massimo 10 file e 15 MB complessivi. I file vengono usati solo per l'invio.</div><div id="quote-mail-attachments"></div></div>
     <div id="quote-mail-status" class="helptext"></div>
     <div class="form-actions"><button id="quote-mail-send" class="btn btn-primary" onclick="sendQuoteMail('${q.id}')">Invia mail</button><button class="btn btn-outline" onclick="openQuoteDetail('${q.id}')">Indietro</button></div>`;
+  try{ quoteMailAttachments=[quotePdfAttachment(q)]; renderQuoteMailAttachments(); }
+  catch(err){ console.error(err); showToast('PDF non allegato: '+((err&&err.message)||'errore')); }
 }
 async function handleQuoteMailFiles(fileList){
   const files=Array.from(fileList||[]);
@@ -8183,16 +8527,50 @@ async function transformQuoteToLead(quoteId){
   openQuoteDetail(quoteId);
 }
 
+function quoteTotalsHTML(q){
+  const t = quoteTotals(q);
+  const row = (l,v,b) => `<div class="trow${b?' grand':''}"><span>${l}</span><span>${v}</span></div>`;
+  return (t.sconto>0 ? row("Importo righe", fmtMoney(t.lordo)) + row("Sconto", "-" + fmtMoney(t.sconto)) : "")
+    + row("Imponibile", fmtMoney(t.imponibile))
+    + t.iva.map(x => row(`Imposta ${x.rate}%`, fmtMoney(x.imposta))).join("")
+    + row("Totale preventivo", fmtMoney(t.totale), true);
+}
+function refreshQuoteLive(id){
+  const q = findItem('quotes', id); if(!q) return;
+  const box = document.getElementById("quote-totals-box"); if(box) box.innerHTML = quoteTotalsHTML(q);
+  (q.righe||[]).forEach(r => { const el = document.getElementById("qrt-" + r.id); if(el) el.textContent = fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0)); });
+}
+function updateQuoteExtra(id, key, value){
+  const q = findItem('quotes', id); if(!q) return;
+  if(key === "sconto") value = Math.max(0, Number(String(value).replace(",", ".")) || 0);
+  q.extra = Object.assign({}, q.extra || {}, {[key]: value});
+  saveState('quotes');
+  refreshQuoteLive(id);
+}
+function updateQuotePay(id, key, value){
+  const q = findItem('quotes', id); if(!q) return;
+  const pay = Object.assign({}, quoteExtra(q).pagamento, {[key]: value});
+  q.extra = Object.assign({}, q.extra || {}, {pagamento: pay});
+  saveState('quotes');
+}
+function updateQuoteField(id, field, value){
+  const q = findItem('quotes', id); if(!q) return;
+  q[field] = (field === "clientId" && !value) ? null : value;
+  saveState('quotes');
+}
 function openQuoteDetail(quoteId){
-  const q = findItem('quotes', quoteId);
-  const c = state.clients.find(x=>x.id===q.clientId);
+  const q = findItem('quotes', quoteId); if(!q) return;
+  const e = quoteExtra(q), P = e.pagamento;
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
-    <h2>Preventivo</h2>
-    <p style="color:var(--muted);margin-top:0;">${q.categoria}</p>
+    <h2>Preventivo n. ${quoteNumberLabel(q)}</h2>
     <div class="ticket-meta">
-      <div><span>Cliente</span>${c?clientDisplayName(c):`<em style="color:var(--muted);">Senza cliente</em>`}</div>
-      <div><span>Data</span>${fmtDate(q.data)}</div>
+      <div><span>Cliente</span>
+        <select class="inline" onchange="updateQuoteField('${q.id}','clientId',this.value)">
+          <option value="">— Senza cliente —</option>${clientOptions(q.clientId,false)}
+        </select>
+      </div>
+      <div><span>Data</span><input class="inline" type="date" value="${escapeHtml(q.data||'')}" onchange="updateQuoteField('${q.id}','data',this.value)"></div>
       <div><span>Categoria</span>
         <select class="inline" onchange="updateQuoteField('${q.id}','categoria',this.value)">${categoryOptions(q.categoria)}</select>
       </div>
@@ -8200,27 +8578,43 @@ function openQuoteDetail(quoteId){
         <select class="inline" onchange="updateQuoteField('${q.id}','stato',this.value)">${QUOTE_STATUSES.map(s=>`<option ${s===q.stato?'selected':''}>${s}</option>`).join("")}</select>
       </div>
     </div>
-    <div class="field"><label>Descrizione generale</label><textarea onchange="updateQuoteField('${q.id}','descrizione',this.value)">${q.descrizione||""}</textarea></div>
+    <div class="field"><label>Descrizione generale <span style="font-weight:500;color:var(--muted);">(interna, resta nell'ordine)</span></label>
+      <textarea onchange="updateQuoteField('${q.id}','descrizione',this.value)">${escapeHtml(q.descrizione||"")}</textarea></div>
     <div class="modal-section">
       <h3>Righe di preventivo</h3>
       ${linesEditor('quotes', q.id, q.righe)}
-      <div class="totals-box">
-        <div class="trow grand"><span>Totale preventivo</span><span>${fmtMoney(quoteImponibile(q))}</span></div>
+      <div class="form-grid" style="margin-top:14px;">
+        <div class="field"><label>Sconto (€, sull'imponibile)</label>
+          <input type="text" inputmode="decimal" value="${e.sconto ? String(e.sconto).replace('.',',') : ''}" placeholder="0,00" onchange="updateQuoteExtra('${q.id}','sconto',this.value)"></div>
+        <div class="field"><label>Data fine validità</label>
+          <input type="date" value="${escapeHtml(e.validita||'')}" onchange="updateQuoteExtra('${q.id}','validita',this.value)"></div>
       </div>
+      <div class="totals-box" id="quote-totals-box">${quoteTotalsHTML(q)}</div>
     </div>
+    <details class="modal-section" style="margin-top:0;">
+      <summary style="cursor:pointer;font-weight:700;">Termini di pagamento e note (compaiono nel PDF)</summary>
+      <div class="form-grid" style="margin-top:12px;">
+        <div class="field"><label>Modalità</label><input value="${escapeHtml(P.modalita)}" onchange="updateQuotePay('${q.id}','modalita',this.value)"></div>
+        <div class="field"><label>Scadenze</label><input value="${escapeHtml(P.scadenza)}" onchange="updateQuotePay('${q.id}','scadenza',this.value)"></div>
+        <div class="field"><label>Banca</label><input value="${escapeHtml(P.banca)}" onchange="updateQuotePay('${q.id}','banca',this.value)"></div>
+        <div class="field"><label>BIC</label><input value="${escapeHtml(P.bic)}" onchange="updateQuotePay('${q.id}','bic',this.value)"></div>
+      </div>
+      <div class="field"><label>IBAN</label><input value="${escapeHtml(P.iban)}" onchange="updateQuotePay('${q.id}','iban',this.value)"></div>
+      <div class="field"><label>Note per il cliente</label><textarea rows="3" onchange="updateQuoteExtra('${q.id}','note',this.value)">${escapeHtml(e.note||"")}</textarea></div>
+    </details>
     <div class="form-actions" style="justify-content:space-between;align-items:center;flex-wrap:wrap;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
+        <button class="btn btn-primary" onclick="downloadQuotePdf('${q.id}')">SCARICA PDF</button>
         <button class="btn btn-outline" onclick="openQuoteMail('${q.id}')">Invia per mail</button>
+        ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
         <button class="btn btn-outline" onclick="transformQuoteToLead('${q.id}')">Trasforma in Lead</button>
-        <button class="btn btn-primary" onclick="closeModal(); showToast('Preventivo salvato')">Salva</button>
+        <button class="btn btn-outline" onclick="closeModal(); showToast('Preventivo salvato')">Salva e chiudi</button>
       </div>
       <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteQuote('${q.id}')">Elimina preventivo</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
 }
-function updateQuoteField(id, field, value){ findItem('quotes',id)[field] = value; saveState('quotes'); }
 
 
 
