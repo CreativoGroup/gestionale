@@ -4039,6 +4039,7 @@ const NAV = [
   {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard"},
 
   {id:"whatsappWeb", label:"WhatsApp Web", icon:"◉", subtitle:"Apre WhatsApp Web", group:"Traffico", externalUrl:"https://web.whatsapp.com/"},
+  {id:"waMode", label:()=>`Apri con: ${waOpenMode()==="app" ? "App WhatsApp" : "WhatsApp Web"} ⇄`, icon:"⚙", subtitle:"", group:"Traffico", action:"waMode"},
   {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico", hidden:true},
   {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico", hidden:true},
 
@@ -4071,7 +4072,7 @@ function renderNav(){
     return `
       <div class="nav-group nav-group-${group.toLowerCase().replace(/\s+/g,"-")}">
         ${group==="Dashboard" ? "" : `<div class="nav-group-title">${group}</div>`}
-        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${n.label}</button>`).join("")}
+        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}</button>`).join("")}
       </div>
     `;
   }).join("");
@@ -4081,7 +4082,7 @@ function renderNav(){
     if(!groupItems.length) return "";
     return `
       ${group==="Dashboard" ? "" : `<div class="mobile-nav-group-title mobile-nav-group-${group.toLowerCase().replace(/\s+/g,"-")}">${group}</div>`}
-      ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span><span>${n.label}</span></button>`).join("")}
+      ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span><span>${typeof n.label==="function"?n.label():n.label}</span></button>`).join("")}
     `;
   }).join("");
 
@@ -4157,7 +4158,8 @@ function renderViewHeading(){
 }
 function goTo(id){
   const navItem = NAV.find(n=>n.id===id);
-  if(navItem && navItem.externalUrl){ openWaWindow(navItem.externalUrl); return; }
+  if(navItem && navItem.action==="waMode"){ toggleWaOpenMode(); return; }
+  if(navItem && navItem.externalUrl){ openWaWindow(""); return; }
   currentView = id;
   document.querySelectorAll("section.view").forEach(s=>s.classList.remove("active"));
   document.getElementById("view-"+id).classList.add("active");
@@ -5100,12 +5102,28 @@ function waMePhone(v){
   if(s.length<=11) s="39"+s;
   return s;
 }
+/* Modalità di apertura (salvata su questo computer): "web" = scheda WhatsApp Web unica, "app" = app WhatsApp installata */
+function waOpenMode(){ try{ return localStorage.getItem("waOpenMode")==="app" ? "app" : "web"; }catch(e){ return "web"; } }
+function toggleWaOpenMode(){
+  const next = waOpenMode()==="app" ? "web" : "app";
+  try{ localStorage.setItem("waOpenMode", next); }catch(e){}
+  renderNav();
+  showToast(next==="app" ? "Da ora apro l'app WhatsApp installata sul computer" : "Da ora apro WhatsApp Web in una scheda unica");
+}
 function waMeUrl(phone,text){
   const n=waMePhone(phone);
-  return n ? `https://wa.me/${n}`+(text?`?text=${encodeURIComponent(text)}`:"") : "";
+  if(!n) return "";
+  const q=text?`&text=${encodeURIComponent(text)}`:"";
+  return waOpenMode()==="app" ? `whatsapp://send?phone=${n}${q}` : `https://web.whatsapp.com/send?phone=${n}${q}`;
 }
 function openWaWindow(url){
-  // Finestra con nome fisso: ogni click riusa la stessa scheda WhatsApp invece di aprirne una nuova
+  if(!url) url = waOpenMode()==="app" ? "whatsapp://" : "https://web.whatsapp.com/";
+  if(/^whatsapp:/i.test(url)){
+    const a=document.createElement("a"); a.href=url; a.style.display="none";
+    document.body.appendChild(a); a.click(); a.remove();
+    return;
+  }
+  // Scheda con nome fisso: ogni click riusa la stessa scheda aperta dal gestionale
   const w=window.open(url,"gestionale_whatsapp");
   if(w){ try{ w.focus(); }catch(e){} }
   else showToast("Il browser ha bloccato l'apertura: consenti i popup per il gestionale");
