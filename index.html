@@ -5030,12 +5030,18 @@ function waMeUrl(phone,text){
   const n=waMePhone(phone);
   return n ? `https://wa.me/${n}`+(text?`?text=${encodeURIComponent(text)}`:"") : "";
 }
+function openWaWindow(url){
+  // Finestra con nome fisso: ogni click riusa la stessa scheda WhatsApp invece di aprirne una nuova
+  const w=window.open(url,"gestionale_whatsapp");
+  if(w){ try{ w.focus(); }catch(e){} }
+  else showToast("Il browser ha bloccato l'apertura: consenti i popup per il gestionale");
+}
 function openClientWhatsapp(clientId){
   const c=state.clients.find(x=>x.id===clientId);
   if(!c) return;
   const url=waMeUrl(c.telefono,"");
   if(!url){ showToast("Il cliente non ha un numero WhatsApp valido"); return; }
-  window.open(url,"_blank","noopener");
+  openWaWindow(url);
 }
 function localWaPhone(v){
   let s=normalizeWaPhone(v);
@@ -9637,7 +9643,7 @@ function openWaMeStage(orderId){
   const message=String(document.getElementById("waNewText")?.value||"").trim();
   const url=waMeUrl(phone,message);
   if(!url){ showToast("Numero WhatsApp non valido"); return; }
-  window.open(url,"_blank","noopener");
+  openWaWindow(url);
 }
 
 async function markWaStageSent(orderId, kind){
