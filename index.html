@@ -3678,6 +3678,23 @@ function renderOrderCommunications(o,c){
 
 let bozzaMailAttachments=[];
 
+// Limite prudenziale per l'invio tramite gmail-send.
+// Evita di trasformare in Base64 file troppo pesanti e quindi evita
+// il "Memory limit exceeded" della Edge Function.
+const BOZZA_MAIL_MAX_FILES=10;
+const BOZZA_MAIL_MAX_FILE_BYTES=15*1024*1024;   // 15 MB per singolo file
+const BOZZA_MAIL_MAX_TOTAL_BYTES=15*1024*1024;  // 15 MB complessivi
+
+function bozzaMailTotalBytes(extraFiles=[]){
+  const current=bozzaMailAttachments.reduce((sum,a)=>sum+(Number(a?.size)||0),0);
+  const extra=Array.from(extraFiles||[]).reduce((sum,f)=>sum+(Number(f?.size)||0),0);
+  return current+extra;
+}
+
+function bozzaMailSizeLimitMessage(){
+  return "File troppo grande per l'invio via email. Il limite prudenziale è 15 MB complessivi. Riduci le dimensioni del file oppure invialo tramite Dropbox.";
+}
+
 function openBozzaMail(orderId){
   const o=findItem('orders',orderId); if(!o) return;
   const c=state.clients.find(x=>x.id===o.clientId);
@@ -3727,7 +3744,7 @@ Rif. ordine: ${riferimento}`;
     <div class="field">
       <label>Allegati</label>
       <input id="bozza-mail-files" type="file" multiple onchange="handleBozzaMailFiles(this.files)" style="padding:9px;background:#fff;">
-      <div class="helptext">Puoi allegare fino a 10 file. Gli allegati vengono usati solo per l'invio e non vengono salvati nel gestionale.</div>
+      <div class="helptext">Puoi allegare fino a 10 file, per un massimo di 15 MB complessivi. Se il file è più grande, riducilo oppure invialo tramite Dropbox. Gli allegati vengono usati solo per l'invio e non vengono salvati nel gestionale.</div>
       <div id="bozza-mail-attachments"></div>
     </div>
 
@@ -3744,15 +3761,41 @@ Rif. ordine: ${riferimento}`;
     setTimeout(()=>jobDropboxInit(o.id),0);
   }
 }
+
 async function handleBozzaMailFiles(fileList){
   const files=Array.from(fileList||[]);
   if(!files.length) return;
-  if(bozzaMailAttachments.length + files.length > 10){
+
+  const input=document.getElementById("bozza-mail-files");
+  const status=document.getElementById("bozza-mail-status");
+
+  if(bozzaMailAttachments.length + files.length > BOZZA_MAIL_MAX_FILES){
     showToast("Puoi allegare al massimo 10 file");
-    const input=document.getElementById("bozza-mail-files"); if(input) input.value="";
+    if(status) status.textContent="Puoi allegare al massimo 10 file.";
+    if(input) input.value="";
     return;
   }
+
+  const oversized=files.find(file=>(Number(file?.size)||0)>BOZZA_MAIL_MAX_FILE_BYTES);
+  if(oversized){
+    const msg=bozzaMailSizeLimitMessage();
+    showToast(`File troppo grande: ${oversized.name}`);
+    if(status) status.textContent=msg;
+    if(input) input.value="";
+    return;
+  }
+
+  if(bozzaMailTotalBytes(files)>BOZZA_MAIL_MAX_TOTAL_BYTES){
+    const msg=bozzaMailSizeLimitMessage();
+    showToast("Allegati troppo pesanti per l'invio via email");
+    if(status) status.textContent=msg;
+    if(input) input.value="";
+    return;
+  }
+
   try{
+    if(status) status.textContent="Preparazione allegati…";
+
     for(const file of files){
       const dataBase64=await fileToBase64(file);
       bozzaMailAttachments.push({
@@ -3762,16 +3805,24 @@ async function handleBozzaMailFiles(fileList){
         dataBase64
       });
     }
+
     renderBozzaMailAttachments();
+    if(status) status.textContent="";
   }catch(err){
     console.error("Allegato bozza Gmail error",err);
+    if(status) status.textContent="Errore durante la lettura di un allegato.";
     showToast("Errore durante la lettura di un allegato");
+  }finally{
+    if(input) input.value="";
   }
 }
 
 function renderBozzaMailAttachments(){
   const box=document.getElementById("bozza-mail-attachments");
   if(!box) return;
+
+  const totalBytes=bozzaMailAttachments.reduce((sum,a)=>sum+(Number(a?.size)||0),0);
+
   box.innerHTML=bozzaMailAttachments.length ? `
     <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
       ${bozzaMailAttachments.map((a,i)=>`
@@ -3782,12 +3833,15 @@ function renderBozzaMailAttachments(){
           </div>
           <button class="btn btn-ghost btn-sm" type="button" onclick="removeBozzaMailAttachment(${i})">Rimuovi</button>
         </div>`).join("")}
+      <div style="font-size:11.5px;color:var(--muted);font-weight:700;padding:2px 4px;">Totale allegati: ${mailFileSize(totalBytes)} / 15 MB</div>
     </div>` : "";
 }
 
 function removeBozzaMailAttachment(index){
   bozzaMailAttachments.splice(index,1);
   renderBozzaMailAttachments();
+  const status=document.getElementById("bozza-mail-status");
+  if(status) status.textContent="";
 }
 
 async function sendBozzaMail(orderId){
@@ -3799,13 +3853,30 @@ async function sendBozzaMail(orderId){
   const bodyText=String(document.getElementById("bozza-mail-body")?.value||"").trim();
   const status=document.getElementById("bozza-mail-status");
   const btn=document.getElementById("bozza-mail-send");
-  if(!to || !bodyText){ showToast("Controlla email e messaggio"); return; }
+
+  if(!to || !bodyText){
+    showToast("Controlla email e messaggio");
+    return;
+  }
+
+  // Secondo controllo prima della chiamata alla Edge Function:
+  // anche se gli allegati fossero stati modificati da codice, un payload
+  // troppo grande non viene mai inviato a gmail-send.
+  if(bozzaMailAttachments.length>BOZZA_MAIL_MAX_FILES || bozzaMailTotalBytes()>BOZZA_MAIL_MAX_TOTAL_BYTES){
+    const msg=bozzaMailSizeLimitMessage();
+    if(status) status.textContent=msg;
+    showToast("Allegati troppo pesanti per l'invio via email");
+    return;
+  }
+
   if(btn) btn.disabled=true;
   if(status) status.textContent="Invio in corso…";
+
   try{
     const {data:sessionData}=await sb.auth.getSession();
     const session=sessionData?.session;
     if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
+
     const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
       method:"POST",
       headers:{
@@ -3815,9 +3886,11 @@ async function sendBozzaMail(orderId){
       },
       body:JSON.stringify({mode:"new",to,subject,bodyText,attachments:bozzaMailAttachments})
     });
+
     const raw=await response.text();
     let result={}; try{result=JSON.parse(raw)}catch(e){}
     if(!response.ok) throw new Error(result?.error||result?.message||raw||`Errore HTTP ${response.status}`);
+
     bozzaMailAttachments=[];
     setBozzaInAttesa(orderId);
     showToast("Bozza inviata via Gmail");
@@ -3827,6 +3900,7 @@ async function sendBozzaMail(orderId){
     if(btn) btn.disabled=false;
   }
 }
+
 function inviaBozzaMattia(orderId){
   setBozzaInAttesa(orderId);
 }
