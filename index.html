@@ -6095,12 +6095,13 @@ function completedOrderStageButton(o){
 }
 function completedOrderInvoiceButton(o){
   if(o.fatturato){
-    return `<button class="btn btn-outline btn-sm" style="border-color:var(--ok);color:var(--ok);cursor:default;" onclick="event.stopPropagation()">FATTURATO</button>`;
+    return `<button class="btn btn-outline btn-sm" style="border-color:#176B3A;color:#176B3A;font-weight:900;cursor:default;" onclick="event.stopPropagation()">FATTURATO</button>`;
   }
-  return `<button class="btn btn-outline btn-sm" style="border-color:var(--accent);color:var(--accent);" onclick="segnaFatturatoDaCompletati('${o.id}')">DA FATTURARE</button>`;
+  if(!o.daFatturare) return ``;
+  return `<button class="btn btn-outline btn-sm" style="border-color:#C62828;color:#C62828;font-weight:900;" onclick="segnaFatturatoDaCompletati('${o.id}')">DA FATTURARE</button>`;
 }
 function completedOrderAmountButton(o){
-  return `<button class="btn btn-outline btn-sm" style="font-weight:850;white-space:nowrap;" title="Aggiungi pagamento" onclick="openCompletedOrderPayment('${o.id}')">${fmtMoney(orderTotale(o))}</button>`;
+  return `<button class="btn btn-outline btn-sm" style="font-weight:850;white-space:nowrap;color:#111827;border-color:#DDE3EA;" title="Aggiungi pagamento" onclick="openCompletedOrderPayment('${o.id}')">${fmtMoney(orderTotale(o))}</button>`;
 }
 async function segnaFatturatoDaCompletati(orderId){
   const o=findItem('orders',orderId);
