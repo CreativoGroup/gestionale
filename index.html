@@ -6605,7 +6605,7 @@ async function segnaRitiroCompletato(orderId){
   (o.righe||[]).forEach(r=>{ if(r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE") r.ritiroEsterno="RITIRATO"; });
   await saveState('orders');
   renderDashboard();
-  showToast(o.stato==="Completato" ? "Ritiro completato: ora il cliente è da avvisare" : "Segnato come RITIRATO dal fornitore");
+  showToast("Ritiro completato: ora il cliente è da avvisare");
 }
 async function segnaRitiratoDaLista(orderId){
   await segnaRitiroCompletato(orderId);
@@ -6711,7 +6711,7 @@ function renderDashboard(){
     if(sa!==sb) return sa-sb;
     return clientName(a.clientId).localeCompare(clientName(b.clientId));
   });
-  const ritiriDaFare = state.orders.filter(o=>o.stato!=="Consegnato" && orderPendingPickupRows(o).length>0);
+  const ritiriDaFare = state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0);
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
   const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
@@ -7174,7 +7174,7 @@ function openDashboardList(type){
     fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato && (o.stato==="Completato" || o.stato==="Consegnato")), isFatturare:true},
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
     materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
-    ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato!=="Consegnato" && orderPendingPickupRows(o).length>0), isRitirare:true},
+    ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0), isRitirare:true},
     avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato && orderPendingPickupRows(o).length===0)},
     scorte: {title:"Articoli sotto scorta", items: computeScorteMonitorate(), isStock:true}
   };
@@ -7646,6 +7646,15 @@ function openClientHistory(clientId){
 let pendingLeadOrderConversion = null;
 
 function newOrderForClient(clientId, leadId=null){
+  if(leadId){
+    const ld=(state.leads||[]).find(x=>x.id===leadId);
+    const ex=ld && ld.convertedOrderId ? (state.orders||[]).find(o=>o.id===ld.convertedOrderId) : null;
+    if(ex){
+      showToast("Per questa richiesta esiste già l'ordine"+(ex.numero?" #"+ex.numero:"")+": lo apro");
+      openJobCard(ex.id);
+      return;
+    }
+  }
   pendingLeadOrderConversion = leadId ? {leadId, clientId} : null;
 
   // Solo le richieste d'ordine nate da Gmail (fonte tecnica "gmail_ordine") portano gli allegati
@@ -9840,9 +9849,41 @@ async function markLeadConvertedToOrder(leadId, clientId, orderId){
   return true;
 }
 
+function findRecentEmptyOrder(clientId){
+  const name=clientName(clientId);
+  const limit=Date.now()-6*60*60*1000;
+  return (state.orders||[]).find(o=>{
+    if(o.stato==="Consegnato") return false;
+    const ts=o.createdAt?Date.parse(o.createdAt):NaN;
+    if(!Number.isFinite(ts) || ts<limit) return false;
+    const sameClient=o.clientId===clientId || (name!=="—" && clientName(o.clientId)===name);
+    if(!sameClient) return false;
+    const vuoto=!String(o.descrizione||"").trim() && (o.righe||[]).every(r=>!r.categoria && !String(r.prodotto||"").trim() && !String(r.descrizione||"").trim() && !(Number(r.prezzoUnitario)>0));
+    return vuoto;
+  })||null;
+}
+let addOrderBusy=false;
 async function addOrder(){
+  if(addOrderBusy) return;
+  addOrderBusy=true;
+  try{ await addOrderInner(); } finally{ addOrderBusy=false; }
+}
+async function addOrderInner(){
   const clientId = await resolveClientId("of-cliente", "ofnc");
   if(!clientId) return;
+
+  const dup=findRecentEmptyOrder(clientId);
+  if(dup && confirm(`Per questo cliente esiste già un ordine vuoto${dup.numero?" (#"+dup.numero+")":""} creato poco fa.\n\nOK = apri quello, evita il doppione\nAnnulla = crea comunque un nuovo ordine`)){
+    if(pendingLeadOrderConversion && pendingLeadOrderConversion.clientId===clientId){
+      const ctx=pendingLeadOrderConversion;
+      pendingLeadOrderConversion=null;
+      await markLeadConvertedToOrder(ctx.leadId, clientId, dup.id);
+    }
+    pendingGmailOrderMessageId=null; pendingGmailOrderContext=null;
+    try{ if(orderFormOpen) toggleForm('orderForm'); }catch(_){}
+    openJobCard(dup.id);
+    return;
+  }
 
   const id = uid();
   const order = mkOrder(id, clientId, "", "", "Da fare", "", undefined, undefined);
