@@ -3604,7 +3604,8 @@ function speseTotaleMese(mese){ return state.expenses.filter(e=>e.data.slice(0,7
 function costiFissiTotaleMese(mese){ return (state.fixedCosts||[]).filter(e=>e.data && e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
 
 /* ============ SEED DEMO ============ */
-function emptyRiga(isOrder){
+function emptyRiga(isOrder, isQuote, ivaRate){
+  if(isQuote) return {id:uid(), descrizione:"", categoria:"", prodotto:"", um:"pz", iva:(ivaRate===undefined?22:ivaRate), quantita:1, prezzoUnitario:0};
   return isOrder ? {id:uid(), descrizione:"", categoria:"", prodotto:"", articoloId:"", stato:"Da fare", quantita:1, prezzoUnitario:0}
                  : {id:uid(), descrizione:"", um:"pz", iva:22, quantita:1, prezzoUnitario:0};
 }
@@ -4299,13 +4300,22 @@ function mobileizeTables(){
 })();
 
 /* ===== STAMPA SCHEDA DI LAVORAZIONE (documento dedicato) ===== */
+function quotePrintOrderLike(q){
+  const e=quoteExtra(q);
+  return {id:q.id, numero:quoteNumberLabel(q), clientId:q.clientId, createdAt:q.data, stato:q.stato, importante:e.importante,
+    righe:q.righe||[], descrizione:q.descrizione||"", dataConsegna:e.dataConsegna, consegnaTipo:e.consegnaTipo, __quote:q};
+}
 function jobCardPrintHtml(o){
-  const c=state.clients.find(x=>x.id===o.clientId);
+  const Q=o.__quote||null;
+  let c=state.clients.find(x=>x.id===o.clientId);
+  if(!c && Q){ const rc=quoteRecipient(Q); if(rc.lead) c={tipo:"Family", nome:leadDisplayName(rc.lead), cognome:"", email:rc.lead.email, telefono:rc.lead.telefono}; }
   const e=escapeHtml;
   const righe=o.righe||[];
-  const imponibile=orderImponibile(o), sped=orderSpedizioneCosto(o), iva=orderIva(o), sconto=Number(o.sconto)||0;
-  const totale=orderTotale(o);
-  const pagamenti=state.payments.filter(p=>p.orderId===o.id).sort((a,b)=>String(a.data||"").localeCompare(String(b.data||"")));
+  const QT=Q?quoteTotals(Q):null;
+  const imponibile=Q?QT.lordo:orderImponibile(o), sped=Q?QT.spedizione:orderSpedizioneCosto(o), iva=Q?QT.imposta:orderIva(o), sconto=Q?QT.sconto:(Number(o.sconto)||0);
+  const totale=Q?QT.totale:orderTotale(o);
+  const ivaOn=Q?QT.imposta>0:!!o.ivaApplicata;
+  const pagamenti=Q?[]:state.payments.filter(p=>p.orderId===o.id).sort((a,b)=>String(a.data||"").localeCompare(String(b.data||"")));
   const incassato=pagamenti.reduce((t,x)=>t+Number(x.importo||0),0);
   const saldo=totale-incassato;
   const nomeCliente=c?clientDisplayName(c):"—";
@@ -4325,7 +4335,7 @@ function jobCardPrintHtml(o){
   }).join("")||`<tr><td colspan="5" class="n" style="text-align:center;padding:14px;">Nessuna lavorazione inserita.</td></tr>`;
   const tot=(l,v,cls="")=>`<div class="t ${cls}"><span>${l}</span><b>${v}</b></div>`;
   const consegna=[o.dataConsegna?fmtDate(o.dataConsegna):"—",o.consegnaTipo||""].filter(Boolean).join(" · ");
-  return `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Scheda lavorazione ${o.numero?("n. "+o.numero):""}</title>
+  return `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${Q?"Preventivo":"Scheda lavorazione"} ${o.numero?("n. "+o.numero):""}</title>
 <style>
 @page{size:A4;margin:12mm;}
 *{box-sizing:border-box;}
@@ -4358,8 +4368,8 @@ td.n{color:#6B7280;width:24px;}
 </style></head><body>
 <div class="top">
   <img src="${QUOTE_LOGO_DATAURL}" alt="Creativò">
-  <div class="ttl"><h1>Scheda di lavorazione${o.numero?` n. ${e(o.numero)}`:""}</h1>
-    <div>${o.createdAt?`Creata il ${fmtDate(String(o.createdAt).slice(0,10))} · `:""}Stato: <span class="badge">${e(o.stato||"")}</span>${o.importante?` <span class="badge">★ IMPORTANTE</span>`:""}</div></div>
+  <div class="ttl"><h1>${Q?"Preventivo":"Scheda di lavorazione"}${o.numero?` n. ${e(o.numero)}`:""}</h1>
+    <div>${o.createdAt?`${Q?"Del":"Creata il"} ${fmtDate(String(o.createdAt).slice(0,10))} · `:""}Stato: <span class="badge">${e(o.stato||"")}</span>${o.importante?` <span class="badge">★ IMPORTANTE</span>`:""}</div></div>
 </div>
 <div class="grid">
   <div class="box"><h3>Cliente</h3>
@@ -4367,9 +4377,10 @@ td.n{color:#6B7280;width:24px;}
     ${cli("Ragione sociale",ragione)}${cli("Referente",referente)}${cli("Indirizzo",indirizzo)}
     ${cli("Telefono",c?.telefono)}${cli("Email",c?.email)}${cli("P. IVA",c?.partitaIva)}${cli("Cod. fiscale",c?.codiceFiscale)}
   </div>
-  <div class="box"><h3>Lavorazione</h3>
-    ${cli("Operatori",orderWorkersLabel(o)!=="—"?orderWorkersLabel(o):"")}
-    ${cli("Inizio consigliato",(()=>{try{const d=effectiveWorkStartDate(o);return d?fmtDate(d):"";}catch(_){return "";}})())}
+  <div class="box"><h3>${Q?"Consegna e validità":"Lavorazione"}</h3>
+    ${Q?cli("Validità fino al",quoteExtra(Q).validita?fmtDate(quoteExtra(Q).validita):""):""}
+    ${Q?"":cli("Operatori",orderWorkersLabel(o)!=="—"?orderWorkersLabel(o):"")}
+    ${Q?"":cli("Inizio consigliato",(()=>{try{const d=effectiveWorkStartDate(o);return d?fmtDate(d):"";}catch(_){return "";}})())}
     ${cli("Consegna",consegna)}
     ${o.avvisato||o.clienteAvvisato?cli("Cliente avvisato",o.avvisatoIl?fmtDate(String(o.avvisatoIl).slice(0,10)):"Sì"):""}
     ${o.daFatturare?cli("Fatturazione","Da fatturare"):""}
@@ -4382,28 +4393,35 @@ td.n{color:#6B7280;width:24px;}
     ${pagamenti.length?`<div class="box pag"><h3>Pagamenti registrati</h3>${pagamenti.map(x=>`<div class="kv"><span>${fmtDate(x.data)}</span><b>${fmtMoney(x.importo)} · ${e(x.tipo||"")}${x.metodo?" · "+e(x.metodo):""}</b></div>`).join("")}</div>`:""}
   </div>
   <div class="tots">
-    ${tot("Imponibile",fmtMoney(imponibile))}
-    ${sped?tot("Spedizione",fmtMoney(sped)):""}
-    ${sconto?tot("Sconto","− "+fmtMoney(sconto)):""}
-    ${o.ivaApplicata?tot("IVA 22%",fmtMoney(iva)):""}
+    ${tot(Q?"Totale lavorazioni":"Imponibile",fmtMoney(imponibile))}
+    ${Q?(sconto?tot("Sconto","− "+fmtMoney(sconto)):""):(sped?tot("Spedizione",fmtMoney(sped)):"")}
+    ${Q?(sped?tot("Spedizione",fmtMoney(sped)):""):(sconto?tot("Sconto","− "+fmtMoney(sconto)):"")}
+    ${ivaOn?tot("IVA 22%",fmtMoney(iva)):""}
     ${tot("TOTALE",fmtMoney(totale),"big")}
-    ${tot("Incassato",fmtMoney(incassato))}
-    ${tot(saldo>0.005?"Saldo da incassare":"Saldo",fmtMoney(saldo),"saldo"+(saldo>0.005?"":" ok"))}
-    ${o.ivaApplicata?"":`<div class="d" style="text-align:right;">Importi IVA esclusa</div>`}
+    ${Q?"":tot("Incassato",fmtMoney(incassato))}
+    ${Q?"":tot(saldo>0.005?"Saldo da incassare":"Saldo",fmtMoney(saldo),"saldo"+(saldo>0.005?"":" ok"))}
+    ${ivaOn?"":`<div class="d" style="text-align:right;">Importi IVA esclusa</div>`}
   </div>
 </div>
-<div class="foot">Creativò Group · scheda stampata il ${new Date().toLocaleDateString("it-IT")}</div>
+<div class="foot">Creativò Group · ${Q?"preventivo":"scheda"} stampato il ${new Date().toLocaleDateString("it-IT")}</div>
 </body></html>`;
+}
+function printQuote(quoteId){
+  const q=findItem('quotes',quoteId); if(!q) return;
+  printHtmlDoc(jobCardPrintHtml(quotePrintOrderLike(q)));
 }
 function printJobCard(orderId){
   const o=findItem('orders',orderId); if(!o) return;
+  printHtmlDoc(jobCardPrintHtml(o));
+}
+function printHtmlDoc(html){
   let fr=document.getElementById("printFrame");
   if(fr) fr.remove();
   fr=document.createElement("iframe");
   fr.id="printFrame";
   fr.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
   document.body.appendChild(fr);
-  fr.srcdoc=jobCardPrintHtml(o);
+  fr.srcdoc=html;
   fr.onload=()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(err){ showToast("Stampa non riuscita"); } };
 }
 function toggleMobileNavDropdown(event){
@@ -6587,7 +6605,11 @@ async function segnaRitiroCompletato(orderId){
   (o.righe||[]).forEach(r=>{ if(r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE") r.ritiroEsterno="RITIRATO"; });
   await saveState('orders');
   renderDashboard();
-  showToast("Ritiro completato: ora il cliente è da avvisare");
+  showToast(o.stato==="Completato" ? "Ritiro completato: ora il cliente è da avvisare" : "Segnato come RITIRATO dal fornitore");
+}
+async function segnaRitiratoDaLista(orderId){
+  await segnaRitiroCompletato(orderId);
+  openDashboardList('ritirare');
 }
 
 async function segnaConsegnatoDaScheda(orderId){
@@ -6689,7 +6711,7 @@ function renderDashboard(){
     if(sa!==sb) return sa-sb;
     return clientName(a.clientId).localeCompare(clientName(b.clientId));
   });
-  const ritiriDaFare = state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0);
+  const ritiriDaFare = state.orders.filter(o=>o.stato!=="Consegnato" && orderPendingPickupRows(o).length>0);
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
   const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
@@ -7152,7 +7174,7 @@ function openDashboardList(type){
     fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato && (o.stato==="Completato" || o.stato==="Consegnato")), isFatturare:true},
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
     materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
-    ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0)},
+    ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato!=="Consegnato" && orderPendingPickupRows(o).length>0), isRitirare:true},
     avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato && orderPendingPickupRows(o).length===0)},
     scorte: {title:"Articoli sotto scorta", items: computeScorteMonitorate(), isStock:true}
   };
@@ -7185,6 +7207,17 @@ function openDashboardList(type){
         <div style="display:flex;align-items:center;gap:10px;">
           <span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span>
           <button class="btn btn-primary btn-sm" onclick="segnaComeFatturato('${o.id}')">FATTURATO</button>
+        </div>
+      </div>`).join("");
+  } else if(cfg.isRitirare){
+    rows = cfg.items.map(o=>`
+      <div class="list-row" style="cursor:default;">
+        <div style="cursor:pointer;flex:1;" onclick="openJobCard('${o.id}')">
+          <div class="lr-main">${clientName(o.clientId)}</div><div class="lr-sub">${orderCategorieLabel(o)} — ${(orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato")} — ${fmtDate(o.dataConsegna)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span>
+          <button class="btn btn-primary btn-sm" onclick="segnaRitiratoDaLista('${o.id}')">RITIRATO</button>
         </div>
       </div>`).join("");
   } else if(cfg.isQuote){
@@ -8223,7 +8256,9 @@ function workPriceInputValue(v){
 }
 
 function moveWorkDescriptionOverflow(orderId, lineId, inputEl){
-  const o=findItem("orders",orderId);
+  let coll="orders";
+  let o=findItem("orders",orderId);
+  if(!o){ o=findItem("quotes",orderId); coll="quotes"; }
   if(!o || !inputEl) return;
   const r=(o.righe||[]).find(x=>x.id===lineId);
   if(!r) return;
@@ -8242,7 +8277,7 @@ function moveWorkDescriptionOverflow(orderId, lineId, inputEl){
   }
 
   r.prodotto=value;
-  saveState("orders");
+  saveState(coll);
 }
 
 function normalizeMoneyFieldValue(value){
@@ -8254,7 +8289,7 @@ function linesEditor(collection, id, righe, options={}){
   const showDots = isOrder && (options.forceShowDots ?? (righe.length > 1));
   const showAdd = options.showAdd !== false;
 
-  if(isOrder){
+  if(isOrder || collection === 'quotes'){
     return `
       <div class="job-v2-table-wrap">
         <table class="job-v2-table">
@@ -8299,7 +8334,7 @@ function linesEditor(collection, id, righe, options={}){
                   <input class="num" type="text" inputmode="decimal" value="${workPriceInputValue(r.prezzoUnitario)}"
                     onchange="updateRigaField('${collection}','${id}','${r.id}','prezzoUnitario',normalizeMoneyFieldValue(this.value));this.value=workPriceInputValue(this.value)">
                 </td>
-                <td class="num" style="padding-top:15px;font-weight:800;">
+                <td class="num" id="qrt-${r.id}" style="padding-top:15px;font-weight:800;">
                   ${fmtMoney((Number(r.quantita)||0)*(Number(r.prezzoUnitario)||0))}
                 </td>
                 ${showDots ? `<td>
@@ -8344,7 +8379,7 @@ function linesEditor(collection, id, righe, options={}){
 function findItem(collection, id){ return state[collection].find(x=>x.id===id); }
 function addRiga(collection, id){
   const item = findItem(collection, id);
-  item.righe.push(emptyRiga(collection==='orders'));
+  item.righe.push(emptyRiga(collection==='orders', collection==='quotes', collection==='quotes' ? (quoteIvaOn(item)?22:0) : undefined));
   if(collection==='orders') recalcFasi(item);
   saveState(collection);
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
@@ -8376,6 +8411,10 @@ function updateRigaField(collection, id, rigaId, field, value){
       if(existingSupplier) riga.fornitore=existingSupplier;
     }
   }
+  if(collection==='quotes' && field==='categoria'){
+    const first=(item.righe||[]).find(x=>x.categoria);
+    if(first) item.categoria=first.categoria;
+  }
   saveState(collection);
   if(collection==='quotes'){ refreshQuoteLive(id); return; }
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
@@ -8404,6 +8443,11 @@ function quoteExtra(q){
     sconto: Number(e.sconto) || 0,
     validita: e.validita || "",
     note: e.note || "",
+    dataConsegna: e.dataConsegna || "",
+    consegnaTipo: e.consegnaTipo || "Ritiro in sede",
+    costoSpedizione: Number(e.costoSpedizione) || 0,
+    importante: !!e.importante,
+    ivaApplicata: (e.ivaApplicata === undefined ? null : !!e.ivaApplicata),
     pagamento: Object.assign({}, QUOTE_PAY_DEFAULT, e.pagamento || {})
   };
 }
@@ -8414,6 +8458,13 @@ function nextQuoteNumber(){
 }
 function quoteRigaIva(r){ return (r.iva === undefined || r.iva === null || r.iva === "") ? 22 : (Number(r.iva) || 0); }
 function round2(n){ return Math.round((Number(n)||0) * 100) / 100; }
+function quoteIvaOn(q){
+  const e = (q && q.extra) || {};
+  if(e.ivaApplicata !== undefined && e.ivaApplicata !== null) return !!e.ivaApplicata;
+  const r = (q && q.righe) || [];
+  return r.length ? r.some(x => quoteRigaIva(x) > 0) : true;
+}
+function quoteSpedizione(q){ const e = quoteExtra(q); return e.consegnaTipo === "Spedizione" ? e.costoSpedizione : 0; }
 function quoteTotals(q){
   const righe = q.righe || [];
   const lordo = righe.reduce((s,r) => s + (Number(r.quantita)||0) * (Number(r.prezzoUnitario)||0), 0);
@@ -8424,10 +8475,12 @@ function quoteTotals(q){
     const rate = quoteRigaIva(r);
     byRate[rate] = (byRate[rate] || 0) + (Number(r.quantita)||0) * (Number(r.prezzoUnitario)||0) * f;
   });
+  const spedizione = quoteSpedizione(q);
+  if(spedizione > 0){ const rr = quoteIvaOn(q) ? 22 : 0; byRate[rr] = (byRate[rr] || 0) + spedizione; }
   const iva = Object.keys(byRate).map(k => ({rate:Number(k), base:round2(byRate[k]), imposta:round2(byRate[k] * Number(k) / 100)})).sort((a,b) => b.rate - a.rate);
   const imposta = round2(iva.reduce((s,x) => s + x.imposta, 0));
-  const imponibile = round2(lordo - sconto);
-  return {lordo:round2(lordo), sconto:round2(sconto), imponibile, iva, imposta, totale:round2(imponibile + imposta)};
+  const imponibile = round2(lordo - sconto + spedizione);
+  return {lordo:round2(lordo), sconto:round2(sconto), spedizione:round2(spedizione), imponibile, iva, imposta, totale:round2(imponibile + imposta)};
 }
 function pdfNum(n, dec){
   const v = (Number(n)||0).toFixed(dec); const neg = v[0] === "-"; const p = (neg ? v.slice(1) : v).split(".");
@@ -8593,7 +8646,7 @@ function buildQuotePdf(q){
   tableHead(y); y += 7;
   const LH = 4.3;
   (q.righe || []).forEach(r => {
-    const lines = pdf.wrap(String(r.descrizione || r.prodotto || ""), "n", 8.5, 84);
+    const lines = pdf.wrap(String([r.prodotto, r.descrizione].filter(Boolean).join(" - ") || r.categoria || ""), "n", 8.5, 84);
     const rowH = Math.max(1, lines.length) * LH + 3;
     if(y + rowH > 240){ pdf.addPage(); header(); y = 46; tableHead(y); y += 7; }
     lines.forEach((ln, i) => txt(ln, 9, y + i*LH, {size:8.5, color:INK}));
@@ -8623,6 +8676,7 @@ function buildQuotePdf(q){
   let ty = top + 3;
   const trow = (label, val, bold) => { const o = {size:8.5, font:bold ? "b" : "n", color:INK}; txt(label, 174, ty, Object.assign({align:"right"}, o)); txt(val, 201, ty, Object.assign({align:"right"}, o)); ty += 5.4; };
   if(t.sconto > 0){ trow("Importo righe", pdfEur(t.lordo)); trow("Sconto", "-" + pdfEur(t.sconto)); }
+  if(t.spedizione > 0) trow("Spedizione", pdfEur(t.spedizione));
   trow("Imponibile", pdfEur(t.imponibile));
   t.iva.forEach(x => trow(`Imposta ${x.rate}%`, pdfEur(x.imposta)));
   hline(131, 202, ty - 3.4, [120,120,120], 0.3);
@@ -8723,7 +8777,7 @@ async function createQuote(clientId, categoria, extraData){
   const id = uid();
   const quote = {
     id, clientId: clientId || null, categoria: categoria || CATEGORIES[0], descrizione:"",
-    righe:[emptyRiga(false)], stato:"Bozza", data:today(),
+    righe:[emptyRiga(false,true)], stato:"Bozza", data:today(),
     extra:Object.assign({numero:nextQuoteNumber(), serie:QUOTE_SERIE}, extraData || {})
   };
   const ok = await upsertOne('quotes', quote);
@@ -8806,20 +8860,23 @@ async function finalizeQuoteToOrder(quoteId, clientId){
   const q = findItem('quotes', quoteId);
   if(!q || !clientId) return;
 
+  const qe = quoteExtra(q);
   const righe = q.righe.map(r=>({
     id:uid(),
-    descrizione:r.descrizione,
-    categoria:q.categoria,
+    descrizione:r.descrizione||"",
+    categoria:r.categoria||q.categoria||"",
     prodotto:r.prodotto||"",
     stato:"Da fare",
     quantita:r.quantita,
     prezzoUnitario:r.prezzoUnitario
   }));
 
-  const order = mkOrder(uid(), clientId, q.descrizione, "", "Da fare", "", righe);
+  const order = mkOrder(uid(), clientId, q.descrizione, "", "Da fare", qe.dataConsegna||"", righe, qe.consegnaTipo);
   const qt = quoteTotals(q);
-  order.ivaApplicata = qt.imposta > 0;
-  order.sconto = Math.max(0, round2(qt.lordo * (order.ivaApplicata ? 1.22 : 1) - qt.totale));
+  order.ivaApplicata = quoteIvaOn(q);
+  order.importante = qe.importante;
+  order.costoSpedizione = qe.consegnaTipo === "Spedizione" ? qe.costoSpedizione : 0;
+  order.sconto = Math.max(0, round2((qt.lordo + quoteSpedizione(q)) * (order.ivaApplicata ? 1.22 : 1) - qt.totale));
   const okOrder = await upsertOne('orders', order);
   if(!okOrder) return;
 
@@ -8912,10 +8969,12 @@ async function transformQuoteToLead(quoteId){
 
 function quoteTotalsHTML(q){
   const t = quoteTotals(q);
-  const row = (l,v,b) => `<div class="trow${b?' grand':''}"><span>${l}</span><span>${v}</span></div>`;
-  return (t.sconto>0 ? row("Importo righe", fmtMoney(t.lordo)) + row("Sconto", "-" + fmtMoney(t.sconto)) : "")
+  const row = (l,v,b) => `<div class="job-v2-money-row${b?' total':''}"><span>${l}</span><strong>${v}</strong></div>`;
+  return row("Totale lavorazioni", fmtMoney(t.lordo))
+    + (t.sconto>0 ? row("Sconto", "-" + fmtMoney(t.sconto)) : "")
+    + (t.spedizione>0 ? row("Spedizione", fmtMoney(t.spedizione)) : "")
     + row("Imponibile", fmtMoney(t.imponibile))
-    + t.iva.map(x => row(`Imposta ${x.rate}%`, fmtMoney(x.imposta))).join("")
+    + t.iva.filter(x=>x.rate>0 || x.imposta>0).map(x => row(`IVA ${x.rate}%`, fmtMoney(x.imposta))).join("")
     + row("Totale preventivo", fmtMoney(t.totale), true);
 }
 function refreshQuoteLive(id){
@@ -8925,9 +8984,11 @@ function refreshQuoteLive(id){
 }
 function updateQuoteExtra(id, key, value){
   const q = findItem('quotes', id); if(!q) return;
-  if(key === "sconto") value = Math.max(0, Number(String(value).replace(",", ".")) || 0);
+  if(key === "sconto" || key === "costoSpedizione") value = Math.max(0, Number(String(value).replace(",", ".")) || 0);
   q.extra = Object.assign({}, q.extra || {}, {[key]: value});
+  if(key === "ivaApplicata"){ (q.righe||[]).forEach(r => { r.iva = value ? 22 : 0; }); }
   saveState('quotes');
+  if(key === "consegnaTipo"){ openQuoteDetail(id); return; }
   refreshQuoteLive(id);
 }
 function updateQuotePay(id, key, value){
@@ -8945,63 +9006,114 @@ function updateQuoteField(id, field, value){
 function openQuoteDetail(quoteId){
   const q = findItem('quotes', quoteId); if(!q) return;
   const e = quoteExtra(q), P = e.pagamento;
+  const rcp = quoteRecipient(q);
+  const stBg = {Bozza:"#eef1f5", Inviato:"#fff2cd", Accettato:"#2E9D57", Rifiutato:"#C0392B"}[q.stato] || "#eef1f5";
+  const stCol = (q.stato==="Accettato"||q.stato==="Rifiutato") ? "#fff" : "#28323F";
   document.getElementById("modalBody").innerHTML = `
-    <button class="close-x" onclick="closeModal()">×</button>
-    <h2>Preventivo n. ${quoteNumberLabel(q)}</h2>
-    ${(() => { const r = quoteRecipient(q); return r.lead ? `<p style="margin:0 0 12px;color:var(--muted);">Lead: <b>${escapeHtml(leadDisplayName(r.lead))}</b>${r.lead.email ? ` · ${escapeHtml(r.lead.email)}` : ""} <button class="btn btn-ghost btn-sm" onclick="openLeadDetail('${r.lead.id}')">← Torna al lead</button></p>` : ""; })()}
-    <div class="ticket-meta">
-      <div><span>Cliente</span>
-        <select class="inline" onchange="updateQuoteField('${q.id}','clientId',this.value)">
-          <option value="">— Senza cliente —</option>${clientOptions(q.clientId,false)}
-        </select>
+    <div class="job-v2">
+      <div class="job-v2-head">
+        <div>
+          <button class="btn btn-ghost btn-sm" style="padding-left:0;" onclick="closeModal()">← Torna</button>
+          <div class="job-v2-title">
+            <h2>Preventivo n. ${quoteNumberLabel(q)}</h2>
+            <span class="job-v2-pill" style="background:${stBg};color:${stCol};">${escapeHtml(String(q.stato||"").toUpperCase())}</span>
+          </div>
+          <p class="job-v2-sub">${q.data?`Creato il ${fmtDate(q.data)}`:""}${rcp.lead?` · Lead: ${escapeHtml(leadDisplayName(rcp.lead))}${rcp.lead.email?` · ${escapeHtml(rcp.lead.email)}`:""}`:""}</p>
+        </div>
+        <button class="close-x" onclick="closeModal()">×</button>
       </div>
-      <div><span>Data</span><input class="inline" type="date" value="${escapeHtml(q.data||'')}" onchange="updateQuoteField('${q.id}','data',this.value)"></div>
-      <div><span>Categoria</span>
-        <select class="inline" onchange="updateQuoteField('${q.id}','categoria',this.value)">${categoryOptions(q.categoria)}</select>
+
+      <section class="job-v2-card" style="--job-accent:#2f80ed;">
+        <div class="job-v2-section-title">
+          <h3><span class="job-v2-num">1</span> Informazioni preventivo</h3>
+          ${e.importante?`<span class="job-v2-pill" style="background:#fff2cd;color:#a26400;">★ IMPORTANTE</span>`:""}
+        </div>
+        <div class="job-v2-info-grid">
+          <div class="job-v2-info-cell">
+            <label>Cliente</label>
+            <select class="inline" onchange="updateQuoteField('${q.id}','clientId',this.value)">
+              <option value="">— Senza cliente —</option>${clientOptions(q.clientId,false)}
+            </select>
+            ${rcp.email?`<div class="job-v2-info-sub">${escapeHtml(rcp.email)}</div>`:""}
+            ${rcp.telefono?`<div class="job-v2-info-sub">${escapeHtml(rcp.telefono)}</div>`:""}
+          </div>
+          <div class="job-v2-info-cell">
+            <label>Data preventivo</label>
+            <input class="inline" type="date" value="${escapeHtml(q.data||'')}" onchange="updateQuoteField('${q.id}','data',this.value)">
+            <label style="margin-top:12px;">Stato</label>
+            <select class="inline" onchange="updateQuoteField('${q.id}','stato',this.value);openQuoteDetail('${q.id}')">${QUOTE_STATUSES.map(s=>`<option ${s===q.stato?'selected':''}>${s}</option>`).join("")}</select>
+            <label class="checkfield" style="margin-top:12px;"><input type="checkbox" ${e.importante?'checked':''} onchange="updateQuoteExtra('${q.id}','importante',this.checked);openQuoteDetail('${q.id}')"> IMPORTANTE</label>
+          </div>
+          <div class="job-v2-info-cell">
+            <label>Consegna prevista</label>
+            <input class="inline" type="date" value="${escapeHtml(e.dataConsegna||'')}" onchange="updateQuoteExtra('${q.id}','dataConsegna',this.value)">
+            <label style="margin-top:12px;">Modalità consegna</label>
+            <select class="inline" onchange="updateQuoteExtra('${q.id}','consegnaTipo',this.value)">
+              ${CONSEGNA_TIPI.map(t=>`<option ${t===e.consegnaTipo?'selected':''}>${t}</option>`).join("")}
+            </select>
+            ${e.consegnaTipo==="Spedizione"?`<label style="margin-top:12px;">Costo spedizione (€)</label>
+            <input class="inline" type="text" inputmode="decimal" value="${e.costoSpedizione?String(e.costoSpedizione).replace('.',','):''}" placeholder="0,00" onchange="updateQuoteExtra('${q.id}','costoSpedizione',this.value)">`:""}
+          </div>
+        </div>
+      </section>
+
+      <section class="job-v2-card" style="--job-accent:#8a56e8;">
+        <div class="job-v2-section-title">
+          <h3><span class="job-v2-num">2</span> Lavorazioni (${(q.righe||[]).length})</h3>
+          <div class="job-v2-info-sub">Stesse righe della scheda di lavorazione: categoria · descrizione prodotto · dettagli espandibili</div>
+        </div>
+        ${linesEditor('quotes', q.id, q.righe)}
+      </section>
+
+      <section class="job-v2-card" style="--job-accent:#355db4;">
+        <div class="job-v2-section-title">
+          <h3>Note integrative</h3>
+          <div class="job-v2-info-sub">Interne: restano nella scheda di lavorazione quando il preventivo diventa ordine</div>
+        </div>
+        <textarea class="job-v2-note job-v2-note-full" placeholder="Indicazioni aggiuntive, dettagli tecnici, richieste del cliente…" onchange="updateQuoteField('${q.id}','descrizione',this.value)">${escapeHtml(q.descrizione||"")}</textarea>
+      </section>
+
+      <section class="job-v2-card" style="--job-accent:#ef5b4a;">
+        <div class="job-v2-section-title"><h3><span class="job-v2-num">3</span> Riepilogo economico</h3></div>
+        <div class="job-v2-three">
+          <div class="job-v2-soft">
+            <h4>Importi</h4>
+            <div class="field" style="margin:0 0 8px;"><label>Sconto (€, sul totale lavorazioni)</label>
+              <input type="text" inputmode="decimal" value="${e.sconto ? String(e.sconto).replace('.',',') : ''}" placeholder="0,00" onchange="updateQuoteExtra('${q.id}','sconto',this.value)"></div>
+            <label class="checkfield"><input type="checkbox" ${quoteIvaOn(q)?'checked':''} onchange="updateQuoteExtra('${q.id}','ivaApplicata',this.checked);openQuoteDetail('${q.id}')"> Applica IVA 22%</label>
+            <div class="field" style="margin:12px 0 0;"><label>Data fine validità</label>
+              <input type="date" value="${escapeHtml(e.validita||'')}" onchange="updateQuoteExtra('${q.id}','validita',this.value)"></div>
+          </div>
+          <div class="job-v2-soft" id="quote-totals-box">${quoteTotalsHTML(q)}</div>
+        </div>
+        <details style="margin-top:14px;">
+          <summary style="cursor:pointer;font-weight:700;">Termini di pagamento e note per il cliente (compaiono nel PDF)</summary>
+          <div class="form-grid" style="margin-top:12px;">
+            <div class="field"><label>Modalità</label><input value="${escapeHtml(P.modalita)}" onchange="updateQuotePay('${q.id}','modalita',this.value)"></div>
+            <div class="field"><label>Scadenze</label><input value="${escapeHtml(P.scadenza)}" onchange="updateQuotePay('${q.id}','scadenza',this.value)"></div>
+            <div class="field"><label>Banca</label><input value="${escapeHtml(P.banca)}" onchange="updateQuotePay('${q.id}','banca',this.value)"></div>
+            <div class="field"><label>BIC</label><input value="${escapeHtml(P.bic)}" onchange="updateQuotePay('${q.id}','bic',this.value)"></div>
+          </div>
+          <div class="field"><label>IBAN</label><input value="${escapeHtml(P.iban)}" onchange="updateQuotePay('${q.id}','iban',this.value)"></div>
+          <div class="field"><label>Note per il cliente</label><textarea rows="3" onchange="updateQuoteExtra('${q.id}','note',this.value)">${escapeHtml(e.note||"")}</textarea></div>
+        </details>
+      </section>
+
+      <div class="job-v2-bottom-actions">
+        <div style="display:flex;gap:9px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="downloadQuotePdf('${q.id}')">SCARICA PDF</button>
+          <button class="btn btn-outline" onclick="printQuote('${q.id}')">Stampa scheda</button>
+          <button class="btn btn-outline" onclick="openQuoteMail('${q.id}')">Invia per mail</button>
+          ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
+          <button class="btn btn-outline" onclick="transformQuoteToLead('${q.id}')">Trasforma in Lead</button>
+          <button class="btn btn-outline" onclick="closeModal(); showToast('Preventivo salvato')">Salva e chiudi</button>
+        </div>
+        <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteQuote('${q.id}')">Elimina preventivo</button>
       </div>
-      <div><span>Stato</span>
-        <select class="inline" onchange="updateQuoteField('${q.id}','stato',this.value)">${QUOTE_STATUSES.map(s=>`<option ${s===q.stato?'selected':''}>${s}</option>`).join("")}</select>
-      </div>
-    </div>
-    <div class="field"><label>Descrizione generale <span style="font-weight:500;color:var(--muted);">(interna, resta nell'ordine)</span></label>
-      <textarea onchange="updateQuoteField('${q.id}','descrizione',this.value)">${escapeHtml(q.descrizione||"")}</textarea></div>
-    <div class="modal-section">
-      <h3>Righe di preventivo</h3>
-      ${linesEditor('quotes', q.id, q.righe)}
-      <div class="form-grid" style="margin-top:14px;">
-        <div class="field"><label>Sconto (€, sull'imponibile)</label>
-          <input type="text" inputmode="decimal" value="${e.sconto ? String(e.sconto).replace('.',',') : ''}" placeholder="0,00" onchange="updateQuoteExtra('${q.id}','sconto',this.value)"></div>
-        <div class="field"><label>Data fine validità</label>
-          <input type="date" value="${escapeHtml(e.validita||'')}" onchange="updateQuoteExtra('${q.id}','validita',this.value)"></div>
-      </div>
-      <div class="totals-box" id="quote-totals-box">${quoteTotalsHTML(q)}</div>
-    </div>
-    <details class="modal-section" style="margin-top:0;">
-      <summary style="cursor:pointer;font-weight:700;">Termini di pagamento e note (compaiono nel PDF)</summary>
-      <div class="form-grid" style="margin-top:12px;">
-        <div class="field"><label>Modalità</label><input value="${escapeHtml(P.modalita)}" onchange="updateQuotePay('${q.id}','modalita',this.value)"></div>
-        <div class="field"><label>Scadenze</label><input value="${escapeHtml(P.scadenza)}" onchange="updateQuotePay('${q.id}','scadenza',this.value)"></div>
-        <div class="field"><label>Banca</label><input value="${escapeHtml(P.banca)}" onchange="updateQuotePay('${q.id}','banca',this.value)"></div>
-        <div class="field"><label>BIC</label><input value="${escapeHtml(P.bic)}" onchange="updateQuotePay('${q.id}','bic',this.value)"></div>
-      </div>
-      <div class="field"><label>IBAN</label><input value="${escapeHtml(P.iban)}" onchange="updateQuotePay('${q.id}','iban',this.value)"></div>
-      <div class="field"><label>Note per il cliente</label><textarea rows="3" onchange="updateQuoteExtra('${q.id}','note',this.value)">${escapeHtml(e.note||"")}</textarea></div>
-    </details>
-    <div class="form-actions" style="justify-content:space-between;align-items:center;flex-wrap:wrap;">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="downloadQuotePdf('${q.id}')">SCARICA PDF</button>
-        <button class="btn btn-outline" onclick="openQuoteMail('${q.id}')">Invia per mail</button>
-        ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
-        <button class="btn btn-outline" onclick="transformQuoteToLead('${q.id}')">Trasforma in Lead</button>
-        <button class="btn btn-outline" onclick="closeModal(); showToast('Preventivo salvato')">Salva e chiudi</button>
-      </div>
-      <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteQuote('${q.id}')">Elimina preventivo</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
 }
-
-
 
 /* ============ DROPBOX ============ */
 const DROPBOX_EDGE_URL = `${SUPABASE_URL}/functions/v1/dropbox-api`;
@@ -11332,9 +11444,13 @@ async function updateOrderField(orderId, field, value){
   // Lo stato della scheda deve essere salvato subito e non deve essere
   // annullato quando si chiude la scheda con la X.
   if(field==='stato'){
+    // "Segna come spedito" porta l'ordine a Consegnato: se lo stato viene
+    // corretto, l'ordine deve tornare tra quelli da spedire.
+    if(value!=="Consegnato" && o.spedito && o.consegnaTipo==="Spedizione") o.spedito=false;
     const saved=await upsertOneReturning('orders',o);
     if(!saved){
       o[field]=oldValue;
+      if(field==='stato' && value!=="Consegnato" && oldValue==="Consegnato") o.spedito=true;
       showToast("Stato non aggiornato: riprova");
       openJobCard(orderId);
       return;
