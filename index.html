@@ -6589,6 +6589,23 @@ async function segnaRitiroCompletato(orderId){
   renderDashboard();
   showToast("Ritiro completato: ora il cliente è da avvisare");
 }
+
+async function segnaConsegnatoDaScheda(orderId){
+  const o=findItem("orders",orderId);
+  if(!o || o.stato==="Consegnato") return;
+  const saldo=orderSaldo(o);
+  if(saldo>0.005 && !confirm(`Ci sono ancora ${fmtMoney(saldo)} da incassare su questo ordine.\n\nSegnarlo come consegnato comunque?`)) return;
+  const oldState=o.stato;
+  o.stato="Consegnato";
+  const saved=await upsertOneReturning("orders",o);
+  if(!saved){ o.stato=oldState; showToast("Impossibile segnare come consegnato"); return; }
+  const i=state.orders.findIndex(x=>x.id===orderId);
+  if(i>=0) state.orders[i]=saved;
+  try{ closeCompletedOrderSheet(); }catch(_){}
+  if(currentView==="dashboard") renderDashboard();
+  if(currentView==="lavoriCompletati") renderLavoriCompletati();
+  showToast("Ordine CONSEGNATO");
+}
 async function consegnaOrdineAvvisato(orderId){
   const o=findItem("orders",orderId);
   if(!o || !o.clienteAvvisato) return;
@@ -14839,9 +14856,11 @@ function openCompletedOrderSheet(orderId){
         <div class="completed-sheet-info-value">${categorie}</div>
       </div>
       <div class="completed-sheet-info-row">
-        <div class="completed-sheet-info-label">Pagamento</div>
+        <div class="completed-sheet-info-label">Consegna</div>
         <div class="completed-sheet-info-value">
-          <button class="btn btn-outline btn-sm" onclick="closeCompletedOrderSheet();openCompletedOrderPayment('${o.id}')">AGGIUNGI PAGAMENTO</button>
+          ${o.stato==="Consegnato"
+            ? `<span class="btn btn-sm" style="background:#0B4F2F;border:1px solid #0B4F2F;color:#fff;font-weight:900;cursor:default;">✓ CONSEGNATO</span>`
+            : `<button class="btn btn-primary btn-sm" onclick="segnaConsegnatoDaScheda('${o.id}')">CONSEGNATO</button>`}
         </div>
       </div>
       <div class="completed-sheet-info-row">
