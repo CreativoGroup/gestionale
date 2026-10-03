@@ -4297,6 +4297,115 @@ function mobileizeTables(){
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",start); else start();
   window.addEventListener("resize",()=>{ if(!tm) tm=setTimeout(run,100); });
 })();
+
+/* ===== STAMPA SCHEDA DI LAVORAZIONE (documento dedicato) ===== */
+function jobCardPrintHtml(o){
+  const c=state.clients.find(x=>x.id===o.clientId);
+  const e=escapeHtml;
+  const righe=o.righe||[];
+  const imponibile=orderImponibile(o), sped=orderSpedizioneCosto(o), iva=orderIva(o), sconto=Number(o.sconto)||0;
+  const totale=orderTotale(o);
+  const pagamenti=state.payments.filter(p=>p.orderId===o.id).sort((a,b)=>String(a.data||"").localeCompare(String(b.data||"")));
+  const incassato=pagamenti.reduce((t,x)=>t+Number(x.importo||0),0);
+  const saldo=totale-incassato;
+  const nomeCliente=c?clientDisplayName(c):"—";
+  const ragione=c&&c.tipo==="Business"&&c.ragioneSociale&&c.ragioneSociale!==nomeCliente?c.ragioneSociale:"";
+  const referente=c?[c.refNome,c.refCognome].filter(Boolean).join(" "):"";
+  const indirizzo=c?[c.indirizzo,[c.cap,c.citta].filter(Boolean).join(" "),c.provincia?`(${c.provincia})`:""].filter(Boolean).join(" · "):"";
+  const cli=(l,v)=>v?`<div class="kv"><span>${l}</span><b>${e(v)}</b></div>`:"";
+  const rows=righe.map((r,i)=>{
+    const q=Number(r.quantita)||0, pu=Number(r.prezzoUnitario)||0;
+    const titolo=[r.categoria,r.prodotto].filter(Boolean).join(" — ");
+    return `<tr>
+      <td class="n">${i+1}</td>
+      <td><b>${e(titolo||"—")}</b>${r.descrizione?`<div class="d">${e(r.descrizione).replace(/\n/g,"<br>")}</div>`:""}${r.fornitore?`<div class="d">Fornitore: ${e(r.fornitore)}</div>`:""}</td>
+      <td class="r">${q.toLocaleString("it-IT")}</td>
+      <td class="r">${fmtMoney(pu)}</td>
+      <td class="r"><b>${fmtMoney(q*pu)}</b></td></tr>`;
+  }).join("")||`<tr><td colspan="5" class="n" style="text-align:center;padding:14px;">Nessuna lavorazione inserita.</td></tr>`;
+  const tot=(l,v,cls="")=>`<div class="t ${cls}"><span>${l}</span><b>${v}</b></div>`;
+  const consegna=[o.dataConsegna?fmtDate(o.dataConsegna):"—",o.consegnaTipo||""].filter(Boolean).join(" · ");
+  return `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Scheda lavorazione ${o.numero?("n. "+o.numero):""}</title>
+<style>
+@page{size:A4;margin:12mm;}
+*{box-sizing:border-box;}
+body{font-family:Helvetica,Arial,sans-serif;color:#1c2430;font-size:11.5px;line-height:1.4;margin:0;}
+.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #14213D;padding-bottom:10px;margin-bottom:12px;}
+.top img{height:46px;}
+.ttl{text-align:right;}
+.ttl h1{margin:0;font-size:20px;color:#14213D;}
+.ttl div{color:#555;margin-top:2px;}
+.badge{display:inline-block;border:1px solid #14213D;border-radius:20px;padding:1px 9px;font-weight:700;font-size:10.5px;margin-left:6px;}
+.box{border:1px solid #cfd5da;border-radius:6px;padding:9px 11px;margin-bottom:10px;page-break-inside:avoid;}
+.box h3{margin:0 0 6px;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#6B7280;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.kv{display:flex;gap:8px;padding:1.5px 0;}.kv span{flex:0 0 92px;color:#6B7280;}.kv b{font-weight:600;}
+.cli-name{font-size:15px;font-weight:700;margin-bottom:4px;}
+table{width:100%;border-collapse:collapse;margin-bottom:10px;}
+th{background:#14213D;color:#fff;text-align:left;font-size:10.5px;padding:6px 7px;}
+th.r,td.r{text-align:right;white-space:nowrap;}
+td{border-bottom:1px solid #dde2e5;padding:7px;vertical-align:top;}
+td.n{color:#6B7280;width:24px;}
+.d{color:#444;font-size:10.5px;margin-top:2px;}
+.tots{margin-left:auto;width:290px;}
+.t{display:flex;justify-content:space-between;padding:3px 0;}
+.t.big{border-top:2px solid #14213D;margin-top:3px;padding-top:6px;font-size:14px;}
+.t.saldo{background:#fdeceb;border-radius:4px;padding:5px 7px;margin-top:4px;font-size:13px;color:#a02a1f;}
+.t.saldo.ok{background:#e8f5ec;color:#256a41;}
+.note{white-space:pre-wrap;min-height:30px;}
+.pag{font-size:10.5px;color:#444;}
+.foot{margin-top:12px;color:#888;font-size:9.5px;text-align:center;}
+</style></head><body>
+<div class="top">
+  <img src="${QUOTE_LOGO_DATAURL}" alt="Creativò">
+  <div class="ttl"><h1>Scheda di lavorazione${o.numero?` n. ${e(o.numero)}`:""}</h1>
+    <div>${o.createdAt?`Creata il ${fmtDate(String(o.createdAt).slice(0,10))} · `:""}Stato: <span class="badge">${e(o.stato||"")}</span>${o.importante?` <span class="badge">★ IMPORTANTE</span>`:""}</div></div>
+</div>
+<div class="grid">
+  <div class="box"><h3>Cliente</h3>
+    <div class="cli-name">${e(nomeCliente)}</div>
+    ${cli("Ragione sociale",ragione)}${cli("Referente",referente)}${cli("Indirizzo",indirizzo)}
+    ${cli("Telefono",c?.telefono)}${cli("Email",c?.email)}${cli("P. IVA",c?.partitaIva)}${cli("Cod. fiscale",c?.codiceFiscale)}
+  </div>
+  <div class="box"><h3>Lavorazione</h3>
+    ${cli("Operatori",orderWorkersLabel(o)!=="—"?orderWorkersLabel(o):"")}
+    ${cli("Inizio consigliato",(()=>{try{const d=effectiveWorkStartDate(o);return d?fmtDate(d):"";}catch(_){return "";}})())}
+    ${cli("Consegna",consegna)}
+    ${o.avvisato||o.clienteAvvisato?cli("Cliente avvisato",o.avvisatoIl?fmtDate(String(o.avvisatoIl).slice(0,10)):"Sì"):""}
+    ${o.daFatturare?cli("Fatturazione","Da fatturare"):""}
+  </div>
+</div>
+<table><thead><tr><th>#</th><th>Lavorazione</th><th class="r">Q.tà</th><th class="r">Prezzo unit.</th><th class="r">Totale</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="grid" style="align-items:start;">
+  <div>
+    <div class="box"><h3>Note integrative</h3><div class="note">${e(o.descrizione||"—")}</div></div>
+    ${pagamenti.length?`<div class="box pag"><h3>Pagamenti registrati</h3>${pagamenti.map(x=>`<div class="kv"><span>${fmtDate(x.data)}</span><b>${fmtMoney(x.importo)} · ${e(x.tipo||"")}${x.metodo?" · "+e(x.metodo):""}</b></div>`).join("")}</div>`:""}
+  </div>
+  <div class="tots">
+    ${tot("Imponibile",fmtMoney(imponibile))}
+    ${sped?tot("Spedizione",fmtMoney(sped)):""}
+    ${sconto?tot("Sconto","− "+fmtMoney(sconto)):""}
+    ${o.ivaApplicata?tot("IVA 22%",fmtMoney(iva)):""}
+    ${tot("TOTALE",fmtMoney(totale),"big")}
+    ${tot("Incassato",fmtMoney(incassato))}
+    ${tot(saldo>0.005?"Saldo da incassare":"Saldo",fmtMoney(saldo),"saldo"+(saldo>0.005?"":" ok"))}
+    ${o.ivaApplicata?"":`<div class="d" style="text-align:right;">Importi IVA esclusa</div>`}
+  </div>
+</div>
+<div class="foot">Creativò Group · scheda stampata il ${new Date().toLocaleDateString("it-IT")}</div>
+</body></html>`;
+}
+function printJobCard(orderId){
+  const o=findItem('orders',orderId); if(!o) return;
+  let fr=document.getElementById("printFrame");
+  if(fr) fr.remove();
+  fr=document.createElement("iframe");
+  fr.id="printFrame";
+  fr.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+  document.body.appendChild(fr);
+  fr.srcdoc=jobCardPrintHtml(o);
+  fr.onload=()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(err){ showToast("Stampa non riuscita"); } };
+}
 function toggleMobileNavDropdown(event){
   if(event) event.stopPropagation();
   const dd = document.getElementById("mobileNavDropdown");
@@ -10943,7 +11052,7 @@ function openJobCard(orderId){
 
       <div class="job-v2-bottom-actions">
         <div style="display:flex;gap:9px;flex-wrap:wrap;">
-          <button class="btn btn-outline" onclick="window.print()">Stampa</button>
+          <button class="btn btn-outline" onclick="printJobCard('${o.id}')">Stampa</button>
           <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
           <button class="btn btn-primary" onclick="saveJobCard('${o.id}')">Salva</button>
           <button class="btn btn-outline" onclick="cancelJobCard('${o.id}')">Annulla</button>
