@@ -6355,7 +6355,7 @@ function noteDateLabel(iso){
 }
 function noteExtra(n){
   const e = (n && n.extra) || {};
-  return {clientId:e.clientId || "", scadenza:e.scadenza || "", priorita:e.priorita === "urgente" ? "urgente" : "normale", stato:e.stato === "in_corso" ? "in_corso" : "da_fare"};
+  return {clientId:e.clientId || "", telefono:e.telefono || "", email:e.email || "", scadenza:e.scadenza || "", priorita:e.priorita === "urgente" ? "urgente" : "normale", stato:e.stato === "in_corso" ? "in_corso" : "da_fare"};
 }
 let noteFilter = {op:"", q:""};
 function ensureNoteStyles(){
@@ -6365,6 +6365,19 @@ function ensureNoteStyles(){
     .note-toolbar input{max-width:260px;padding:9px 14px;border:1px solid var(--border);border-radius:999px;font:inherit;font-size:14px;background:#fff;outline:none;}
     .note-toolbar input:focus{border-color:var(--accent);}
     .note-col{min-width:0;}
+    .nota-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 16px;margin:6px 0 4px;}
+    .nota-form .field{margin:0;min-width:0;}
+    .nota-form .full{grid-column:1/-1;}
+    .nota-form .span2{grid-column:span 2;}
+    .nota-form input,.nota-form select,.nota-form textarea{width:100%;max-width:100%;box-sizing:border-box;}
+    .nota-form textarea{min-height:120px;resize:vertical;}
+    .nota-form .nota-box{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 16px;background:var(--paper);border:1px solid var(--border);border-radius:14px;padding:14px;}
+    .nota-form .nota-box .field{margin:0;}
+    .nota-form .nota-hint{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin:-4px 0 0;}
+    .nota-form .nota-client-info{grid-column:1/-1;background:var(--paper);border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:14px;}
+    @media(max-width:700px){.nota-form,.nota-form .nota-box{grid-template-columns:1fr;}.nota-form .span2{grid-column:auto;}}
+    .nota-contact{display:flex;gap:6px 14px;flex-wrap:wrap;margin:2px 0 6px;font-size:13px;}
+    .nota-contact a{color:var(--teal);text-decoration:none;font-weight:600;}
     .note-chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:7px 14px;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);}
     .note-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
     .note-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start;}
@@ -6402,6 +6415,8 @@ function noteCardHTML(n, col){
   const late = !n.fatto && e.scadenza && e.scadenza < todayIso;
   const isToday = !n.fatto && e.scadenza === todayIso;
   const hasPhone = c && waMePhone(c.telefono);
+  const freePhone = !c && e.telefono && waMePhone(e.telefono);
+  const phoneShown = c ? c.telefono : e.telefono, mailShown = c ? c.email : e.email;
   const classes = ["nota-card", n.fatto ? "fatta" : late ? "scaduta" : e.priorita === "urgente" ? "urgente" : ""].join(" ");
   const ex = DB_EXTRA.noteComunicazioni;
   const actions = n.fatto
@@ -6411,6 +6426,7 @@ function noteCardHTML(n, col){
           ? `<button class="btn btn-outline btn-sm" onclick="setNotaStato('${n.id}','da_fare')">← DA FARE</button>`
           : `<button class="btn btn-outline btn-sm" onclick="setNotaStato('${n.id}','in_corso')">IN CORSO →</button>`) : ""}
        ${hasPhone ? `<button class="btn btn-outline btn-sm" onclick="openClientWhatsapp('${c.id}')">WHATSAPP</button>` : ""}
+       ${freePhone ? `<button class="btn btn-outline btn-sm" onclick="openNoteWhatsapp('${n.id}')">WHATSAPP</button>` : ""}
        <button class="btn btn-outline btn-sm" onclick="openNoteForm('${n.id}')">MODIFICA</button>
        <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">LEAD</button>`;
   return `<div class="${classes}">
@@ -6419,6 +6435,7 @@ function noteCardHTML(n, col){
       ${e.priorita === "urgente" && !n.fatto ? `<span class="nota-badge urg">URGENTE</span>` : ""}
       ${late ? `<span class="nota-badge late">SCADUTA ${escapeHtml(fmtDate(e.scadenza))}</span>` : isToday ? `<span class="nota-badge today">OGGI</span>` : (e.scadenza && !n.fatto ? `<span class="nota-badge">entro ${escapeHtml(fmtDate(e.scadenza))}</span>` : "")}
     </div>
+    ${(phoneShown||mailShown) ? `<div class="nota-contact">${phoneShown?`<a href="tel:${escapeHtml(String(phoneShown).replace(/[^+\d]/g,''))}">☎ ${escapeHtml(phoneShown)}</a>`:""}${mailShown?`<a href="mailto:${escapeHtml(mailShown)}">✉ ${escapeHtml(mailShown)}</a>`:""}</div>` : ""}
     <div class="nota-text">${escapeHtml(n.testo || "")}</div>
     <div class="nota-foot">${escapeHtml(n.operatore || "—")} · ${escapeHtml(noteDateLabel(n.creatoIl))}${n.fatto ? ` · fatta ${escapeHtml(noteDateLabel(n.fattoIl))}` : ""}</div>
     <div class="nota-actions">${actions}</div>
@@ -6453,30 +6470,51 @@ function renderNote(){
     </div>
   `;
 }
+function noteFormClientToggle(sel){
+  const v=sel.value;
+  const box=document.getElementById("nota-f-contatti");
+  const info=document.getElementById("nota-f-clientinfo");
+  if(box) box.style.display=v?"none":"grid";
+  if(info){
+    const c=v?state.clients.find(x=>x.id===v):null;
+    info.style.display=c?"block":"none";
+    if(c) info.innerHTML=`<strong>${escapeHtml(clientDisplayName(c))}</strong>${c.telefono?` · ${escapeHtml(c.telefono)}`:""}${c.email?` · ${escapeHtml(c.email)}`:""}<br><span style="color:var(--muted);font-size:12.5px;">I contatti vengono presi dall'anagrafica del cliente.</span>`;
+  }
+}
 function openNoteForm(id){
+  ensureNoteStyles();
   const n = id ? findItem("noteComunicazioni", id) : null;
   const e = noteExtra(n), ex = DB_EXTRA.noteComunicazioni;
+  const hasClient = !!(ex && e.clientId);
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
-    <h2>${n ? "Modifica nota" : "Nuova nota"}</h2>
-    <div class="form-grid">
-      ${ex ? `<div class="field"><label>Cliente</label>
-        <select id="nota-f-cliente" onchange="document.getElementById('nota-f-nome-wrap').style.display=this.value?'none':'block'">
-          <option value="">— Altro / nome libero —</option>${clientOptions(e.clientId,false)}
-        </select></div>` : ""}
-      <div class="field" id="nota-f-nome-wrap" style="${ex && e.clientId ? 'display:none;' : ''}"><label>Nome persona</label>
-        <input id="nota-f-nome" placeholder="Nome cliente / referente" value="${escapeHtml(n ? (n.nomePersona||'') : '')}"></div>
-      <div class="field"><label>Operatore</label>
-        <select id="nota-f-op"><option value="">Seleziona operatore…</option>${NOTE_OPERATORS.map(o => `<option value="${escapeHtml(o)}" ${n && n.operatore === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join("")}</select></div>
+    <h2 style="margin-bottom:14px;">${n ? "Modifica nota" : "Nuova nota"}</h2>
+    <div class="nota-form">
+      ${ex ? `<div class="field full"><label>Cliente</label>
+        <select id="nota-f-cliente" onchange="noteFormClientToggle(this)">
+          <option value="">— Nuovo contatto / non ancora cliente —</option>${clientOptions(e.clientId,false)}
+        </select></div>
+      <div class="nota-client-info" id="nota-f-clientinfo" style="display:none;"></div>` : ""}
+      <div class="nota-box" id="nota-f-contatti" style="${hasClient ? 'display:none;' : ''}">
+        <div class="field"><label>Nome *</label>
+          <input id="nota-f-nome" placeholder="Nome e cognome / azienda" value="${escapeHtml(n ? (n.nomePersona||'') : '')}"></div>
+        <div class="field"><label>Telefono</label>
+          <input id="nota-f-tel" type="tel" inputmode="tel" placeholder="Es. 335 123 4567" value="${escapeHtml(e.telefono)}"></div>
+        <div class="field"><label>Email</label>
+          <input id="nota-f-email" type="email" inputmode="email" placeholder="nome@esempio.it" value="${escapeHtml(e.email)}"></div>
+        <p class="nota-hint">Serve il nome e almeno un recapito: telefono oppure email.</p>
+      </div>
+      <div class="field full"><label>Descrizione richiesta *</label>
+        <textarea id="nota-f-testo" placeholder="Cosa ha chiesto il cliente / cosa c'è da fare…">${escapeHtml(n ? (n.testo||'') : '')}</textarea></div>
+      <div class="field"><label>Operatore *</label>
+        <select id="nota-f-op"><option value="">Seleziona…</option>${NOTE_OPERATORS.map(o => `<option value="${escapeHtml(o)}" ${n && n.operatore === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join("")}</select></div>
       ${ex ? `<div class="field"><label>Scadenza <span style="font-weight:500;color:var(--muted);">(facoltativa)</span></label>
         <input id="nota-f-scad" type="date" value="${escapeHtml(e.scadenza)}"></div>
       <div class="field"><label>Priorità</label>
         <select id="nota-f-prio"><option value="normale" ${e.priorita==='normale'?'selected':''}>Normale</option><option value="urgente" ${e.priorita==='urgente'?'selected':''}>Urgente</option></select></div>` : ""}
     </div>
-    <div class="field"><label>Testo</label>
-      <textarea id="nota-f-testo" rows="5" placeholder="Scrivi la nota / attività da gestire…">${escapeHtml(n ? (n.testo||'') : '')}</textarea></div>
-    <div class="form-actions" style="justify-content:space-between;flex-wrap:wrap;">
-      <div style="display:flex;gap:10px;">
+    <div class="form-actions" style="justify-content:space-between;flex-wrap:wrap;margin-top:18px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="saveNoteForm('${n ? n.id : ''}')">Salva nota</button>
         <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
       </div>
@@ -6484,24 +6522,29 @@ function openNoteForm(id){
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
-  setTimeout(() => document.getElementById("nota-f-testo")?.focus(), 50);
+  const sel=document.getElementById("nota-f-cliente"); if(sel) noteFormClientToggle(sel);
+  setTimeout(() => (document.getElementById(hasClient ? "nota-f-testo" : "nota-f-nome"))?.focus(), 50);
 }
 async function saveNoteForm(id){
   const ex = DB_EXTRA.noteComunicazioni;
   const clientId = ex ? String(document.getElementById("nota-f-cliente")?.value || "") : "";
   const c = clientId ? state.clients.find(x => x.id === clientId) : null;
   const nomePersona = c ? clientDisplayName(c) : String(document.getElementById("nota-f-nome")?.value || "").trim();
+  const telefono = c ? "" : String(document.getElementById("nota-f-tel")?.value || "").trim();
+  const email = c ? "" : String(document.getElementById("nota-f-email")?.value || "").trim();
   const operatore = String(document.getElementById("nota-f-op")?.value || "").trim();
   const testo = String(document.getElementById("nota-f-testo")?.value || "").trim();
-  if(!nomePersona){ showToast("Scegli un cliente o scrivi il nome della persona"); return; }
+  if(!nomePersona){ showToast("Scegli un cliente o scrivi il nome"); return; }
+  if(!c && !telefono && !email){ showToast("Inserisci almeno un recapito: telefono o email"); return; }
+  if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ showToast("L'indirizzo email non sembra valido"); return; }
   if(!operatore){ showToast("Seleziona l'operatore"); return; }
-  if(!testo){ showToast("Inserisci il testo della nota"); return; }
+  if(!testo){ showToast("Scrivi la descrizione della richiesta"); return; }
   const prev = id ? findItem("noteComunicazioni", id) : null;
   const note = prev ? Object.assign({}, prev) : {id:uid(), tipo:"Comunicazione", fatto:false, creatoIl:new Date().toISOString(), fattoIl:""};
   note.nomePersona = nomePersona; note.operatore = operatore; note.testo = testo;
   if(ex){
     note.extra = Object.assign({}, (prev && prev.extra) || {}, {
-      clientId, scadenza:String(document.getElementById("nota-f-scad")?.value || ""),
+      clientId, telefono, email, scadenza:String(document.getElementById("nota-f-scad")?.value || ""),
       priorita:document.getElementById("nota-f-prio")?.value === "urgente" ? "urgente" : "normale"
     });
   }
@@ -6536,6 +6579,12 @@ function deleteNota(id){
   });
 }
 
+function openNoteWhatsapp(id){
+  const n=findItem("noteComunicazioni",id); if(!n) return;
+  const e=noteExtra(n);
+  if(!waMePhone(e.telefono)){ showToast("Telefono non valido per WhatsApp"); return; }
+  openWaWindow(waMeUrl(e.telefono,""));
+}
 function trasformaNotaInLead(id){
   const n=findItem("noteComunicazioni",id);
   if(!n) return;
@@ -6543,8 +6592,8 @@ function trasformaNotaInLead(id){
   openManualLeadForm({
     nome:n.nomePersona||"",
     azienda:"",
-    email:"",
-    telefono:"",
+    email:noteExtra(n).email||"",
+    telefono:noteExtra(n).telefono||"",
     oggettoRichiesta:`Nota - ${n.nomePersona||"Nuovo contatto"}`,
     richiesta:n.testo||"",
     stato:"Nuovo",
