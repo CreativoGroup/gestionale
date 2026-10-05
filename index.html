@@ -3066,7 +3066,13 @@ const PAY_TIPI = ["Acconto","Saldo"];
 const CLIENT_TYPES = ["Business","Family"];
 const CARATTERE_OPTIONS = ["Tra i migliori","Buon cliente","Potenziale","Ripetitivo","Grande ordine","Da coccolare","Dormiente","Da evitare"];
 const SETTORI = ["Abbigliamento", "Agenzia Viaggi/Auto/Funebre", "Architetti", "Arte", "Associazione Sportiva", "Automotive", "Cinema/Spettacolo", "Creativi", "Cura Persona", "Danza", "Edile", "Editoria", "Ente e Associazioni", "Eventi / Marketing", "Fisioterapia", "Hotellerie", "Immobiliare", "Legale/Tributario/Assicurativo", "Lusso", "Medicina Estetica", "Medico", "Ospedale", "Palestra", "Piccolo Commerciante", "Ristorazione", "Scuola/Parrocchia", "Settore Politica", "Studio Professionale", "Tecnologico", "Università"];
-const CONSEGNA_TIPI = ["Ritiro in sede","Spedizione"];
+const CONSEGNA_TIPI = ["Ritiro in sede","Spedizione","Allestimento"];
+function orderAllestimentoIndirizzo(o){
+  const c=state.clients.find(x=>x.id===o.clientId);
+  if(!c) return "";
+  const citta=[[c.cap,c.citta].filter(Boolean).join(" "),c.provincia?`(${c.provincia})`:""].filter(Boolean).join(" ");
+  return [c.indirizzo,citta].filter(Boolean).join(", ");
+}
 
 /* Scorte minime monitorate: solo articoli richiesti */
 const STOCK_ALERT_RULES = [
@@ -6749,6 +6755,7 @@ function renderDashboard(){
   const scorteBasse = computeScorteMonitorate();
   const completatiDaConsegnare = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato==="Completato"));
   const daSpedire = state.orders.filter(o=>o.consegnaTipo==="Spedizione" && !o.spedito && o.stato!=="Consegnato");
+  const daAllestire = state.orders.filter(o=>o.consegnaTipo==="Allestimento" && !o.spedito && o.stato!=="Consegnato").sort((a,b)=>String(a.dataConsegna||"9999").localeCompare(String(b.dataConsegna||"9999")));
   const daFatturare = state.orders.filter(o=>o.daFatturare && !o.fatturato && (o.stato==="Completato" || o.stato==="Consegnato"));
   const ordiniImportanti = state.orders.filter(o=>o.importante && o.stato!=="Consegnato");
   const magazzinoDaOrdinare = computeMagazzinoDaOrdinare();
@@ -6836,6 +6843,20 @@ function renderDashboard(){
         `).join("")}</tbody></table>` : `<p class="empty">Nessuna spedizione in sospeso.</p>`}
       </div>
     </div>
+    <div class="card" style="margin-top:16px;">
+      <h3 style="margin-top:0;">Allestimenti da fare</h3>
+      ${daAllestire.length ? `<table><thead><tr><th>Data consegna</th><th>Cliente</th><th>Dove</th><th></th></tr></thead><tbody>${daAllestire.map(o=>`
+        <tr>
+          <td style="white-space:nowrap;font-weight:700;">${o.dataConsegna?fmtDate(o.dataConsegna):"—"}</td>
+          <td>${clientName(o.clientId)}</td>
+          <td>${orderAllestimentoIndirizzo(o)||"—"}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-primary btn-sm" onclick="segnaAllestimentoCompletato('${o.id}')">COMPLETATO</button>
+            <button class="btn btn-outline btn-sm mobile-hide" onclick="openJobCard('${o.id}')">Scheda</button>
+          </td>
+        </tr>
+      `).join("")}</tbody></table>` : `<p class="empty">Nessun allestimento in programma.</p>`}
+    </div>
     <div class="grid grid-2" style="margin-top:16px;">
       <div class="card dashboard-workload-section">
         <h3 style="margin-top:0;">Carico di lavoro per operatore</h3>
@@ -6870,6 +6891,15 @@ function renderDashboard(){
         </tr>`).join("")}</tbody></table>` : `<p class="empty">Nessun credito aperto.</p>`}
     </div>
   `;
+}
+function segnaAllestimentoCompletato(orderId){
+  const o = findItem('orders', orderId);
+  if(!o) return;
+  o.spedito = true;
+  o.stato = "Consegnato";
+  saveState('orders');
+  renderDashboard();
+  showToast("Allestimento completato e ordine archiviato");
 }
 function segnaComeSpedito(orderId){
   const o = findItem('orders', orderId);
@@ -11215,6 +11245,11 @@ function openJobCard(orderId){
                 <label class="checkfield"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Spedito</label>
               </div>
             ` : ""}
+            ${o.consegnaTipo==="Allestimento" ? `
+              <div class="field" style="display:flex;align-items:end;">
+                <label class="checkfield"><input type="checkbox" ${o.spedito?'checked':''} onchange="updateOrderCheck('${o.id}','spedito',this.checked)"> Allestimento completato</label>
+              </div>
+            ` : ""}
           </div>
           <div class="job-v2-info-sub">Inizio lavoro consigliato: <strong>${startSuggested}</strong></div>
         </div>
@@ -11537,7 +11572,7 @@ async function updateOrderField(orderId, field, value){
   if(field==='stato'){
     // "Segna come spedito" porta l'ordine a Consegnato: se lo stato viene
     // corretto, l'ordine deve tornare tra quelli da spedire.
-    if(value!=="Consegnato" && o.spedito && o.consegnaTipo==="Spedizione") o.spedito=false;
+    if(value!=="Consegnato" && o.spedito && (o.consegnaTipo==="Spedizione"||o.consegnaTipo==="Allestimento")) o.spedito=false;
     const saved=await upsertOneReturning('orders',o);
     if(!saved){
       o[field]=oldValue;
