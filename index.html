@@ -6837,30 +6837,32 @@ function renderDashboard(){
           </tr>
         `).join("")}</tbody></table>` : `<p class="empty">Nessun ordine completato in attesa di consegna.</p>`}
       </div>
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0;align-self:start;">
       <div class="card dashboard-compact-card">
-        <h3 style="margin-top:0;">Ordini da spedire</h3>
-        ${daSpedire.length ? `<table><tbody>${daSpedire.map(o=>`
-          <tr><td>${clientName(o.clientId)}</td><td class="mobile-hide">${orderCategorieLabel(o)}</td><td class="mobile-hide"><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
-          <td style="white-space:nowrap;">
-            <button class="btn btn-primary btn-sm" onclick="segnaComeSpedito('${o.id}')">SEGNA COME SPEDITO</button>
-            <button class="btn btn-outline btn-sm mobile-hide" onclick="openJobCard('${o.id}')">Scheda</button>
-          </td></tr>
-        `).join("")}</tbody></table>` : `<p class="empty">Nessuna spedizione in sospeso.</p>`}
+        <h3 style="margin-top:0;">Allestimenti da fare</h3>
+        ${daAllestire.length ? `<table><thead><tr><th>Data consegna</th><th>Cliente</th><th>Dove</th><th></th></tr></thead><tbody>${daAllestire.map(o=>`
+          <tr>
+            <td style="white-space:nowrap;font-weight:700;">${o.dataConsegna?fmtDate(o.dataConsegna):"—"}</td>
+            <td>${clientName(o.clientId)}</td>
+            <td>${orderAllestimentoIndirizzo(o)||"—"}</td>
+            <td style="white-space:nowrap;">
+              <button class="btn btn-primary btn-sm" onclick="segnaAllestimentoCompletato('${o.id}')">COMPLETATO</button>
+              <button class="btn btn-outline btn-sm mobile-hide" onclick="openJobCard('${o.id}')">Scheda</button>
+            </td>
+          </tr>
+        `).join("")}</tbody></table>` : `<p class="empty">Nessun allestimento in programma.</p>`}
       </div>
-    </div>
-    <div class="card" style="margin-top:16px;">
-      <h3 style="margin-top:0;">Allestimenti da fare</h3>
-      ${daAllestire.length ? `<table><thead><tr><th>Data consegna</th><th>Cliente</th><th>Dove</th><th></th></tr></thead><tbody>${daAllestire.map(o=>`
-        <tr>
-          <td style="white-space:nowrap;font-weight:700;">${o.dataConsegna?fmtDate(o.dataConsegna):"—"}</td>
-          <td>${clientName(o.clientId)}</td>
-          <td>${orderAllestimentoIndirizzo(o)||"—"}</td>
-          <td style="white-space:nowrap;">
-            <button class="btn btn-primary btn-sm" onclick="segnaAllestimentoCompletato('${o.id}')">COMPLETATO</button>
-            <button class="btn btn-outline btn-sm mobile-hide" onclick="openJobCard('${o.id}')">Scheda</button>
-          </td>
-        </tr>
-      `).join("")}</tbody></table>` : `<p class="empty">Nessun allestimento in programma.</p>`}
+        <div class="card dashboard-compact-card">
+          <h3 style="margin-top:0;">Ordini da spedire</h3>
+          ${daSpedire.length ? `<table><tbody>${daSpedire.map(o=>`
+            <tr><td>${clientName(o.clientId)}</td><td class="mobile-hide">${orderCategorieLabel(o)}</td><td class="mobile-hide"><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
+            <td style="white-space:nowrap;">
+              <button class="btn btn-primary btn-sm" onclick="segnaComeSpedito('${o.id}')">SEGNA COME SPEDITO</button>
+              <button class="btn btn-outline btn-sm mobile-hide" onclick="openJobCard('${o.id}')">Scheda</button>
+            </td></tr>
+          `).join("")}</tbody></table>` : `<p class="empty">Nessuna spedizione in sospeso.</p>`}
+        </div>
+      </div>
     </div>
     <div class="grid grid-2" style="margin-top:16px;">
       <div class="card dashboard-workload-section">
