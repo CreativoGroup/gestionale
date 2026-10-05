@@ -3410,8 +3410,11 @@ function subscribeRealtime(){
 
 /* Sincronizzazione di sicurezza: funziona anche se Realtime non è abilitato nel progetto Supabase. */
 const rawSyncSignatures = {};
+let lastSharedRefresh = 0; /* evita riletture ravvicinate (es. tornando più volte sulla finestra): riduce il traffico verso Supabase */
 async function refreshSharedDataFromSupabase(render=true){
   if(!currentUser || dataSyncBusy || activeDbWrites>0) return;
+  if(Date.now()-lastSharedRefresh < 30000) return;
+  lastSharedRefresh=Date.now();
   dataSyncBusy=true;
   try{
     const collections = currentUser.role==="admin"
@@ -3440,7 +3443,7 @@ function startDataAutoRefresh(){
   if(dataSyncTimer) clearInterval(dataSyncTimer);
   dataSyncTimer=setInterval(()=>{
     if(document.visibilityState==="visible") refreshSharedDataFromSupabase(true);
-  },5000);
+  },60000);
   if(!dataSyncListenersInstalled){
     dataSyncListenersInstalled=true;
     window.addEventListener("focus",()=>refreshSharedDataFromSupabase(true));
