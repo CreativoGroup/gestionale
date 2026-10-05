@@ -8360,6 +8360,15 @@ function moveWorkDescriptionOverflow(orderId, lineId, inputEl){
   if(!r) return;
 
   let value=String(inputEl.value||"");
+  if(coll==="quotes"){
+    // Nei preventivi la riga è libera, senza limite di caratteri: il testo oltre i 30
+    // caratteri viene spostato nei dettagli solo quando il preventivo diventa lavorazione.
+    value=value.replace(/\s*\n\s*/g," ");
+    if(inputEl.tagName==="TEXTAREA"){ inputEl.style.height="auto"; inputEl.style.height=inputEl.scrollHeight+"px"; }
+    r.prodotto=value;
+    saveState(coll);
+    return;
+  }
   if(value.length>30){
     const extra=value.slice(30);
     value=value.slice(0,30);
@@ -8410,11 +8419,14 @@ function linesEditor(collection, id, righe, options={}){
                   </select>
                 </td>
                 <td class="job-v2-product">
-                  <input class="desc-input"
+                  ${collection==='quotes' ? `<textarea class="desc-input" rows="1" style="resize:vertical;min-height:40px;overflow:hidden;"
+                    placeholder="Descrizione della voce · scrivi liberamente, senza limite"
+                    oninput="moveWorkDescriptionOverflow('${id}','${r.id}',this)"
+                    onchange="moveWorkDescriptionOverflow('${id}','${r.id}',this)">${escapeHtml(r.prodotto||'')}</textarea>` : `<input class="desc-input"
                     value="${escapeHtml(r.prodotto||'')}"
                     placeholder="Descrizione breve · max 30 caratteri"
                     oninput="moveWorkDescriptionOverflow('${id}','${r.id}',this)"
-                    onchange="moveWorkDescriptionOverflow('${id}','${r.id}',this)">
+                    onchange="moveWorkDescriptionOverflow('${id}','${r.id}',this)">`}
                   <details class="job-v2-desc-toggle">
                     <summary>Dettagli lavorazione ${r.descrizione?`· ${escapeHtml(String(r.descrizione).slice(0,55))}${String(r.descrizione).length>55?'…':''}`:""}</summary>
                     <textarea id="work-detail-${r.id}" class="desc-input" rows="4"
@@ -8744,7 +8756,7 @@ function buildQuotePdf(q){
   tableHead(y); y += 7;
   const LH = 4.3;
   (q.righe || []).forEach(r => {
-    const lines = pdf.wrap(String([r.prodotto, r.descrizione].filter(Boolean).join(" - ") || r.categoria || ""), "n", 8.5, 84);
+    const lines = pdf.wrap(String([r.prodotto, r.descrizione].filter(Boolean).join(" - ") || ""), "n", 8.5, 84);
     const rowH = Math.max(1, lines.length) * LH + 3;
     if(y + rowH > 240){ pdf.addPage(); header(); y = 46; tableHead(y); y += 7; }
     lines.forEach((ln, i) => txt(ln, 9, y + i*LH, {size:8.5, color:INK}));
@@ -8971,15 +8983,27 @@ async function finalizeQuoteToOrder(quoteId, clientId){
   if(!q || !clientId) return;
 
   const qe = quoteExtra(q);
-  const righe = q.righe.map(r=>({
+  // La voce del preventivo è libera: in lavorazione i primi 30 caratteri restano nella riga,
+  // il testo restante passa sotto, nella descrizione (dettagli lavorazione).
+  const splitVoce = (testo, dettagli) => {
+    const full = String(testo||"").trim();
+    if(full.length <= 30) return {prodotto:full, descrizione:dettagli||""};
+    let cut = 30;
+    if(full[30] !== " "){ const sp = full.slice(0,30).lastIndexOf(" "); if(sp >= 12) cut = sp; }
+    const resto = full.slice(cut).trim();
+    return {prodotto:full.slice(0,cut).trim(), descrizione:[resto, dettagli].filter(Boolean).join("\n")};
+  };
+  const righe = q.righe.map(r=>{
+    const sp = splitVoce(r.prodotto, r.descrizione||"");
+    return {
     id:uid(),
-    descrizione:r.descrizione||"",
+    descrizione:sp.descrizione,
     categoria:r.categoria||q.categoria||"",
-    prodotto:r.prodotto||"",
+    prodotto:sp.prodotto,
     stato:"Da fare",
     quantita:r.quantita,
     prezzoUnitario:r.prezzoUnitario
-  }));
+  };});
 
   const order = mkOrder(uid(), clientId, q.descrizione, "", "Da fare", qe.dataConsegna||"", righe, qe.consegnaTipo);
   const qt = quoteTotals(q);
@@ -9009,7 +9033,7 @@ async function finalizeQuoteToOrder(quoteId, clientId){
 let quoteMailAttachments=[];
 function quoteMailText(q,c){
   const t=quoteTotals(q);
-  return `Gentile ${c?clientDisplayName(c):'cliente'},\n\nin allegato trova il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)} relativo a ${q.categoria||'quanto richiesto'}.\n\n${q.descrizione?q.descrizione+'\n\n':''}Totale: ${fmtMoney(t.totale)} (IVA inclusa)\n\nPer qualsiasi necessità può rispondere direttamente a questa mail.\n\nCordiali saluti\nTeam Creativò`;
+  return `Gentile ${c?clientDisplayName(c):'cliente'},\n\nin allegato trova il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)} relativo a quanto richiesto.\n\n${q.descrizione?q.descrizione+'\n\n':''}Totale: ${fmtMoney(t.totale)} (IVA inclusa)\n\nPer qualsiasi necessità può rispondere direttamente a questa mail.\n\nCordiali saluti\nTeam Creativò`;
 }
 function openQuoteMail(quoteId){
   const q=findItem('quotes',quoteId); if(!q) return;
