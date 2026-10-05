@@ -7310,7 +7310,7 @@ function openDashboardList(type){
   } else if(cfg.isQuote){
     rows = cfg.items.map(q=>`
       <div class="list-row" onclick="openQuoteDetail('${q.id}')">
-        <div><div class="lr-main">${q.clientId ? clientName(q.clientId) : (quoteRecipient(q).nome || clientName(q.clientId))}</div><div class="lr-sub">${q.categoria} — ${fmtMoney(quoteImponibile(q))}</div></div>
+        <div><div class="lr-main">${quoteRecipient(q).nome || clientName(q.clientId)}</div><div class="lr-sub">${q.categoria} — ${fmtMoney(quoteImponibile(q))}</div></div>
         <span class="pill ${QUOTE_CLASS[q.stato]}">${q.stato}</span>
       </div>`).join("");
   } else {
@@ -8587,7 +8587,9 @@ function pdfEur(n, dec=2){ return pdfNum(n, dec) + " €"; }
 function quotePdfRecipient(q){
   const c = (state.clients||[]).find(x => x.id === q.clientId) || null;
   const b = quotePdfClientBlock(c);
-  if(!c){ const r = quoteRecipient(q); b.nome = r.nome; }
+  const libero = String(q.extra && q.extra.nomeLibero || "").trim();
+  if(libero){ b.nome = libero; }
+  else if(!c){ const r = quoteRecipient(q); b.nome = r.nome; }
   return b;
 }
 function quotePdfClientBlock(c){
@@ -8851,7 +8853,7 @@ function quoteRecipient(q){
   const l = q.extra && q.extra.leadId ? ((state.leads||[]).find(x => x.id === q.extra.leadId) || null) : null;
   return {
     client:c, lead:l,
-    nome: c ? clientDisplayName(c) : (String(q.extra && q.extra.nomeLibero || "").trim() || (l ? leadDisplayName(l) : "")),
+    nome: String(q.extra && q.extra.nomeLibero || "").trim() || (c ? clientDisplayName(c) : (l ? leadDisplayName(l) : "")),
     email: (c && c.email) || (l && l.email) || "",
     telefono: (c && c.telefono) || (l && l.telefono) || ""
   };
@@ -9143,7 +9145,8 @@ function openQuoteDetail(quoteId){
             <select class="inline" onchange="updateQuoteField('${q.id}','clientId',this.value)">
               <option value="">— Senza cliente —</option>${clientOptions(q.clientId,false)}
             </select>
-            ${q.clientId ? "" : `<input class="inline" type="text" style="margin-top:8px;" placeholder="Oppure scrivi un nome" value="${escapeHtml((q.extra&&q.extra.nomeLibero)||'')}" onchange="updateQuoteExtra('${q.id}','nomeLibero',this.value.trim())">`}
+            <label style="margin-top:12px;">Nome persona o azienda</label>
+            <input class="inline" type="text" placeholder="Scrivi qui il nome (se non è in anagrafica)" value="${escapeHtml((q.extra&&q.extra.nomeLibero)||'')}" onchange="updateQuoteExtra('${q.id}','nomeLibero',this.value.trim());openQuoteDetail('${q.id}')">
             ${rcp.email?`<div class="job-v2-info-sub">${escapeHtml(rcp.email)}</div>`:""}
             ${rcp.telefono?`<div class="job-v2-info-sub">${escapeHtml(rcp.telefono)}</div>`:""}
           </div>
