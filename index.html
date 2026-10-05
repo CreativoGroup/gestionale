@@ -3068,6 +3068,7 @@ const CARATTERE_OPTIONS = ["Tra i migliori","Buon cliente","Potenziale","Ripetit
 const SETTORI = ["Abbigliamento", "Agenzia Viaggi/Auto/Funebre", "Architetti", "Arte", "Associazione Sportiva", "Automotive", "Cinema/Spettacolo", "Creativi", "Cura Persona", "Danza", "Edile", "Editoria", "Ente e Associazioni", "Eventi / Marketing", "Fisioterapia", "Hotellerie", "Immobiliare", "Legale/Tributario/Assicurativo", "Lusso", "Medicina Estetica", "Medico", "Ospedale", "Palestra", "Piccolo Commerciante", "Ristorazione", "Scuola/Parrocchia", "Settore Politica", "Studio Professionale", "Tecnologico", "Università"];
 const CONSEGNA_TIPI = ["Ritiro in sede","Spedizione","Allestimento"];
 function orderAllestimentoIndirizzo(o){
+  if(o.allestimentoIndirizzo && String(o.allestimentoIndirizzo).trim()) return String(o.allestimentoIndirizzo).trim();
   const c=state.clients.find(x=>x.id===o.clientId);
   if(!c) return "";
   const citta=[[c.cap,c.citta].filter(Boolean).join(" "),c.provincia?`(${c.provincia})`:""].filter(Boolean).join(" ");
@@ -3184,8 +3185,12 @@ let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expens
 let currentView = "dashboard";
 /* Colonne "extra" (jsonb) per dati aggiuntivi di preventivi e note: servono una colonna su Supabase (script SQL mostrato nell'app). */
 const DB_EXTRA = {quotes:false, noteComunicazioni:false};
+let DB_ALLEST = false; /* colonna orders.allestimento_indirizzo presente su Supabase? */
+const DB_ALLEST_SQL = "alter table public.orders add column if not exists allestimento_indirizzo text;";
 const DB_EXTRA_SQL = "alter table public.quotes add column if not exists extra jsonb default '{}'::jsonb;\nalter table public.note_comunicazioni add column if not exists extra jsonb default '{}'::jsonb;";
 async function probeDbExtraColumns(){
+  try{ const {error} = await sb.from("orders").select("id,allestimento_indirizzo").limit(1); DB_ALLEST = !error; }
+  catch(e){ DB_ALLEST = false; }
   for(const [coll, table] of [["quotes","quotes"],["noteComunicazioni","note_comunicazioni"]]){
     try{ const {error} = await sb.from(table).select("id,extra").limit(1); DB_EXTRA[coll] = !error; }
     catch(e){ DB_EXTRA[coll] = false; }
@@ -3225,7 +3230,7 @@ function toDbRow(collection, o){
   switch(collection){
     case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, nome_commerciale:o.nomeCommerciale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, richiesta:o.richiesta||null, carattere:o.carattere||null, archiviato_recenti:!!o.archiviatoRecenti, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null, dropbox_folder_url:o.dropboxFolderUrl||null};
     case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito, ...(DB_EXTRA.quotes?{extra:o.extra||{}}:{})};
-    case "orders": return {id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, avviso_metodo:o.avvisoMetodo||null, avvisato_il:o.avvisatoIl||null, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
+    case "orders": return {...(DB_ALLEST?{allestimento_indirizzo:o.allestimentoIndirizzo||null}:{}), id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, avviso_metodo:o.avvisoMetodo||null, avvisato_il:o.avvisatoIl||null, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
     case "warehouse": return {id:o.id, codice:o.codice||null, nome:o.nome||null, categoria:o.categoria||null, colore:o.colore||null, taglia:o.taglia||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
     case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
@@ -3244,7 +3249,7 @@ function fromDbRow(collection, r){
     case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito, extra:r.extra||{}};
     case "orders": {
       const normalizedStatus = r.stato==="In lavorazione" ? "In preparazione grafica" : r.stato;
-      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], createdAt:r.created_at};
+      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], allestimentoIndirizzo:r.allestimento_indirizzo||"", createdAt:r.created_at};
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:normalizePaymentMethod(r.metodo)};
@@ -8820,6 +8825,18 @@ function dbExtraBanner(kind){
     <button class="btn btn-outline btn-sm" onclick="copyDbExtraSql()">COPIA SCRIPT SQL</button>
   </div>`;
 }
+function copyAllestSql(){
+  const done = () => showToast("Script SQL copiato");
+  try{ navigator.clipboard.writeText(DB_ALLEST_SQL).then(done, () => prompt("Copia lo script SQL:", DB_ALLEST_SQL)); }
+  catch(e){ prompt("Copia lo script SQL:", DB_ALLEST_SQL); }
+}
+function allestimentoFieldHtml(o){
+  if(o.consegnaTipo!=="Allestimento") return "";
+  const esc = v => String(v||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  return `<label style="margin-top:15px;">Indirizzo allestimento</label>
+    <input type="text" value="${esc(o.allestimentoIndirizzo)}" placeholder="Se vuoto, usa l'indirizzo del cliente" onchange="updateOrderField('${o.id}','allestimentoIndirizzo',this.value.trim());openJobCard('${o.id}')">
+    ${DB_ALLEST ? "" : `<div style="margin-top:8px;font-size:12px;color:#6B5A2A;background:#FFF6E5;border:1px solid #F0D9A8;border-radius:10px;padding:8px 10px;">Per salvare questo indirizzo serve una modifica una tantum a Supabase: SQL Editor → incolla lo script → Run → ricarica. <button class="btn btn-outline btn-sm" type="button" onclick="copyAllestSql()">COPIA SCRIPT SQL</button></div>`}`;
+}
 function copyDbExtraSql(){
   const done = () => showToast("Script SQL copiato");
   try{ navigator.clipboard.writeText(DB_EXTRA_SQL).then(done, () => prompt("Copia lo script SQL:", DB_EXTRA_SQL)); }
@@ -11172,6 +11189,7 @@ function openJobCard(orderId){
             <select class="inline job-v2-delivery-select" onchange="updateOrderField('${o.id}','consegnaTipo',this.value);openJobCard('${o.id}')">
               ${CONSEGNA_TIPI.map(t=>`<option ${t===o.consegnaTipo?'selected':''}>${t}</option>`).join("")}
             </select>
+            ${allestimentoFieldHtml(o)}
           </div>
         </div>
       </section>
