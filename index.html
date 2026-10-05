@@ -7310,7 +7310,7 @@ function openDashboardList(type){
   } else if(cfg.isQuote){
     rows = cfg.items.map(q=>`
       <div class="list-row" onclick="openQuoteDetail('${q.id}')">
-        <div><div class="lr-main">${clientName(q.clientId)}</div><div class="lr-sub">${q.categoria} — ${fmtMoney(quoteImponibile(q))}</div></div>
+        <div><div class="lr-main">${q.clientId ? clientName(q.clientId) : (quoteRecipient(q).nome || clientName(q.clientId))}</div><div class="lr-sub">${q.categoria} — ${fmtMoney(quoteImponibile(q))}</div></div>
         <span class="pill ${QUOTE_CLASS[q.stato]}">${q.stato}</span>
       </div>`).join("");
   } else {
@@ -8851,7 +8851,7 @@ function quoteRecipient(q){
   const l = q.extra && q.extra.leadId ? ((state.leads||[]).find(x => x.id === q.extra.leadId) || null) : null;
   return {
     client:c, lead:l,
-    nome: c ? clientDisplayName(c) : (l ? leadDisplayName(l) : ""),
+    nome: c ? clientDisplayName(c) : (String(q.extra && q.extra.nomeLibero || "").trim() || (l ? leadDisplayName(l) : "")),
     email: (c && c.email) || (l && l.email) || "",
     telefono: (c && c.telefono) || (l && l.telefono) || ""
   };
@@ -9110,6 +9110,7 @@ function updateQuoteField(id, field, value){
   q[field] = (field === "clientId" && !value) ? null : value;
   saveState('quotes');
   if(field === "stato") onQuoteStatusChanged(q);
+  if(field === "clientId") openQuoteDetail(id);
 }
 function openQuoteDetail(quoteId){
   const q = findItem('quotes', quoteId); if(!q) return;
@@ -9142,6 +9143,7 @@ function openQuoteDetail(quoteId){
             <select class="inline" onchange="updateQuoteField('${q.id}','clientId',this.value)">
               <option value="">— Senza cliente —</option>${clientOptions(q.clientId,false)}
             </select>
+            ${q.clientId ? "" : `<input class="inline" type="text" style="margin-top:8px;" placeholder="Oppure scrivi un nome" value="${escapeHtml((q.extra&&q.extra.nomeLibero)||'')}" onchange="updateQuoteExtra('${q.id}','nomeLibero',this.value.trim())">`}
             ${rcp.email?`<div class="job-v2-info-sub">${escapeHtml(rcp.email)}</div>`:""}
             ${rcp.telefono?`<div class="job-v2-info-sub">${escapeHtml(rcp.telefono)}</div>`:""}
           </div>
