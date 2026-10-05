@@ -1860,6 +1860,23 @@
   white-space:normal;
   overflow-wrap:anywhere;
 }
+/* Voce preventivo libera (textarea) con lo stesso aspetto del campo breve */
+.job-v2-product textarea.desc-input{
+  font-family:inherit !important;
+  font-weight:400 !important;
+  font-size:16px !important;
+  line-height:1.35;
+  padding:10px 12px;
+}
+/* Il pulsante ✕ di eliminazione resta sempre visibile, anche con la tabella più larga della finestra */
+.job-v2-table th:last-child,
+.job-v2-table td:last-child{
+  position:sticky;
+  right:0;
+  z-index:2;
+}
+.job-v2-table td:last-child{background:#fff;}
+.job-v2-table th:last-child{background:#f7f9fb;}
 @media(max-width:1050px){
   .job-v2-table-wrap{overflow-x:auto !important;}
   .job-v2-table{min-width:900px !important;}
