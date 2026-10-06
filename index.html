@@ -4212,8 +4212,7 @@ function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, 
 const NAV = [
   {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard"},
 
-  {id:"whatsappWeb", label:"WhatsApp Web", icon:"◉", subtitle:"Apre WhatsApp Web", group:"Traffico", externalUrl:"https://web.whatsapp.com/"},
-  {id:"waMode", label:()=>`Apri con: ${waOpenMode()==="app" ? "App WhatsApp" : "WhatsApp Web"} ⇄`, icon:"⚙", subtitle:"", group:"Traffico", action:"waMode"},
+  {id:"whatsappWeb", label:"WhatsApp", icon:"◉", subtitle:"Apre WhatsApp Web", group:"Traffico", externalUrl:"https://web.whatsapp.com/"},
   {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico", hidden:true},
   {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico", hidden:true},
 
@@ -5468,7 +5467,7 @@ function waMePhone(v){
   return s;
 }
 /* Modalità di apertura (salvata su questo computer): "web" = scheda WhatsApp Web unica, "app" = app WhatsApp installata */
-function waOpenMode(){ try{ return localStorage.getItem("waOpenMode")==="app" ? "app" : "web"; }catch(e){ return "web"; } }
+function waOpenMode(){ return "web"; } /* WhatsApp si apre sempre con WhatsApp Web */
 function toggleWaOpenMode(){
   const next = waOpenMode()==="app" ? "web" : "app";
   try{ localStorage.setItem("waOpenMode", next); }catch(e){}
