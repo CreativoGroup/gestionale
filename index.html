@@ -3204,11 +3204,15 @@ let currentView = "dashboard";
 /* Colonne "extra" (jsonb) per dati aggiuntivi di preventivi e note: servono una colonna su Supabase (script SQL mostrato nell'app). */
 const DB_EXTRA = {quotes:false, noteComunicazioni:false};
 let DB_ALLEST = false; /* colonna orders.allestimento_indirizzo presente su Supabase? */
+let DB_CONSEGNATO = false; /* colonna orders.consegnato_il presente su Supabase? */
+const DB_CONSEGNATO_SQL = "alter table public.orders add column if not exists consegnato_il timestamptz;";
 const DB_ALLEST_SQL = "alter table public.orders add column if not exists allestimento_indirizzo text;";
 const DB_EXTRA_SQL = "alter table public.quotes add column if not exists extra jsonb default '{}'::jsonb;\nalter table public.note_comunicazioni add column if not exists extra jsonb default '{}'::jsonb;";
 async function probeDbExtraColumns(){
   try{ const {error} = await sb.from("orders").select("id,allestimento_indirizzo").limit(1); DB_ALLEST = !error; }
   catch(e){ DB_ALLEST = false; }
+  try{ const {error} = await sb.from("orders").select("id,consegnato_il").limit(1); DB_CONSEGNATO = !error; }
+  catch(e){ DB_CONSEGNATO = false; }
   for(const [coll, table] of [["quotes","quotes"],["noteComunicazioni","note_comunicazioni"]]){
     try{ const {error} = await sb.from(table).select("id,extra").limit(1); DB_EXTRA[coll] = !error; }
     catch(e){ DB_EXTRA[coll] = false; }
@@ -3248,7 +3252,7 @@ function toDbRow(collection, o){
   switch(collection){
     case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, nome_commerciale:o.nomeCommerciale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, richiesta:o.richiesta||null, carattere:o.carattere||null, archiviato_recenti:!!o.archiviatoRecenti, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null, dropbox_folder_url:o.dropboxFolderUrl||null};
     case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito, ...(DB_EXTRA.quotes?{extra:o.extra||{}}:{})};
-    case "orders": return {...(DB_ALLEST?{allestimento_indirizzo:o.allestimentoIndirizzo||null}:{}), id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, avviso_metodo:o.avvisoMetodo||null, avvisato_il:o.avvisatoIl||null, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
+    case "orders": return {...(DB_ALLEST?{allestimento_indirizzo:o.allestimentoIndirizzo||null}:{}), ...(DB_CONSEGNATO?{consegnato_il:(o.stato==="Consegnato"?(o.consegnatoIl||null):null)}:{}), id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, avviso_metodo:o.avvisoMetodo||null, avvisato_il:o.avvisatoIl||null, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
     case "warehouse": return {id:o.id, codice:o.codice||null, nome:o.nome||null, categoria:o.categoria||null, colore:o.colore||null, taglia:o.taglia||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
     case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
@@ -3267,7 +3271,7 @@ function fromDbRow(collection, r){
     case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito, extra:r.extra||{}};
     case "orders": {
       const normalizedStatus = r.stato==="In lavorazione" ? "In preparazione grafica" : r.stato;
-      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], allestimentoIndirizzo:r.allestimento_indirizzo||"", createdAt:r.created_at};
+      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], allestimentoIndirizzo:r.allestimento_indirizzo||"", consegnatoIl:r.consegnato_il||"", createdAt:r.created_at};
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:normalizePaymentMethod(r.metodo)};
@@ -6703,9 +6707,9 @@ async function segnaConsegnatoDaScheda(orderId){
   const saldo=orderSaldo(o);
   if(saldo>0.005 && !confirm(`Ci sono ancora ${fmtMoney(saldo)} da incassare su questo ordine.\n\nSegnarlo come consegnato comunque?`)) return;
   const oldState=o.stato;
-  o.stato="Consegnato";
+  o.stato="Consegnato"; o.consegnatoIl=new Date().toISOString();
   const saved=await upsertOneReturning("orders",o);
-  if(!saved){ o.stato=oldState; showToast("Impossibile segnare come consegnato"); return; }
+  if(!saved){ o.stato=oldState; o.consegnatoIl=""; showToast("Impossibile segnare come consegnato"); return; }
   const i=state.orders.findIndex(x=>x.id===orderId);
   if(i>=0) state.orders[i]=saved;
   try{ closeCompletedOrderSheet(); }catch(_){}
@@ -6718,11 +6722,11 @@ async function consegnaOrdineAvvisato(orderId){
   if(!o || !o.clienteAvvisato) return;
 
   const oldState=o.stato;
-  o.stato="Consegnato";
+  o.stato="Consegnato"; o.consegnatoIl=new Date().toISOString();
 
   const saved=await upsertOneReturning("orders",o);
   if(!saved){
-    o.stato=oldState;
+    o.stato=oldState; o.consegnatoIl="";
     showToast("Impossibile segnare come consegnato");
     return;
   }
@@ -6927,7 +6931,7 @@ function segnaAllestimentoCompletato(orderId){
   const o = findItem('orders', orderId);
   if(!o) return;
   o.spedito = true;
-  o.stato = "Consegnato";
+  o.stato = "Consegnato"; o.consegnatoIl = new Date().toISOString();
   saveState('orders');
   renderDashboard();
   showToast("Allestimento completato e ordine archiviato");
@@ -6936,7 +6940,7 @@ function segnaComeSpedito(orderId){
   const o = findItem('orders', orderId);
   if(!o) return;
   o.spedito = true;
-  o.stato = "Consegnato";
+  o.stato = "Consegnato"; o.consegnatoIl = new Date().toISOString();
   saveState('orders');
   renderDashboard();
   showToast("Ordine segnato come spedito e archiviato");
@@ -8877,6 +8881,11 @@ function dbExtraBanner(kind){
     <button class="btn btn-outline btn-sm" onclick="copyDbExtraSql()">COPIA SCRIPT SQL</button>
   </div>`;
 }
+function copyConsegnatoSql(){
+  const done = () => showToast("Script SQL copiato");
+  try{ navigator.clipboard.writeText(DB_CONSEGNATO_SQL).then(done, () => prompt("Copia lo script SQL:", DB_CONSEGNATO_SQL)); }
+  catch(e){ prompt("Copia lo script SQL:", DB_CONSEGNATO_SQL); }
+}
 function copyAllestSql(){
   const done = () => showToast("Script SQL copiato");
   try{ navigator.clipboard.writeText(DB_ALLEST_SQL).then(done, () => prompt("Copia lo script SQL:", DB_ALLEST_SQL)); }
@@ -9922,7 +9931,8 @@ function sortOrdersByInsertionDesc(list){
 // Ordini consegnati: il più recente per data di consegna va in cima.
 // A parità di giorno conta l'ultimo avviso al cliente, poi il numero d'ordine.
 function compareDeliveredNewestFirst(a,b){
-  const day=o=>{ const t=Date.parse(o?.dataConsegna||""); return Number.isFinite(t)?t:orderRecentArchiveTime(o); };
+  // Se è registrato il momento esatto della consegna si usa quello; per i lavori più vecchi, la data di consegna.
+  const day=o=>{ const e=Date.parse(o?.consegnatoIl||""); if(Number.isFinite(e)) return e; const t=Date.parse(o?.dataConsegna||""); return Number.isFinite(t)?t:orderRecentArchiveTime(o); };
   const avv=o=>{ const t=Date.parse(o?.avvisatoIl||""); return Number.isFinite(t)?t:0; };
   const dd=day(b)-day(a); if(dd) return dd;
   const aa=avv(b)-avv(a); if(aa) return aa;
@@ -9991,6 +10001,7 @@ function renderOrdini(){
     <h3 style="margin:0 0 10px;">In corso <span style="color:var(--muted);font-weight:500;font-size:14px;">(${attivi.length})</span></h3>
     ${ordiniTableHtml(attivi)}
     <h3 style="margin:26px 0 10px;">Archiviati — consegnati <span style="color:var(--muted);font-weight:500;font-size:14px;">(${archiviati.length})</span></h3>
+    ${DB_CONSEGNATO ? "" : `<div style="margin:0 0 10px;font-size:12.5px;color:#6B5A2A;background:#FFF6E5;border:1px solid #F0D9A8;border-radius:10px;padding:8px 10px;">Per ordinare con la data e l'ora esatta di consegna serve una modifica una tantum a Supabase: SQL Editor → incolla lo script → Run → ricarica. <button class="btn btn-outline btn-sm" type="button" onclick="copyConsegnatoSql()">COPIA SCRIPT SQL</button></div>`}
     ${ordiniTableHtml(archiviati)}
 
   `;
@@ -11653,6 +11664,10 @@ async function updateOrderField(orderId, field, value){
 
   const oldValue=o[field];
   o[field]=value;
+  if(field==='stato'){
+    if(value==="Consegnato" && oldValue!=="Consegnato") o.consegnatoIl=new Date().toISOString();
+    else if(value!=="Consegnato") o.consegnatoIl="";
+  }
 
   // Lo stato della scheda deve essere salvato subito e non deve essere
   // annullato quando si chiude la scheda con la X.
