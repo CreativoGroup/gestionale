@@ -3761,6 +3761,45 @@ function setBozzaInAttesa(orderId){
 function getPresaCaricoMeta(order){
   return (order?.fasi||[]).find(f=>f && f.key==="__presa_carico__") || null;
 }
+/* Tono dei messaggi: "tu" (confidenziale) oppure "lei" (formale). Scelta ricordata su questo computer. */
+function registroMessaggi(){ try{ return localStorage.getItem("registroMessaggi")==="lei" ? "lei" : "tu"; }catch(e){ return "tu"; } }
+function setRegistroMessaggi(v){ try{ localStorage.setItem("registroMessaggi", v==="lei" ? "lei" : "tu"); }catch(e){} }
+function isLei(){ return registroMessaggi()==="lei"; }
+function registroSelectHtml(refreshJs){
+  const r=registroMessaggi();
+  return `<div class="field"><label>Tono del messaggio</label>
+    <select onchange="setRegistroMessaggi(this.value);${refreshJs}">
+      <option value="tu" ${r==="tu"?"selected":""}>Confidenziale (tu)</option>
+      <option value="lei" ${r==="lei"?"selected":""}>Formale (lei)</option>
+    </select><div class="helptext">Cambiando il tono il testo viene riscritto: le modifiche fatte a mano si perdono.</div></div>`;
+}
+/* Saluto in base all'ora e nome del cliente */
+function salutoOra(){
+  const h=new Date().getHours();
+  return h<13 ? "Buongiorno" : (h<18 ? "Buon pomeriggio" : "Buonasera");
+}
+function clientNamePart(c, full){
+  if(!c || !c.id) return "";
+  const nome = c.tipo==="Business" ? c.refNome : c.nome;
+  const cogn = c.tipo==="Business" ? c.refCognome : c.cognome;
+  const n=String(nome||"").trim();
+  if(!n) return "";
+  return full ? [n, String(cogn||"").trim()].filter(Boolean).join(" ") : n.split(/\s+/)[0];
+}
+function salutoCliente(c){
+  const n=clientNamePart(c, isLei());
+  return n ? `${salutoOra()} ${n},` : `${salutoOra()},`;
+}
+function presaInCaricoText(saluto, ref){
+  return isLei()
+    ? `${saluto}\n\nle scrivo per comunicarle che abbiamo preso in carico il suo ordine${ref}. Ci mettiamo al lavoro e la aggiorneremo appena ci saranno novità.\n\nSe nel frattempo desidera aggiungere qualcosa, risponda pure a questa mail.`
+    : `${saluto}\n\nti scrivo per dirti che abbiamo preso in carico il tuo ordine${ref}. Ci mettiamo al lavoro e ti aggiorniamo appena ci sono novità.\n\nSe nel frattempo vuoi aggiungere qualcosa, rispondi pure a questa mail.`;
+}
+function bozzaText(saluto){
+  return isLei()
+    ? `${saluto}\n\nle allego la bozza grafica del suo lavoro. La guardi con calma e ci faccia sapere cosa ne pensa: se le piace ci dà l'ok e procediamo con la produzione, altrimenti ritocchiamo quello che serve.\n\nNon iniziamo nulla finché non ci conferma.`
+    : `${saluto}\n\nti allego la bozza grafica del tuo lavoro. Dagli un'occhiata e dimmi cosa ne pensi: se ti piace ci dai l'ok e partiamo con la produzione, altrimenti ritocchiamo quello che serve.\n\nNon iniziamo nulla finché non ci confermi.`;
+}
 function formatDateTimeIt(value){
   if(!value) return "";
   const d=new Date(value);
@@ -3789,18 +3828,8 @@ async function sendOrderTakenEmail(orderId){
       if(!session?.access_token) throw new Error("Sessione del gestionale non disponibile.");
 
       const subject="Ordine preso in carico";
-      const bodyText=`Gentile cliente,
-
-abbiamo preso in carico il tuo ordine.
-Avviseremo appena il lavoro sarà pronto per essere ritirato.
-
-Cordiali saluti
-
-Creativò Group Srls
-06 45665328 · 375 9095981
-creativogroup.it
-Via Giuseppe Taverna 43
-00135 Roma`;
+      const refPresa=o.numero ? ` n. ${o.numero}` : "";
+      const bodyText=presaInCaricoText(salutoCliente(c), refPresa);
 
       const response=await fetch(`${SUPABASE_URL}/functions/v1/gmail-send`,{
         method:"POST",
@@ -3898,19 +3927,14 @@ function openBozzaMail(orderId){
 
   const email=String(c.email||'').trim();
   const riferimento=String(o.numero||o.id);
-  const subject=`[BOZZA ORDINE #${riferimento}] ${clientDisplayName(c)}`;
-  const body=`Gentile cliente,
-
-le inviamo la bozza relativa al lavoro in corso.
-
-Attendiamo conferma prima di poter procedere con la produzione.
-
-Rif. ordine: ${riferimento}`;
+  const subject=`Bozza grafica · ordine ${riferimento}`;
+  const body=bozzaText(salutoCliente(c));
 
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>Invia bozza via Mail</h2>
     <p style="margin-top:0;color:var(--muted);">Messaggio precompilato. Puoi modificarlo e allegare i file prima dell'invio.</p>
+    ${registroSelectHtml(`document.getElementById('bozza-mail-body').value=bozzaText(salutoCliente(state.clients.find(x=>x.id==='${c.id}')))`)}
 
     <div class="field">
       <label>A</label>
@@ -6998,9 +7022,23 @@ function openCreditiCliente(clientId){
 function avvisoClienteDefaultText(orderId){
   const o=findItem('orders',orderId);
   const c=o ? state.clients.find(x=>x.id===o.clientId) : null;
-  const nome=clientDisplayName(c)||"";
-  const saluto=nome ? `Buongiorno ${nome},` : "Buongiorno,";
-  return `Gentile cliente,\n\nAbbiamo il piacere di comunicare che il lavoro è pronto per essere ritirato.\nPer qualsiasi necessità si può rispondere direttamente a questa mail.\n\nCordiali saluti\nTeam Creativò`;
+  const saluto=salutoCliente(c);
+  const lei=isLei();
+  const chiusura=lei ? "Grazie per aver scelto noi, speriamo sia di suo gradimento." : "Grazie per averci scelto, speriamo ti piaccia quanto piace a noi.";
+  if(o && o.consegnaTipo==="Spedizione"){
+    return lei
+      ? `${saluto}\n\nil suo lavoro è pronto! Provvediamo a spedirlo e le invieremo il tracking non appena parte.\n\n${chiusura}`
+      : `${saluto}\n\nil tuo lavoro è pronto! Te lo spediamo e ti mandiamo il tracking appena parte.\n\n${chiusura}`;
+  }
+  if(o && o.consegnaTipo==="Allestimento"){
+    const quando=o.dataConsegna ? ` per il ${fmtDate(o.dataConsegna)}` : "";
+    return lei
+      ? `${saluto}\n\nil suo lavoro è pronto! Le confermiamo l'allestimento${quando}.\n\n${chiusura}`
+      : `${saluto}\n\nil tuo lavoro è pronto! Ti confermiamo l'allestimento${quando}.\n\n${chiusura}`;
+  }
+  return lei
+    ? `${saluto}\n\nil suo lavoro è pronto! Può passare a ritirarlo quando preferisce: se ha bisogno di conoscere gli orari, ci scriva pure qui.\n\n${chiusura}`
+    : `${saluto}\n\nil tuo lavoro è pronto! Puoi passare a ritirarlo quando vuoi: se ti serve sapere gli orari, scrivici pure qui.\n\n${chiusura}`;
 }
 
 function formatAvvisoDate(iso){
@@ -7083,6 +7121,7 @@ function openAvvisoMail(orderId){
       <label>Oggetto</label>
       <input id="avviso-mail-subject" value="Lavoro pronto">
     </div>
+    ${registroSelectHtml(`document.getElementById('avviso-mail-body').value=avvisoClienteDefaultText('${orderId}')`)}
     <div class="field">
       <label>Messaggio</label>
       <textarea id="avviso-mail-body" rows="8">${escapeHtml(avvisoClienteDefaultText(orderId))}</textarea>
@@ -9052,7 +9091,15 @@ async function finalizeQuoteToOrder(quoteId, clientId){
 let quoteMailAttachments=[];
 function quoteMailText(q,c){
   const t=quoteTotals(q);
-  return `Gentile ${c?clientDisplayName(c):'cliente'},\n\nin allegato trova il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)} relativo a quanto richiesto.\n\n${q.descrizione?q.descrizione+'\n\n':''}Totale: ${fmtMoney(t.totale)} (IVA inclusa)\n\nPer qualsiasi necessità può rispondere direttamente a questa mail.\n\nCordiali saluti\nTeam Creativò`;
+  const dettaglio = q.descrizione ? `\n${q.descrizione}\n` : "";
+  const corpo = isLei()
+    ? `le mando in allegato il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)}.\n${dettaglio}\nTotale: ${fmtMoney(t.totale)} (IVA inclusa).\n\nLo guardi con calma: se qualcosa non la convince o desidera modificare qualcosa, risponda pure a questa mail e lo sistemeremo insieme.`
+    : `ti mando in allegato il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)}.\n${dettaglio}\nTotale: ${fmtMoney(t.totale)} (IVA inclusa).\n\nGuardalo con calma: se qualcosa non ti torna o vuoi cambiare qualcosa, rispondi pure a questa mail e lo sistemiamo insieme.`;
+  return `${salutoCliente(c)}\n\n${corpo}`;
+}
+function quoteMailClient(q){
+  const rcp=quoteRecipient(q);
+  return rcp.client || {tipo:'Family',nome:rcp.nome,cognome:'',email:rcp.email};
 }
 function openQuoteMail(quoteId){
   const q=findItem('quotes',quoteId); if(!q) return;
@@ -9068,7 +9115,8 @@ function openQuoteMail(quoteId){
     <h2>Invia preventivo via Mail</h2>
     <p style="margin-top:0;color:var(--muted);">La mail parte direttamente dal Gmail collegato al gestionale. Gli allegati non vengono salvati nel gestionale.</p>
     <div class="field"><label>A</label><input id="quote-mail-to" value="${escapeHtml(c.email||'')}" readonly></div>
-    <div class="field"><label>Oggetto</label><input id="quote-mail-subject" value="${escapeHtml('Preventivo n. '+quoteNumberLabel(q)+' - '+clientDisplayName(c))}"></div>
+    <div class="field"><label>Oggetto</label><input id="quote-mail-subject" value="${escapeHtml('Preventivo n. '+quoteNumberLabel(q))}"></div>
+    ${registroSelectHtml(`document.getElementById('quote-mail-body').value=quoteMailText(findItem('quotes','${q.id}'),quoteMailClient(findItem('quotes','${q.id}')))`)}
     <div class="field"><label>Messaggio</label><textarea id="quote-mail-body" rows="12">${escapeHtml(quoteMailText(q,c))}</textarea></div>
     <div class="field"><label>Allegati</label><input id="quote-mail-files" type="file" multiple onchange="handleQuoteMailFiles(this.files)" style="padding:9px;background:#fff;"><div class="helptext">Massimo 10 file e 15 MB complessivi. I file vengono usati solo per l'invio.</div><div id="quote-mail-attachments"></div></div>
     <div id="quote-mail-status" class="helptext"></div>
@@ -10644,33 +10692,23 @@ function fmtRecommendedStart(deliveryDate){
   return x ? fmtDate(x) : "—";
 }
 
-function orderStageMessage(kind, orderId){
+function orderStageMessage(kind, orderId, forMail=false){
   const o=findItem("orders",orderId);
   const c=o ? state.clients.find(x=>x.id===o.clientId) : null;
-  const nome=c ? clientDisplayName(c) : "cliente";
-  const ref=o?.numero ? ` #${o.numero}` : "";
+  const saluto=salutoCliente(c);
+  const ref=o?.numero ? ` n. ${o.numero}` : "";
+  // Le email ricevono la firma automatica dal sistema di invio; su WhatsApp la chiusura si aggiunge qui.
+  const chiusura = forMail ? "" : "\n\nCreativò Group";
 
-  if(kind==="bozza"){
-    return `Gentile ${nome},
-
-ti inviamo la bozza grafica relativa al tuo ordine${ref}.
-Ti chiediamo di verificarla e di comunicarci la conferma prima di procedere con la produzione.
-
-Grazie,
-Creativò Group`;
-  }
+  if(kind==="bozza") return bozzaText(saluto)+chiusura;
 
   if(kind==="produzione"){
-    return `Gentile ${nome},
-
-il tuo ordine${ref} è entrato in produzione.
-Ti avviseremo appena il lavoro sarà pronto.
-
-Grazie,
-Creativò Group`;
+    return (isLei()
+      ? `${saluto}\n\nottime notizie: il suo ordine${ref} è entrato in produzione. Ci stiamo lavorando e la avviseremo appena sarà pronto.`
+      : `${saluto}\n\nbuone notizie: il tuo ordine${ref} è entrato in produzione. Ci stiamo lavorando e ti avvisiamo appena è pronto.`)+chiusura;
   }
 
-  return avvisoClienteDefaultText(orderId);
+  return avvisoClienteDefaultText(orderId)+chiusura;
 }
 
 function openOrderWhatsappStage(orderId, kind){
@@ -10710,6 +10748,9 @@ function openOrderWhatsappStage(orderId, kind){
     <div class="field">
       <label>Messaggio</label>
       <textarea id="waNewText" rows="8">${escapeHtml(orderStageMessage(kind,orderId))}</textarea>
+    </div>
+    ${registroSelectHtml(`document.getElementById('waNewText').value=orderStageMessage('${kind}','${orderId}')`)}
+    <div style="display:none">
     </div>
 
     <div class="form-actions">
@@ -10765,9 +10806,10 @@ function openOrderProductionMail(orderId){
       <label>Oggetto</label>
       <input id="stage-mail-subject" value="Ordine in produzione">
     </div>
+    ${registroSelectHtml(`document.getElementById('stage-mail-body').value=orderStageMessage('produzione','${orderId}',true)`)}
     <div class="field">
       <label>Messaggio</label>
-      <textarea id="stage-mail-body" rows="8">${escapeHtml(orderStageMessage("produzione",orderId))}</textarea>
+      <textarea id="stage-mail-body" rows="8">${escapeHtml(orderStageMessage("produzione",orderId,true))}</textarea>
     </div>
     <div id="stage-mail-status" class="helptext"></div>
     <div class="form-actions">
@@ -10784,7 +10826,7 @@ function openProductionMailInGmail(orderId){
   const c=state.clients.find(x=>x.id===o.clientId);
   const to=String(document.getElementById("stage-mail-to")?.value||c?.email||"").trim();
   const subject=String(document.getElementById("stage-mail-subject")?.value||"Ordine in produzione").trim();
-  const bodyText=String(document.getElementById("stage-mail-body")?.value||orderStageMessage("produzione",orderId)).trim();
+  const bodyText=String(document.getElementById("stage-mail-body")?.value||orderStageMessage("produzione",orderId,true)).trim();
 
   const url="https://mail.google.com/mail/?view=cm&fs=1"
     + `&to=${encodeURIComponent(to)}`
@@ -14029,18 +14071,7 @@ async function gmailLeadAction(messageId){
 async function gmailOrderAction(messageId){
   const m=gmailSelectedMessage;
   if(!m?.id){ showToast("Apri prima una mail"); return; }
-  const bodyText=`Gentile cliente,
-
-abbiamo preso in carico il tuo ordine.
-Avviseremo appena il lavoro sarà pronto per essere ritirato.
-
-Cordiali saluti
-
-Creativò Group Srls
-06 45665328 · 375 9095981
-creativogroup.it
-Via Giuseppe Taverna 43
-00135 Roma`;
+  const bodyText=presaInCaricoText(salutoOra()+",", "");
   const btn=document.getElementById("gmail-btn-order");
   if(btn){ btn.disabled=true; btn.textContent="Invio risposta…"; }
   try{
