@@ -9919,6 +9919,15 @@ function orderInsertionSortValue(o){
 function sortOrdersByInsertionDesc(list){
   return [...list].sort((a,b)=>orderInsertionSortValue(b)-orderInsertionSortValue(a));
 }
+// Ordini consegnati: il più recente per data di consegna va in cima.
+// A parità di giorno conta l'ultimo avviso al cliente, poi il numero d'ordine.
+function compareDeliveredNewestFirst(a,b){
+  const day=o=>{ const t=Date.parse(o?.dataConsegna||""); return Number.isFinite(t)?t:orderRecentArchiveTime(o); };
+  const avv=o=>{ const t=Date.parse(o?.avvisatoIl||""); return Number.isFinite(t)?t:0; };
+  const dd=day(b)-day(a); if(dd) return dd;
+  const aa=avv(b)-avv(a); if(aa) return aa;
+  return (Number(b?.numero)||0)-(Number(a?.numero)||0);
+}
 function ordiniTableHtml(list){
   return `
     <div class="table-wrap">
@@ -9955,7 +9964,7 @@ function renderOrdini(){
     (!f.worker || orderWorkersList(o).includes(f.worker)) &&
     (!f.search || (clientName(o.clientId)+" "+(o.descrizione||"")+" "+orderCategorieLabel(o)).toLowerCase().includes(f.search.toLowerCase()));
   const attivi = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato!=="Consegnato" && matches(o)));
-  const archiviati = sortOrdersByInsertionDesc(state.orders.filter(o=>o.stato==="Consegnato" && matches(o)));
+  const archiviati = state.orders.filter(o=>o.stato==="Consegnato" && matches(o)).sort(compareDeliveredNewestFirst);
   document.getElementById("view-ordini").innerHTML = `
     <div class="form-panel ${orderFormOpen ? 'open' : ''}" id="orderForm">
       <h3>Nuovo ordine</h3>
