@@ -3776,10 +3776,10 @@ function salutoCliente(c){
   return n ? `${salutoOra()} ${n},` : `${salutoOra()},`;
 }
 function presaInCaricoText(saluto, ref){
-  return `${saluto}\n\nti scrivo per dirti che abbiamo preso in carico il tuo ordine${ref}. Ci mettiamo al lavoro e ti aggiorniamo appena ci sono novità.\n\nSe nel frattempo vuoi aggiungere qualcosa, rispondi pure a questa mail.`;
+  return `${saluto}\n\nti scrivo per dirti che abbiamo preso in carico il tuo ordine${ref}. Ci mettiamo al lavoro e ti aggiorniamo appena ci sono novità.`;
 }
 function bozzaText(saluto){
-  return `${saluto}\n\nti allego la bozza grafica del tuo lavoro. Dagli un'occhiata e dimmi cosa ne pensi: se ti piace ci dai l'ok e partiamo con la produzione, altrimenti ritocchiamo quello che serve.\n\nNon iniziamo nulla finché non ci confermi.`;
+  return `${saluto}\n\nti allego la bozza grafica. Dagli un'occhiata e dimmi cosa ne pensi: se ti piace ci dai l'ok, altrimenti ritocchiamo quello che serve.\n\nResto a disposizione.`;
 }
 function formatDateTimeIt(value){
   if(!value) return "";
@@ -7004,15 +7004,15 @@ function avvisoClienteDefaultText(orderId){
   const o=findItem('orders',orderId);
   const c=o ? state.clients.find(x=>x.id===o.clientId) : null;
   const saluto=salutoCliente(c);
-  const chiusura="Grazie per averci scelto, speriamo ti piaccia quanto piace a noi.";
+  const chiusura="Grazie per averci scelto, speriamo rimanga soddisfatto.";
   if(o && o.consegnaTipo==="Spedizione"){
     return `${saluto}\n\nil tuo lavoro è pronto! Te lo spediamo e ti mandiamo il tracking appena parte.\n\n${chiusura}`;
   }
   if(o && o.consegnaTipo==="Allestimento"){
     const quando=o.dataConsegna ? ` per il ${fmtDate(o.dataConsegna)}` : "";
-    return `${saluto}\n\nil tuo lavoro è pronto! Ti confermiamo l'allestimento${quando}.\n\n${chiusura}`;
+    return `${saluto}\n\nil tuo lavoro è pronto! Ti confermiamo l'allestimento${quando}.`;
   }
-  return `${saluto}\n\nil tuo lavoro è pronto! Puoi passare a ritirarlo quando vuoi: se ti serve sapere gli orari, scrivici pure qui.\n\n${chiusura}`;
+  return `${saluto}\n\nil tuo lavoro è pronto! Puoi passare a ritirarlo quando vuoi.`;
 }
 
 function formatAvvisoDate(iso){
@@ -10676,7 +10676,7 @@ function orderStageMessage(kind, orderId, forMail=false){
   if(kind==="bozza") return bozzaText(saluto)+chiusura;
 
   if(kind==="produzione"){
-    return `${saluto}\n\nbuone notizie: il tuo ordine${ref} è entrato in produzione. Ci stiamo lavorando e ti avvisiamo appena è pronto.${chiusura}`;
+    return `${saluto}\n\nl'ordine è in produzione. Avviseremo appena sarà pronto.${chiusura}`;
   }
 
   return avvisoClienteDefaultText(orderId)+chiusura;
