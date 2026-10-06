@@ -6914,7 +6914,7 @@ function renderDashboard(){
         <tr class="credit-mobile-row">
           <td class="credit-client-name">${clientName(g.clientId)}</td>
           <td class="mobile-hide">${g.orders.length===1 ? orderCategorieLabel(g.orders[0].o) : `${g.orders.length} ordini — ${g.orders.map(x=>orderCategorieLabel(x.o)).join(", ")}`}</td>
-          <td class="credit-residuo" style="color:var(--danger);font-weight:800;">${fmtMoney(g.totaleSaldo)}</td>
+          <td class="credit-residuo"><button class="btn btn-outline btn-sm" style="color:var(--danger);font-weight:800;white-space:nowrap;border-color:#DDE3EA;" title="${g.orders.length===1?"Clic per registrare un pagamento":"Clic per scegliere l'ordine da pagare"}" onclick="${g.orders.length===1?`openCompletedOrderPayment('${g.orders[0].o.id}')`:`openCreditiCliente('${g.clientId}')`}">${fmtMoney(g.totaleSaldo)}</button></td>
           <td class="credit-action" style="white-space:nowrap;">${g.orders.length===1
             ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button>`
             : `<button class="btn btn-outline btn-sm" onclick="openCreditiCliente('${g.clientId}')">Dettaglio</button>`}</td>
@@ -6991,6 +6991,7 @@ function openCreditiCliente(clientId){
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="text-align:right;"><div class="lr-main">${fmtMoney(orderTotale(x.o))}</div><div class="lr-sub" style="color:var(--danger);font-weight:600;">${fmtMoney(x.saldo)} da saldare</div></div>
+            <button class="btn btn-outline btn-sm" title="Registra un pagamento" onclick="openCompletedOrderPayment('${x.o.id}')">+ Pagamento</button>
             <button class="btn btn-ghost btn-sm" onclick="deleteOrderFromCreditiCliente('${x.o.id}','${clientId}')">✕</button>
           </div>
         </div>`).join("")}
