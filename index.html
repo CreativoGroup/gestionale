@@ -9067,9 +9067,8 @@ async function finalizeQuoteToOrder(quoteId, clientId){
 
 let quoteMailAttachments=[];
 function quoteMailText(q,c){
-  const t=quoteTotals(q);
   const dettaglio = q.descrizione ? `\n${q.descrizione}\n` : "";
-  const corpo = `presentiamo in allegato il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)}.\n${dettaglio}\nTotale: ${fmtMoney(t.totale)} (IVA inclusa).\n\nGuardalo con calma: se qualcosa non ti torna o vuoi cambiare qualcosa, rispondi pure a questa mail e lo sistemiamo insieme.`;
+  const corpo = `presentiamo in allegato il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)}.\n${dettaglio}\nRestiamo a disposizione per qualsiasi chiarimento.`;
   return `${salutoCliente(c)}\n\n${corpo}`;
 }
 function quoteMailClient(q){
