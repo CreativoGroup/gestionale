@@ -13106,6 +13106,57 @@ function openOrderValueDetails(monthKey,label){
   document.getElementById("modalBackdrop").classList.add("open");
 }
 
+function monthMovementRows(key, kind){
+  const inP=d=>d && String(d).slice(0,key.length)===key;
+  const pay=(list)=>list.map(p=>{
+    const o=findItem("orders",p.orderId);
+    return {data:p.data, tipo:"Incasso", descrizione:`${clientName(p.clientId)} — ${p.tipo||"Pagamento"}${o&&o.numero?` · ordine #${o.numero}`:""}`, metodo:normalizePaymentMethod(p.metodo), importo:Number(p.importo)||0, orderId:p.orderId};
+  });
+  const pays=state.payments.filter(p=>inP(p.data));
+  const nonFatt=pays.filter(p=>!paymentIsFatturato(p));
+  const fatt=pays.filter(p=>paymentIsFatturato(p));
+  const ent=(state.entrate||[]).filter(e=>inP(e.data)).map(e=>({data:e.data,tipo:"Entrata",descrizione:e.descrizione,metodo:e.metodo,importo:Number(e.importo)||0}));
+  const sp=state.expenses.filter(e=>inP(e.data)).map(e=>({data:e.data,tipo:"Spesa",descrizione:e.descrizione,metodo:e.metodo,importo:-(Number(e.importo)||0)}));
+  const cf=(state.fixedCosts||[]).filter(e=>inP(e.data)).map(e=>({data:e.data,tipo:"Costo fisso",descrizione:e.descrizione,metodo:e.metodo,importo:-(Number(e.importo)||0)}));
+  switch(kind){
+    case "contanti": return pay(nonFatt.filter(p=>normalizePaymentMethod(p.metodo)==="Contanti"));
+    case "carta": return pay(nonFatt.filter(p=>normalizePaymentMethod(p.metodo)==="Carta di Pagamento"));
+    case "bonifico": return pay(nonFatt.filter(p=>normalizePaymentMethod(p.metodo)==="Bonifico"));
+    case "nonfatt": return pay(nonFatt);
+    case "fatt": return pay(fatt);
+    case "entrate": return ent;
+    case "spese": return sp;
+    case "costi": return cf;
+    default: return [...pay(nonFatt),...ent,...sp,...cf];
+  }
+}
+const MONTH_MOVEMENT_TITLES={contanti:"Pagamenti in contanti",carta:"Pagamenti con carta",bonifico:"Pagamenti con bonifico",nonfatt:"Pagamenti non fatturati",fatt:"Pagamenti fatturati",entrate:"Entrate",spese:"Spese",costi:"Costi fissi",tutti:"Totale complessivo"};
+function monthCell(key,label,kind,amount,asCount){
+  const v=Number(amount)||0;
+  const txt=asCount ? String(v) : fmtMoney(v);
+  if(Math.abs(v)<0.005) return asCount ? "—" : txt;
+  return `<button class="btn btn-outline btn-sm" style="white-space:nowrap;${v<0&&!asCount?'color:var(--danger);':''}" title="Clic per vedere i movimenti" onclick="openMonthMovements('${key}','${String(label).replace(/'/g,"")}','${kind}')">${txt}</button>`;
+}
+function openMonthMovements(key,label,kind){
+  const righe=monthMovementRows(key,kind).sort((a,b)=>String(b.data).localeCompare(String(a.data)));
+  const totale=righe.reduce((s,r)=>s+r.importo,0);
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>${MONTH_MOVEMENT_TITLES[kind]||"Movimenti"} — ${escapeHtml(label)}</h2>
+    <p class="helptext" style="margin-top:0;">${righe.length} ${righe.length===1?"movimento":"movimenti"} · totale <strong>${fmtMoney(totale)}</strong></p>
+    <div class="table-wrap" style="margin-top:12px;">
+      <table>
+        <thead><tr><th>Data</th><th>Tipo</th><th>Descrizione</th><th>Metodo</th><th>Importo</th></tr></thead>
+        <tbody>
+          ${righe.length ? righe.map(r=>`<tr${r.orderId?` class="clickable-row" onclick="openJobCard('${r.orderId}')"`:""}><td>${fmtDate(r.data)}</td><td>${r.tipo}</td><td>${escapeHtml(r.descrizione||"—")}</td><td>${escapeHtml(r.metodo||"—")}</td><td style="${r.importo<0?'color:var(--danger)':''}">${fmtMoney(r.importo)}</td></tr>`).join("") : `<tr><td colspan="5" class="empty">Nessun movimento.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+    <div class="form-actions" style="margin-top:16px;"><button class="btn btn-outline" onclick="closeModal()">Chiudi</button></div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
 function openReportDetails(start, end, label){
   const pagamenti = state.payments.filter(p=>p.data>=start && p.data<=end && !paymentIsFatturato(p)).map(p=>({tipo:"Incasso", data:p.data, descrizione:`${clientName(p.clientId)} — ${p.tipo}`, importo:p.importo, metodo:p.metodo}));
   const entrate = (state.entrate||[]).filter(e=>e.data>=start && e.data<=end).map(e=>({tipo:"Entrata", data:e.data, descrizione:e.descrizione, importo:e.importo, metodo:e.metodo}));
@@ -13233,14 +13284,15 @@ function renderIncassi(){
       soldiIncassati:0,nPagamentiFatturati:0,pagamentiFatturati:0,totaleIncassiReali:0,
       entrate:0,spese:0,costiFissi:0,differenza:0
     });
+    const yKey = rows[0].monthKey.slice(0,4), yLab = `Anno ${yKey}`;
     reportHtml = `
       <div class="card" style="margin-bottom:18px;"><canvas id="monthlyChart" height="90"></canvas></div>
       <div class="table-wrap" style="margin-bottom:20px;overflow-x:auto;">
         <table>
           <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta di Pagamento</th><th>Bonifico</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Totale pagamenti NON fatturati</th><th>Pagamenti fatturati (esclusi dal totale)</th><th>Totale complessivo</th></tr></thead>
           <tbody>
-            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini||"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${r.nPagamenti||"—"}</td><td>${fmtMoney(r.contanti)}</td><td>${fmtMoney(r.carta)}</td><td>${fmtMoney(r.bonifico)}</td><td>${fmtMoney(r.entrate)}</td><td>${fmtMoney(r.spese)}</td><td>${fmtMoney(r.costiFissi)}</td><td style="font-weight:700;">${fmtMoney(r.soldiIncassati)}</td><td style="font-weight:700;">${fmtMoney(r.pagamentiFatturati)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${fmtMoney(r.differenza)}</td></tr>`).join("")}
-            <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${tot.nPagamenti}</td><td>${fmtMoney(tot.contanti)}</td><td>${fmtMoney(tot.carta)}</td><td>${fmtMoney(tot.bonifico)}</td><td>${fmtMoney(tot.entrate)}</td><td>${fmtMoney(tot.spese)}</td><td>${fmtMoney(tot.costiFissi)}</td><td>${fmtMoney(tot.soldiIncassati)}</td><td>${fmtMoney(tot.pagamentiFatturati)}</td><td>${fmtMoney(tot.differenza)}</td></tr>
+            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini?`<button class="btn btn-outline btn-sm" title="Clic per vedere gli ordini" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${r.nOrdini}</button>`:"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${monthCell(r.monthKey,r.mese,"nonfatt",r.nPagamenti,true)}</td><td>${monthCell(r.monthKey,r.mese,"contanti",r.contanti)}</td><td>${monthCell(r.monthKey,r.mese,"carta",r.carta)}</td><td>${monthCell(r.monthKey,r.mese,"bonifico",r.bonifico)}</td><td>${monthCell(r.monthKey,r.mese,"entrate",r.entrate)}</td><td>${monthCell(r.monthKey,r.mese,"spese",r.spese)}</td><td>${monthCell(r.monthKey,r.mese,"costi",r.costiFissi)}</td><td style="font-weight:700;">${monthCell(r.monthKey,r.mese,"nonfatt",r.soldiIncassati)}</td><td style="font-weight:700;">${monthCell(r.monthKey,r.mese,"fatt",r.pagamentiFatturati)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${monthCell(r.monthKey,r.mese,"tutti",r.differenza)}</td></tr>`).join("")}
+            <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${monthCell(yKey,yLab,"nonfatt",tot.nPagamenti,true)}</td><td>${monthCell(yKey,yLab,"contanti",tot.contanti)}</td><td>${monthCell(yKey,yLab,"carta",tot.carta)}</td><td>${monthCell(yKey,yLab,"bonifico",tot.bonifico)}</td><td>${monthCell(yKey,yLab,"entrate",tot.entrate)}</td><td>${monthCell(yKey,yLab,"spese",tot.spese)}</td><td>${monthCell(yKey,yLab,"costi",tot.costiFissi)}</td><td>${monthCell(yKey,yLab,"nonfatt",tot.soldiIncassati)}</td><td>${monthCell(yKey,yLab,"fatt",tot.pagamentiFatturati)}</td><td>${monthCell(yKey,yLab,"tutti",tot.differenza)}</td></tr>
           </tbody>
         </table>
       </div>
@@ -13252,7 +13304,7 @@ function renderIncassi(){
           <strong>Pagamenti fatturati</strong> = incassi registrati nel mese collegati a schede già fatturate.<br>
           <strong>Entrate</strong> = entrate extra non collegate agli ordini.<br>
           <strong>Totale complessivo</strong> = pagamenti non fatturati + pagamenti fatturati + entrate − spese − costi fissi.<br>
-          Clicca sull'importo di <strong>Totale Ordini</strong> di un mese per vedere tutte le schede che lo compongono.
+          Clicca su un numero della tabella per vedere tutti i movimenti che lo compongono (ordini, pagamenti, entrate, spese).
         </p>
       </div>`;
   }
@@ -13621,8 +13673,15 @@ async function deleteFixedCost(id){
 
 
 /* ============ ENTRATE ============ */
+let entrateFiltro = {mese:"", metodo:""};
+function setEntrateFiltro(k,v){ entrateFiltro[k]=v; renderEntrate(); }
+function resetEntrateFiltri(){ entrateFiltro={mese:"",metodo:""}; renderEntrate(); }
 function renderEntrate(){
-  const totaleEntrate = (state.entrate||[]).reduce((s,e)=>s+Number(e.importo),0);
+  const mesiDisponibili=[...new Set((state.entrate||[]).map(e=>String(e.data||"").slice(0,7)).filter(Boolean))].sort().reverse();
+  if(entrateFiltro.mese && !mesiDisponibili.includes(entrateFiltro.mese)) entrateFiltro.mese="";
+  const filtroAttivo=!!(entrateFiltro.mese||entrateFiltro.metodo);
+  const entrateFiltrate=(state.entrate||[]).filter(e=>(!entrateFiltro.mese||String(e.data||"").slice(0,7)===entrateFiltro.mese)&&(!entrateFiltro.metodo||e.metodo===entrateFiltro.metodo));
+  const totaleEntrate = entrateFiltrate.reduce((s,e)=>s+Number(e.importo),0);
   const entrateMese = entrateTotaleMese(currentMonth());
   document.getElementById("view-entrate").innerHTML = `
     <div class="form-panel" id="incomeForm">
@@ -13640,17 +13699,24 @@ function renderEntrate(){
       <p class="helptext" style="margin-top:10px;">Le entrate qui registrate si sommano agli incassi degli ordini nel calcolo del guadagno netto.</p>
     </div>
     <div class="grid grid-auto" style="margin-bottom:18px;">
-      <div class="card stat"><p class="stat-label">Totale entrate (storico)</p><p class="stat-value">${fmtMoney(totaleEntrate)}</p></div>
+      <div class="card stat"><p class="stat-label">${filtroAttivo?"Totale entrate filtrate":"Totale entrate (storico)"}</p><p class="stat-value">${fmtMoney(totaleEntrate)}</p>${filtroAttivo?`<p class="stat-sub">${entrateFiltrate.length} ${entrateFiltrate.length===1?"entrata":"entrate"}${entrateFiltro.mese?` · ${speseMeseLabel(entrateFiltro.mese)}`:""}${entrateFiltro.metodo?` · ${escapeHtml(entrateFiltro.metodo)}`:""}</p>`:""}</div>
       <div class="card stat"><p class="stat-label">Entrate mese corrente</p><p class="stat-value">${fmtMoney(entrateMese)}</p></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:14px;">
+      <div class="field" style="margin:0;min-width:180px;"><label>Mese</label>
+        <select onchange="setEntrateFiltro('mese',this.value)"><option value="">Tutti i mesi</option>${mesiDisponibili.map(m=>`<option value="${m}" ${entrateFiltro.mese===m?"selected":""}>${speseMeseLabel(m)}</option>`).join("")}</select></div>
+      <div class="field" style="margin:0;min-width:180px;"><label>Tipo di pagamento</label>
+        <select onchange="setEntrateFiltro('metodo',this.value)"><option value="">Tutti</option>${PAY_METHODS.map(m=>`<option ${entrateFiltro.metodo===m?"selected":""}>${m}</option>`).join("")}</select></div>
+      ${filtroAttivo?`<button class="btn btn-outline btn-sm" onclick="resetEntrateFiltri()">Azzera filtri</button>`:""}
     </div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Data</th><th>Descrizione</th><th>Importo</th><th>Metodo</th><th></th></tr></thead>
         <tbody>
-          ${(state.entrate||[]).length ? [...state.entrate].sort((a,b)=>b.data.localeCompare(a.data)).map(e=>`
+          ${entrateFiltrate.length ? [...entrateFiltrate].sort((a,b)=>b.data.localeCompare(a.data)).map(e=>`
             <tr><td>${fmtDate(e.data)}</td><td>${e.descrizione}</td><td style="color:var(--ok);font-weight:600;">+ ${fmtMoney(e.importo)}</td><td>${e.metodo}</td>
             <td><button class="btn btn-ghost btn-sm" onclick="deleteEntrata('${e.id}')">Elimina</button></td></tr>
-          `).join("") : `<tr><td colspan="5" class="empty">Nessuna entrata registrata.</td></tr>`}
+          `).join("") : `<tr><td colspan="5" class="empty">${(state.entrate||[]).length?"Nessuna entrata con questi filtri.":"Nessuna entrata registrata."}</td></tr>`}
         </tbody>
       </table>
     </div>
