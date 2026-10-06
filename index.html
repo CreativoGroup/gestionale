@@ -7403,7 +7403,7 @@ function clientFieldsHTML(prefix, existing){
     <datalist id="${prefix}-cognomi-list">${clientCognomiOptions()}</datalist>
     <div class="form-grid" style="margin-top:12px;">
       <div class="field"><label>Telefono</label><input id="${prefix}-telefono" value="${e.telefono||''}"></div>
-      <div class="field"><label>Email</label><input id="${prefix}-email" type="email" value="${e.email||''}"></div>
+      <div class="field">${emailListFieldHtml(prefix, e.email)}</div>
       <div class="field" id="${prefix}-settore-wrap"><label>Settore merceologico <span id="${prefix}-settore-req">*</span></label><select id="${prefix}-settore">${settoreOptions(e.settore)}</select></div>
       <div class="field" id="${prefix}-richiesta-wrap" style="display:none;"><label>RICHIESTA</label><select id="${prefix}-richiesta">${familyRichiestaOptions(e.richiesta)}</select></div>
     </div>
@@ -7534,7 +7534,11 @@ function readCommonClientFields(prefix){
 async function createClientFromPrefix(prefix, existingId){
   const tipo = document.getElementById(`${prefix}-tipo`).value;
   const telefono = document.getElementById(`${prefix}-telefono`).value.trim();
-  const email = document.getElementById(`${prefix}-email`).value.trim();
+  emailListSync(prefix);
+  const emailList = splitEmails(document.getElementById(`${prefix}-email`).value);
+  const badEmail = emailList.find(x=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
+  if(badEmail){ showToast(`L'indirizzo "${badEmail}" non sembra valido`); return null; }
+  const email = emailList.join(", ");
   if(!telefono && !email){ showToast("Inserisci almeno telefono o email"); return null; }
 
   const comuni = readCommonClientFields(prefix);
@@ -7706,7 +7710,7 @@ function renderClienti(){
               <td><span class="pill ${c.tipo==='Business'?'pill-business':'pill-family'}">${c.tipo}</span></td>
               <td><span class="status-dot client-dot-${c.tipo==='Business'?'business':'family'}"></span><span style="font-weight:600;color:${c.tipo==='Business'?'#1D5A9E':'#B9660C'}">${escapeHtml(clientDisplayName(c))}</span></td>
               <td>${escapeHtml(c.telefono||"—")}</td>
-              <td>${c.email? `<a class="link" href="mailto:${escapeHtml(c.email)}" onclick="event.stopPropagation()">${escapeHtml(c.email)}</a>`:"—"}</td>
+              <td>${emailLinksHtml(c.email)}</td>
               <td>${clientReadyForArchive(c) ? escapeHtml(clientSpecLabel(c)) : `<span style="color:var(--warn);">${escapeHtml(clientSpecLabel(c))}</span>`}</td>
               <td onclick="event.stopPropagation()"><select class="inline" onchange="updateClientCarattere('${c.id}',this.value)"><option value="">—</option>${CARATTERE_OPTIONS.map(op=>`<option value="${op}" ${c.carattere===op?'selected':''}>${op}</option>`).join("")}</select></td>
               <td>${fmtMoney(clientFatturato(c.id))}</td>
@@ -7730,7 +7734,7 @@ function openClientHistory(clientId){
     <div class="ticket-meta">
       <div><span>Indirizzo</span>${indirizzoCompleto||"—"}</div>
       <div><span>Telefono</span>${c.telefono||"—"}</div>
-      <div><span>Email</span>${c.email||"—"}</div>
+      <div><span>Email</span>${splitEmails(c.email).map(escapeHtml).join("<br>")||"—"}</div>
       <div><span>Partita IVA</span>${c.partitaIva||"—"}</div>
       <div><span>Codice Fiscale</span>${c.codiceFiscale||"—"}</div>
       <div><span>PEC</span>${c.pec||"—"}</div>
@@ -14398,10 +14402,52 @@ function gmailLeadRequestText(m){
   return String(m?.snippet||"").trim().slice(0,6000);
 }
 
+// Più email per cliente: restano nello stesso campo "email", separate da virgola.
+function splitEmails(v){
+  return String(v||"").split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean);
+}
+function emailListFieldHtml(prefix, value){
+  const list=splitEmails(value);
+  if(!list.length) list.push("");
+  const rows=list.map(em=>emailListRowHtml(prefix, em)).join("");
+  return `<label>Email <span style="font-weight:400;color:var(--muted);font-size:12px;">· puoi aggiungerne più di una</span></label>
+    <input type="hidden" id="${prefix}-email" value="${escapeHtml(list.filter(Boolean).join(', '))}">
+    <div id="${prefix}-email-rows" style="display:flex;flex-direction:column;gap:6px;">${rows}</div>
+    <button type="button" class="btn btn-ghost" style="margin-top:6px;padding:6px 12px;font-size:13px;" onclick="emailListAdd('${prefix}')">+ Aggiungi un'altra email</button>`;
+}
+function emailListRowHtml(prefix, em){
+  return `<div class="email-row" style="display:flex;gap:6px;align-items:center;">
+    <input type="email" inputmode="email" placeholder="nome@esempio.it" value="${escapeHtml(em||'')}" oninput="emailListSync('${prefix}')" style="flex:1;min-width:0;">
+    <button type="button" title="Togli questa email" aria-label="Togli questa email" onclick="emailListRemove('${prefix}',this)" style="border:none;background:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 8px;">✕</button>
+  </div>`;
+}
+function emailListSync(prefix){
+  const box=document.getElementById(`${prefix}-email-rows`), h=document.getElementById(`${prefix}-email`);
+  if(!box||!h) return;
+  const vals=[...box.querySelectorAll("input")].map(i=>i.value.trim()).filter(Boolean);
+  h.value=vals.join(", ");
+}
+function emailListAdd(prefix){
+  const box=document.getElementById(`${prefix}-email-rows`); if(!box) return;
+  box.insertAdjacentHTML("beforeend", emailListRowHtml(prefix,""));
+  const ins=box.querySelectorAll("input"); ins[ins.length-1]?.focus();
+}
+function emailListRemove(prefix, btn){
+  const box=document.getElementById(`${prefix}-email-rows`); if(!box) return;
+  const row=btn.closest(".email-row");
+  if(box.querySelectorAll(".email-row").length<=1){ const i=row.querySelector("input"); if(i) i.value=""; }
+  else row.remove();
+  emailListSync(prefix);
+}
+function emailLinksHtml(v){
+  const l=splitEmails(v);
+  if(!l.length) return "—";
+  return l.map(em=>`<a class="link" href="mailto:${escapeHtml(em)}" onclick="event.stopPropagation()">${escapeHtml(em)}</a>`).join("<br>");
+}
 function findClientByEmail(email){
   const target=String(email||"").trim().toLowerCase();
   if(!target) return null;
-  return state.clients.find(c=>String(c.email||"").trim().toLowerCase()===target)||null;
+  return state.clients.find(c=>splitEmails(c.email).some(x=>x.toLowerCase()===target))||null;
 }
 
 function closeLeadModal(){
