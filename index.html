@@ -13423,8 +13423,20 @@ function deletePayment(id){
 }
 
 /* ============ SPESE ============ */
+let speseFiltro = {mese:"", metodo:""};
+function speseMeseLabel(m){
+  const [y,mm]=m.split("-");
+  const nomi=["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+  return `${nomi[Number(mm)-1]||mm} ${y}`;
+}
+function setSpeseFiltro(k,v){ speseFiltro[k]=v; renderSpese(); }
+function resetSpeseFiltri(){ speseFiltro={mese:"",metodo:""}; renderSpese(); }
 function renderSpese(){
-  const totaleSpese = state.expenses.reduce((s,e)=>s+Number(e.importo),0);
+  const mesiDisponibili=[...new Set(state.expenses.map(e=>String(e.data||"").slice(0,7)).filter(Boolean))].sort().reverse();
+  if(speseFiltro.mese && !mesiDisponibili.includes(speseFiltro.mese)) speseFiltro.mese="";
+  const filtroAttivo=!!(speseFiltro.mese||speseFiltro.metodo);
+  const speseFiltrate=state.expenses.filter(e=>(!speseFiltro.mese||String(e.data||"").slice(0,7)===speseFiltro.mese)&&(!speseFiltro.metodo||e.metodo===speseFiltro.metodo));
+  const totaleSpese = speseFiltrate.reduce((s,e)=>s+Number(e.importo),0);
   const speseMese = speseTotaleMese(currentMonth());
   const guadagnoMese = (paymentsTotaleMese(currentMonth()) + entrateTotaleMese(currentMonth())) - speseMese;
   document.getElementById("view-spese").innerHTML = `
@@ -13442,18 +13454,25 @@ function renderSpese(){
       </div>
     </div>
     <div class="grid grid-auto" style="margin-bottom:18px;">
-      <div class="card stat"><p class="stat-label">Totale spese (storico)</p><p class="stat-value">${fmtMoney(totaleSpese)}</p></div>
+      <div class="card stat"><p class="stat-label">${filtroAttivo?"Totale spese filtrate":"Totale spese (storico)"}</p><p class="stat-value">${fmtMoney(totaleSpese)}</p>${filtroAttivo?`<p class="stat-sub">${speseFiltrate.length} ${speseFiltrate.length===1?"spesa":"spese"}${speseFiltro.mese?` · ${speseMeseLabel(speseFiltro.mese)}`:""}${speseFiltro.metodo?` · ${escapeHtml(speseFiltro.metodo)}`:""}</p>`:""}</div>
       <div class="card stat"><p class="stat-label">Spese mese corrente</p><p class="stat-value">${fmtMoney(speseMese)}</p></div>
       <div class="card stat"><p class="stat-label">Guadagno netto mese corrente</p><p class="stat-value" style="${guadagnoMese<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagnoMese)}</p><p class="stat-sub">incassi ordini + entrate − spese</p></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:14px;">
+      <div class="field" style="margin:0;min-width:180px;"><label>Mese</label>
+        <select onchange="setSpeseFiltro('mese',this.value)"><option value="">Tutti i mesi</option>${mesiDisponibili.map(m=>`<option value="${m}" ${speseFiltro.mese===m?"selected":""}>${speseMeseLabel(m)}</option>`).join("")}</select></div>
+      <div class="field" style="margin:0;min-width:180px;"><label>Tipo di pagamento</label>
+        <select onchange="setSpeseFiltro('metodo',this.value)"><option value="">Tutti</option>${PAY_METHODS.map(m=>`<option ${speseFiltro.metodo===m?"selected":""}>${m}</option>`).join("")}</select></div>
+      ${filtroAttivo?`<button class="btn btn-outline btn-sm" onclick="resetSpeseFiltri()">Azzera filtri</button>`:""}
     </div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Data</th><th>Descrizione</th><th>Importo</th><th>Metodo</th><th></th></tr></thead>
         <tbody>
-          ${state.expenses.length ? [...state.expenses].sort((a,b)=>b.data.localeCompare(a.data)).map(e=>`
+          ${speseFiltrate.length ? [...speseFiltrate].sort((a,b)=>b.data.localeCompare(a.data)).map(e=>`
             <tr><td>${fmtDate(e.data)}</td><td>${e.descrizione}</td><td>${fmtMoney(e.importo)}</td><td>${e.metodo}</td>
             <td><button class="btn btn-ghost btn-sm" onclick="deleteExpense('${e.id}')">Elimina</button></td></tr>
-          `).join("") : `<tr><td colspan="5" class="empty">Nessuna spesa registrata.</td></tr>`}
+          `).join("") : `<tr><td colspan="5" class="empty">${state.expenses.length?"Nessuna spesa con questi filtri.":"Nessuna spesa registrata."}</td></tr>`}
         </tbody>
       </table>
     </div>
