@@ -13590,10 +13590,12 @@ function renderEntrateUscite(){
   const righe=tutti
     .filter(e=>(!euFiltro.mese||String(e.data||"").slice(0,7)===euFiltro.mese)&&(!euFiltro.metodo||e.metodo===euFiltro.metodo)&&(!euFiltro.tipo||e._tipo===euFiltro.tipo))
     .sort((a,b)=>String(b.data||"").localeCompare(String(a.data||"")));
-  const totEntrate=righe.filter(e=>e._tipo==="entrata").reduce((s,e)=>s+Number(e.importo||0),0);
-  const totSpese=righe.filter(e=>e._tipo==="spesa").reduce((s,e)=>s+Number(e.importo||0),0);
-  const guadagnoMese=(paymentsTotaleMese(currentMonth())+entrateTotaleMese(currentMonth()))-speseTotaleMese(currentMonth());
-  const periodo=filtroAttivo?`${righe.length} ${righe.length===1?"movimento":"movimenti"}${euFiltro.mese?` · ${speseMeseLabel(euFiltro.mese)}`:""}${euFiltro.metodo?` · ${escapeHtml(euFiltro.metodo)}`:""}`:"";
+  // Le card mostrano il periodo filtrato; senza filtri, il mese corrente.
+  const base = filtroAttivo ? righe : tutti.filter(e=>String(e.data||"").slice(0,7)===currentMonth());
+  const periodo = euFiltro.mese ? speseMeseLabel(euFiltro.mese) : (filtroAttivo ? "filtro attivo" : speseMeseLabel(currentMonth()));
+  const totEntrate=base.filter(e=>e._tipo==="entrata").reduce((s,e)=>s+Number(e.importo||0),0);
+  const totSpese=base.filter(e=>e._tipo==="spesa").reduce((s,e)=>s+Number(e.importo||0),0);
+  const differenza=totEntrate-totSpese;
   document.getElementById("view-entrateUscite").innerHTML = `
     <div class="form-panel" id="euForm">
       <h3>Nuovo movimento</h3>
@@ -13610,9 +13612,9 @@ function renderEntrateUscite(){
       </div>
     </div>
     <div class="grid grid-auto" style="margin-bottom:18px;">
-      <div class="card stat"><p class="stat-label">${filtroAttivo?"Entrate (filtrate)":"Entrate (storico)"}</p><p class="stat-value" style="color:var(--ok);">${fmtMoney(totEntrate)}</p>${periodo?`<p class="stat-sub">${periodo}</p>`:""}</div>
-      <div class="card stat"><p class="stat-label">${filtroAttivo?"Uscite (filtrate)":"Uscite (storico)"}</p><p class="stat-value">${fmtMoney(totSpese)}</p></div>
-      <div class="card stat"><p class="stat-label">Guadagno netto mese corrente</p><p class="stat-value" style="${guadagnoMese<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagnoMese)}</p><p class="stat-sub">incassi ordini + entrate − spese</p></div>
+      <div class="card stat"><p class="stat-label">Entrate · ${periodo}</p><p class="stat-value" style="color:var(--ok);">${fmtMoney(totEntrate)}</p></div>
+      <div class="card stat"><p class="stat-label">Uscite · ${periodo}</p><p class="stat-value">${fmtMoney(totSpese)}</p></div>
+      <div class="card stat"><p class="stat-label">Differenza · ${periodo}</p><p class="stat-value" style="${differenza<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(differenza)}</p><p class="stat-sub">entrate − uscite</p></div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:14px;">
       <div class="field" style="margin:0;min-width:160px;"><label>Mese</label>
