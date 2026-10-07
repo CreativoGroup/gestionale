@@ -3003,6 +3003,16 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* Se il componente di accesso non si carica dalla prima fonte, riprova da una seconda e, se serve, avvisa. */
+if(!window.supabase){ document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"><\/script>'); }
+window.addEventListener("DOMContentLoaded",function(){
+  if(!window.supabase){
+    var e=document.getElementById("login-error");
+    if(e){ e.textContent="Impossibile caricare i componenti del gestionale. Controlla la connessione e ricarica la pagina (Cmd+Maiusc+R)."; e.style.display="block"; }
+  }
+});
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
@@ -15267,11 +15277,30 @@ async function doSignIn(){
   const email = document.getElementById("login-email").value.trim();
   const password = document.getElementById("login-password").value;
   const errEl = document.getElementById("login-error");
+  const btn = document.querySelector("#loginScreen .btn-primary");
+  const showErr = msg => { errEl.textContent = msg; errEl.style.display = "block"; };
   errEl.style.display = "none";
-  if(!email || !password){ errEl.textContent = "Inserisci email e password"; errEl.style.display = "block"; return; }
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  if(error){ errEl.textContent = "Credenziali non valide"; errEl.style.display = "block"; return; }
-  await onSignedIn(data.session);
+  if(!email || !password){ showErr("Inserisci email e password"); return; }
+  if(btn){ btn.disabled = true; btn.textContent = "Accesso in corso…"; }
+  try{
+    const res = await Promise.race([
+      sb.auth.signInWithPassword({ email, password }),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),20000))
+    ]);
+    if(res.error){
+      const m = String(res.error.message||"");
+      showErr(/invalid login|credentials/i.test(m) ? "Credenziali non valide" : ("Accesso non riuscito: " + m));
+      return;
+    }
+    await onSignedIn(res.data.session);
+  }catch(err){
+    console.error("Accesso", err);
+    showErr(err && err.message==="timeout"
+      ? "Il server non risponde. Chiudi le altre schede del gestionale, ricarica la pagina (Cmd+Maiusc+R) e riprova."
+      : "Errore durante l'accesso: " + (err && err.message ? err.message : err));
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = "Accedi"; }
+  }
 }
 async function signOut(){
   stopDataAutoRefresh();
@@ -15284,11 +15313,12 @@ async function onSignedIn(session){
   currentUser = await fetchUserProfile(session.user.id, session.user.email);
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("app").style.display = "flex";
-  await loadAllFromSupabase();
-  await expireStaleWaitingLeads();
-  await cleanupOldNoteComunicazioni();
-  subscribeRealtime();
-  startDataAutoRefresh();
+  // Un errore in uno di questi passaggi non deve impedire l'ingresso nel gestionale.
+  for(const step of [loadAllFromSupabase, expireStaleWaitingLeads, cleanupOldNoteComunicazioni]){
+    try{ await step(); }catch(e){ console.error("Avvio:", step.name, e); }
+  }
+  try{ subscribeRealtime(); }catch(e){ console.error("Realtime", e); }
+  try{ startDataAutoRefresh(); }catch(e){ console.error("Auto refresh", e); }
   renderNav();
   goTo("dashboard");
   if(!window._leadExpiryTimer){
@@ -15299,9 +15329,20 @@ async function onSignedIn(session){
   }
 }
 async function initAuth(){
-  const { data } = await sb.auth.getSession();
+  let data = null;
+  try{
+    const r = await Promise.race([sb.auth.getSession(), new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),15000))]);
+    data = r && r.data;
+  }catch(e){ console.error("getSession", e); }
   if(data && data.session){
-    await onSignedIn(data.session);
+    try{ await onSignedIn(data.session); }
+    catch(e){
+      console.error("onSignedIn", e);
+      document.getElementById("loginScreen").style.display = "flex";
+      document.getElementById("app").style.display = "none";
+      const errEl=document.getElementById("login-error");
+      if(errEl){ errEl.textContent="Errore durante l'avvio: " + (e && e.message ? e.message : e); errEl.style.display="block"; }
+    }
   } else {
     document.getElementById("loginScreen").style.display = "flex";
     document.getElementById("app").style.display = "none";
