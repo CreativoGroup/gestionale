@@ -2988,6 +2988,7 @@
     <section class="view" id="view-spese"></section>
     <section class="view" id="view-costiFissi"></section>
     <section class="view" id="view-entrate"></section>
+    <section class="view" id="view-entrateUscite"></section>
     <section class="view" id="view-posta"></section>
     <section class="view" id="view-whatsapp"></section>
     <section class="view" id="view-instagram"></section>
@@ -4233,13 +4234,14 @@ const NAV = [
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
-  {id:"lavoriCompletati", label:"Lavori completati", icon:"✓", subtitle:"Da consegnare e completati recenti", group:"Operativa"},
+  {id:"lavoriCompletati", label:"Lavori completati", icon:"✓", subtitle:"Da consegnare e completati recenti", group:"Operativa", hidden:true},
 
   {id:"dropbox", label:"Dropbox", icon:"☁", subtitle:"Archivio file collegato al gestionale", group:"Archivio"},
 
   {id:"incassi", label:"Incassi", icon:"€", subtitle:"Report pagamenti e crediti aperti", adminOnly:true, group:"Amministrazione"},
-  {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine", group:"Amministrazione"},
-  {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti", group:"Amministrazione"},
+  {id:"entrateUscite", label:"Entrate e uscite", icon:"±", subtitle:"Altre entrate e spese sostenute", group:"Amministrazione"},
+  {id:"entrate", label:"Entrate", icon:"+", subtitle:"Altre entrate non legate a un ordine", group:"Amministrazione", hidden:true},
+  {id:"spese", label:"Spese", icon:"−", subtitle:"Uscite e costi sostenuti", group:"Amministrazione", hidden:true},
   {id:"costiFissi", label:"Costi fissi", icon:"▦", subtitle:"F24, bollette, abbonamenti e costi ricorrenti", adminOnly:true, group:"Amministrazione"}
 ];
 function visibleNav(){ return NAV.filter(n => !n.hidden).filter(n => !n.adminOnly || (currentUser && currentUser.role==="admin")); }
@@ -4542,6 +4544,7 @@ function renderTopbarActions(){
     spese: `<button class="btn btn-primary" onclick="toggleForm('expenseForm')">+ Nuova spesa</button>`,
     costiFissi: currentUser&&currentUser.role==="admin" ? `<button class="btn btn-primary" onclick="toggleForm('fixedCostForm')">+ Nuovo costo fisso</button>` : ``,
     entrate: `<button class="btn btn-primary" onclick="toggleForm('incomeForm')">+ Nuova entrata</button>`,
+    entrateUscite: `<button class="btn btn-outline" onclick="openEuForm('entrata')">+ Nuova entrata</button> <button class="btn btn-primary" onclick="openEuForm('spesa')">+ Nuova spesa</button>`,
     posta: `<button class="btn btn-primary" onclick="loadGmailMessages(true)">↻ Aggiorna posta</button>`,
     whatsapp: ``,
     instagram: ``,
@@ -4554,7 +4557,7 @@ function renderTopbarActions(){
 function renderCurrentView(){
   ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti,
     ordini:renderOrdini, flusso:renderFlusso,
-    magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, dropbox:renderDropbox, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate,
+    magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, dropbox:renderDropbox, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate, entrateUscite:renderEntrateUscite,
     posta:renderPosta, whatsapp:renderWhatsapp, instagram:()=>renderMetaChannel("instagram"), leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
 }
 let clientFormOpen = false;
@@ -13554,6 +13557,108 @@ function deleteExpense(id){
   });
 }
 
+
+/* ============ ENTRATE E USCITE (pagina unica) ============ */
+let euFiltro = {mese:"", metodo:"", tipo:""};
+function setEuFiltro(k,v){ euFiltro[k]=v; renderEntrateUscite(); }
+function resetEuFiltri(){ euFiltro={mese:"",metodo:"",tipo:""}; renderEntrateUscite(); }
+function parseEuroInput(v){
+  let s=String(v||"").replace(/[€\s]/g,"");
+  if(!s) return 0;
+  if(s.includes(",")) s=s.replace(/\./g,"").replace(",",".");
+  const n=Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+function formatEuroInput(el){
+  const n=parseEuroInput(el.value);
+  if(!el.value.trim() || Number.isNaN(n)) return;
+  el.value=n.toFixed(2).replace(".",",");
+}
+function openEuForm(tipo){
+  const f=document.getElementById("euForm"); if(!f) return;
+  const sel=document.getElementById("eu-tipo"); if(sel) sel.value=tipo;
+  f.classList.add("open");
+  setTimeout(()=>document.getElementById("eu-descrizione")?.focus(),50);
+}
+function renderEntrateUscite(){
+  const ent=(state.entrate||[]).map(e=>({...e, _tipo:"entrata"}));
+  const usc=(state.expenses||[]).map(e=>({...e, _tipo:"spesa"}));
+  const tutti=[...ent,...usc];
+  const mesi=[...new Set(tutti.map(e=>String(e.data||"").slice(0,7)).filter(Boolean))].sort().reverse();
+  if(euFiltro.mese && !mesi.includes(euFiltro.mese)) euFiltro.mese="";
+  const filtroAttivo=!!(euFiltro.mese||euFiltro.metodo||euFiltro.tipo);
+  const righe=tutti
+    .filter(e=>(!euFiltro.mese||String(e.data||"").slice(0,7)===euFiltro.mese)&&(!euFiltro.metodo||e.metodo===euFiltro.metodo)&&(!euFiltro.tipo||e._tipo===euFiltro.tipo))
+    .sort((a,b)=>String(b.data||"").localeCompare(String(a.data||"")));
+  const totEntrate=righe.filter(e=>e._tipo==="entrata").reduce((s,e)=>s+Number(e.importo||0),0);
+  const totSpese=righe.filter(e=>e._tipo==="spesa").reduce((s,e)=>s+Number(e.importo||0),0);
+  const guadagnoMese=(paymentsTotaleMese(currentMonth())+entrateTotaleMese(currentMonth()))-speseTotaleMese(currentMonth());
+  const periodo=filtroAttivo?`${righe.length} ${righe.length===1?"movimento":"movimenti"}${euFiltro.mese?` · ${speseMeseLabel(euFiltro.mese)}`:""}${euFiltro.metodo?` · ${escapeHtml(euFiltro.metodo)}`:""}`:"";
+  document.getElementById("view-entrateUscite").innerHTML = `
+    <div class="form-panel" id="euForm">
+      <h3>Nuovo movimento</h3>
+      <div class="form-grid">
+        <div class="field"><label>Tipo</label><select id="eu-tipo"><option value="entrata">Entrata</option><option value="spesa">Spesa</option></select></div>
+        <div class="field" style="grid-column:span 2;"><label>Descrizione</label><input id="eu-descrizione" placeholder="Es. Acquisto materiale di consumo / Rimborso"></div>
+        <div class="field"><label>Importo (€)</label><input id="eu-importo" type="text" inputmode="decimal" placeholder="0,00" onblur="formatEuroInput(this)"></div>
+        <div class="field"><label>Data</label><input id="eu-data" type="date" value="${today()}"></div>
+        <div class="field"><label>Modalità di pagamento</label><select id="eu-metodo">${PAY_METHODS.map(m=>`<option>${m}</option>`).join("")}</select></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addMovimento()">Salva</button>
+        <button class="btn btn-outline" onclick="toggleForm('euForm')">Annulla</button>
+      </div>
+    </div>
+    <div class="grid grid-auto" style="margin-bottom:18px;">
+      <div class="card stat"><p class="stat-label">${filtroAttivo?"Entrate (filtrate)":"Entrate (storico)"}</p><p class="stat-value" style="color:var(--ok);">${fmtMoney(totEntrate)}</p>${periodo?`<p class="stat-sub">${periodo}</p>`:""}</div>
+      <div class="card stat"><p class="stat-label">${filtroAttivo?"Uscite (filtrate)":"Uscite (storico)"}</p><p class="stat-value">${fmtMoney(totSpese)}</p></div>
+      <div class="card stat"><p class="stat-label">Guadagno netto mese corrente</p><p class="stat-value" style="${guadagnoMese<0?'color:var(--danger)':'color:var(--ok)'}">${fmtMoney(guadagnoMese)}</p><p class="stat-sub">incassi ordini + entrate − spese</p></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:14px;">
+      <div class="field" style="margin:0;min-width:160px;"><label>Mese</label>
+        <select onchange="setEuFiltro('mese',this.value)"><option value="">Tutti i mesi</option>${mesi.map(m=>`<option value="${m}" ${euFiltro.mese===m?"selected":""}>${speseMeseLabel(m)}</option>`).join("")}</select></div>
+      <div class="field" style="margin:0;min-width:160px;"><label>Tipo di pagamento</label>
+        <select onchange="setEuFiltro('metodo',this.value)"><option value="">Tutti</option>${PAY_METHODS.map(m=>`<option ${euFiltro.metodo===m?"selected":""}>${m}</option>`).join("")}</select></div>
+      <div class="field" style="margin:0;min-width:160px;"><label>Entrate / uscite</label>
+        <select onchange="setEuFiltro('tipo',this.value)"><option value="">Tutte</option><option value="entrata" ${euFiltro.tipo==="entrata"?"selected":""}>Solo entrate</option><option value="spesa" ${euFiltro.tipo==="spesa"?"selected":""}>Solo uscite</option></select></div>
+      ${filtroAttivo?`<button class="btn btn-outline btn-sm" onclick="resetEuFiltri()">Azzera filtri</button>`:""}
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Tipo</th><th>Descrizione</th><th>Importo</th><th>Metodo</th><th></th></tr></thead>
+        <tbody>
+          ${righe.length ? righe.map(e=>`
+            <tr><td>${fmtDate(e.data)}</td>
+            <td>${e._tipo==="entrata"?`<span class="pill pill-done">Entrata</span>`:`<span class="pill pill-todo">Uscita</span>`}</td>
+            <td>${escapeHtml(e.descrizione||"")}</td>
+            <td style="font-weight:600;${e._tipo==="entrata"?'color:var(--ok);':''}">${e._tipo==="entrata"?"+ ":"− "}${fmtMoney(e.importo)}</td>
+            <td>${escapeHtml(e.metodo||"")}</td>
+            <td><button class="btn btn-ghost btn-sm" onclick="deleteMovimento('${e._tipo}','${e.id}')">Elimina</button></td></tr>
+          `).join("") : `<tr><td colspan="6" class="empty">${tutti.length?"Nessun movimento con questi filtri.":"Nessun movimento registrato."}</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+function addMovimento(){
+  const tipo=document.getElementById("eu-tipo").value;
+  const descrizione=document.getElementById("eu-descrizione").value.trim();
+  const importo=parseEuroInput(document.getElementById("eu-importo").value);
+  if(!descrizione){ showToast("Inserisci una descrizione"); return; }
+  if(!(importo>0)){ showToast("Inserisci un importo valido"); return; }
+  const rec={id:uid(), descrizione, importo:Math.round(importo*100)/100, metodo:document.getElementById("eu-metodo").value, data:document.getElementById("eu-data").value||today()};
+  if(tipo==="entrata"){ state.entrate.push(rec); saveState('entrate'); }
+  else { state.expenses.push(rec); saveState('expenses'); }
+  renderEntrateUscite();
+  showToast(tipo==="entrata"?"Entrata registrata":"Spesa registrata");
+}
+function deleteMovimento(tipo,id){
+  askConfirm(tipo==="entrata"?"Eliminare questa entrata?":"Eliminare questa spesa?", ()=>{
+    if(tipo==="entrata"){ state.entrate=state.entrate.filter(e=>e.id!==id); dbDelete('entrate', id); }
+    else { state.expenses=state.expenses.filter(e=>e.id!==id); dbDelete('expenses', id); }
+    renderEntrateUscite();
+  });
+}
 
 /* ============ COSTI FISSI (SOLO AMMINISTRATORE) ============ */
 function fixedCostsTotaleMese(month){
