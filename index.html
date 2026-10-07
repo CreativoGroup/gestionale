@@ -6580,7 +6580,12 @@ async function saveNoteForm(id){
   }
   const note = prev ? Object.assign({}, prev) : {id:uid(), tipo:"Comunicazione", fatto:false, creatoIl:new Date().toISOString(), fattoIl:""};
   note.nomePersona = nomePersona; note.testo = testo;
-  if(!prev) note.operatore = currentUser?.nome || "";
+  // Il database richiede sempre un operatore: se la nota è nuova usiamo chi l'ha inserita.
+  if(!prev || !String(prev.operatore||"").trim()){
+    const nomeUtente = String(currentUser?.nome || "").trim();
+    const noto = NOTE_OPERATORS.find(o => o.toLowerCase() === nomeUtente.toLowerCase());
+    note.operatore = noto || nomeUtente || String(currentUser?.email || "").split("@")[0] || "Gestionale";
+  }
   if(ex){
     const extra = Object.assign({}, (prev && prev.extra) || {}, {clientId:"", telefono, email});
     if(allegato) extra.allegato = allegato; else delete extra.allegato;
