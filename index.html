@@ -11358,13 +11358,13 @@ function openJobCard(orderId){
             <div class="job-v2-money-row"><span>Totale lavorazioni</span><strong>${fmtMoney(imponibile)}</strong></div>
             ${orderSpedizioneCosto(o)>0?`<div class="job-v2-money-row"><span>Spedizione</span><strong>${fmtMoney(orderSpedizioneCosto(o))}</strong></div>`:""}
             <div class="field" style="margin:10px 0 5px;"><label>Sconto (€)</label><input type="number" min="0" step="0.01" value="${o.sconto||0}" onchange="updateOrderField('${o.id}','sconto',Number(this.value)||0);openJobCard('${o.id}')"></div>
-            <label class="checkfield" style="margin-top:10px;"><input type="checkbox" ${o.ivaApplicata?'checked':''} onchange="updateOrderCheck('${o.id}','ivaApplicata',this.checked)"> Applica IVA 22%</label>
             ${o.ivaApplicata?`<div class="job-v2-money-row"><span>IVA 22%</span><strong>${fmtMoney(iva)}</strong></div>`:""}
             <div class="job-v2-money-row total"><span>Totale</span><span>${fmtMoney(totale)}</span></div>
           </div>
 
           <div class="job-v2-soft">
             <h4>Fatturazione</h4>
+            <label class="checkfield" style="margin-bottom:10px;"><input type="checkbox" ${o.ivaApplicata?'checked':''} onchange="updateOrderCheck('${o.id}','ivaApplicata',this.checked)"> Applica IVA 22%</label>
             <label class="checkfield"><input type="checkbox" ${o.daFatturare?'checked':''} onchange="updateOrderCheck('${o.id}','daFatturare',this.checked)"> Da fatturare</label>
             ${o.daFatturare?`<label class="checkfield" style="margin-top:10px;"><input type="checkbox" ${o.fatturato?'checked':''} onchange="updateOrderCheck('${o.id}','fatturato',this.checked)"> Fatturato</label>`:""}
             <div class="job-v2-info-sub" style="margin-top:16px;">Lo stato di fatturazione viene usato anche nei report Incassi.</div>
