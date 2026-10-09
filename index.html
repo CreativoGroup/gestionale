@@ -6488,7 +6488,6 @@ function noteRowHTML(n){
       <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">LEAD</button>
       ${wa ? `<button class="btn btn-outline btn-sm" onclick="${c ? `openClientWhatsapp('${c.id}')` : `openNoteWhatsapp('${n.id}')`}">WHATSAPP</button>` : ""}
       <button class="btn btn-ghost btn-sm" title="Modifica" onclick="openNoteForm('${n.id}')">✎</button>
-      <button class="btn btn-ghost btn-sm" style="color:var(--danger);" title="Elimina la nota" onclick="deleteNota('${n.id}')">ELIMINA</button>
     </div>
   </div>`;
 }
@@ -6546,7 +6545,6 @@ function openNoteForm(id){
     <div class="form-actions" style="margin-top:18px;">
       <button class="btn btn-primary" id="nota-f-save" onclick="saveNoteForm('${n ? n.id : ''}')">Salva nota</button>
       <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
-      ${n ? `<button class="btn btn-ghost" style="color:var(--danger);margin-left:auto;" onclick="deleteNota('${n.id}')">ELIMINA</button>` : ""}
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
