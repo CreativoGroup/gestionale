@@ -11724,7 +11724,7 @@ function openAddPaymentModal(orderId){
     </div>
 
     <div class="form-grid">
-      <div class="field"><label>Tipo</label><select id="ap-tipo">${PAY_TIPI.map(t=>`<option>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>Tipo</label><select id="ap-tipo">${PAY_TIPI.map(t=>`<option ${t==="Saldo"?"selected":""}>${t}</option>`).join("")}</select></div>
       <div class="field"><label>Importo €</label><input id="ap-importo" type="number" min="0" step="0.01" value="${saldo>0?saldo.toFixed(2):''}"></div>
       <div class="field"><label>Giorno</label><input id="ap-data" type="date" value="${today()}"></div>
       <div class="field"><label>Modalità di pagamento</label><select id="ap-metodo">${PAY_METHODS.map(m=>`<option>${m}</option>`).join("")}</select></div>
@@ -13535,7 +13535,7 @@ function renderIncassi(){
       <h3>Registra incasso</h3>
       <div class="form-grid">
         <div class="field" style="grid-column:1/-1;"><label>Ordine collegato</label><select id="pf-ordine" onchange="suggestPfImporto()">${orderOptionsForPayments()}</select></div>
-        <div class="field"><label>Tipo</label><select id="pf-tipo">${PAY_TIPI.map(t=>`<option>${t}</option>`).join("")}</select></div>
+        <div class="field"><label>Tipo</label><select id="pf-tipo">${PAY_TIPI.map(t=>`<option ${t==="Saldo"?"selected":""}>${t}</option>`).join("")}</select></div>
         <div class="field"><label>Importo (€)</label><input id="pf-importo" type="number" min="0" step="0.01" value="${state.orders[0] ? Math.max(0,orderSaldo(state.orders[0])).toFixed(2) : ''}"></div>
         <div class="field"><label>Giorno di incasso</label><input id="pf-data" type="date" value="${today()}"></div>
         <div class="field"><label>Metodo</label><select id="pf-metodo">${PAY_METHODS.map(m=>`<option>${m}</option>`).join("")}</select></div>
