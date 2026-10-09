@@ -4810,6 +4810,7 @@ function renderLeads(){
         <button class="btn btn-outline btn-sm" onclick="openQuoteDetail('${qt.id}')">Dettagli</button>
         <button class="btn btn-outline btn-sm" onclick="downloadQuotePdf('${qt.id}')">PDF</button>
         ${qt.convertito ? `<span class="pill pill-done">Convertito</span>` : ""}
+        <button class="btn btn-ghost btn-sm" title="Elimina preventivo" aria-label="Elimina preventivo" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" onclick="deleteQuote('${qt.id}')">🗑</button>
       </td></tr>`;
   }).join("");
   const stat = (label, n) => `<div class="lead-stat"><span>${label}</span><strong>${n}</strong></div>`;
