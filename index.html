@@ -9195,7 +9195,7 @@ async function sendQuoteMail(quoteId){
 async function transformQuoteToLead(quoteId){
   const q=findItem('quotes',quoteId); if(!q) return;
   const existing=(state.leads||[]).find(l=>l.fonte===`preventivo:${quoteId}`);
-  if(existing){showToast('Questo preventivo è già stato trasformato in Lead');return;}
+  if(existing||(q.extra&&q.extra.leadId)){showToast('Questo preventivo è già collegato a un Lead');return;}
   const c=state.clients.find(x=>x.id===q.clientId);
   const righe=(q.righe||[]).map(r=>`${r.descrizione||r.prodotto||q.categoria}: ${r.quantita||0} x ${fmtMoney(r.prezzoUnitario||0)}`).join('\n');
   const lead={id:uuid(),nome:c?.nome||'',azienda:c?.ragioneSociale||c?.azienda||'',email:c?.email||'',telefono:c?.telefono||'',oggettoRichiesta:`Preventivo - ${q.categoria||''}`.trim(),richiesta:`${q.descrizione||''}${q.descrizione&&righe?'\n':''}${righe}${righe?'\n':''}Totale: ${fmtMoney(quoteImponibile(q))}`.trim(),stato:'In attesa di conferma',fonte:`preventivo:${q.id}`,creatoIl:new Date().toISOString(),aggiornatoIl:new Date().toISOString()};
@@ -9346,7 +9346,7 @@ function openQuoteDetail(quoteId){
           <button class="btn btn-outline" onclick="printQuote('${q.id}')">Stampa scheda</button>
           <button class="btn btn-outline" onclick="openQuoteMail('${q.id}')">Invia per mail</button>
           ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
-          ${(state.leads||[]).some(l=>l.fonte===`preventivo:${q.id}`)?'':`<button class="btn btn-outline" onclick="transformQuoteToLead('${q.id}')">Trasforma in Lead</button>`}
+          ${((state.leads||[]).some(l=>l.fonte===`preventivo:${q.id}`)||(q.extra&&q.extra.leadId))?'':`<button class="btn btn-outline" onclick="transformQuoteToLead('${q.id}')">Trasforma in Lead</button>`}
           <button class="btn btn-outline" onclick="closeModal(); showToast('Preventivo salvato')">Salva e chiudi</button>
         </div>
         <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteQuote('${q.id}')">Elimina preventivo</button>
