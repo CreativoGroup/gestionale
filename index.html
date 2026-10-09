@@ -5853,7 +5853,7 @@ async function runWhatsappDiagnosi(){
   clearWaMetaDebug();
   waMetaDebug("DIAGNOSI","Sto chiedendo a Meta lo stato del collegamento…");
   try{
-    const { data, error } = await sb.functions.invoke("whatsapp-diagnose",{ body:{} });
+    const { data, error } = await sb.functions.invoke("hyper-endpoint",{ body:{} });
     if(error){
       let msg=error?.message||"Errore";
       try{ const ctx=error?.context; if(ctx && typeof ctx.text==="function") msg+=" · "+(await ctx.text()); }catch(e){}
