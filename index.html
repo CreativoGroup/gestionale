@@ -4758,7 +4758,6 @@ function leadCardHTML(l){
         ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s => `<option value="${s}" ${l.stato === s ? "selected" : ""}>${s}</option>`).join("")}
       </select>
       <button class="btn btn-outline btn-sm" title="Nuovo preventivo" aria-label="Nuovo preventivo" style="padding:6px 10px;font-size:15px;line-height:1;" onclick="newQuoteForLead('${l.id}')">📄</button>
-      ${waMePhone(l.telefono) ? `<button class="btn btn-outline btn-sm" onclick="openLeadWhatsapp('${l.id}')">WHATSAPP</button>` : ""}
       <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">APRI</button>
       <button class="btn btn-ghost btn-sm" title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" onclick="deleteLead('${l.id}')">🗑</button>
     </div>
@@ -9265,6 +9264,16 @@ function quoteMailText(q,c){
   const corpo = `presentiamo in allegato il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)}.\n${dettaglio}\nRestiamo a disposizione per qualsiasi chiarimento.`;
   return `${salutoCliente(c)}\n\n${corpo}`;
 }
+function openQuoteWhatsapp(quoteId){
+  const q=findItem('quotes',quoteId); if(!q) return;
+  const rcp=quoteRecipient(q);
+  const c=rcp.client || {tipo:'Family',nome:rcp.nome,cognome:'',email:rcp.email};
+  const testo=`${salutoCliente(c)}\n\nti inviamo il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)}.\nRestiamo a disposizione per qualsiasi chiarimento.`;
+  const url=waMeUrl(rcp.telefono, testo);
+  if(!url){ showToast('Numero WhatsApp non valido'); return; }
+  openWaWindow(url);
+  showToast('Il PDF non si allega da solo: scaricalo con SCARICA PDF e trascinalo nella chat');
+}
 function quoteMailClient(q){
   const rcp=quoteRecipient(q);
   return rcp.client || {tipo:'Family',nome:rcp.nome,cognome:'',email:rcp.email};
@@ -9475,6 +9484,7 @@ function openQuoteDetail(quoteId){
           <button class="btn btn-primary" onclick="downloadQuotePdf('${q.id}')">SCARICA PDF</button>
           <button class="btn btn-outline" onclick="printQuote('${q.id}')">Stampa scheda</button>
           <button class="btn btn-outline" onclick="openQuoteMail('${q.id}')">Invia per mail</button>
+          ${waMePhone(quoteRecipient(q).telefono) ? `<button class="btn btn-outline" onclick="openQuoteWhatsapp('${q.id}')">Invia su WhatsApp</button>` : ""}
           ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
           ${((state.leads||[]).some(l=>l.fonte===`preventivo:${q.id}`)||(q.extra&&q.extra.leadId))?'':`<button class="btn btn-outline" onclick="transformQuoteToLead('${q.id}')">Trasforma in Lead</button>`}
           <button class="btn btn-outline" onclick="closeModal(); showToast('Preventivo salvato')">Salva e chiudi</button>
