@@ -9346,7 +9346,7 @@ function openQuoteDetail(quoteId){
           <button class="btn btn-outline" onclick="printQuote('${q.id}')">Stampa scheda</button>
           <button class="btn btn-outline" onclick="openQuoteMail('${q.id}')">Invia per mail</button>
           ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
-          <button class="btn btn-outline" onclick="transformQuoteToLead('${q.id}')">Trasforma in Lead</button>
+          ${(state.leads||[]).some(l=>l.fonte===`preventivo:${q.id}`)?'':`<button class="btn btn-outline" onclick="transformQuoteToLead('${q.id}')">Trasforma in Lead</button>`}
           <button class="btn btn-outline" onclick="closeModal(); showToast('Preventivo salvato')">Salva e chiudi</button>
         </div>
         <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="deleteQuote('${q.id}')">Elimina preventivo</button>
