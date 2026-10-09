@@ -6457,6 +6457,9 @@ function ensureNoteStyles(){
     .nota-list{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;}
     .nota-row{display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(150px,1.1fr) minmax(220px,3fr) auto;gap:10px 16px;align-items:start;padding:12px 16px;border-bottom:1px solid var(--border);}
     .nota-row:last-child{border-bottom:0;}
+    .nota-c-text .nota-body{white-space:pre-wrap;word-break:break-word;}
+    .nota-c-text .nota-body.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+    .nota-more{background:none;border:0;padding:4px 0 0;color:var(--accent,#F05B37);font-weight:700;font-size:12.5px;cursor:pointer;}
     .nota-row:nth-child(even){background:#FAFBFC;}
     .nota-c-contact{display:flex;flex-direction:column;gap:3px;font-size:13px;min-width:0;word-break:break-all;}
     .nota-c-contact a{color:var(--teal);text-decoration:none;font-weight:600;}
@@ -6473,6 +6476,11 @@ function noteSortKey(a, b){
   if(sa !== sb) return sa.localeCompare(sb);
   return String(b.creatoIl||"").localeCompare(String(a.creatoIl||""));
 }
+function toggleNotaTesto(id,btn){
+  const el=document.getElementById("nb-"+id); if(!el) return;
+  const chiuso=el.classList.toggle("clamp");
+  if(btn) btn.textContent=chiuso?"Leggi tutto ▼":"Chiudi ▲";
+}
 function noteRowHTML(n){
   const e = noteExtra(n), c = e.clientId ? state.clients.find(x => x.id === e.clientId) : null;
   const nome = c ? clientDisplayName(c) : (n.nomePersona || "Senza nome");
@@ -6486,7 +6494,13 @@ function noteRowHTML(n){
   return `<div class="nota-row">
     <div class="nota-c-name"><strong>${escapeHtml(nome)}</strong><div class="nota-foot">${escapeHtml(noteDateLabel(n.creatoIl))}${n.operatore ? ` · ${escapeHtml(n.operatore)}` : ""}</div></div>
     <div class="nota-c-contact">${contatti || `<span class="nota-foot">—</span>`}</div>
-    <div class="nota-c-text">${escapeHtml(n.testo || "")}${all ? `<div style="margin-top:6px;"><button class="nota-file" onclick="openNoteAttachment('${n.id}')">📎 ${escapeHtml(all.name || "Allegato")}</button></div>` : ""}</div>
+    <div class="nota-c-text">${(()=>{
+      const t = String(n.testo || "");
+      const lungo = t.length > 180 || t.split("\n").length > 3;
+      return lungo
+        ? `<div class="nota-body clamp" id="nb-${n.id}">${escapeHtml(t)}</div><button class="nota-more" onclick="toggleNotaTesto('${n.id}',this)">Leggi tutto ▼</button>`
+        : `<div class="nota-body">${escapeHtml(t)}</div>`;
+    })()}${all ? `<div style="margin-top:6px;"><button class="nota-file" onclick="openNoteAttachment('${n.id}')">📎 ${escapeHtml(all.name || "Allegato")}</button></div>` : ""}</div>
     <div class="nota-c-actions">
       <button class="btn btn-primary btn-sm" title="Fatto: elimina la nota" onclick="markNotaFatta('${n.id}')">FATTO</button>
       <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">LEAD</button>
