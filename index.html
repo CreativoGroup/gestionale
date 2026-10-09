@@ -5984,6 +5984,25 @@ setInterval(()=>{
     refreshWhatsappInbox(true);
   }
 },20000);
+function deleteWhatsappConversation(waId){
+  const conv=whatsappConversationGroups().find(x=>x.waId===waId);
+  if(!conv) return;
+  askConfirm(`Eliminare tutta la conversazione con ${conv.name||waId}? I messaggi verranno cancellati dal gestionale (su WhatsApp restano).`, async () => {
+    const key=String(waId).replace(/[^\d]/g,"");
+    const {data,error}=await sb.from("whatsapp_messages").delete().or(`wa_id.eq.${key},from_number.eq.${key}`).select("id");
+    if(error){ console.error(error); showToast("Errore: conversazione non eliminata"); return; }
+    if(!data || !data.length){
+      showToast("Non eliminata: Supabase non permette di cancellare i messaggi (serve una regola, vedi istruzioni)");
+      return;
+    }
+    const ids=new Set(data.map(r=>r.id));
+    state.whatsappMessages=(state.whatsappMessages||[]).filter(m=>!ids.has(m.id) && String(m.waId||m.fromNumber||"")!==String(waId));
+    snapshotCollection("whatsappMessages");
+    selectedWhatsappWaId="";
+    if(currentView==="whatsapp") renderWhatsapp();
+    showToast("Conversazione eliminata");
+  });
+}
 function createNoteFromWhatsapp(waId){
   const conv=whatsappConversationGroups().find(x=>x.waId===waId);
   if(!conv) return;
@@ -6355,6 +6374,7 @@ function renderWhatsapp(){
 
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
               <button class="btn btn-outline btn-sm" onclick="createNoteFromWhatsapp('${escapeHtml(active.waId)}')">CREA NOTA</button>
+              <button class="btn btn-ghost btn-sm" title="Elimina conversazione" aria-label="Elimina conversazione" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" onclick="deleteWhatsappConversation('${escapeHtml(active.waId)}')">🗑</button>
               ${!existingClient?`<button class="btn btn-primary btn-sm" onclick="createLeadFromWhatsapp('${escapeHtml(active.waId)}',true)">NUOVO CLIENTE + ORDINE</button>`:""}
               ${existingClient?`<button class="btn btn-outline btn-sm" onclick="createOrderFromWhatsapp('${escapeHtml(active.waId)}')">CREA ORDINE</button>`:""}
             </div>
