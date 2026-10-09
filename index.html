@@ -4236,8 +4236,8 @@ const NAV = [
   {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico", hidden:true},
   {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico", hidden:true},
 
-  {id:"note", label:"Note", icon:"✎", subtitle:"Note / Attività interne da gestire", group:"Info e richieste"},
-  {id:"leads", label:"Lead e preventivi", icon:"◎", subtitle:"Richieste da seguire, preventivi e PDF", group:"Info e richieste"},
+  {id:"note", label:"Note e lead", icon:"✎", subtitle:"Note da gestire, richieste (lead) e preventivi", group:"Info e richieste"},
+  {id:"leads", label:"Lead e preventivi", icon:"◎", subtitle:"Richieste da seguire, preventivi e PDF", group:"Info e richieste", hidden:true},
 
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Anagrafica"},
   {id:"leadOrdine", label:"NUOVI CLIENTI CON ORDINE", icon:"◆", subtitle:"Ordini ricevuti da clienti non ancora presenti o da completare", group:"Operativa"},
@@ -4531,6 +4531,7 @@ function renderViewHeading(){
   setTimeout(syncMobileDashboardHeaderOrder,0);
 }
 function goTo(id){
+  if(id==="leads") id="note"; // Note e Lead sono ora nella stessa pagina
   const navItem = NAV.find(n=>n.id===id);
   if(navItem && navItem.action==="waMode"){ toggleWaOpenMode(); return; }
   if(navItem && navItem.externalUrl){ openWaWindow(""); return; }
@@ -4761,7 +4762,7 @@ function renderLeads(){
       .lead-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;font-weight:800;}
     </style>`);
   }
-  const root = document.getElementById("view-leads");
+  const root = document.getElementById("note-leads-part") || document.getElementById("view-leads");
   if(!root) return;
   const q = String(leadSearch||"").trim().toLowerCase();
   const all = [...(state.leads||[])].sort((a,b) => String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
@@ -5184,7 +5185,7 @@ async function saveLeadEdit(id){
   const i=state.leads.findIndex(x=>x.id===id);
   if(i>=0) state.leads[i]=saved;
 
-  if(currentView==="leads") renderLeads();
+  if(currentView==="leads"||currentView==="note") renderLeads();
   if(currentView==="leadOrdine") renderLeadOrdine();
   if(currentView==="dashboard") renderDashboard();
 
@@ -5206,7 +5207,7 @@ async function setLeadStatus(id,status){
     return;
   }
   showToast("Lead aggiornato");
-  if(currentView==="leads") renderLeads();
+  if(currentView==="leads"||currentView==="note") renderLeads();
   if(currentView==="leadOrdine") renderLeadOrdine();
   if(currentView==="dashboard") renderDashboard();
 }
@@ -5264,7 +5265,7 @@ async function markLeadLinkedToClient(leadId, clientId){
   l.clientId=clientId;
   l.aggiornatoIl=nowIso;
 
-  if(currentView==="leads") renderLeads();
+  if(currentView==="leads"||currentView==="note") renderLeads();
   if(currentView==="leadOrdine") renderLeadOrdine();
   if(currentView==="dashboard") renderDashboard();
   return true;
@@ -5356,7 +5357,7 @@ function deleteLead(id){
       state.leads=(state.leads||[]).filter(x=>x.id!==id);
       try{ closeModal(); }catch(e){}
       showToast("Lead eliminato");
-      if(currentView==="leads") renderLeads();
+      if(currentView==="leads"||currentView==="note") renderLeads();
       if(currentView==="leadOrdine") renderLeadOrdine();
       if(currentView==="dashboard") renderDashboard();
     }
@@ -5433,7 +5434,7 @@ async function expireStaleWaitingLeads(){
     }
   }
 
-  if(currentView==="leads") renderLeads();
+  if(currentView==="leads"||currentView==="note") renderLeads();
   if(currentView==="leadOrdine") renderLeadOrdine();
   if(currentView==="dashboard") renderDashboard();
 }
@@ -6511,7 +6512,11 @@ function renderNote(){
     <div class="nota-list">
       ${list.length ? list.map(noteRowHTML).join("") : `<p class="empty" style="margin:14px 4px;">Nessuna nota.</p>`}
     </div>
+    <h2 style="margin:32px 0 6px;font-size:20px;">Lead e preventivi</h2>
+    <p class="helptext" style="margin:0 0 14px;">Le richieste da seguire. Premendo LEAD su una nota, la nota passa qui sotto.</p>
+    <div id="note-leads-part"></div>
   `;
+  renderLeads();
 }
 async function openNoteAttachment(id){
   const n = findItem("noteComunicazioni", id);
@@ -6634,21 +6639,35 @@ function openNoteWhatsapp(id){
   if(!waMePhone(e.telefono)){ showToast("Telefono non valido per WhatsApp"); return; }
   openWaWindow(waMeUrl(e.telefono,""));
 }
-function trasformaNotaInLead(id){
+async function trasformaNotaInLead(id){
   const n=findItem("noteComunicazioni",id);
   if(!n) return;
-
-  const ne=noteExtra(n), nc=ne.clientId?state.clients.find(x=>x.id===ne.clientId):null;
-  openManualLeadForm({
-    nome:n.nomePersona||"",
+  const e=noteExtra(n), c=e.clientId?state.clients.find(x=>x.id===e.clientId):null;
+  const nome=String(n.nomePersona||"").trim() || "Nuovo contatto";
+  const testo=String(n.testo||"").trim();
+  const all=e.allegato;
+  const primaRiga=testo.split(/\r?\n/)[0].trim();
+  const now=new Date().toISOString();
+  const lead={
+    id:uuid(),
+    nome,
     azienda:"",
-    email:(nc?nc.email:ne.email)||"",
-    telefono:(nc?nc.telefono:ne.telefono)||"",
-    oggettoRichiesta:`Nota - ${n.nomePersona||"Nuovo contatto"}`,
-    richiesta:n.testo||"",
+    email:String((c?c.email:e.email)||"").trim().toLowerCase(),
+    telefono:String((c?c.telefono:e.telefono)||"").trim(),
+    oggettoRichiesta:primaRiga ? (primaRiga.length>70 ? primaRiga.slice(0,67)+"…" : primaRiga) : `Nota - ${nome}`,
+    richiesta:testo + (all && all.name ? `\n\nAllegato della nota: ${all.name} (Dropbox › Allegati note)` : ""),
     stato:"Nuovo",
-    fonte:`nota:${n.id}`
-  });
+    fonte:"nota",
+    creatoIl:now,
+    aggiornatoIl:now
+  };
+  const ok=await upsertOne("leads",lead);
+  if(!ok) return;
+  if(!state.leads.some(x=>x.id===lead.id)) state.leads.unshift(lead);
+  await dbDelete("noteComunicazioni", id);
+  state.noteComunicazioni=state.noteComunicazioni.filter(x=>x.id!==id);
+  if(currentView==="note") renderNote();
+  showToast("Nota spostata nei Lead");
 }
 
 async function markNotaFatta(id){
@@ -8934,7 +8953,7 @@ async function newQuoteForLead(leadId){
   openQuoteDetail(id);
 }
 function refreshQuoteViews(){
-  if(currentView === "leads") renderLeads();
+  if(currentView === "leads" || currentView === "note") renderLeads();
 }
 async function onQuoteStatusChanged(q){
   const l = q.extra && q.extra.leadId ? (state.leads||[]).find(x => x.id === q.extra.leadId) : null;
