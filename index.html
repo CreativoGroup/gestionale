@@ -4743,6 +4743,7 @@ function leadCardHTML(l){
       <button class="btn btn-primary btn-sm" onclick="newQuoteForLead('${l.id}')">+ PREVENTIVO</button>
       ${waMePhone(l.telefono) ? `<button class="btn btn-outline btn-sm" onclick="openLeadWhatsapp('${l.id}')">WHATSAPP</button>` : ""}
       <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">APRI</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLead('${l.id}')">ELIMINA</button>
     </div>
   </div>`;
 }
@@ -4943,6 +4944,7 @@ function renderLeadOrdine(){
                       ✦ ${linkedClient?'CREA ORDINE':'APRI E CREA ORDINE'}
                     </button>
                     <button class="btn btn-outline btn-sm" title="L'ordine è già stato fatto: sposta nello storico" onclick="markLeadOrderDone('${l.id}')">GIÀ FATTO</button>
+                    <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLead('${l.id}')">Elimina</button>
                   </td>
                 </tr>`;
               }).join("")}
@@ -5100,6 +5102,7 @@ function openLeadDetail(id){
 
       ${l.gmailMessageId && !isNewCustomerOrder ? `<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>` : ""}
       <button class="btn btn-ghost" style="${isNewCustomerOrder ? "border-radius:999px;padding:10px 16px;color:var(--muted);font-weight:700;" : ""}" onclick="discardLead('${l.id}');closeModal();">SCARTA</button>
+      <button class="btn btn-ghost" style="color:var(--danger);" onclick="deleteLead('${l.id}')">ELIMINA</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
@@ -5351,6 +5354,7 @@ function deleteLead(id){
         return;
       }
       state.leads=(state.leads||[]).filter(x=>x.id!==id);
+      try{ closeModal(); }catch(e){}
       showToast("Lead eliminato");
       if(currentView==="leads") renderLeads();
       if(currentView==="leadOrdine") renderLeadOrdine();
@@ -6484,6 +6488,7 @@ function noteRowHTML(n){
       <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">LEAD</button>
       ${wa ? `<button class="btn btn-outline btn-sm" onclick="${c ? `openClientWhatsapp('${c.id}')` : `openNoteWhatsapp('${n.id}')`}">WHATSAPP</button>` : ""}
       <button class="btn btn-ghost btn-sm" title="Modifica" onclick="openNoteForm('${n.id}')">✎</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--danger);" title="Elimina la nota" onclick="deleteNota('${n.id}')">ELIMINA</button>
     </div>
   </div>`;
 }
@@ -6541,6 +6546,7 @@ function openNoteForm(id){
     <div class="form-actions" style="margin-top:18px;">
       <button class="btn btn-primary" id="nota-f-save" onclick="saveNoteForm('${n ? n.id : ''}')">Salva nota</button>
       <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+      ${n ? `<button class="btn btn-ghost" style="color:var(--danger);margin-left:auto;" onclick="deleteNota('${n.id}')">ELIMINA</button>` : ""}
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
