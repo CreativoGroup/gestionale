@@ -5848,6 +5848,24 @@ window.addEventListener("message",(event)=>{
   waMetaDebug("window.message",{origin,data:safeMetaObject(event.data)});
 });
 
+async function runWhatsappDiagnosi(){
+  toggleWaMetaDebug(true);
+  clearWaMetaDebug();
+  waMetaDebug("DIAGNOSI","Sto chiedendo a Meta lo stato del collegamento…");
+  try{
+    const { data, error } = await sb.functions.invoke("whatsapp-diagnose",{ body:{} });
+    if(error){
+      let msg=error?.message||"Errore";
+      try{ const ctx=error?.context; if(ctx && typeof ctx.text==="function") msg+=" · "+(await ctx.text()); }catch(e){}
+      waMetaDebug("DIAGNOSI errore",msg);
+      return;
+    }
+    Object.keys(data||{}).forEach(k=>waMetaDebug("DIAGNOSI · "+k,data[k]));
+    waMetaDebug("DIAGNOSI","Fatto. Premi COPIA LOG e incolla qui.");
+  }catch(e){
+    waMetaDebug("DIAGNOSI errore",String(e&&e.message||e));
+  }
+}
 function openWhatsappCoexistence(){
   toggleWaMetaDebug(true);
   clearWaMetaDebug();
@@ -6233,6 +6251,7 @@ function renderWhatsapp(){
           <span class="pill wa-db-ok">DATABASE COLLEGATO</span>
           <span class="pill wa-meta-wait">NUMERO REALE: IN ATTESA META</span>
           <button class="btn btn-outline btn-sm" onclick="openWhatsappCoexistence()">RIPROVA COLLEGAMENTO META</button>
+          <button class="btn btn-outline btn-sm" onclick="runWhatsappDiagnosi()">DIAGNOSI</button>
           <button class="btn btn-primary btn-sm" onclick="openNewWhatsappMessage()">+ NUOVO MESSAGGIO</button>
           <button class="btn btn-outline btn-sm" onclick="refreshWhatsappInbox()">AGGIORNA</button>
         </div>
