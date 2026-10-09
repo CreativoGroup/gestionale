@@ -6600,6 +6600,7 @@ function noteFonte(n){
   const e = noteExtra(n);
   if(e.fonte === "whatsapp") return "whatsapp";
   if(e.fonte === "gmail" || e.gmail_thread_id || String(n.operatore||"") === "Gmail") return "gmail";
+  if(/^(Cliente|Creativò): /.test(String(n.testo||"")) && noteExtra(n).telefono) return "whatsapp";
   return "";
 }
 function noteFonteIcon(n){
