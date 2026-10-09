@@ -4800,7 +4800,7 @@ function renderLeads(){
       <td><div class="lead-actions">
         <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">Apri</button>
         ${l.stato==="Perso" && !l.clientId ? `<button class="btn btn-outline btn-sm" onclick="changeLeadStatusFromSelect('${l.id}','Nuovo')">Riapri</button>` : ""}
-        <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLead('${l.id}')">Elimina</button>
+        <button title="Elimina" aria-label="Elimina" class="btn btn-ghost btn-sm" style="padding:6px 10px;font-size:15px;line-height:1;color:var(--danger);" onclick="deleteLead('${l.id}')">🗑</button>
       </div></td>
     </tr>`).join("");
   const allQuotes = [...(state.quotes||[])].sort((a,b) => (Number(b.extra && b.extra.numero)||0) - (Number(a.extra && a.extra.numero)||0));
@@ -4964,7 +4964,7 @@ function renderLeadOrdine(){
                       ✦ ${linkedClient?'CREA ORDINE':'APRI E CREA ORDINE'}
                     </button>
                     <button class="btn btn-outline btn-sm" title="L'ordine è già stato fatto: sposta nello storico" onclick="markLeadOrderDone('${l.id}')">GIÀ FATTO</button>
-                    <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLead('${l.id}')">Elimina</button>
+                    <button title="Elimina" aria-label="Elimina" class="btn btn-ghost btn-sm" style="padding:6px 10px;font-size:15px;line-height:1;color:var(--danger);" onclick="deleteLead('${l.id}')">🗑</button>
                   </td>
                 </tr>`;
               }).join("")}
@@ -5122,7 +5122,7 @@ function openLeadDetail(id){
 
       ${l.gmailMessageId && !isNewCustomerOrder ? `<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>` : ""}
       <button class="btn btn-ghost" style="${isNewCustomerOrder ? "border-radius:999px;padding:10px 16px;color:var(--muted);font-weight:700;" : ""}" onclick="discardLead('${l.id}');closeModal();">SCARTA</button>
-      <button class="btn btn-ghost" style="color:var(--danger);" onclick="deleteLead('${l.id}')">ELIMINA</button>
+      <button title="Elimina" aria-label="Elimina" class="btn btn-ghost" style="padding:6px 10px;font-size:15px;line-height:1;color:var(--danger);" onclick="deleteLead('${l.id}')">🗑</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
@@ -7903,7 +7903,7 @@ function renderClienti(){
               <td>${clientReadyForArchive(c) ? escapeHtml(clientSpecLabel(c)) : `<span style="color:var(--warn);">${escapeHtml(clientSpecLabel(c))}</span>`}</td>
               <td onclick="event.stopPropagation()"><select class="inline" onchange="updateClientCarattere('${c.id}',this.value)"><option value="">—</option>${CARATTERE_OPTIONS.map(op=>`<option value="${op}" ${c.carattere===op?'selected':''}>${op}</option>`).join("")}</select></td>
               <td>${fmtMoney(clientFatturato(c.id))}</td>
-              <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteClient('${c.id}')">Elimina</button></td>
+              <td><button title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteClient('${c.id}')">🗑</button></td>
             </tr>`).join("") : `<tr><td colspan="9" class="empty">Nessun cliente con questi filtri.</td></tr>`}
         </tbody>
       </table>
@@ -10152,7 +10152,7 @@ function ordiniTableHtml(list){
               <td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td>
               <td style="white-space:nowrap;">
                 <button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button>
-                <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${o.id}')">Elimina</button>
+                <button title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" class="btn btn-ghost btn-sm" onclick="deleteOrder('${o.id}')">🗑</button>
               </td>
             </tr>`;
           }).join("") : `<tr><td colspan="10" class="empty">Nessun ordine con questi filtri.</td></tr>`}
@@ -12667,7 +12667,7 @@ function magazzinoRowsHtml(list){
         <button class="btn btn-primary btn-sm" onclick="saveWarehouseRow('${w.id}')">Aggiorna</button>
         <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',1)">+1</button>
         <button class="btn btn-ghost btn-sm" onclick="adjustStock('${w.id}',-1)">-1</button>
-        <button class="btn btn-ghost btn-sm" onclick="deleteItem('${w.id}')">Elimina</button>
+        <button title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" class="btn btn-ghost btn-sm" onclick="deleteItem('${w.id}')">🗑</button>
       </td>
     </tr>`;
   }).join("") : `<tr><td colspan="10" class="empty">Nessun articolo disponibile con questi filtri.</td></tr>`;
@@ -13744,7 +13744,7 @@ function renderSpese(){
         <tbody>
           ${speseFiltrate.length ? [...speseFiltrate].sort((a,b)=>b.data.localeCompare(a.data)).map(e=>`
             <tr><td>${fmtDate(e.data)}</td><td>${e.descrizione}</td><td>${fmtMoney(e.importo)}</td><td>${e.metodo}</td>
-            <td><button class="btn btn-ghost btn-sm" onclick="deleteExpense('${e.id}')">Elimina</button></td></tr>
+            <td><button title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" class="btn btn-ghost btn-sm" onclick="deleteExpense('${e.id}')">🗑</button></td></tr>
           `).join("") : `<tr><td colspan="5" class="empty">${state.expenses.length?"Nessuna spesa con questi filtri.":"Nessuna spesa registrata."}</td></tr>`}
         </tbody>
       </table>
@@ -13843,7 +13843,7 @@ function renderEntrateUscite(){
             <td>${escapeHtml(e.descrizione||"")}</td>
             <td style="font-weight:600;${e._tipo==="entrata"?'color:var(--ok);':''}">${e._tipo==="entrata"?"+ ":"− "}${fmtMoney(e.importo)}</td>
             <td>${escapeHtml(e.metodo||"")}</td>
-            <td><button class="btn btn-ghost btn-sm" onclick="deleteMovimento('${e._tipo}','${e.id}')">Elimina</button></td></tr>
+            <td><button title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" class="btn btn-ghost btn-sm" onclick="deleteMovimento('${e._tipo}','${e.id}')">🗑</button></td></tr>
           `).join("") : `<tr><td colspan="6" class="empty">${tutti.length?"Nessun movimento con questi filtri.":"Nessun movimento registrato."}</td></tr>`}
         </tbody>
       </table>
@@ -13938,7 +13938,7 @@ function renderCostiFissi(){
               <td>${fmtMoney(e.importo)}</td>
               <td>${e.metodo||"—"}</td>
               <td>${e.filePath ? `<button class="btn btn-outline btn-sm" onclick="openFixedCostFile('${e.id}')">Apri PDF</button>` : "—"}</td>
-              <td><button class="btn btn-ghost btn-sm" onclick="deleteFixedCost('${e.id}')">Elimina</button></td>
+              <td><button title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" class="btn btn-ghost btn-sm" onclick="deleteFixedCost('${e.id}')">🗑</button></td>
             </tr>
           `).join("") : `<tr><td colspan="6" class="empty">Nessun costo fisso registrato.</td></tr>`}
         </tbody>
@@ -14040,7 +14040,7 @@ function renderEntrate(){
         <tbody>
           ${entrateFiltrate.length ? [...entrateFiltrate].sort((a,b)=>b.data.localeCompare(a.data)).map(e=>`
             <tr><td>${fmtDate(e.data)}</td><td>${e.descrizione}</td><td style="color:var(--ok);font-weight:600;">+ ${fmtMoney(e.importo)}</td><td>${e.metodo}</td>
-            <td><button class="btn btn-ghost btn-sm" onclick="deleteEntrata('${e.id}')">Elimina</button></td></tr>
+            <td><button title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" class="btn btn-ghost btn-sm" onclick="deleteEntrata('${e.id}')">🗑</button></td></tr>
           `).join("") : `<tr><td colspan="5" class="empty">${(state.entrate||[]).length?"Nessuna entrata con questi filtri.":"Nessuna entrata registrata."}</td></tr>`}
         </tbody>
       </table>
