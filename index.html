@@ -4232,8 +4232,8 @@ function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, 
 const NAV = [
   {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard"},
 
-  {id:"whatsappWeb", label:"WhatsApp", icon:"◉", subtitle:"Apre WhatsApp Web", group:"Traffico", externalUrl:"https://web.whatsapp.com/"},
-  {id:"whatsapp", label:"WhatsApp API", icon:"◉", subtitle:"Messaggi WhatsApp Business (collegamento Meta)", group:"Traffico"},
+  {id:"whatsappWeb", label:"WhatsApp Web", icon:"◉", subtitle:"Apre WhatsApp Web", group:"Traffico", externalUrl:"https://web.whatsapp.com/"},
+  {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico"},
   {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico", hidden:true},
 
   {id:"note", label:"Note e lead", icon:"✎", subtitle:"Note da gestire, richieste (lead) e preventivi", group:"Info e richieste"},
@@ -6244,14 +6244,10 @@ function renderWhatsapp(){
       <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
         <div>
           <h3 style="margin:0 0 6px;">WhatsApp</h3>
-          <p class="helptext" style="margin:0;">Inbox operativa collegata al database del gestionale.</p>
+          <p class="helptext" style="margin:0;">Messaggi dei clienti sul numero +39 375 909 5981.</p>
         </div>
 
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <span class="pill wa-db-ok">DATABASE COLLEGATO</span>
-          <span class="pill wa-meta-wait">NUMERO REALE: IN ATTESA META</span>
-          <button class="btn btn-outline btn-sm" onclick="openWhatsappCoexistence()">RIPROVA COLLEGAMENTO META</button>
-          <button class="btn btn-outline btn-sm" onclick="runWhatsappDiagnosi()">DIAGNOSI</button>
           <button class="btn btn-primary btn-sm" onclick="openNewWhatsappMessage()">+ NUOVO MESSAGGIO</button>
           <button class="btn btn-outline btn-sm" onclick="refreshWhatsappInbox()">AGGIORNA</button>
         </div>
