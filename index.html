@@ -4742,7 +4742,7 @@ function leadCardHTML(l){
       <select class="inline" onchange="changeLeadStatusFromSelect('${l.id}',this.value)" title="Sposta">
         ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s => `<option value="${s}" ${l.stato === s ? "selected" : ""}>${s}</option>`).join("")}
       </select>
-      <button class="btn btn-primary btn-sm" onclick="newQuoteForLead('${l.id}')">+ PREVENTIVO</button>
+      <button class="btn btn-outline btn-sm" title="Nuovo preventivo" aria-label="Nuovo preventivo" style="padding:6px 10px;font-size:15px;line-height:1;" onclick="newQuoteForLead('${l.id}')">📄</button>
       ${waMePhone(l.telefono) ? `<button class="btn btn-outline btn-sm" onclick="openLeadWhatsapp('${l.id}')">WHATSAPP</button>` : ""}
       <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">APRI</button>
       <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLead('${l.id}')">ELIMINA</button>
