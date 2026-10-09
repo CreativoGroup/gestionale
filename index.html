@@ -4240,7 +4240,7 @@ function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, 
 const NAV = [
   {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard"},
 
-  {id:"whatsappWeb", label:"WhatsApp Web", icon:"◉", subtitle:"Apre WhatsApp Web", group:"Traffico", externalUrl:"https://web.whatsapp.com/"},
+  {id:"whatsappWeb", label:"WhatsApp Web", icon:"◉", subtitle:"Apre WhatsApp Web", group:"Traffico", externalUrl:"https://web.whatsapp.com/", hidden:true},
   {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico"},
   {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico", hidden:true},
 
@@ -6563,7 +6563,6 @@ function noteRowHTML(n){
     <div class="nota-c-actions">
       <button class="btn btn-primary btn-sm" title="Fatto: elimina la nota" onclick="markNotaFatta('${n.id}')">FATTO</button>
       <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">LEAD</button>
-      ${wa ? `<button class="btn btn-outline btn-sm" onclick="${c ? `openClientWhatsapp('${c.id}')` : `openNoteWhatsapp('${n.id}')`}">WHATSAPP</button>` : ""}
       <button class="btn btn-ghost btn-sm" title="Modifica" onclick="openNoteForm('${n.id}')">✎</button>
     </div>
   </div>`;
