@@ -4952,7 +4952,7 @@ function renderLeads(){
   `;
 }
 
-function isOrderLeadSource(f){ f=String(f||""); return f==="gmail_ordine"||f==="whatsapp_ordine"; }
+function isOrderLeadSource(f){ f=String(f||""); return f==="gmail_ordine"||f==="whatsapp_ordine"||f==="instagram_ordine"; }
 let leadOrdineHistoryOpen=false;
 function toggleLeadOrdineHistory(){ leadOrdineHistoryOpen=!leadOrdineHistoryOpen; renderLeadOrdine(); }
 /* Un "nuovo cliente con ordine" è completato se l'ordine è stato creato da qui, se è stato chiuso a mano,
@@ -6693,7 +6693,7 @@ function renderWhatsappInner(){
 /* ============ INSTAGRAM (messaggi diretti) ============ */
 let igMessages=[], igSelected="", igLoaded=false;
 const igDrafts={};
-const IG_COLS="id,ig_user_id,username,contact_name,direction,message_type,body,message_timestamp,status,created_at";
+const IG_COLS="id,attachments,ig_user_id,username,contact_name,direction,message_type,body,message_timestamp,status,created_at";
 function igGroups(){
   const map=new Map();
   igMessages.forEach(m=>{
@@ -6746,11 +6746,98 @@ function deleteInstagramConversation(id){
     renderInstagram(); showToast("Conversazione eliminata");
   });
 }
+function igLinks(){ try{ return JSON.parse(localStorage.getItem("igClientLinks")||"{}")||{}; }catch(e){ return {}; } }
+function igSetLink(igId,clientId){ try{ const l=igLinks(); l[igId]=clientId; localStorage.setItem("igClientLinks",JSON.stringify(l)); }catch(e){} }
+function igClientFor(g){
+  const id=igLinks()[g.id];
+  if(id){ const c=state.clients.find(x=>x.id===id); if(c) return c; }
+  const n=String(g.name||"").trim().toLowerCase();
+  if(!n) return null;
+  return state.clients.find(c=>clientDisplayName(c).trim().toLowerCase()===n)||null;
+}
 function createNoteFromInstagram(id){
   const g=igGroups().find(x=>x.id===id); if(!g) return;
-  const last=[...g.messages].reverse().find(m=>m.direction==="inbound")||g.messages[g.messages.length-1];
-  navigator.clipboard?.writeText?.(`Instagram ${igTitle(g)}: ${last?.body||""}`).catch(()=>{});
-  showToast("Testo copiato: incollalo in un nuovo appunto");
+  const client=igClientFor(g);
+  const ultimi=g.messages.slice(-6).map(m=>`${m.direction==="outbound"?"Creativò":"Cliente"}: ${String(m.body||"").trim()}`).join("\n").slice(0,700);
+  openNoteForm("",{nome:client?clientDisplayName(client):igTitle(g),tel:client?(client.telefono||""):"",email:client?(client.email||""):"",testo:ultimi,fonte:"instagram"});
+}
+function createLeadFromInstagram(id){
+  const g=igGroups().find(x=>x.id===id); if(!g) return;
+  const body=g.messages.map(m=>`${m.direction==="outbound"?"Creativò":"Cliente"}: ${m.body||""}`).join("\n");
+  openManualLeadForm({nome:g.name||(g.username?"@"+g.username:""),telefono:"",oggettoRichiesta:"Richiesta Instagram",richiesta:body,stato:"Accettato",fonte:"instagram_ordine"});
+}
+function createOrderFromInstagram(id){
+  const g=igGroups().find(x=>x.id===id); if(!g) return;
+  const c=igClientFor(g);
+  if(c){ newOrderForClient(c.id); return; }
+  igPickClient(id,"order");
+}
+function igPickClient(id,then,q){
+  const g=igGroups().find(x=>x.id===id); if(!g) return;
+  const qq=String(q||"").trim().toLowerCase();
+  const list=state.clients.filter(c=>!qq||clientDisplayName(c).toLowerCase().includes(qq)).sort((a,b)=>clientDisplayName(a).localeCompare(clientDisplayName(b),"it")).slice(0,30);
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2 style="margin-bottom:6px;">Chi è ${escapeHtml(igTitle(g))}?</h2>
+    <p class="helptext" style="margin-top:0;">Scegli il cliente: il collegamento resta salvato per le prossime volte.</p>
+    <input id="igPickQ" placeholder="Cerca cliente..." value="${escapeHtml(q||"")}" oninput="igPickClient('${escapeHtml(id)}','${then}',this.value)" style="width:100%;margin-bottom:8px;">
+    ${list.map(c=>`<div class="list-row" onclick="igPickDone('${escapeHtml(id)}','${c.id}','${then}')"><div class="lr-main">${escapeHtml(clientDisplayName(c))}</div></div>`).join("")||`<p class="empty">Nessun cliente trovato.</p>`}`;
+  document.getElementById("modalBackdrop").classList.add("open");
+  const i=document.getElementById("igPickQ"); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); }
+}
+function igPickDone(id,clientId,then){
+  igSetLink(id,clientId); closeModal();
+  if(then==="order") newOrderForClient(clientId);
+  else if(String(then).startsWith("save:")){ const [,mid]=then.split(":"); igSaveMediaToOrder(mid,id); }
+  else renderInstagram();
+}
+function igMediaOf(m){
+  const a=Array.isArray(m.attachments)?m.attachments:[];
+  return a.map(x=>({type:String(x?.type||"file"),url:x?.payload?.url||""})).filter(x=>x.url);
+}
+async function igFetchMedia(url,type){
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("Il file non è più disponibile su Instagram");
+  const blob=await r.blob();
+  const ext=(blob.type.split("/")[1]||"bin").replace("jpeg","jpg").split(";")[0];
+  return {name:`instagram-${type}-${Date.now()}.${ext}`,blob};
+}
+async function igDownloadMedia(msgId,i,btn){
+  const m=igMessages.find(x=>x.id===msgId); const a=m&&igMediaOf(m)[i]; if(!a) return;
+  const old=btn?btn.textContent:""; if(btn){btn.disabled=true;btn.textContent="Scarico…";}
+  try{
+    const {name,blob}=await igFetchMedia(a.url,a.type);
+    const u=URL.createObjectURL(blob), l=document.createElement("a");
+    l.href=u; l.download=name; l.style.display="none"; document.body.appendChild(l); l.click(); l.remove();
+    setTimeout(()=>URL.revokeObjectURL(u),30000);
+  }catch(e){ console.error(e); window.open(a.url,"_blank"); showToast("Aperto in una nuova scheda: da lì puoi salvarlo"); }
+  finally{ if(btn){btn.disabled=false;btn.textContent=old;} }
+}
+function igSaveMediaToOrder(msgId,igId,i){
+  const g=igGroups().find(x=>x.id===igId); if(!g) return;
+  const client=igClientFor(g);
+  if(!client){ igPickClient(igId,"save:"+msgId); return; }
+  const orders=state.orders.filter(o=>o.clientId===client.id && o.stato!=="Consegnato").sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))).slice(0,10);
+  if(!orders.length){ showToast("Questo cliente non ha ordini aperti: crea prima l'ordine"); return; }
+  window._igMediaIdx=i||0;
+  if(orders.length===1){ igSaveMediaDo(msgId,orders[0].id); return; }
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2 style="margin-bottom:6px;">In quale ordine salvo il file?</h2>
+    <p class="helptext" style="margin-top:0;">Cliente: ${escapeHtml(clientDisplayName(client))}</p>
+    ${orders.map(o=>`<div class="list-row" onclick="igSaveMediaDo('${msgId}','${o.id}')"><div><div class="lr-main">${o.numero?`#${escapeHtml(String(o.numero))} · `:""}${escapeHtml(String(o.descrizione||orderCategorieLabel(o)||"Ordine").slice(0,70))}</div><div class="lr-sub">${escapeHtml(o.stato||"")}</div></div></div>`).join("")}`;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+async function igSaveMediaDo(msgId,orderId){
+  const o=findItem("orders",orderId); const m=igMessages.find(x=>x.id===msgId); const a=m&&igMediaOf(m)[window._igMediaIdx||0];
+  if(!o||!a) return;
+  closeModal(); showToast("Salvo il file nell'ordine…");
+  try{
+    const {name,blob}=await igFetchMedia(a.url,a.type);
+    await jobDropboxEnsureStructure(o.id);
+    await dropboxUploadBlob(`${jobDropboxBasePath(o)}/FILE RICEVUTI/${jobDropboxFileName(o,name)}`,blob);
+    showToast(`File salvato nell'ordine${o.numero?` #${o.numero}`:""} (Dropbox › FILE RICEVUTI)`);
+  }catch(e){ console.error(e); showToast("Impossibile salvare il file: scaricalo e caricalo a mano nell'ordine"); }
 }
 function renderInstagram(){
   const root=document.getElementById("view-instagram"); if(!root) return;
@@ -6788,13 +6875,15 @@ function renderInstagram(){
           <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:10px;">
             <div><h3 style="margin:0 0 5px;">${escapeHtml(igTitle(active))}</h3>${active.username?`<div class="helptext" style="margin:0;">@${escapeHtml(active.username)}</div>`:""}</div>
             <div style="display:flex;gap:8px;">
-              <button class="btn btn-outline btn-sm" onclick="createNoteFromInstagram('${escapeHtml(active.id)}')">COPIA PER NOTA</button>
+              <button class="btn btn-outline btn-sm" onclick="createNoteFromInstagram('${escapeHtml(active.id)}')">CREA NOTA</button>
+              ${igClientFor(active)?`<button class="btn btn-outline btn-sm" onclick="createOrderFromInstagram('${escapeHtml(active.id)}')">CREA ORDINE</button>`:`<button class="btn btn-primary btn-sm" onclick="createLeadFromInstagram('${escapeHtml(active.id)}')">NUOVO CLIENTE + ORDINE</button><button class="btn btn-outline btn-sm" onclick="igPickClient('${escapeHtml(active.id)}','link')">COLLEGA CLIENTE</button>`}
               <button class="btn btn-ghost btn-sm" title="Elimina conversazione" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" onclick="deleteInstagramConversation('${escapeHtml(active.id)}')">🗑</button>
             </div>
           </div>
           <div id="igChatScroll" class="wa-chat-scroll">
             ${active.messages.map(m=>{const out=m.direction==="outbound";return `<div class="wa-bubble ${out?"out":"in"}">
               <div style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(m.body||"[messaggio]")}</div>
+              ${igMediaOf(m).map((a,i)=>`<div style="margin-top:6px;"><button class="btn btn-outline btn-sm" onclick="igDownloadMedia('${m.id}',${i},this)">⬇ SCARICA</button> ${out?"":`<button class="btn btn-outline btn-sm" onclick="igSaveMediaToOrder('${m.id}','${escapeHtml(active.id)}',${i})">SALVA NELL'ORDINE</button>`}</div>`).join("")}
               <div class="wa-bubble-meta"><span>${waDateLabel(m.message_timestamp||m.created_at)}</span></div></div>`;}).join("")}
           </div>
           <div class="wa-compose">
@@ -6896,6 +6985,7 @@ function toggleNotaTesto(id,btn){
 function noteFonte(n){
   const e = noteExtra(n);
   if(e.fonte === "whatsapp") return "whatsapp";
+  if(e.fonte === "instagram") return "instagram";
   if(e.fonte === "gmail" || e.gmail_thread_id || String(n.operatore||"") === "Gmail") return "gmail";
   if(/^(Cliente|Creativò): /.test(String(n.testo||"")) && noteExtra(n).telefono) return "whatsapp";
   return "";
@@ -6903,6 +6993,7 @@ function noteFonte(n){
 function noteFonteIcon(n){
   const f = noteFonte(n);
   if(f === "whatsapp") return `<span class="nota-src" title="Da WhatsApp"><svg viewBox="0 0 24 24" width="13" height="13" fill="#25D366"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.2 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6-.4.4c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.1 1 2 1.3 2.3 1.4.3.1.4.1.6-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.2z"/></svg></span>`;
+  if(f === "instagram") return `<span class="nota-src" title="Da Instagram"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#C13584" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#C13584" stroke="none"/></svg></span>`;
   if(f === "gmail") return `<span class="nota-src" title="Da Gmail"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="#EA4335" d="M2 6.5 12 14l10-7.5V5a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/><path fill="#C5221F" d="M2 6.5V19a1 1 0 0 0 1 1h3V9.8zM22 6.5V19a1 1 0 0 1-1 1h-3V9.8z"/></svg></span>`;
   return "";
 }
