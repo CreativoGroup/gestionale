@@ -4329,7 +4329,7 @@ function renderNav(){
     return `
       <div class="nav-group nav-group-${group.toLowerCase().replace(/\s+/g,"-")}">
         ${group==="Dashboard" ? "" : `<div class="nav-group-title">${group}</div>`}
-        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}${navBadgeHTML(n)}${n.id==="ordini"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo ordine" onclick="event.stopPropagation();navNuovoOrdine()">+ NUOVO ORDINE</span>`:""}</button>`).join("")}
+        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}${navBadgeHTML(n)}${n.id==="ordini"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo ordine" onclick="event.stopPropagation();navNuovoOrdine()">+ NUOVO</span>`:""}</button>`).join("")}
       </div>
     `;
   }).join("");
