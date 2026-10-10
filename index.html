@@ -6870,7 +6870,7 @@ function renderAgenda(){
       </div>`;
     }
     const a=x.a, t=AGENDA_TIPI[a.tipo]||AGENDA_TIPI.appuntamento;
-    const extra=a.tipo==="sopralluogo"?` · 📷 ${(a.foto||[]).length} · 📏 ${(a.misure||[]).length}`:"";
+    const extra=a.tipo==="sopralluogo"?` · 📷 ${(a.foto||[]).length}`:"";
     return `<div class="ag-row ${x.done?"done":""}" onclick="openAgendaItem('${a.id}')">
       <div class="ag-ic">${t.ic}</div>
       <div class="ag-main"><div class="ag-title">${escapeHtml(agendaTitle(a))}</div>
@@ -7007,7 +7007,7 @@ function openAgendaItem(id,keepScroll){
         </div></div>
     </div>
     ${sop?`
-    <div class="ag-box"><p class="helptext" style="margin:0;">Quando sei sul posto: scatta le foto, scrivi le misure e gli appunti qui sotto. Si salva da solo.</p></div>
+    <div class="ag-box"><p class="helptext" style="margin:0;">Quando sei sul posto: scatta le foto e scrivi misure e appunti qui sotto. Si salva da solo.</p></div>
     <div class="ag-box"><h4>📷 Foto</h4>
       <div id="ag-foto" class="ag-fotos"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -7016,14 +7016,9 @@ function openAgendaItem(id,keepScroll){
       </div>
       <div class="helptext" style="margin-top:6px;">Le foto vanno su Dropbox, nella cartella SOPRALLUOGHI.</div>
     </div>
-    <div class="ag-box"><h4>📏 Misure</h4>
-      <div id="ag-misure"></div>
-      <div class="ag-presets">
-        ${["Larghezza","Altezza","Profondità","Altra misura"].map(l=>`<button type="button" class="btn btn-outline btn-sm" onclick="agendaMisuraAdd('${a.id}','${l==="Altra misura"?"":l}')">+ ${l}</button>`).join("")}
-      </div>
-    </div>`:""}
+    `:""}
     ${(isNew&&a.tipo==="sopralluogo")?"":`<div class="ag-box"><h4>📝 Appunti</h4>
-      <textarea rows="${sop?6:4}" style="width:100%" placeholder="${sop?"Cosa hai visto, cosa serve, accordi con il cliente…":"Note"}" oninput="agendaSet('${a.id}','note',this.value)">${escapeHtml(a.note)}</textarea>
+      <textarea rows="${sop?6:4}" style="width:100%" placeholder="${sop?"Misure, cosa hai visto, cosa serve, accordi con il cliente…":"Note"}" oninput="agendaSet('${a.id}','note',this.value)">${escapeHtml(a.note)}</textarea>
     </div>`}
     <div class="ag-state" id="ag-state"></div>
     <div class="form-actions" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -7035,7 +7030,7 @@ function openAgendaItem(id,keepScroll){
     </div>`;
   document.getElementById("modalBackdrop").classList.add("open");
   if(keepScroll) body.parentElement.scrollTop=scroll;
-  if(sop){ agendaRenderMisure(a.id); agendaRenderFoto(a.id); }
+  if(sop){ agendaRenderFoto(a.id); }
 }
 /* ---- Misure ---- */
 function agendaRenderMisure(id){
