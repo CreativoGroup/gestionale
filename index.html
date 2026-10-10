@@ -6798,6 +6798,38 @@ function agendaStyles(){
   if(document.getElementById("agendaStyles")) return;
   document.head.insertAdjacentHTML("beforeend",`<style id="agendaStyles">
   .ag-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .ag-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .ag-nav{display:flex;align-items:center;gap:8px}
+  .ag-week{font-weight:800;font-size:17px;min-width:120px;text-align:center}
+  .ag-board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(136px,1fr);gap:10px;overflow-x:auto;padding-bottom:8px;align-items:start}
+  .ag-col{background:#F1F4F8;border:2px solid transparent;border-radius:16px;padding:8px;min-height:260px;min-width:0}
+  .ag-col.today{background:#FFF3EE;border-color:rgba(232,85,47,.35)}
+  .ag-col.past:not(.today){opacity:.85}
+  .ag-col.fix{background:#FEF2F2}
+  .ag-col.over{border-color:var(--accent);background:#FFF7F3}
+  .ag-col-h{display:flex;justify-content:space-between;align-items:center;font-size:14px}
+  .ag-col-d{color:var(--muted);font-weight:700;font-size:13px}
+  .ag-col-hr{font-size:11px;color:var(--muted);margin:2px 0 8px}
+  .ag-col-add{border:none;background:#fff;border-radius:10px;width:28px;height:28px;font-size:18px;line-height:1;color:var(--accent);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+  .ag-card{background:#fff;border:1px solid var(--border);border-left:4px solid #94A3B8;border-radius:12px;padding:9px 10px;margin-bottom:8px;cursor:pointer;box-shadow:0 1px 3px rgba(20,29,43,.06)}
+  .ag-card:hover{border-color:#cbd5e1;box-shadow:0 3px 10px rgba(20,29,43,.1)}
+  .ag-card.t-sopralluogo{border-left-color:#E8552F}
+  .ag-card.t-appuntamento{border-left-color:#2F80ED}
+  .ag-card.t-allestimento,.ag-card.auto{border-left-color:#20A857}
+  .ag-card.done{opacity:.5}
+  .ag-card.done .ag-c-title{text-decoration:line-through}
+  .ag-card.drag{opacity:.4}
+  .ag-c-top{display:flex;align-items:center;gap:6px}
+  .ag-c-time{font-weight:800;font-size:13px;flex:1}
+  .ag-c-time.off{color:var(--danger)}
+  .ag-c-ic{font-size:15px}
+  .ag-c-ok{border:1px solid var(--border);background:#fff;border-radius:8px;width:26px;height:26px;cursor:pointer;color:var(--muted);font-weight:800}
+  .ag-c-ok:hover{background:#20A857;color:#fff;border-color:#20A857}
+  .ag-c-title{font-weight:800;font-size:14px;margin-top:3px;word-break:break-word}
+  .ag-c-sub{font-size:12px;color:var(--muted);margin-top:2px;word-break:break-word}
+  .ag-c-pers{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+  .ag-c-pers span{font-size:11px;font-weight:700;background:#EEF5FF;color:#2468d4;border-radius:999px;padding:1px 8px}
+  .ag-c-acts{margin-top:6px}
   .ag-chip{border:1px solid var(--border);background:var(--card);border-radius:999px;padding:8px 14px;font:inherit;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer}
   .ag-chip.active{background:#111827;border-color:#111827;color:#fff}
   .ag-sec{margin:18px 0 8px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
@@ -6839,6 +6871,15 @@ function agendaStyles(){
   .ag-lightbox img{max-width:100%;max-height:100%;border-radius:8px}
   .ag-state{font-size:12px;color:var(--muted);text-align:right;min-height:16px}
   @media(max-width:760px){
+    .ag-board{display:flex;flex-direction:column;overflow:visible}
+    .ag-col{min-height:0;width:100%}
+    .ag-col.empty:not(.today) .ag-col-hr{display:none}
+    .ag-col.empty{padding:8px 10px}
+    .ag-col.empty:not(.today){opacity:.7}
+    .ag-head{flex-direction:column;align-items:stretch}
+    .ag-nav{justify-content:space-between;gap:6px}
+    .ag-nav .btn{min-height:38px;padding:4px 12px}
+    .ag-week{flex:1;min-width:0;font-size:16px}
     .ag-top h3,.ag-top .helptext{display:none}
     .ag-top .ag-newbtns{display:grid!important;grid-template-columns:1fr 1fr;width:100%}
     .ag-top .ag-newbtns .btn-primary{grid-column:1/-1}
@@ -6884,57 +6925,98 @@ function agendaUnifiedItems(){
   const orders=agendaAllestimentiOrdini().map(o=>({kind:"order",o,tipo:"allestimento",data:o.dataConsegna||"",ora:"",done:false}));
   return [...own,...orders];
 }
+/* Orari di apertura: Lun–Sab, 9:30–13:30 (modificabili qui) */
+const AGENDA_ORARI={giorni:[1,2,3,4,5,6],
+  fasce:{1:[["09:30","13:30"],["15:00","19:00"]],2:[["09:30","13:30"],["15:00","19:00"]],3:[["09:30","13:30"],["15:00","19:00"]],4:[["09:30","13:30"],["15:00","19:00"]],5:[["09:30","13:30"],["15:00","19:00"]],6:[["09:30","13:30"]]}};
+function agendaOrarioLabel(g){ return (AGENDA_ORARI.fasce[g]||[]).map(f=>f.map(h=>h.replace(/^0/,"").replace(/:00$/,"")).join("–")).join(" · "); }
+function agendaFuoriOrario(ora,iso){ if(!ora||!iso) return false; const g=agParse(iso).getDay(); const f=AGENDA_ORARI.fasce[g]; if(!f) return true; return !f.some(([da,a])=>ora>=da&&ora<=a); }
+const AGENDA_GG=["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
+let agendaWeek="";
+function agIso(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function agParse(iso){ const [y,m,d]=String(iso).split("-").map(Number); return new Date(y,(m||1)-1,d||1); }
+function agMonday(iso){ const d=agParse(iso||today()); const k=(d.getDay()+6)%7; d.setDate(d.getDate()-k); return agIso(d); }
+function agAdd(iso,n){ const d=agParse(iso); d.setDate(d.getDate()+n); return agIso(d); }
+function agendaWeekShift(n){ agendaWeek=n===0?agMonday(today()):agAdd(agendaWeek||agMonday(today()),n*7); renderAgenda(); }
+function agendaCardHtml(x){
+  if(x.kind==="order"){
+    const o=x.o;
+    return `<div class="ag-card auto" onclick="openJobCard('${o.id}')">
+      <div class="ag-c-top"><span class="ag-c-ic">🛠</span><span class="ag-c-time">DALL'ORDINE${o.numero?` #${escapeHtml(String(o.numero))}`:""}</span></div>
+      <div class="ag-c-title">${escapeHtml(clientName(o.clientId))}</div>
+      <div class="ag-c-sub">${escapeHtml(orderAllestimentoIndirizzo(o)||"Indirizzo non indicato")}</div>
+      ${orderWorkersList(o).length?`<div class="ag-c-sub">👤 ${escapeHtml(orderWorkersList(o).join(", "))}</div>`:""}
+      <div class="ag-c-acts"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();segnaAllestimentoCompletato('${o.id}')">COMPLETATO</button></div>
+    </div>`;
+  }
+  const a=x.a, t=AGENDA_TIPI[a.tipo]||AGENDA_TIPI.appuntamento;
+  const cli=agendaClienteLabel(a), tit=agendaTitle(a);
+  const fuori=agendaFuoriOrario(a.ora,a.data);
+  return `<div class="ag-card t-${a.tipo} ${x.done?"done":""}" draggable="true" ondragstart="agendaDragStart(event,'${a.id}')" ondragend="this.classList.remove('drag')" onclick="openAgendaItem('${a.id}')">
+    <div class="ag-c-top"><span class="ag-c-ic" title="${t.l}">${t.ic}</span><span class="ag-c-time ${fuori?"off":""}" title="${fuori?"Fuori orario di apertura":""}">${escapeHtml(a.ora||"")}</span>
+      <button class="ag-c-ok" title="${x.done?"Riapri":"Segna come fatto"}" onclick="event.stopPropagation();agendaToggleDone('${a.id}')">${x.done?"↺":"✓"}</button></div>
+    <div class="ag-c-title">${escapeHtml(tit)}</div>
+    ${cli&&cli!==tit?`<div class="ag-c-sub">${escapeHtml(cli)}</div>`:""}
+    ${a.luogo?`<div class="ag-c-sub">📍 ${escapeHtml(a.luogo)}</div>`:""}
+    ${agendaPersone(a).length?`<div class="ag-c-pers">${agendaPersone(a).map(n=>`<span>${escapeHtml(n)}</span>`).join("")}</div>`:""}
+    ${a.tipo==="sopralluogo"&&(a.foto||[]).length?`<div class="ag-c-sub">📷 ${(a.foto||[]).length}</div>`:""}
+  </div>`;
+}
+function agendaDragStart(e,id){ e.dataTransfer.setData("text/plain",id); e.dataTransfer.effectAllowed="move"; e.currentTarget.classList.add("drag"); }
+function agendaDragOver(e){ e.preventDefault(); e.currentTarget.classList.add("over"); }
+function agendaDragLeave(e){ e.currentTarget.classList.remove("over"); }
+async function agendaDrop(e,date){
+  e.preventDefault(); e.currentTarget.classList.remove("over");
+  const id=e.dataTransfer.getData("text/plain"); const a=agendaGet(id); if(!a) return;
+  if(a.data===date) return;
+  a.data=date; await agendaPersist(a); renderAgenda();
+  if(currentView==="dashboard") renderDashboard();
+}
+function agendaNewOn(date){
+  const tipo=agendaFilter!=="tutti"?agendaFilter:"sopralluogo";
+  agendaDraft=agendaNewItem(tipo); if(date) agendaDraft.data=date; openAgendaItem(agendaDraft.id);
+}
 function renderAgenda(){
   agendaStyles();
   const root=document.getElementById("view-agenda"); if(!root) return;
-  let items=agendaUnifiedItems().filter(x=>agendaFilter==="tutti"||x.tipo===agendaFilter);
-  const todo=items.filter(x=>!x.done).sort((a,b)=>(a.data||"9999").localeCompare(b.data||"9999")||(a.ora||"").localeCompare(b.ora||""));
-  const done=items.filter(x=>x.done).sort((a,b)=>(b.data||"").localeCompare(a.data||"")).slice(0,40);
+  if(!agendaWeek) agendaWeek=agMonday(today());
   const oggi=today();
-  const late=todo.filter(x=>x.data && x.data<oggi), todayL=todo.filter(x=>x.data===oggi), next=todo.filter(x=>x.data>oggi), nodate=todo.filter(x=>!x.data);
-  const rowHtml=x=>{
-    if(x.kind==="order"){
-      const o=x.o;
-      return `<div class="ag-row" onclick="openJobCard('${o.id}')">
-        <div class="ag-ic">🛠</div>
-        <div class="ag-main"><div class="ag-title">${escapeHtml(clientName(o.clientId))}</div>
-          <div class="ag-sub"><span class="ag-badge ag-auto">DALL'ORDINE${o.numero?` #${escapeHtml(String(o.numero))}`:""}</span>${escapeHtml(orderAllestimentoIndirizzo(o)||"Indirizzo non indicato")}${orderWorkersList(o).length?` · 👤 ${escapeHtml(orderWorkersList(o).join(", "))}`:""}</div></div>
-        <div class="ag-when">${x.data?fmtDate(x.data):"—"}<small>Allestimento</small></div>
-        <div class="ag-acts"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();segnaAllestimentoCompletato('${o.id}')">COMPLETATO</button></div>
-      </div>`;
-    }
-    const a=x.a, t=AGENDA_TIPI[a.tipo]||AGENDA_TIPI.appuntamento;
-    const extra=a.tipo==="sopralluogo"?` · 📷 ${(a.foto||[]).length}`:"";
-    return `<div class="ag-row ${x.done?"done":""}" onclick="openAgendaItem('${a.id}')">
-      <div class="ag-ic">${t.ic}</div>
-      <div class="ag-main"><div class="ag-title">${escapeHtml(agendaTitle(a))}</div>
-        <div class="ag-sub">${agendaIsLate(a)?`<span class="ag-badge late">IN RITARDO</span>`:""}<span class="ag-badge">${t.l.toUpperCase()}</span>${escapeHtml(agendaClienteLabel(a)&&agendaClienteLabel(a)!==agendaTitle(a)?agendaClienteLabel(a)+" · ":"")}${escapeHtml(a.luogo||"")}${extra}${agendaPersone(a).length?` · 👤 ${escapeHtml(agendaPersone(a).join(", "))}`:""}</div></div>
-      <div class="ag-when">${a.data?fmtDate(a.data):"Senza data"}<small>${escapeHtml(a.ora||"")}</small></div>
-      <div class="ag-acts">
-        <button class="btn btn-outline btn-sm" title="${x.done?"Riapri":"Segna come fatto"}" onclick="event.stopPropagation();agendaToggleDone('${a.id}')">${x.done?"↺":"✓ FATTO"}</button>
-        <button class="btn btn-ghost btn-sm" title="Elimina" style="color:var(--danger)" onclick="event.stopPropagation();agendaDelete('${a.id}')">🗑</button>
-      </div>
+  const items=agendaUnifiedItems().filter(x=>agendaFilter==="tutti"||x.tipo===agendaFilter);
+  const sortFn=(x,y)=>(x.ora||"").localeCompare(y.ora||"")||(x.data||"").localeCompare(y.data||"");
+  // da sistemare: in ritardo (non fatti, giorno passato) e senza data
+  const sistema=items.filter(x=>!x.done&&(!x.data||x.data<oggi)).sort((x,y)=>(x.data||"9999").localeCompare(y.data||"9999")||sortFn(x,y));
+  const days=AGENDA_ORARI.giorni.map(g=>{ const k=(g+6)%7; const iso=agAdd(agendaWeek,k); return {iso,g}; });
+  const colHtml=d=>{
+    const list=items.filter(x=>x.data===d.iso&&!(x.data<oggi&&!x.done)).sort(sortFn);
+    const dt=agParse(d.iso);
+    return `<div class="ag-col ${d.iso===oggi?"today":""} ${d.iso<oggi?"past":""} ${list.length?"":"empty"}" ondragover="agendaDragOver(event)" ondragleave="agendaDragLeave(event)" ondrop="agendaDrop(event,'${d.iso}')">
+      <div class="ag-col-h"><div><b>${AGENDA_GG[d.g]}</b> <span class="ag-col-d">${dt.getDate()}/${String(dt.getMonth()+1).padStart(2,"0")}</span></div>
+        <button class="ag-col-add" title="Aggiungi" onclick="agendaNewOn('${d.iso}')">+</button></div>
+      <div class="ag-col-hr">${agendaOrarioLabel(d.g)}</div>
+      <div class="ag-col-b">${list.map(x=>agendaCardHtml(x)).join("")}</div>
     </div>`;
   };
-  const sec=(label,list,cls="")=>list.length?`<div class="ag-sec ${cls}">${label} (${list.length})</div>${list.map(rowHtml).join("")}`:"";
+  const w0=agParse(days[0].iso), w1=agParse(days[days.length-1].iso);
+  const MESI=["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+  const lab=`${w0.getDate()} ${w0.getMonth()!==w1.getMonth()?MESI[w0.getMonth()]+" ":""}– ${w1.getDate()} ${MESI[w1.getMonth()]}`;
   root.innerHTML=`
-    <div class="card ag-top" style="margin-bottom:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-        <div><h3 style="margin:0 0 4px;">Agenda</h3><p class="helptext" style="margin:0;">Appuntamenti, sopralluoghi e allestimenti. Nel sopralluogo trovi foto, misure e appunti.</p></div>
-        <div class="ag-newbtns" style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" onclick="openAgendaNew('sopralluogo')">+ SOPRALLUOGO</button>
-          <button class="btn btn-outline btn-sm" onclick="openAgendaNew('appuntamento')">+ APPUNTAMENTO</button>
-          <button class="btn btn-outline btn-sm" onclick="openAgendaNew('allestimento')">+ ALLESTIMENTO</button>
-        </div>
+    <div class="ag-head">
+      <div class="ag-nav">
+        <button class="btn btn-outline btn-sm" onclick="agendaWeekShift(-1)">◀</button>
+        <div class="ag-week">${lab}</div>
+        <button class="btn btn-outline btn-sm" onclick="agendaWeekShift(1)">▶</button>
+        <button class="btn btn-ghost btn-sm" onclick="agendaWeekShift(0)">Oggi</button>
+      </div>
+      <div class="ag-bar" style="margin:0">
+        ${["tutti","appuntamento","sopralluogo","allestimento"].map(f=>`<button class="ag-chip ${agendaFilter===f?"active":""}" onclick="agendaSetFilter('${f}')">${f==="tutti"?"Tutti":AGENDA_TIPI[f].pl}</button>`).join("")}
+        <button class="btn btn-primary btn-sm" onclick="agendaNewOn('${oggi}')">+ NUOVO</button>
       </div>
     </div>
-    <div class="ag-bar">
-      ${["tutti","appuntamento","sopralluogo","allestimento"].map(f=>`<button class="ag-chip ${agendaFilter===f?"active":""}" onclick="agendaSetFilter('${f}')">${f==="tutti"?"Tutti":AGENDA_TIPI[f].pl}</button>`).join("")}
-    </div>
-    ${todo.length||done.length?`
-      ${sec("In ritardo",late,"late")}${sec("Oggi",todayL)}${sec("Prossimi",next)}${sec("Senza data",nodate)}
-      ${done.length?`<div class="ag-sec" style="cursor:pointer" onclick="agendaShowDone=!agendaShowDone;renderAgenda()">${agendaShowDone?"▼":"▶"} Fatti (${done.length})</div>${agendaShowDone?done.map(rowHtml).join(""):""}`:""}
-    `:`<div class="card"><p class="empty">Nessun elemento in agenda. Premi “+ SOPRALLUOGO” per iniziare.</p></div>`}`;
+    <div class="ag-board">
+      ${sistema.length?`<div class="ag-col fix"><div class="ag-col-h"><div><b>Da sistemare</b> <span class="ag-col-d">${sistema.length}</span></div></div>
+        <div class="ag-col-hr">in ritardo o senza data · trascina su un giorno</div>
+        <div class="ag-col-b">${sistema.map(x=>agendaCardHtml(x)).join("")}</div></div>`:""}
+      ${days.map(colHtml).join("")}
+    </div>`;
 }
 function agendaSetFilter(f){ agendaFilter=f; renderAgenda(); }
 async function agendaToggleDone(id){
@@ -6954,7 +7036,7 @@ function agendaDelete(id){
 function agendaNewItem(tipo){
   return {id:uid(),tipo,titolo:"",clientId:"",clienteNome:"",data:today(),ora:"",luogo:"",stato:"Da fare",note:"",misure:[],foto:[],orderId:"",persone:"",createdAt:new Date().toISOString(),updatedAt:""};
 }
-function openAgendaNew(tipo){ agendaDraft=agendaNewItem(tipo||"sopralluogo"); openAgendaItem(agendaDraft.id); }
+function openAgendaNew(tipo,data){ agendaDraft=agendaNewItem(tipo||"sopralluogo"); if(data) agendaDraft.data=data; openAgendaItem(agendaDraft.id); }
 /* Salvataggio: in bozza finché non c'è qualcosa di scritto; poi automatico mentre scrivi */
 function agendaHasContent(a){ return !!(a.titolo||a.clientId||a.clienteNome||a.note||a.luogo||(a.foto||[]).length||(a.misure||[]).length); }
 async function agendaPersist(a,force=false){
