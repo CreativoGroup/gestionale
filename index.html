@@ -6149,25 +6149,28 @@ function deleteWhatsappConversation(waId){
     showToast("Conversazione eliminata");
   });
 }
+async function fetchWhatsappMedia(rowId){
+  const {data:sd} = await sb.auth.getSession();
+  const token = sd?.session?.access_token;
+  if(!token) throw new Error("Sessione del gestionale non disponibile.");
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/whtasapp-media-ts`,{
+    method:"POST",
+    headers:{Authorization:`Bearer ${token}`, apikey:SUPABASE_KEY, "Content-Type":"application/json"},
+    body:JSON.stringify({id:rowId})
+  });
+  if(!res.ok){
+    let msg = `Errore ${res.status}`;
+    try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
+    throw new Error(msg);
+  }
+  const name = decodeURIComponent(res.headers.get("X-File-Name") || "allegato");
+  return {name, blob: await res.blob()};
+}
 async function downloadWhatsappMedia(rowId, btn){
   const old = btn ? btn.textContent : "";
   if(btn){ btn.disabled = true; btn.textContent = "Scarico…"; }
   try{
-    const {data:sd} = await sb.auth.getSession();
-    const token = sd?.session?.access_token;
-    if(!token) throw new Error("Sessione del gestionale non disponibile.");
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/whtasapp-media-ts`,{
-      method:"POST",
-      headers:{Authorization:`Bearer ${token}`, apikey:SUPABASE_KEY, "Content-Type":"application/json"},
-      body:JSON.stringify({id:rowId})
-    });
-    if(!res.ok){
-      let msg = `Errore ${res.status}`;
-      try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
-      throw new Error(msg);
-    }
-    const name = decodeURIComponent(res.headers.get("X-File-Name") || "allegato");
-    const blob = await res.blob();
+    const {name, blob} = await fetchWhatsappMedia(rowId);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = name; a.style.display = "none";
@@ -6178,6 +6181,39 @@ async function downloadWhatsappMedia(rowId, btn){
     showToast(err?.message || "Impossibile scaricare il file");
   }finally{
     if(btn){ btn.disabled = false; btn.textContent = old; }
+  }
+}
+/* Salva l'allegato ricevuto su WhatsApp nella cartella Dropbox dell'ordine (FILE RICEVUTI) */
+function openWhatsappSaveToOrder(rowId, waId){
+  const conv = whatsappConversationGroups().find(x=>x.waId===waId);
+  const client = conv ? findClientByWhatsappPhone(conv.phone||conv.waId) : null;
+  if(!client){ showToast("Questo numero non è ancora un cliente: crea prima l'ordine o il cliente"); return; }
+  const orders = state.orders.filter(o=>o.clientId===client.id && o.stato!=="Consegnato")
+    .sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))).slice(0,10);
+  if(!orders.length){ showToast("Questo cliente non ha ordini aperti: crea prima l'ordine"); return; }
+  if(orders.length===1){ saveWhatsappMediaToOrder(rowId, orders[0].id); return; }
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2 style="margin-bottom:6px;">In quale ordine salvo il file?</h2>
+    <p class="helptext" style="margin-top:0;">Cliente: ${escapeHtml(clientDisplayName(client))}</p>
+    ${orders.map(o=>`<div class="list-row" onclick="saveWhatsappMediaToOrder('${rowId}','${o.id}')">
+      <div><div class="lr-main">${o.numero?`#${escapeHtml(String(o.numero))} · `:""}${escapeHtml(String(o.descrizione||orderCategorieLabel(o)||"Ordine").slice(0,70))}</div>
+      <div class="lr-sub">${escapeHtml(o.stato||"")}${o.dataConsegna?` · consegna ${escapeHtml(fmtDate(o.dataConsegna))}`:""}</div></div></div>`).join("")}`;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+async function saveWhatsappMediaToOrder(rowId, orderId){
+  const o = findItem("orders", orderId); if(!o) return;
+  closeModal();
+  showToast("Salvo il file nell'ordine…");
+  try{
+    const {name, blob} = await fetchWhatsappMedia(rowId);
+    await jobDropboxEnsureStructure(o.id);
+    const path = `${jobDropboxBasePath(o)}/FILE RICEVUTI/${jobDropboxFileName(o, name)}`;
+    await dropboxUploadBlob(path, blob);
+    showToast(`File salvato nell'ordine${o.numero?` #${o.numero}`:""} (Dropbox › FILE RICEVUTI)`);
+  }catch(err){
+    console.error("Salva allegato WhatsApp nell'ordine", err);
+    showToast(err?.message || "Impossibile salvare il file nell'ordine");
   }
 }
 function createNoteFromWhatsapp(waId){
@@ -6569,7 +6605,7 @@ function renderWhatsapp(){
               return `<div class="wa-bubble ${out?"out":"in"}">
                 <div style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(m.body||`[${m.messageType||"Messaggio"}]`)}</div>
                 ${!out && ["document","image","audio","video","sticker"].includes(String(m.messageType||"").toLowerCase())
-                  ? `<div style="margin-top:6px;"><button class="btn btn-outline btn-sm" onclick="downloadWhatsappMedia('${m.id}',this)">⬇ SCARICA FILE</button></div>` : ""}
+                  ? `<div style="margin-top:6px;"><button class="btn btn-outline btn-sm" onclick="downloadWhatsappMedia('${m.id}',this)">⬇ SCARICA</button> <button class="btn btn-outline btn-sm" onclick="openWhatsappSaveToOrder('${m.id}','${escapeHtml(active.waId)}')">SALVA NELL'ORDINE</button></div>` : ""}
                 <div class="wa-bubble-meta">
                   ${label}
                   <span>${waDateLabel(m.messageTimestamp||m.createdAt)}</span>
