@@ -3070,22 +3070,21 @@ function fasiSectionLabel(o){
   return (hasTipologia && !hasServizio) ? "Tipologia di lavorazione" : "Fasi di lavorazione";
 }
 /* Fornitori suggeriti per prodotto di Lavorazioni Esterne. Solo "Altro" usa un campo di testo libero. */
-const FORNITORI_STANDARD_TIPOGRAFIA = ["Former","Presstime","Flyeralarm","Pressup","Pixart"];
-const FORNITORI_PER_PRODOTTO_ESTERNO = {
-  "Tipografia": FORNITORI_STANDARD_TIPOGRAFIA,
-  "Serigrafia": ["Officine del Cotone","4C Serigrafia","Ricamarte"],
-  "Grande Formato": ["PRESSTIME","COKE","FORMER","HI PRINT","ALTRO"],
-  "Gadget": ["Photosi","COSIMO AMALIO","GET IMPRESSED","AMGS"],
-  "Piccolo Formato": FORNITORI_STANDARD_TIPOGRAFIA,
-  "Biglietti da visita": FORNITORI_STANDARD_TIPOGRAFIA,
-  "Volantini": FORNITORI_STANDARD_TIPOGRAFIA,
-  "Pieghevoli": FORNITORI_STANDARD_TIPOGRAFIA,
-  "Cartelline": FORNITORI_STANDARD_TIPOGRAFIA,
-  "Blocco appunti": FORNITORI_STANDARD_TIPOGRAFIA
-};
-const FORNITORI_ESTERNI = [...new Set(Object.values(FORNITORI_PER_PRODOTTO_ESTERNO).flat())]
-  .filter(Boolean)
-  .sort((a,b)=>String(a).localeCompare(String(b),"it",{sensitivity:"base"}));
+/* Fornitori di Lavorazioni Esterne: in alto quelli usati quasi sempre, poi tutti gli altri sotto "ALTRI FORNITORI". */
+const FORNITORI_PRINCIPALI = ["Presstime","Former","Flyeralarm","Made It"];
+const FORNITORI_ALTRI = ["4C Serigrafia","AMGS","Cosimo Amalio","Get Impressed","Hi Print","Officine del Cotone","Photosi","Pixart","Pressup","Ricamarte"];
+const FORNITORI_ESTERNI = [...FORNITORI_PRINCIPALI, ...FORNITORI_ALTRI];
+function fornitoriSelectOptions(selected){
+  const sel = String(selected||"").trim();
+  const low = x => String(x).trim().toLowerCase();
+  const isSel = f => sel && low(f)===low(sel);
+  const opt = f => `<option value="${escapeHtml(f)}" ${isSel(f)?'selected':''}>${escapeHtml(f)}</option>`;
+  /* fornitore già salvato ma non più in elenco (es. COKE): resta visibile, così non si perde */
+  const extra = sel && !FORNITORI_ESTERNI.some(f=>low(f)===low(sel)) ? `<option value="${escapeHtml(sel)}" selected>${escapeHtml(sel)}</option>` : "";
+  return `<option value="">Seleziona fornitore…</option>
+    <optgroup label="Più usati">${FORNITORI_PRINCIPALI.map(opt).join("")}</optgroup>
+    <optgroup label="ALTRI FORNITORI">${FORNITORI_ALTRI.map(opt).join("")}${extra}</optgroup>`;
+}
 const PAY_METHODS = ["Contanti","Carta di Pagamento","Bonifico"];
 
 function normalizePaymentMethod(v){
@@ -10669,8 +10668,7 @@ function renderRitiroEsternoSection(o){
     <div class="field" style="max-width:420px;margin:12px 0 16px;">
       <label>Fornitore unico</label>
       <select class="inline" style="font-size:15px;padding:10px 12px;" onchange="updateFornitoreEsternoUnico('${o.id}',this.value)">
-        <option value="">Seleziona fornitore…</option>
-        ${FORNITORI_ESTERNI.map(f=>`<option value="${escapeHtml(f)}" ${selectedSupplier===f?'selected':''}>${escapeHtml(f)}</option>`).join("")}
+        ${fornitoriSelectOptions(selectedSupplier)}
       </select>
     </div>
 
