@@ -6156,7 +6156,7 @@ async function downloadWhatsappMedia(rowId, btn){
     const {data:sd} = await sb.auth.getSession();
     const token = sd?.session?.access_token;
     if(!token) throw new Error("Sessione del gestionale non disponibile.");
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-media`,{
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/whtasapp-media-ts`,{
       method:"POST",
       headers:{Authorization:`Bearer ${token}`, apikey:SUPABASE_KEY, "Content-Type":"application/json"},
       body:JSON.stringify({id:rowId})
