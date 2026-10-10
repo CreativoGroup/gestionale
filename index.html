@@ -3027,7 +3027,46 @@ let currentUser = null;
 let gmailAutoRefreshTimer = null; // {id, email, role}
 
 /* ============ CONFIGURAZIONE ============ */
-const CATEGORIES = ["Stampa","DTF","Ricamo","Servizio","Gadget","Allestimenti","Stampante Xerox","Lavorazioni Esterne"];
+const CATEGORIES = ["Stampa","Ricamo","Allestimenti","Gadget","Stampante Xerox","Servizio","Fornitori","Altri fornitori"];
+/* Sottocategorie = macchinario usato. Per Fornitori / Altri fornitori la sottocategoria è il fornitore. */
+const SOTTOCATEGORIE = {
+  "Stampa": ["DTF","EPSON F2000","INTAGLIO"],
+  "Ricamo": ["BROTHER","SWF"],
+  "Allestimenti": ["SUMMA","MIMAKI"],
+  "Gadget": ["MIMAKI 3042","SUBLIMATICA","LASER"]
+};
+function isExternalCat(c){ return c==="Fornitori" || c==="Altri fornitori" || c==="Lavorazioni Esterne"; }
+function sottocategorieDi(c){
+  if(c==="Fornitori") return FORNITORI_PRINCIPALI;
+  if(c==="Altri fornitori") return FORNITORI_ALTRI;
+  return SOTTOCATEGORIE[c] || [];
+}
+function sottocategoriaOptions(c, selected){
+  const sel=String(selected||"").trim(), low=x=>String(x).trim().toLowerCase();
+  const list=sottocategorieDi(c);
+  const extra = sel && !list.some(x=>low(x)===low(sel)) ? `<option value="${escapeHtml(sel)}" selected>${escapeHtml(sel)}</option>` : "";
+  return `<option value="">${isExternalCat(c)?"Fornitore…":"Macchinario…"}</option>` + list.map(x=>`<option value="${escapeHtml(x)}" ${sel&&low(x)===low(sel)?'selected':''}>${escapeHtml(x)}</option>`).join("") + extra;
+}
+/* Vecchi dati: "DTF" diventa Stampa › DTF; "Lavorazioni Esterne" diventa Fornitori / Altri fornitori in base al fornitore. */
+function migrateCategoriaVecchia(cat, fornitore){
+  if(cat==="DTF") return {categoria:"Stampa", sottocategoria:"DTF"};
+  if(cat==="Lavorazioni Esterne"){
+    const f=String(fornitore||"").trim();
+    const principale=f && FORNITORI_PRINCIPALI.some(x=>x.toLowerCase()===f.toLowerCase());
+    return {categoria: principale?"Fornitori":"Altri fornitori", sottocategoria:f};
+  }
+  return null;
+}
+function migrateRighe(righe){
+  return (righe||[]).map(r=>{
+    if(!r) return r;
+    const m=migrateCategoriaVecchia(r.categoria, r.fornitore);
+    if(!m) return r;
+    const out=Object.assign({}, r, {categoria:m.categoria});
+    if(m.sottocategoria) out.sottocategoria=m.sottocategoria;
+    return out;
+  });
+}
 const PRODOTTI_PER_CATEGORIA = {
   "Stampa": ["Tessuto del cliente","T-shirt","Polo","Felpa","Shopper","Cappello","Altro"],
   "DTF": ["Transfer DTF","Stampa su capo","Altro"],
@@ -3049,7 +3088,7 @@ const STATUS_DOT = {"Da fare":"#FFFFFF","In preparazione grafica":"#E4573D","In 
 function statusDot(stato){ return `<span class="status-dot" style="background:${STATUS_DOT[stato]||'#ccc'}"></span>`; }
 function statusTextColor(stato){ return (stato==="Da fare"||stato==="In produzione") ? "#28323F" : "#fff"; }
 function orderHasExternal(o){
-  return !!(o && (o.righe||[]).some(r=>r && r.categoria==="Lavorazioni Esterne"));
+  return !!(o && (o.righe||[]).some(r=>r && isExternalCat(r.categoria)));
 }
 const QUOTE_STATUSES = ["Bozza","Inviato","Accettato","Rifiutato"];
 const QUOTE_CLASS = {"Bozza":"pill-draft","Inviato":"pill-sent","Accettato":"pill-accepted","Rifiutato":"pill-refused"};
@@ -3280,10 +3319,10 @@ function toDbRow(collection, o){
 function fromDbRow(collection, r){
   switch(collection){
     case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", nomeCommerciale:r.nome_commerciale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", richiesta:r.richiesta||"", carattere:r.carattere||"", archiviatoRecenti:!!r.archiviato_recenti, creatoIl:r.creato_il||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||"", dropboxFolderUrl:r.dropbox_folder_url||""};
-    case "quotes": return {id:r.id, clientId:r.client_id, categoria:r.categoria, descrizione:r.descrizione||"", righe:r.righe||[], stato:r.stato, data:r.data, convertito:!!r.convertito, extra:r.extra||{}};
+    case "quotes": return {id:r.id, clientId:r.client_id, categoria:(migrateCategoriaVecchia(r.categoria,"")||{}).categoria||r.categoria, descrizione:r.descrizione||"", righe:migrateRighe(r.righe||[]), stato:r.stato, data:r.data, convertito:!!r.convertito, extra:r.extra||{}};
     case "orders": {
       const normalizedStatus = r.stato==="In lavorazione" ? "In preparazione grafica" : r.stato;
-      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:r.righe||[], fasi:r.fasi||[], magazzino:r.magazzino||[], allestimentoIndirizzo:r.allestimento_indirizzo||"", consegnatoIl:r.consegnato_il||"", createdAt:r.created_at};
+      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:migrateRighe(r.righe||[]), fasi:r.fasi||[], magazzino:r.magazzino||[], allestimentoIndirizzo:r.allestimento_indirizzo||"", consegnatoIl:r.consegnato_il||"", createdAt:r.created_at};
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:normalizePaymentMethod(r.metodo)};
@@ -4391,7 +4430,7 @@ function jobCardPrintHtml(o){
   const cli=(l,v)=>v?`<div class="kv"><span>${l}</span><b>${e(v)}</b></div>`:"";
   const rows=righe.map((r,i)=>{
     const q=Number(r.quantita)||0, pu=Number(r.prezzoUnitario)||0;
-    const titolo=[r.categoria,r.prodotto].filter(Boolean).join(" — ");
+    const titolo=[r.categoria,r.sottocategoria,r.prodotto].filter(Boolean).join(" — ");
     return `<tr>
       <td class="n">${i+1}</td>
       <td><b>${e(titolo||"—")}</b>${r.descrizione?`<div class="d">${e(r.descrizione).replace(/\n/g,"<br>")}</div>`:""}${r.fornitore?`<div class="d">Fornitore: ${e(r.fornitore)}</div>`:""}</td>
@@ -6857,7 +6896,7 @@ function orderPendingPickupRows(o){
 }
 function orderPendingPickupSuppliers(o){
   if(!orderPendingPickupRows(o).length) return [];
-  return [...new Set((o?.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne").map(r=>String(r.fornitore||"").trim()).filter(Boolean))];
+  return [...new Set((o?.righe||[]).filter(r=>isExternalCat(r.categoria)).map(r=>String(r.fornitore||"").trim()).filter(Boolean))];
 }
 function orderCustomerStage(o){
   if(orderPendingPickupRows(o).length) return "DA RITIRARE";
@@ -6876,7 +6915,7 @@ async function segnaRitiroCompletato(orderId){
     const others=(o.fasi||[]).filter(f=>!(f && f.key==="__ritiro_esterno__"));
     o.fasi=[...others,{key:"__ritiro_esterno__",id:uid(),status:"RITIRATO"}];
   }
-  (o.righe||[]).forEach(r=>{ if(r.categoria==="Lavorazioni Esterne" && (r.ritiroEsterno==="DA RITIRARE" || orderSupplierAutoPickup(o))) r.ritiroEsterno="RITIRATO"; });
+  (o.righe||[]).forEach(r=>{ if(isExternalCat(r.categoria) && (r.ritiroEsterno==="DA RITIRARE" || orderSupplierAutoPickup(o))) r.ritiroEsterno="RITIRATO"; });
   await saveState('orders');
   renderDashboard();
   showToast("Ritiro completato: ora il cliente è da avvisare");
@@ -8642,6 +8681,10 @@ function linesEditor(collection, id, righe, options={}){
                     onchange="updateRigaField('${collection}','${id}','${r.id}','categoria',this.value)">
                     ${categoryOptions(r.categoria,true)}
                   </select>
+                  ${sottocategorieDi(r.categoria).length ? `<select class="inline riga-sottocategoria-select" style="margin-top:6px;"
+                    onchange="updateRigaField('${collection}','${id}','${r.id}','sottocategoria',this.value)">
+                    ${sottocategoriaOptions(r.categoria, r.sottocategoria||r.fornitore)}
+                  </select>` : ""}
                 </td>
                 <td class="job-v2-product">
                   ${collection==='quotes' ? `<textarea class="desc-input" rows="1" style="resize:vertical;min-height:40px;overflow:hidden;"
@@ -8734,22 +8777,24 @@ function updateRigaField(collection, id, rigaId, field, value){
   const item = findItem(collection, id);
   const riga = item.righe.find(r=>r.id===rigaId);
   riga[field] = (field==='quantita'||field==='prezzoUnitario'||field==='iva') ? Number(value)||0 : value;
-  if(collection==='orders' && field==='categoria'){
-    recalcFasi(item);
-    if(value!=="Lavorazioni Esterne"){
-      delete riga.ritiroEsterno;
-      delete riga.fornitore;
-    }else{
-      const existingSupplier=(item.righe||[]).find(x=>x.id!==riga.id && x.categoria==="Lavorazioni Esterne" && String(x.fornitore||"").trim())?.fornitore||"";
-      if(existingSupplier) riga.fornitore=existingSupplier;
+  if(field==='categoria'){
+    /* cambiando categoria la sottocategoria (macchinario o fornitore) riparte da zero */
+    delete riga.sottocategoria;
+    delete riga.fornitore;
+    if(!isExternalCat(value)) delete riga.ritiroEsterno;
+  }
+  if(field==='sottocategoria'){
+    if(isExternalCat(riga.categoria)){
+      if(value) riga.fornitore=value; else delete riga.fornitore;
     }
   }
+  if(collection==='orders' && field==='categoria') recalcFasi(item);
   if(collection==='quotes' && field==='categoria'){
     const first=(item.righe||[]).find(x=>x.categoria);
     if(first) item.categoria=first.categoria;
   }
   saveState(collection);
-  if(collection==='quotes'){ refreshQuoteLive(id); return; }
+  if(collection==='quotes'){ if(field==='categoria'){ openQuoteDetail(id); } else refreshQuoteLive(id); return; }
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
 }
 
@@ -9230,6 +9275,8 @@ async function finalizeQuoteToOrder(quoteId, clientId){
     descrizione:sp.descrizione,
     categoria:r.categoria||q.categoria||"",
     prodotto:sp.prodotto,
+    ...(r.sottocategoria?{sottocategoria:r.sottocategoria}:{}),
+    ...(r.fornitore?{fornitore:r.fornitore}:{}),
     stato:"Da fare",
     quantita:r.quantita,
     prezzoUnitario:r.prezzoUnitario
@@ -10453,7 +10500,7 @@ function flowWorkerInitials(name){
   return parts.slice(0,2).map(x=>x[0]?.toUpperCase()||"").join("");
 }
 function flowExternalSupplier(o){
-  const ext=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne");
+  const ext=(o.righe||[]).filter(r=>isExternalCat(r.categoria));
   const supplier=ext.map(r=>String(r.fornitore||"").trim()).find(Boolean);
   return supplier||"da indicare";
 }
@@ -10475,7 +10522,7 @@ function flowBozzaWaiting(o){
   return m?.stato==="IN ATTESA DI RISPOSTA";
 }
 function flowStageOf(o){
-  const hasExternal=(o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne");
+  const hasExternal=(o.righe||[]).some(r=>isExternalCat(r.categoria));
   if(o.stato==="Da fare") return "Da fare";
   if(o.stato==="In preparazione grafica") return "In preparazione grafica";
   if((o.stato==="In produzione" || o.stato==="Produzione esterna") && hasExternal) return "Produzione esterna";
@@ -10516,7 +10563,7 @@ function renderFlusso(){
   }
   if(f.worker) list=list.filter(o=>orderWorkersList(o).includes(f.worker));
   if(f.important) list=list.filter(o=>!!o.importante);
-  if(f.external) list=list.filter(o=>flowStageOf(o)==="Produzione esterna" || (o.righe||[]).some(r=>r.categoria==="Lavorazioni Esterne"));
+  if(f.external) list=list.filter(o=>flowStageOf(o)==="Produzione esterna" || (o.righe||[]).some(r=>isExternalCat(r.categoria)));
 
   if(f.delivery==="today") list=list.filter(o=>flowDateKey(o.dataConsegna)===today);
   if(f.delivery==="soon") list=list.filter(o=>{
@@ -10658,7 +10705,7 @@ function toggleFasiSection(orderId){
   openJobCard(orderId);
 }
 function renderRitiroEsternoSection(o){
-  const righe=(o.righe||[]).filter(r=>r.categoria==="Lavorazioni Esterne");
+  const righe=(o.righe||[]).filter(r=>isExternalCat(r.categoria));
   if(!righe.length) return "";
 
   const selectedSupplier=String(righe.find(r=>String(r.fornitore||"").trim())?.fornitore||"").trim();
@@ -10668,12 +10715,7 @@ function renderRitiroEsternoSection(o){
     <h3>Lavorazioni esterne — fornitore e ritiro</h3>
     <p class="helptext" style="margin-top:-4px;">Fornitore e gestione consegna/ritiro sono indipendenti dal numero di righe prodotto.</p>
 
-    <div class="field" style="max-width:420px;margin:12px 0 16px;">
-      <label>Fornitore unico</label>
-      <select class="inline" style="font-size:15px;padding:10px 12px;" onchange="updateFornitoreEsternoUnico('${o.id}',this.value)">
-        ${fornitoriSelectOptions(selectedSupplier)}
-      </select>
-    </div>
+    <p style="margin:12px 0 16px;"><b>Fornitore:</b> ${selectedSupplier?escapeHtml([...new Set(righe.map(r=>String(r.fornitore||"").trim()).filter(Boolean))].join(", ")):`<span style="color:var(--muted);">scegli la sottocategoria nella riga della lavorazione</span>`}</p>
 
     ${(!orderSupplierAutoPickup(o) && !entries.some(e=>e.status==="DA RITIRARE")) ? `<p class="helptext" style="margin:0;">Con questo fornitore non serve segnare il ritiro. Per Presstime, Former, 4C Serigrafia, Officine del Cotone e Ricamarte l'ordine va in DA RITIRARE in automatico.</p>` : `${orderSupplierAutoPickup(o)?`<p class="helptext" style="margin:0 0 8px;">Ordine in DA RITIRARE in automatico. Quando lo ritiri, spunta RITIRATO.</p>`:""}
     <div class="external-logistics-list">
@@ -10696,7 +10738,7 @@ function updateFornitoreEsternoUnico(orderId,value){
   if(!o) return;
   const supplier=String(value||"").trim();
   (o.righe||[]).forEach(r=>{
-    if(r.categoria==="Lavorazioni Esterne") r.fornitore=supplier;
+    if(isExternalCat(r.categoria)) r.fornitore=supplier;
   });
   saveState('orders');
   openJobCard(orderId);
@@ -10825,17 +10867,17 @@ function resetWorkStartDate(orderId){
 /* Fornitori da cui si ritira sempre: lo stato "DA RITIRARE" è automatico, senza spunta a mano. */
 const FORNITORI_RITIRO_AUTO = ["presstime","former","4c serigrafia","officine del cotone","ricamarte"];
 function orderSupplierName(o){
-  return String((o?.righe||[]).find(r=>r && r.categoria==="Lavorazioni Esterne" && String(r.fornitore||"").trim())?.fornitore||"").trim();
+  return String((o?.righe||[]).find(r=>r && isExternalCat(r.categoria) && String(r.fornitore||"").trim())?.fornitore||"").trim();
 }
 function orderSupplierAutoPickup(o){
-  return FORNITORI_RITIRO_AUTO.includes(orderSupplierName(o).toLowerCase());
+  return (o?.righe||[]).some(r=>r && isExternalCat(r.categoria) && FORNITORI_RITIRO_AUTO.includes(String(r.fornitore||r.sottocategoria||"").trim().toLowerCase()));
 }
 function getExternalLogisticsEntries(order){
   const auto = orderSupplierAutoPickup(order);
   const eff = e => (auto && !String(e.status||"").trim()) ? Object.assign({}, e, {status:"DA RITIRARE"}) : e;
   const stored=(order?.fasi||[]).filter(f=>f && f.key==="__ritiro_esterno__");
   if(stored.length) return stored.map(eff);
-  const legacy=(order?.righe||[]).find(r=>r.categoria==="Lavorazioni Esterne" && String(r.ritiroEsterno||"").trim());
+  const legacy=(order?.righe||[]).find(r=>isExternalCat(r.categoria) && String(r.ritiroEsterno||"").trim());
   return [eff({key:"__ritiro_esterno__",id:"default",status:String(legacy?.ritiroEsterno||"")})];
 }
 function updateExternalLogisticsStatus(orderId,entryId,status){
@@ -10850,7 +10892,7 @@ function updateExternalLogisticsStatus(orderId,entryId,status){
   const others=(o.fasi||[]).filter(f=>!(f && f.key==="__ritiro_esterno__"));
   o.fasi=[...others,...entries];
   // Manteniamo i vecchi campi riga sincronizzati solo per compatibilità con dati storici.
-  (o.righe||[]).forEach(r=>{ if(r.categoria==="Lavorazioni Esterne") r.ritiroEsterno=status; });
+  (o.righe||[]).forEach(r=>{ if(isExternalCat(r.categoria)) r.ritiroEsterno=status; });
   saveState("orders");
   openJobCard(orderId);
   showToast(status==="DA RITIRARE" ? "Aggiunto agli ordini da ritirare" : `Stato ritiro: ${status}`);
@@ -10859,7 +10901,7 @@ function addExternalLogisticsEntry(orderId){
   const o=findItem("orders",orderId); if(!o) return;
   let entries=(o.fasi||[]).filter(f=>f && f.key==="__ritiro_esterno__");
   if(!entries.length){
-    const legacy=(o.righe||[]).find(r=>r.categoria==="Lavorazioni Esterne" && String(r.ritiroEsterno||"").trim());
+    const legacy=(o.righe||[]).find(r=>isExternalCat(r.categoria) && String(r.ritiroEsterno||"").trim());
     entries=[{key:"__ritiro_esterno__",id:uid(),status:String(legacy?.ritiroEsterno||"")}];
   }
   entries.push({key:"__ritiro_esterno__",id:uid(),status:""});
