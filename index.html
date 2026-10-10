@@ -47,6 +47,13 @@
   nav.tabs button:hover{background:var(--sidebar-hover);color:var(--text);}
   nav.tabs button.active{background:var(--accent);color:#fff;}
   nav.tabs .icon{width:18px;text-align:center;}
+  .client-pick-wrap{position:relative;}
+  .client-pick-list{position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);overflow:hidden;margin-top:4px;}
+  .client-pick-list:empty{display:none;}
+  .client-pick{padding:10px 14px;cursor:pointer;font-size:14px;}
+  .client-pick small{color:var(--muted);margin-left:6px;}
+  .client-pick:hover{background:var(--sidebar-hover);}
+  .client-pick-new{color:var(--accent);font-weight:700;border-top:1px solid var(--border);}
   nav.tabs .nav-mini-btn{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:3px 7px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);background:#fff;white-space:nowrap;}
   nav.tabs .nav-mini-btn:hover{background:var(--accent);color:#fff;}
   nav.tabs button.active .nav-mini-btn{border-color:#fff;color:var(--accent);}
@@ -8043,6 +8050,8 @@ function newOrderForClient(clientId, leadId=null){
     sel.value = clientId;
     const wrap = document.getElementById("of-newclient");
     if(wrap) wrap.style.display = "none";
+    const srch = document.getElementById("of-cliente-search");
+    if(srch) srch.value = clientName(clientId);
   }
   window.scrollTo({top:0,behavior:"smooth"});
 }
@@ -8199,6 +8208,43 @@ function clientOptions(selected, withNew){
   if(!withNew) return opts;
   const placeholder = `<option value="" ${!selected?'selected':''} disabled>— Seleziona cliente —</option>`;
   return placeholder + `<option value="__new__">+ Nuovo cliente…</option>` + opts;
+}
+function clientSearchNorm(x){ return String(x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim(); }
+function orderClientSearch(q, keep){
+  const sel=document.getElementById("of-cliente"), box=document.getElementById("of-cliente-results");
+  if(!sel||!box) return;
+  /* se si riscrive, la scelta precedente non vale più */
+  if(keep && sel.value){ return; }
+  sel.value=""; onClientSelectChange(sel,"of-newclient");
+  const n=clientSearchNorm(q);
+  const list = n ? state.clients.filter(c=>{
+    const hay=clientSearchNorm([clientDisplayName(c),c.ragioneSociale,c.nomeCommerciale,c.refNome,c.refCognome,c.nome,c.cognome,c.telefono,c.email].join(" "));
+    return n.split(/\s+/).every(t=>hay.includes(t));
+  }).slice(0,8) : [];
+  const nuovo = n ? `<div class="client-pick client-pick-new" onmousedown="event.preventDefault();orderClientNew()">+ Nuovo cliente “${escapeHtml(String(q).trim())}”</div>` : "";
+  box.innerHTML = list.map(c=>`<div class="client-pick" onmousedown="event.preventDefault();orderClientPick('${c.id}')"><b>${escapeHtml(clientDisplayName(c))}</b>${c.telefono?` <small>${escapeHtml(c.telefono)}</small>`:""}</div>`).join("") + nuovo;
+}
+function orderClientPick(id){
+  const sel=document.getElementById("of-cliente"), inp=document.getElementById("of-cliente-search"), box=document.getElementById("of-cliente-results");
+  if(!sel) return;
+  sel.value=id; onClientSelectChange(sel,"of-newclient");
+  if(inp) inp.value=clientName(id);
+  if(box) box.innerHTML="";
+}
+function orderClientNew(){
+  const sel=document.getElementById("of-cliente"), inp=document.getElementById("of-cliente-search"), box=document.getElementById("of-cliente-results");
+  if(!sel) return;
+  const testo=String(inp?.value||"").trim();
+  sel.value="__new__"; onClientSelectChange(sel,"of-newclient");
+  const tipo=document.getElementById("ofnc-tipo");
+  if(tipo && tipo.value==="Business"){
+    const f=document.getElementById("ofnc-nomecommerciale"); if(f) f.value=testo;
+  }else{
+    const parti=testo.split(/\s+/); const nome=document.getElementById("ofnc-nome"), cog=document.getElementById("ofnc-cognome");
+    if(nome) nome.value=parti.shift()||""; if(cog) cog.value=parti.join(" ");
+  }
+  if(box) box.innerHTML="";
+  document.getElementById("of-newclient")?.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 function onClientSelectChange(selectEl, wrapId){
   document.getElementById(wrapId).style.display = selectEl.value==="__new__" ? "block" : "none";
@@ -10232,7 +10278,12 @@ function renderOrdini(){
     <div class="form-panel ${orderFormOpen ? 'open' : ''}" id="orderForm">
       <h3>Nuovo ordine</h3>
       <div class="form-grid">
-        <div class="field"><label>Cliente</label><select id="of-cliente" onchange="onClientSelectChange(this,'of-newclient')">${clientOptions(null,true)}</select></div>
+        <div class="field client-pick-wrap"><label>Cliente</label>
+          <select id="of-cliente" style="display:none" onchange="onClientSelectChange(this,'of-newclient')">${clientOptions(null,true)}</select>
+          <input id="of-cliente-search" type="search" autocomplete="off" placeholder="Scrivi il nome del cliente…"
+            oninput="orderClientSearch(this.value)" onfocus="orderClientSearch(this.value,true)" onblur="setTimeout(()=>{const b=document.getElementById('of-cliente-results'); if(b) b.innerHTML='';},220)">
+          <div id="of-cliente-results" class="client-pick-list"></div>
+        </div>
       </div>
       <div id="of-newclient" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
         <p class="helptext" style="margin-top:0;">Dati del nuovo cliente</p>
