@@ -2945,6 +2945,49 @@
   #view-leads input[type=text],#view-leads input[type=search],#view-note input[type=text]{width:100%!important;max-width:none!important;}
 }
 </style>
+<style id="mobileV3">
+.wa-back{display:none}
+@media(max-width:760px){
+  .wa-back{display:inline-flex;margin-bottom:8px}
+  .wa-shell.m-list .wa-chat-card{display:none}
+  .wa-shell.m-chat .wa-sidebar{display:none}
+  .wa-shell:has(.wa-chat-card .wa-back) {}
+  .wa-top .helptext,.wa-top .wa-status-grid{display:none}
+  .wa-top{padding:10px 14px!important;margin-bottom:12px!important}
+  .wa-top h3{margin:0!important}
+  body:has(.wa-shell.m-chat) .wa-top{display:none}
+  .wa-conv-list{max-height:none}
+  .wa-top h3{display:none!important}
+  .wa-top>div{flex-wrap:nowrap!important}
+  .wa-top .btn{min-height:38px;padding:0 14px;font-size:12px}
+  .wa-shell.m-chat .wa-chat-card{display:flex;flex-direction:column;height:calc(100dvh - 190px);min-height:380px;padding:12px}
+  .wa-shell.m-chat .wa-chat-card>div:first-child{flex:0 0 auto;gap:8px!important;padding-bottom:10px!important;margin-bottom:6px!important}
+  .wa-shell.m-chat .wa-chat-card>div:first-child>div:last-child{justify-content:flex-start!important}
+  .wa-chat-card .btn-sm{min-height:36px;padding:0 12px;font-size:12px;white-space:nowrap}
+  .wa-shell.m-chat .wa-chat-card>div:first-child>div:last-child{flex-wrap:wrap}
+  .wa-chat-card .wa-back{margin-bottom:6px}
+  .wa-chat-card h3{font-size:17px}
+  .wa-chat-scroll{flex:1 1 auto;min-height:0;max-height:none;height:auto}
+  .wa-compose{flex:0 0 auto;margin-top:6px;padding-top:10px}
+  .wa-compose>div:first-child{display:none}
+  .wa-compose textarea{min-height:56px!important;rows:2;margin-bottom:8px}
+  .wa-file-row{flex-wrap:wrap;gap:8px}
+  .lead-detail-grid{grid-template-columns:1fr 1fr!important;gap:8px!important}
+  .lead-detail-box{padding:8px 10px;min-width:0;word-break:break-word;font-size:14px}
+  .lead-detail-box[style*="grid-column"]{grid-column:1/-1!important}
+  .flow-toggle{min-height:40px;padding:0 10px;font-size:13px}
+  .flow-toolbar{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important}
+  .flow-toolbar>input[type=search]:first-child,.flow-toolbar>#flowMacchinaInput{grid-column:1/-1}
+  .wa-compose textarea{height:64px!important;min-height:64px!important;resize:none}
+  .wa-compose .helptext,.wa-compose .notice{display:none}
+  .wa-compose .btn-primary{min-height:40px;padding:0 18px;font-size:13px}
+  .wa-file-input{max-width:60%;font-size:12px}
+  .wa-conv-btn{padding:14px 14px}
+  .mob-bar button{position:relative}
+  .mob-bar .wa-unread-badge,.mob-bar .ig-unread-badge{position:absolute;top:0;left:calc(50% + 4px);margin:0;min-width:18px;padding:0 5px;line-height:17px;font-size:10px;border:2px solid var(--card)}
+  .mob-bar button.active .wa-unread-badge,.mob-bar button.active .ig-unread-badge{background:#E8552F;color:#fff}
+}
+</style>
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -4423,7 +4466,7 @@ function renderNav(){
 }
 
 /* ===== MOBILE V2: barra in basso, scheda "Altro", tabelle a schede ===== */
-const MOB_TABS=[{id:"dashboard",l:"Home",i:"⌂"},{id:"note",l:"Note",i:"✎"},{id:"ordini",l:"Ordini",i:"▣"},{id:"clienti",l:"Clienti",i:"☺"},{id:"leads",l:"Lead",i:"✉"}];
+const MOB_TABS=[{id:"whatsapp",l:"WhatsApp",i:"◉"},{id:"instagram",l:"Instagram",i:"◎"},{id:"note",l:"Note",i:"✎"},{id:"ordini",l:"Ordini",i:"▣"}];
 function mobLabel(n){ return typeof n.label==="function"?n.label():n.label; }
 function renderMobBar(){
   const bar=document.getElementById("mobBar"), sh=document.getElementById("mobSheet");
@@ -4431,7 +4474,7 @@ function renderMobBar(){
   const items=visibleNav();
   const tabs=MOB_TABS.filter(t=>items.some(n=>n.id===t.id));
   const inTabs=tabs.some(t=>t.id===currentView);
-  bar.innerHTML=tabs.map(t=>`<button class="${t.id===currentView?'active':''}" onclick="mobGo('${t.id}')"><span class="ic">${t.i}</span>${t.l}</button>`).join("")
+  bar.innerHTML=tabs.map(t=>`<button class="${t.id===currentView?'active':''}" onclick="mobGo('${t.id}')"><span class="ic">${t.i}</span>${t.l}${navBadgeHTML({id:t.id})}</button>`).join("")
     +`<button class="${!inTabs?'active':''}" onclick="openMobSheet()"><span class="ic">☰</span>Altro</button>`;
   const groups=["Traffico","Info e richieste","Anagrafica","Operativa","Archivio","Amministrazione"];
   const rest=items.filter(n=>n.id!=="dashboard");
@@ -6091,7 +6134,7 @@ function whatsappUnreadCount(){
   groups.forEach(g=>{
     const l=waLastMessage(g);
     if(!l || l.direction!=="inbound") return;
-    if(g.waId===selectedWhatsappWaId && currentView==="whatsapp" && !document.hidden) return;
+    if(g.waId===selectedWhatsappWaId && currentView==="whatsapp" && !document.hidden && (!isMobileUI()||waMobileChat)) return;
     if(map[g.waId]!==l.id) n++;
   });
   return n;
@@ -6126,8 +6169,11 @@ function whatsappConversationGroups(){
     return String(bd).localeCompare(String(ad));
   });
 }
+let waMobileChat=false;
+function waBack(){ waMobileChat=false; renderWhatsapp(); }
 function selectWhatsappConversation(waId){
   selectedWhatsappWaId=String(waId||"");
+  waMobileChat=true;
   renderWhatsapp();
 }
 async function refreshWhatsappInbox(silent=false){
@@ -6407,7 +6453,7 @@ async function sendNewWhatsappMessage(){
     if(btn){btn.disabled=true;btn.textContent="INVIO...";}
     await sendWhatsappRequest({to:phone,message,contactName,file});
     closeModal();
-    selectedWhatsappWaId=normalizeWaPhone(phone);
+    selectedWhatsappWaId=normalizeWaPhone(phone); waMobileChat=true;
     await refreshWhatsappInbox(true);
     renderWhatsapp();
     showToast("Messaggio WhatsApp inviato");
@@ -6526,12 +6572,12 @@ function renderWhatsappInner(){
   });
 
   const active=allConvs.find(c=>c.waId===selectedWhatsappWaId)||null;
-  if(active && !document.hidden){ waMarkRead(active); _waBadgeShown=-1; setTimeout(updateWhatsappBadge,0); }
+  if(active && !document.hidden && (!isMobileUI()||waMobileChat)){ waMarkRead(active); _waBadgeShown=-1; setTimeout(updateWhatsappBadge,0); }
   const existingClient=active?findClientByWhatsappPhone(active.phone||active.waId):null;
   const linkedCount=allConvs.filter(c=>findClientByWhatsappPhone(c.phone||c.waId)).length;
 
   root.innerHTML=`
-    <div class="card" style="margin-bottom:18px;">
+    <div class="card wa-top" style="margin-bottom:18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
         <div>
           <h3 style="margin:0 0 6px;">WhatsApp</h3>
@@ -6561,7 +6607,7 @@ function renderWhatsappInner(){
     </div>
 
     ${allConvs.length?`
-    <div class="wa-shell">
+    <div class="wa-shell ${waMobileChat?"m-chat":"m-list"}">
       <div class="card wa-sidebar">
         <div class="wa-sidebar-head">
           <div style="font-weight:850;">Conversazioni (${allConvs.length})</div>
@@ -6611,6 +6657,7 @@ function renderWhatsappInner(){
         ${active?`
           <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:10px;">
             <div>
+              <button class="btn btn-outline btn-sm wa-back" onclick="waBack()">← Conversazioni</button>
               <h3 style="margin:0 0 5px;">${escapeHtml(active.name||active.phone||active.waId)}</h3>
               <div class="helptext" style="margin:0;">
                 +${escapeHtml(normalizeWaPhone(active.phone||active.waId))}
@@ -6696,7 +6743,8 @@ function renderWhatsappInner(){
 }
 
 /* ============ INSTAGRAM (messaggi diretti) ============ */
-let igMessages=[], igSelected="", igLoaded=false;
+let igMessages=[], igSelected="", igLoaded=false, igMobileChat=false;
+function isMobileUI(){ try{ return window.matchMedia("(max-width:760px)").matches; }catch(e){ return false; } }
 const igDrafts={};
 const IG_COLS="id,attachments,ig_user_id,username,contact_name,direction,message_type,body,message_timestamp,status,created_at";
 function igGroups(){
@@ -6733,7 +6781,7 @@ function igUnreadCount(){
   let n=0;
   last.forEach((m,k)=>{
     if(m.direction!=="inbound") return;
-    if(k===igSelected && currentView==="instagram" && !document.hidden) return;
+    if(k===igSelected && currentView==="instagram" && !document.hidden && (!isMobileUI()||igMobileChat)) return;
     if(map[k]!==m.id) n++;
   });
   return n;
@@ -6763,7 +6811,8 @@ async function refreshInstagram(silent=true){
   if(!silent) showToast("Instagram aggiornato");
 }
 setInterval(()=>{ if(currentView==="instagram" && !document.hidden) refreshInstagram(true); },20000);
-function selectInstagramConversation(id){ igSelected=String(id||""); renderInstagram(); }
+function selectInstagramConversation(id){ igSelected=String(id||""); igMobileChat=true; renderInstagram(); }
+function igBack(){ igMobileChat=false; renderInstagram(); }
 async function sendInstagramReply(id){
   const ta=document.getElementById("igReplyText"); const btn=document.getElementById("igReplyBtn");
   const text=String(ta?.value||"").trim();
@@ -6893,18 +6942,18 @@ function renderInstagram(){
   if(!igSelected && convs.length) igSelected=convs[0].id;
   if(igSelected && !convs.some(c=>c.id===igSelected)) igSelected=convs[0]?.id||"";
   const active=convs.find(c=>c.id===igSelected)||null;
-  if(active && !document.hidden){ const l=active.messages[active.messages.length-1]; if(l){ const rm=igReadMap(); if(rm[active.id]!==l.id){ rm[active.id]=l.id; igSaveReadMap(rm); } } igBadgeShown=-1; setTimeout(updateInstagramBadge,0); }
+  if(active && !document.hidden && (!isMobileUI()||igMobileChat)){ const l=active.messages[active.messages.length-1]; if(l){ const rm=igReadMap(); if(rm[active.id]!==l.id){ rm[active.id]=l.id; igSaveReadMap(rm); } } igBadgeShown=-1; setTimeout(updateInstagramBadge,0); }
   const lastIn=active?[...active.messages].reverse().find(m=>m.direction==="inbound"):null;
   const expired=active && (!lastIn || (Date.now()-new Date(lastIn.message_timestamp||lastIn.created_at).getTime())>24*3600*1000);
   root.innerHTML=`
-    <div class="card" style="margin-bottom:18px;">
+    <div class="card wa-top" style="margin-bottom:18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
         <div><h3 style="margin:0 0 6px;">Instagram</h3><p class="helptext" style="margin:0;">Messaggi diretti ricevuti sul profilo Creativò.</p></div>
         <button class="btn btn-outline btn-sm" onclick="refreshInstagram(false)">AGGIORNA</button>
       </div>
     </div>
     ${convs.length?`
-    <div class="wa-shell">
+    <div class="wa-shell ${igMobileChat?"m-chat":"m-list"}">
       <div class="card wa-sidebar">
         <div class="wa-sidebar-head"><div style="font-weight:850;">Conversazioni (${convs.length})</div></div>
         <div class="wa-conv-list">
@@ -6917,7 +6966,7 @@ function renderInstagram(){
       <div class="card wa-chat-card">
         ${active?`
           <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:10px;">
-            <div><h3 style="margin:0 0 5px;">${escapeHtml(igTitle(active))}</h3>${active.username?`<div class="helptext" style="margin:0;">@${escapeHtml(active.username)}</div>`:""}</div>
+            <div><button class="btn btn-outline btn-sm wa-back" onclick="igBack()">← Conversazioni</button><h3 style="margin:0 0 5px;">${escapeHtml(igTitle(active))}</h3>${active.username?`<div class="helptext" style="margin:0;">@${escapeHtml(active.username)}</div>`:""}</div>
             <div style="display:flex;gap:8px;">
               <button class="btn btn-outline btn-sm" onclick="createNoteFromInstagram('${escapeHtml(active.id)}')">CREA NOTA</button>
               ${igClientFor(active)?`<button class="btn btn-outline btn-sm" onclick="createOrderFromInstagram('${escapeHtml(active.id)}')">CREA ORDINE</button>`:`<button class="btn btn-primary btn-sm" onclick="createLeadFromInstagram('${escapeHtml(active.id)}')">NUOVO CLIENTE + ORDINE</button><button class="btn btn-outline btn-sm" onclick="igPickClient('${escapeHtml(active.id)}','link')">COLLEGA CLIENTE</button>`}
