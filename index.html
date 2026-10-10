@@ -6916,7 +6916,7 @@ async function agendaPersist(a,force=false){
   if(!a) return null;
   const inState=(state.agenda||[]).some(x=>x.id===a.id);
   if(!inState){
-    if(!force && !agendaHasContent(a)) return null;
+    if(!force) return null;
     state.agenda.push(a); if(agendaDraft&&agendaDraft.id===a.id) agendaDraft=null;
   }
   a.updatedAt=new Date().toISOString();
@@ -6924,8 +6924,17 @@ async function agendaPersist(a,force=false){
   agendaSetStatus(saved?"Salvato":"Non salvato: controlla la tabella Agenda in Supabase");
   return saved;
 }
+async function agendaCreate(id){
+  const a=agendaGet(id); if(!a) return;
+  if(!a.clientId && !a.clienteNome && !a.titolo){ showToast("Scrivi almeno il cliente o un titolo"); return; }
+  const saved=await agendaPersist(a,true);
+  if(!saved){ return; }
+  showToast(a.tipo==="sopralluogo"?"Sopralluogo creato: aprilo quando sei sul posto per foto e misure":"Creato in agenda");
+  closeModal();
+}
 function agendaSetStatus(t){ const el=document.getElementById("ag-state"); if(el) el.textContent=t; }
 function agendaQueue(id){
+  if(!(state.agenda||[]).some(x=>x.id===id)) return;
   agendaSetStatus("Salvo…");
   clearTimeout(agendaTimers[id]);
   agendaTimers[id]=setTimeout(()=>{ const a=agendaGet(id); if(a) agendaPersist(a); },700);
@@ -6960,13 +6969,14 @@ function agendaRefreshMaps(id){
 function openAgendaItem(id,keepScroll){
   agendaStyles();
   const a=agendaGet(id); if(!a) return;
-  const sop=a.tipo==="sopralluogo";
+  const isNew=!(state.agenda||[]).some(x=>x.id===a.id);
+  const sop=a.tipo==="sopralluogo" && !isNew;
   const body=document.getElementById("modalBody");
   const scroll=keepScroll?body.parentElement.scrollTop:0;
   body.innerHTML=`
     <button class="close-x" onclick="closeModal()">×</button>
-    <h2 style="margin-bottom:12px;">${AGENDA_TIPI[a.tipo].ic} ${AGENDA_TIPI[a.tipo].l}</h2>
-    <div class="ag-types">${Object.keys(AGENDA_TIPI).map(k=>`<button type="button" class="ag-type ${a.tipo===k?"active":""}" onclick="agendaSetTipo('${a.id}','${k}')">${AGENDA_TIPI[k].ic} ${AGENDA_TIPI[k].l}</button>`).join("")}</div>
+    <h2 style="margin-bottom:12px;">${AGENDA_TIPI[a.tipo].ic} ${isNew?"Nuovo ":""}${AGENDA_TIPI[a.tipo].l}</h2>
+    ${isNew?`<div class="ag-types">${Object.keys(AGENDA_TIPI).map(k=>`<button type="button" class="ag-type ${a.tipo===k?"active":""}" onclick="agendaSetTipo('${a.id}','${k}')">${AGENDA_TIPI[k].ic} ${AGENDA_TIPI[k].l}</button>`).join("")}</div>`:""}
     <div class="ag-grid">
       <div class="field full"><label>Titolo <span style="font-weight:500;color:var(--muted)">(facoltativo)</span></label>
         <input value="${escapeHtml(a.titolo)}" placeholder="Es. Vetrina negozio, Fiera di ottobre…" oninput="agendaSet('${a.id}','titolo',this.value)"></div>
@@ -6983,6 +6993,7 @@ function openAgendaItem(id,keepScroll){
         </div></div>
     </div>
     ${sop?`
+    <div class="ag-box"><p class="helptext" style="margin:0;">Quando sei sul posto: scatta le foto, scrivi le misure e gli appunti qui sotto. Si salva da solo.</p></div>
     <div class="ag-box"><h4>📷 Foto</h4>
       <div id="ag-foto" class="ag-fotos"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -6997,14 +7008,16 @@ function openAgendaItem(id,keepScroll){
         ${["Larghezza","Altezza","Profondità","Altra misura"].map(l=>`<button type="button" class="btn btn-outline btn-sm" onclick="agendaMisuraAdd('${a.id}','${l==="Altra misura"?"":l}')">+ ${l}</button>`).join("")}
       </div>
     </div>`:""}
-    <div class="ag-box"><h4>📝 Appunti</h4>
+    ${(isNew&&a.tipo==="sopralluogo")?"":`<div class="ag-box"><h4>📝 Appunti</h4>
       <textarea rows="${sop?6:4}" style="width:100%" placeholder="${sop?"Cosa hai visto, cosa serve, accordi con il cliente…":"Note"}" oninput="agendaSet('${a.id}','note',this.value)">${escapeHtml(a.note)}</textarea>
-    </div>
+    </div>`}
     <div class="ag-state" id="ag-state"></div>
     <div class="form-actions" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-      ${sop||a.tipo==="allestimento"?`<button class="btn btn-primary" onclick="agendaCreateOrder('${a.id}')">CREA ORDINE</button><button class="btn btn-outline" onclick="agendaPickOrder('${a.id}')">INVIA A ORDINE ESISTENTE</button>`:""}
+      ${isNew?`<button class="btn btn-primary" onclick="agendaCreate('${a.id}')">CREA ${AGENDA_TIPI[a.tipo].l.toUpperCase()}</button><button class="btn btn-ghost" onclick="closeModal()">Annulla</button>`:`
+      ${sop?agendaQuoteButton(a):""}
+      ${a.tipo==="allestimento"?`<button class="btn btn-primary" onclick="agendaCreateOrder('${a.id}')">CREA ORDINE</button><button class="btn btn-outline" onclick="agendaPickOrder('${a.id}')">INVIA A ORDINE ESISTENTE</button>`:""}
       <button class="btn btn-outline" onclick="agendaToggleDone('${a.id}').then(()=>closeModal())">${a.stato==="Fatto"?"Riapri":"✓ Segna come fatto"}</button>
-      <button class="btn btn-ghost" onclick="closeModal()">Chiudi</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Chiudi</button>`}
     </div>`;
   document.getElementById("modalBackdrop").classList.add("open");
   if(keepScroll) body.parentElement.scrollTop=scroll;
@@ -7129,6 +7142,26 @@ function agendaPickOrder(id){
     <h2 style="margin-bottom:6px;">A quale ordine?</h2>
     <p class="helptext" style="margin-top:0;">Misure, appunti e foto vengono aggiunti alla scheda dell'ordine.</p>
     ${list.map(o=>`<div class="list-row" onclick="agendaSendToOrder('${id}','${o.id}').then(()=>openAgendaItem('${id}'))"><div><div class="lr-main">${o.numero?`#${escapeHtml(String(o.numero))} · `:""}${escapeHtml(clientName(o.clientId))}</div><div class="lr-sub">${escapeHtml(String(o.descrizione||orderCategorieLabel(o)||"Ordine").slice(0,70))} · ${escapeHtml(o.stato||"")}</div></div></div>`).join("")}`;
+}
+function agendaQuoteFor(a){ return (state.quotes||[]).find(q=>q.extra&&q.extra.agendaId===a.id); }
+function agendaQuoteButton(a){
+  const q=agendaQuoteFor(a);
+  return q?`<button class="btn btn-primary" onclick="openQuoteDetail('${q.id}')">APRI PREVENTIVO${q.extra&&q.extra.numero?` #${escapeHtml(String(q.extra.numero))}`:""}</button>`
+          :`<button class="btn btn-primary" onclick="agendaCreateQuote('${a.id}')">CREA PREVENTIVO</button>`;
+}
+async function agendaCreateQuote(id){
+  const a=agendaGet(id); if(!a) return;
+  const ex=agendaQuoteFor(a); if(ex){ openQuoteDetail(ex.id); return; }
+  const qid=await createQuote(a.clientId||null, CATEGORIES[0], {agendaId:a.id, nomeLibero:a.clientId?"":(a.clienteNome||"")});
+  if(!qid) return;
+  const q=findItem("quotes",qid);
+  q.descrizione=a.titolo||"";
+  if(q.righe[0] && !q.righe[0].descrizione && a.titolo) q.righe[0].descrizione=a.titolo;
+  saveState("quotes");
+  await agendaPersist(a,true);
+  closeModal();
+  showToast("Preventivo creato: misure, appunti e foto passano all'ordine quando lo accetti");
+  openQuoteDetail(qid);
 }
 function agendaCreateOrder(id){
   const a=agendaGet(id); if(!a) return;
@@ -10272,6 +10305,7 @@ async function finalizeQuoteToOrder(quoteId, clientId){
   if(!okOrder) return;
 
   if(!state.orders.some(o=>o.id===order.id)) state.orders.push(order);
+  const agId=q.extra&&q.extra.agendaId; if(agId && agendaGet(agId)){ try{ await agendaSendToOrder(agId, order.id, true); }catch(err){ console.error("Agenda → ordine",err); } }
 
   q.clientId = clientId;
   q.convertito = true;
