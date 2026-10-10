@@ -8033,7 +8033,7 @@ function renderDashboard(){
   });
   const ritiriDaFare = state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0);
   const prossimiAgenda = (state.agenda||[]).filter(a=>a.stato!=="Fatto" && a.data && a.data>=oggi).map(a=>({a})).sort((x,y)=>((x.a.data||"")+(x.a.ora||"")).localeCompare((y.a.data||"")+(y.a.ora||""))).slice(0,6);
-  const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma");
+  const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma" || l.stato==="Da ricontattare");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
 
   document.getElementById("view-dashboard").innerHTML = `
@@ -8042,7 +8042,7 @@ function renderDashboard(){
       <div class="card stat clickable" onclick="openDashboardList('fatturare')"><p class="stat-label">Schede da fatturare</p><p class="stat-value" style="${daFatturare.length?'color:var(--accent)':''}">${daFatturare.length}</p><p class="stat-sub">contrassegnate "da fatturare"</p></div>
       <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${pezziDaOrdinare?'color:var(--teal)':''}">${pezziDaOrdinare}</p><p class="stat-sub">pezzi confermati da ordinare</p></div>
       <div class="card stat clickable" onclick="openDashboardList('ritirare')"><p class="stat-label">Ordini da ritirare</p><p class="stat-value" style="${ritiriDaFare.length?'color:var(--warn)':''}">${ritiriDaFare.length}</p><p class="stat-sub">lavorazioni esterne da ritirare</p></div>
-      <div class="card stat clickable" onclick="goTo('leads')"><p class="stat-label">Lead da confermare</p><p class="stat-value" style="${leadDaConfermare.length?'color:var(--accent)':''}">${leadDaConfermare.length}</p><p class="stat-sub">nuove richieste da qualificare</p></div>
+      <div class="card stat clickable" onclick="goTo('leads')"><p class="stat-label">Lead DA RICONTATTARE</p><p class="stat-value" style="${leadDaConfermare.length?'color:var(--accent)':''}">${leadDaConfermare.length}</p><p class="stat-sub">richieste da richiamare</p></div>
       <div class="card stat clickable" onclick="openDashboardList('scorte')"><p class="stat-label">Avvisi magazzino</p><p class="stat-value" style="${scorteBasse.length?'color:var(--danger)':''}">${scorteBasse.length}</p><p class="stat-sub">articoli a/scorta minima</p></div>
     </div>
 
