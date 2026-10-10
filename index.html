@@ -5208,6 +5208,7 @@ function openLeadDetail(id){
       <div class="lead-detail-box"><small>Oggetto</small>${escapeHtml(l.oggettoRichiesta||"—")}</div>
       <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(l.richiesta||"—")}</div></div>
     </div>
+    ${l.gmailMessageId ? `<div id="lead-gm-att" style="margin-top:14px;"></div>` : ""}
     ${!isNewCustomerOrder ? `<div class="modal-section" style="margin:16px 0 0;padding:14px 18px;">
       <h3 style="margin:0 0 10px;font-size:15px;">Preventivi</h3>
       ${leadQuotes(l.id).length ? leadQuotes(l.id).map(qt => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;">
@@ -5235,6 +5236,7 @@ function openLeadDetail(id){
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
+  if(l.gmailMessageId) gmAttLoadInto("lead-gm-att", l.gmailMessageId, {clientId:l.clientId||(linkedClient?linkedClient.id:""), email:l.email, orderId:l.convertedOrderId||""});
 }
 
 async function completeNewCustomerOrderWithClient(recordId, clientId){
@@ -7109,6 +7111,93 @@ async function openNoteAttachment(id){
   if(!a || !a.path) return;
   await dropboxDownloadFile(a.path, a.name || "allegato");
 }
+/* ---- Allegati di una mail: scarica e salva nell'ordine (Dropbox › FILE RICEVUTI) ---- */
+const gmAttCache={};
+async function gmAttLoadInto(boxId,messageId,ctx){
+  const box=document.getElementById(boxId); if(!box||!messageId) return;
+  box.innerHTML=`<p class="helptext" style="margin:0;">Cerco gli allegati della mail…</p>`;
+  try{
+    const m=await fetchGmailMessageById(messageId);
+    const atts=(Array.isArray(m?.attachments)?m.attachments:[]).map(a=>({
+      attachmentId:String(a?.attachmentId||a?.id||"").trim(),
+      filename:String(a?.filename||"allegato").trim()||"allegato",
+      mimeType:String(a?.mimeType||"application/octet-stream"),
+      size:Number(a?.size)||0
+    })).filter(a=>a.attachmentId);
+    gmAttCache[messageId]={atts,ctx:ctx||{}};
+    const now=document.getElementById(boxId); if(!now) return;
+    if(!atts.length){ now.innerHTML=""; return; }
+    now.innerHTML=`<div style="font-weight:800;margin:0 0 6px;">Allegati della mail (${atts.length})</div>`+atts.map((a,i)=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--border);">
+        <div style="min-width:0;word-break:break-word;">📎 ${escapeHtml(a.filename)}${a.size?` <span class="helptext">· ${mailFileSize(a.size)}</span>`:""}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="gmAttDownload('${messageId}',${i},this)">⬇ SCARICA</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="gmAttSave('${messageId}',${i})">SALVA NELL'ORDINE</button>
+        </div>
+      </div>`).join("");
+  }catch(err){
+    console.error("Allegati mail",err);
+    const now=document.getElementById(boxId);
+    if(now) now.innerHTML=`<p class="helptext" style="margin:0;">Non riesco a leggere gli allegati della mail.</p>`;
+  }
+}
+function gmAttSaveFromReader(i){
+  const m=gmailSelectedMessage; if(!m||!m.id) return;
+  const atts=(Array.isArray(m.attachments)?m.attachments:[]).map(a=>({attachmentId:String(a?.attachmentId||a?.id||"").trim(),filename:String(a?.filename||"allegato"),mimeType:String(a?.mimeType||"application/octet-stream"),size:Number(a?.size)||0}));
+  if(!atts[i]||!atts[i].attachmentId){ showToast("Allegato non disponibile"); return; }
+  gmAttCache[m.id]={atts,ctx:{email:gmailExtractAddress(m.from||"")}};
+  gmAttSave(m.id,i);
+}
+async function gmAttDownload(messageId,i,btn){
+  const a=gmAttCache[messageId]?.atts?.[i]; if(!a) return;
+  const old=btn?btn.textContent:""; if(btn){btn.disabled=true;btn.textContent="Scarico…";}
+  try{
+    const f=await fetchGmailAttachmentBlobByMeta(messageId,a);
+    const u=URL.createObjectURL(f.blob), l=document.createElement("a");
+    l.href=u; l.download=f.filename||a.filename; l.style.display="none"; document.body.appendChild(l); l.click(); l.remove();
+    setTimeout(()=>URL.revokeObjectURL(u),30000);
+  }catch(e){ console.error(e); showToast(e?.message||"Impossibile scaricare il file"); }
+  finally{ if(btn){btn.disabled=false;btn.textContent=old;} }
+}
+function gmAttSave(messageId,i){
+  const c=gmAttCache[messageId]; if(!c||!c.atts[i]) return;
+  const ctx=c.ctx||{};
+  if(ctx.orderId && findItem("orders",ctx.orderId)){ gmAttSaveDo(messageId,i,ctx.orderId); return; }
+  const client=ctx.clientId?state.clients.find(x=>x.id===ctx.clientId):findClientByEmail(ctx.email);
+  if(client){
+    const open=state.orders.filter(o=>o.clientId===client.id && o.stato!=="Consegnato");
+    if(open.length===1){ gmAttSaveDo(messageId,i,open[0].id); return; }
+  }
+  gmAttPickOrder(messageId,i,"",client?client.id:"");
+}
+function gmAttPickOrder(messageId,i,q,clientId){
+  const qq=String(q||"").trim().toLowerCase();
+  let list=state.orders.filter(o=>o.stato!=="Consegnato");
+  if(!qq && clientId) list=list.filter(o=>o.clientId===clientId);
+  else if(qq) list=list.filter(o=>{
+    const c=state.clients.find(x=>x.id===o.clientId);
+    return [clientDisplayName(c),o.numero||"",o.descrizione||""].join(" ").toLowerCase().includes(qq);
+  });
+  list=list.sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))).slice(0,20);
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2 style="margin-bottom:6px;">In quale ordine salvo il file?</h2>
+    <input id="gmAttQ" placeholder="Cerca per cliente, numero o descrizione..." value="${escapeHtml(q||"")}" oninput="gmAttPickOrder('${messageId}',${i},this.value,'${clientId||""}')" style="width:100%;margin-bottom:8px;">
+    ${list.map(o=>{const c=state.clients.find(x=>x.id===o.clientId);return `<div class="list-row" onclick="gmAttSaveDo('${messageId}',${i},'${o.id}')"><div><div class="lr-main">${o.numero?`#${escapeHtml(String(o.numero))} · `:""}${escapeHtml(clientDisplayName(c))}</div><div class="lr-sub">${escapeHtml(String(o.descrizione||orderCategorieLabel(o)||"Ordine").slice(0,70))} · ${escapeHtml(o.stato||"")}</div></div></div>`;}).join("")||`<p class="empty">Nessun ordine trovato.</p>`}`;
+  document.getElementById("modalBackdrop").classList.add("open");
+  const inp=document.getElementById("gmAttQ"); if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); }
+}
+async function gmAttSaveDo(messageId,i,orderId){
+  const o=findItem("orders",orderId); const a=gmAttCache[messageId]?.atts?.[i]; if(!o||!a) return;
+  if(!dropboxIsConnected()){ closeModal(); showToast("Dropbox non collegato"); return; }
+  closeModal(); showToast("Salvo il file nell'ordine…");
+  try{
+    const f=await fetchGmailAttachmentBlobByMeta(messageId,a);
+    await jobDropboxEnsureStructure(o.id);
+    await dropboxUploadBlob(`${jobDropboxBasePath(o)}/FILE RICEVUTI/${jobDropboxFileName(o,f.filename||a.filename)}`,f.blob);
+    showToast(`File salvato nell'ordine${o.numero?` #${o.numero}`:""} (Dropbox › FILE RICEVUTI)`);
+  }catch(e){ console.error(e); showToast(e?.message||"Impossibile salvare il file nell'ordine"); }
+}
 function openNoteFromGmail(){
   const m=gmailSelectedMessage;
   if(!m){ showToast("Apri prima una mail"); return; }
@@ -7117,7 +7206,7 @@ function openNoteFromGmail(){
   const tel=gmailExtractPhone(`${m.bodyText||""} ${m.bodyHtml||""}`)||"";
   const corpo=String(m.snippet||m.bodyText||"").replace(/\s+/g," ").trim().slice(0,300);
   const testo=[m.subject?String(m.subject).trim():"",corpo].filter(Boolean).join(" — ");
-  openNoteForm("",{nome,tel,email,testo,fonte:"gmail"});
+  openNoteForm("",{nome,tel,email,testo,fonte:"gmail",gmailMessageId:m.id||gmailSelectedId||""});
 }
 function openNoteForm(id,prefill){
   ensureNoteStyles();
@@ -7143,6 +7232,8 @@ function openNoteForm(id,prefill){
         ${all ? `<div style="margin-bottom:6px;font-size:14px;">📎 ${escapeHtml(all.name||"Allegato")} · <label style="font-weight:500;"><input type="checkbox" id="nota-f-rmfile"> togli allegato</label></div>` : ""}
         <input id="nota-f-file" type="file"></div>
       <input type="hidden" id="nota-f-fonte" value="${escapeHtml(pf.fonte||'')}">
+      <input type="hidden" id="nota-f-gmid" value="${escapeHtml(pf.gmailMessageId||(n&&n.extra&&n.extra.gmailMessageId)||'')}">
+      <div class="field full" id="nota-gm-att"></div>
     </div>
     <div class="form-actions" style="margin-top:18px;">
       <button class="btn btn-primary" id="nota-f-save" onclick="saveNoteForm('${n ? n.id : ''}')">Salva nota</button>
@@ -7151,6 +7242,8 @@ function openNoteForm(id,prefill){
   `;
   document.getElementById("modalBackdrop").classList.add("open");
   setTimeout(() => document.getElementById("nota-f-nome")?.focus(), 50);
+  const gmid = pf.gmailMessageId || (n && n.extra && n.extra.gmailMessageId) || "";
+  if(gmid) gmAttLoadInto("nota-gm-att", gmid, {clientId:(e&&e.clientId)||"", email:(c?c.email:(e.email||pf.email))||""});
 }
 async function saveNoteForm(id){
   const btn = document.getElementById("nota-f-save");
@@ -7197,6 +7290,8 @@ async function saveNoteForm(id){
     if(allegato) extra.allegato = allegato; else delete extra.allegato;
     const fonteNuova = String(document.getElementById("nota-f-fonte")?.value || "");
     if(fonteNuova && !extra.fonte) extra.fonte = fonteNuova;
+    const gmidNuovo = String(document.getElementById("nota-f-gmid")?.value || "");
+    if(gmidNuovo) extra.gmailMessageId = gmidNuovo;
     note.extra = extra;
   }
   const saved = await upsertOneReturning("noteComunicazioni", note);
@@ -15064,6 +15159,7 @@ function renderGmailReader(){
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); openGmailAttachment(${i})">Apri</button>
             <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); downloadGmailAttachment(${i})">Scarica</button>
+            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); gmAttSaveFromReader(${i})">Salva nell'ordine</button>
           </div>
         </div>`).join("")}
     </div>`:"";
