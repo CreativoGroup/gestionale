@@ -47,6 +47,9 @@
   nav.tabs button:hover{background:var(--sidebar-hover);color:var(--text);}
   nav.tabs button.active{background:var(--accent);color:#fff;}
   nav.tabs .icon{width:18px;text-align:center;}
+  nav.tabs .nav-mini-btn{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:3px 7px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);background:#fff;white-space:nowrap;}
+  nav.tabs .nav-mini-btn:hover{background:var(--accent);color:#fff;}
+  nav.tabs button.active .nav-mini-btn{border-color:#fff;color:var(--accent);}
   .sidebar-footer{margin-top:auto;padding:10px 8px;font-size:11px;color:var(--muted);line-height:1.5;}
   main{flex:1;min-width:0;padding:26px 30px 60px;}
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;flex-wrap:wrap;position:relative;z-index:100;}
@@ -2950,7 +2953,7 @@
 <div id="app" style="display:none;">
 
   <aside class="sidebar">
-    <div class="brand-logo">
+    <div class="brand-logo" onclick="goTo('dashboard')" title="Vai alla Dashboard" style="cursor:pointer;">
       <img src="data:image/png;base64,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" alt="Logo agenzia">
       <small>Gestionale — Grafica &amp; Stampa</small>
     </div>
@@ -4278,7 +4281,7 @@ function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, 
 }
 /* ============ NAVIGAZIONE ============ */
 const NAV = [
-  {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard"},
+  {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard", hidden:true},
 
   {id:"whatsappWeb", label:"WhatsApp Web", icon:"◉", subtitle:"Apre WhatsApp Web", group:"Traffico", externalUrl:"https://web.whatsapp.com/", hidden:true},
   {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico"},
@@ -4308,6 +4311,13 @@ function navBadgeHTML(n){
   const c=(typeof whatsappUnreadCount==="function") ? whatsappUnreadCount() : 0;
   return `<span class="wa-unread-badge" style="${c?"":"display:none;"}">${c>99?"99+":c}</span>`;
 }
+function navNuovoOrdine(){
+  goTo("ordini");
+  pendingLeadOrderConversion=null;
+  orderFormOpen=true;
+  const el=document.getElementById("orderForm");
+  if(el){ el.classList.add("open"); try{ el.scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){} }
+}
 function renderNav(){
   const items = visibleNav();
   const current = NAV.find(n=>n.id===currentView) || items[0];
@@ -4319,7 +4329,7 @@ function renderNav(){
     return `
       <div class="nav-group nav-group-${group.toLowerCase().replace(/\s+/g,"-")}">
         ${group==="Dashboard" ? "" : `<div class="nav-group-title">${group}</div>`}
-        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}${navBadgeHTML(n)}</button>`).join("")}
+        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}${navBadgeHTML(n)}${n.id==="ordini"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo ordine" onclick="event.stopPropagation();navNuovoOrdine()">+ NUOVO ORDINE</span>`:""}</button>`).join("")}
       </div>
     `;
   }).join("");
@@ -10707,31 +10717,22 @@ function toggleFasiSection(orderId){
 function renderRitiroEsternoSection(o){
   const righe=(o.righe||[]).filter(r=>isExternalCat(r.categoria));
   if(!righe.length) return "";
-
-  const selectedSupplier=String(righe.find(r=>String(r.fornitore||"").trim())?.fornitore||"").trim();
+  const fornitori=[...new Set(righe.map(r=>String(r.fornitore||r.sottocategoria||"").trim()).filter(Boolean))];
   const entries=getExternalLogisticsEntries(o);
-
+  const pending=entries.some(e=>e.status==="DA RITIRARE");
+  const done=!pending && entries.length>0 && entries.every(e=>e.status==="RITIRATO");
+  const stato = pending
+    ? `<span style="font-weight:800;color:var(--warn);">DA RITIRARE</span> <button class="btn btn-primary btn-sm" style="margin-left:10px;" onclick="segnaRitiroDaScheda('${o.id}')">SEGNA RITIRATO</button>`
+    : (done ? `<span style="font-weight:800;color:#2E9D57;">RITIRATO ✓</span>` : "");
   return `<div class="modal-section">
-    <h3>Lavorazioni esterne — fornitore e ritiro</h3>
-    <p class="helptext" style="margin-top:-4px;">Fornitore e gestione consegna/ritiro sono indipendenti dal numero di righe prodotto.</p>
-
-    <p style="margin:12px 0 16px;"><b>Fornitore:</b> ${selectedSupplier?escapeHtml([...new Set(righe.map(r=>String(r.fornitore||"").trim()).filter(Boolean))].join(", ")):`<span style="color:var(--muted);">scegli la sottocategoria nella riga della lavorazione</span>`}</p>
-
-    ${(!orderSupplierAutoPickup(o) && !entries.some(e=>e.status==="DA RITIRARE")) ? `<p class="helptext" style="margin:0;">Con questo fornitore non serve segnare il ritiro. Per Presstime, Former, 4C Serigrafia, Officine del Cotone e Ricamarte l'ordine va in DA RITIRARE in automatico.</p>` : `${orderSupplierAutoPickup(o)?`<p class="helptext" style="margin:0 0 8px;">Ordine in DA RITIRARE in automatico. Quando lo ritiri, spunta RITIRATO.</p>`:""}
-    <div class="external-logistics-list">
-      ${entries.map((e,idx)=>`<div class="external-logistics-row">
-        <div class="external-logistics-head">
-          <div class="external-logistics-title">Consegna / ritiro ${idx+1}</div>
-          ${entries.length>1?`<button class="btn btn-ghost btn-sm" onclick="removeExternalLogisticsEntry('${o.id}','${e.id}')">Rimuovi</button>`:""}
-        </div>
-        <div class="external-logistics-actions">
-          ${["CONSEGNA IN SEDE","DA RITIRARE","RITIRATO"].map(st=>`<label class="checkfield" style="font-weight:${e.status===st?'800':'600'};"><input type="radio" name="ritiro-entry-${e.id}" ${e.status===st?'checked':''} onchange="updateExternalLogisticsStatus('${o.id}','${e.id}','${st}')"> ${st}</label>`).join("")}
-        </div>
-      </div>`).join("")}
-    </div>
-
-    <button class="btn btn-outline btn-sm external-logistics-add" onclick="addExternalLogisticsEntry('${o.id}')">+ AGGIUNGI CONSEGNA / RITIRO</button>`}
+    <h3>Lavorazioni esterne</h3>
+    <p style="margin:10px 0 ${stato?'10px':'0'};"><b>Fornitore:</b> ${fornitori.length?escapeHtml(fornitori.join(", ")):`<span style="color:var(--muted);">scegli la sottocategoria nella riga della lavorazione</span>`}</p>
+    ${stato?`<p style="margin:0;">${stato}</p>`:""}
   </div>`;
+}
+async function segnaRitiroDaScheda(orderId){
+  await segnaRitiroCompletato(orderId);
+  openJobCard(orderId);
 }
 function updateFornitoreEsternoUnico(orderId,value){
   const o=findItem('orders',orderId);
