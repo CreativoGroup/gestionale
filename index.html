@@ -7028,8 +7028,8 @@ function renderDashboard(){
           </div>
           <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
             <div style="text-align:right;"><div class="lr-main">${fmtDate(a.data)}</div><div class="lr-sub">${a.ora}</div></div>
-            <button class="btn btn-outline btn-sm" onclick="modificaAppuntamento('${a.id}')">MODIFICA</button>
-            <button class="btn btn-ghost btn-sm" onclick="deleteAppuntamento('${a.id}')">✕</button>
+            <button class="btn btn-outline btn-sm" title="Modifica" aria-label="Modifica" style="padding:6px 10px;font-size:15px;line-height:1;" onclick="modificaAppuntamento('${a.id}')">✎</button>
+            <button class="btn btn-ghost btn-sm" title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" onclick="deleteAppuntamento('${a.id}')">🗑</button>
           </div>
         </div>`).join("") : `<p class="empty">Nessun appuntamento in programma.</p>`}
     </div>
