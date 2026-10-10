@@ -6822,7 +6822,13 @@ function agendaStyles(){
   .ag-grid .full{grid-column:1/-1}
   .ag-box{margin-top:16px;padding:14px;border:1px solid var(--border);border-radius:14px;background:#FBFCFD}
   .ag-box h4{margin:0 0 10px;font-size:14px}
-  .ag-fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-bottom:10px}
+  .ag-fotos{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:10px}
+  .ag-fcard{border:1px solid var(--border);border-radius:14px;background:#fff;padding:10px;display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;align-items:start}
+  .ag-fcard .ag-foto{aspect-ratio:1/1}
+  .ag-ftxt{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .modal .ag-ftxt input,.modal .ag-ftxt textarea{width:100%;border:1px solid var(--border);border-radius:12px;padding:8px 12px;font:inherit;background:#fff;min-width:0}
+  .ag-ftxt textarea{min-height:64px!important;resize:vertical}
+  @media(max-width:520px){.ag-fcard{grid-template-columns:96px minmax(0,1fr)}}
   .ag-foto{position:relative;border-radius:10px;overflow:hidden;background:#E2E8F0;aspect-ratio:1/1}
   .ag-foto img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
   .ag-foto button{position:absolute;top:4px;right:4px;border:none;border-radius:8px;background:rgba(15,23,42,.65);color:#fff;width:28px;height:28px;cursor:pointer}
@@ -6898,7 +6904,7 @@ function renderAgenda(){
       </div>`;
     }
     const a=x.a, t=AGENDA_TIPI[a.tipo]||AGENDA_TIPI.appuntamento;
-    const extra=a.tipo==="sopralluogo"?` · 📷 ${(a.foto||[]).length} · 📏 ${(a.misure||[]).length}`:"";
+    const extra=a.tipo==="sopralluogo"?` · 📷 ${(a.foto||[]).length}`:"";
     return `<div class="ag-row ${x.done?"done":""}" onclick="openAgendaItem('${a.id}')">
       <div class="ag-ic">${t.ic}</div>
       <div class="ag-main"><div class="ag-title">${escapeHtml(agendaTitle(a))}</div>
@@ -7035,7 +7041,7 @@ function openAgendaItem(id,keepScroll){
         </div></div>
     </div>
     ${sop?`
-    <div class="ag-box"><p class="helptext" style="margin:0;">Quando sei sul posto: scatta le foto e scrivi le misure e gli appunti qui sotto. Si salva da solo.</p></div>
+    <div class="ag-box"><p class="helptext" style="margin:0;">Quando sei sul posto: scatta le foto e scrivi per ognuna descrizione e misura. Si salva da solo.</p></div>
     <div class="ag-box"><h4>📷 Foto</h4>
       <div id="ag-foto" class="ag-fotos"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -7044,12 +7050,7 @@ function openAgendaItem(id,keepScroll){
       </div>
       <div class="helptext" style="margin-top:6px;">Le foto vanno su Dropbox, nella cartella SOPRALLUOGHI.</div>
     </div>
-    <div class="ag-box"><h4>📏 Misure</h4>
-      <div id="ag-misure"></div>
-      <div class="ag-presets">
-        ${["Larghezza","Altezza","Profondità","Altra misura"].map(l=>`<button type="button" class="btn btn-outline btn-sm" onclick="agendaMisuraAdd('${a.id}','${l==="Altra misura"?"":l}')">+ ${l}</button>`).join("")}
-      </div>
-    </div>`:""}
+    `:""}
     ${(isNew&&a.tipo==="sopralluogo")?"":`<div class="ag-box"><h4>📝 Appunti</h4>
       <textarea rows="${sop?3:4}" style="width:100%" placeholder="${sop?"Cosa hai visto, cosa serve, accordi con il cliente…":"Note"}" oninput="agendaSet('${a.id}','note',this.value)">${escapeHtml(a.note)}</textarea>
     </div>`}
@@ -7063,7 +7064,7 @@ function openAgendaItem(id,keepScroll){
     </div>`;
   document.getElementById("modalBackdrop").classList.add("open");
   if(keepScroll) body.parentElement.scrollTop=scroll;
-  if(sop){ agendaRenderMisure(a.id); agendaRenderFoto(a.id); }
+  if(sop){ agendaRenderFoto(a.id); }
 }
 /* ---- Misure ---- */
 function agendaRenderMisure(id){
@@ -7127,10 +7128,13 @@ async function agendaThumbUrl(path){
 }
 function agendaRenderFoto(id){
   const a=agendaGet(id), box=document.getElementById("ag-foto"); if(!a||!box) return;
-  box.innerHTML=(a.foto||[]).map(f=>`<div class="ag-foto"><img data-p="${escapeHtml(f.path)}" alt="" onclick="agendaOpenPhoto(this)"><button type="button" title="Elimina foto" onclick="agendaDeletePhoto('${id}','${f.id}')">🗑</button></div>`).join("");
+  box.innerHTML=(a.foto||[]).map(f=>`<div class="ag-fcard"><div class="ag-foto"><img data-p="${escapeHtml(f.path)}" alt="" onclick="agendaOpenPhoto(this)"><button type="button" title="Elimina foto" onclick="agendaDeletePhoto('${id}','${f.id}')">🗑</button></div>
+    <div class="ag-ftxt"><textarea rows="2" placeholder="Descrizione (cosa si vede, dove)" oninput="agendaPhotoSet('${id}','${f.id}','nota',this.value)">${escapeHtml(f.nota||"")}</textarea>
+    <input value="${escapeHtml(f.misura||"")}" placeholder="Misura (es. 240x120)" oninput="agendaPhotoSet('${id}','${f.id}','misura',this.value)"></div></div>`).join("");
   box.querySelectorAll("img").forEach(img=>{ agendaThumbUrl(img.dataset.p).then(u=>{ img.src=u; }).catch(()=>{ img.alt="non disponibile"; }); });
   box.style.display=(a.foto||[]).length?"grid":"none";
 }
+function agendaPhotoSet(id,fid,field,val){ const a=agendaGet(id); const f=a&&(a.foto||[]).find(x=>x.id===fid); if(!f) return; f[field]=val; agendaQueue(id); }
 function agendaOpenPhoto(img){
   if(!img.src) return;
   const d=document.createElement("div"); d.className="ag-lightbox"; d.onclick=()=>d.remove();
@@ -7148,7 +7152,7 @@ function agendaDeletePhoto(id,fid){
 function agendaSummaryText(a){
   const d=a.data?fmtDate(a.data):"";
   const mis=(a.misure||[]).filter(m=>m.label||m.value).map(m=>`- ${m.label||"Misura"}: ${m.value||""}`).join("\n");
-  return [`— ${AGENDA_TIPI[a.tipo].l.toUpperCase()} del ${d} —`, a.luogo?`Dove: ${a.luogo}`:"", mis?`Misure:\n${mis}`:"", a.note?`Appunti: ${a.note}`:"", (a.foto||[]).length?`Foto: ${(a.foto||[]).length} (cartella FILE RICEVUTI dell'ordine)`:""].filter(Boolean).join("\n");
+  return [`— ${AGENDA_TIPI[a.tipo].l.toUpperCase()} del ${d} —`, a.luogo?`Dove: ${a.luogo}`:"", mis?`Misure:\n${mis}`:"", a.note?`Appunti: ${a.note}`:"", (a.foto||[]).length?`Foto (${(a.foto||[]).length}, nella cartella FILE RICEVUTI):\n`+(a.foto||[]).map((f,i)=>`- Foto ${i+1}${f.nota?`: ${f.nota}`:""}${f.misura?` — ${f.misura}`:""}`).join("\n"):""].filter(Boolean).join("\n");
 }
 async function agendaSendToOrder(id,orderId,silent){
   const a=agendaGet(id), o=findItem("orders",orderId); if(!a||!o) return;
