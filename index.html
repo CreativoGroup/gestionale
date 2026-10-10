@@ -6664,6 +6664,8 @@ function ensureNoteStyles(){
     .nota-list{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;}
     .nota-row{display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(150px,1.1fr) minmax(220px,3fr) auto;gap:10px 16px;align-items:start;padding:12px 16px;border-bottom:1px solid var(--border);}
     .nota-row:last-child{border-bottom:0;}
+    .nota-row.nota-appunto{grid-template-columns:1fr auto;align-items:center;}
+    .nota-row.nota-appunto .nota-body{font-size:16px;font-weight:700;line-height:1.4;}
     .nota-c-text .nota-body{white-space:pre-wrap;word-break:break-word;}
     .nota-c-text .nota-body.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
     .nota-more{background:none;border:0;padding:4px 0 0;color:var(--accent,#F05B37);font-weight:700;font-size:12.5px;cursor:pointer;}
@@ -6701,7 +6703,18 @@ function noteFonteIcon(n){
   if(f === "gmail") return `<span class="nota-src" title="Da Gmail"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="#EA4335" d="M2 6.5 12 14l10-7.5V5a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/><path fill="#C5221F" d="M2 6.5V19a1 1 0 0 0 1 1h3V9.8zM22 6.5V19a1 1 0 0 1-1 1h-3V9.8z"/></svg></span>`;
   return "";
 }
+function noteIsAppunto(n){ return noteExtra(n).fonte==="appunto" || (String(n.nomePersona||"")==="Appunto" && !noteExtra(n).telefono && !noteExtra(n).email); }
 function noteRowHTML(n){
+  if(noteIsAppunto(n)){
+    const t=String(n.testo||"");
+    return `<div class="nota-row nota-appunto" title="${escapeHtml(noteDateLabel(n.creatoIl))}${n.operatore?` · ${escapeHtml(n.operatore)}`:""}">
+      <div class="nota-c-text"><div class="nota-body">${escapeHtml(t)}</div></div>
+      <div class="nota-c-actions">
+        <button class="btn btn-primary btn-sm" title="Fatto: elimina l'appunto" onclick="markNotaFatta('${n.id}')">FATTO</button>
+        <button class="btn btn-ghost btn-sm" title="Modifica" onclick="openNoteForm('${n.id}')">✎</button>
+      </div>
+    </div>`;
+  }
   const e = noteExtra(n), c = e.clientId ? state.clients.find(x => x.id === e.clientId) : null;
   const nome = c ? clientDisplayName(c) : (n.nomePersona || "Senza nome");
   const tel = c ? c.telefono : e.telefono, mail = c ? c.email : e.email;
