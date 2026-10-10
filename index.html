@@ -4322,27 +4322,40 @@ function navNuovoAppunto(){
   goTo("note");
   openAppuntoForm();
 }
-function openAppuntoForm(){
+function openAppuntoForm(id){
   ensureNoteStyles();
+  const ex = id ? findItem("noteComunicazioni", id) : null;
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
-    <h2 style="margin-bottom:14px;">Nuovo appunto</h2>
+    <h2 style="margin-bottom:14px;">${ex?"Modifica appunto":"Nuovo appunto"}</h2>
     <div class="nota-form">
       <div class="field full"><label>Descrizione *</label>
-        <textarea id="appunto-testo" rows="4" placeholder="Es. Chiamare Mario Ribalta · ordinare materiale da Euroma…"></textarea></div>
+        <textarea id="appunto-testo" rows="4" placeholder="Es. Chiamare Mario Ribalta · ordinare materiale da Euroma…">${escapeHtml(ex?ex.testo||"":"")}</textarea></div>
     </div>
     <div class="form-actions" style="margin-top:18px;">
-      <button class="btn btn-primary" id="appunto-save" onclick="saveAppunto()">Salva appunto</button>
+      <button class="btn btn-primary" id="appunto-save" onclick="saveAppunto('${ex?ex.id:""}')">Salva appunto</button>
       <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
     </div>`;
   document.getElementById("modalBackdrop").classList.add("open");
   setTimeout(()=>document.getElementById("appunto-testo")?.focus(),50);
 }
-async function saveAppunto(){
+async function saveAppunto(id){
   const btn=document.getElementById("appunto-save");
   const testo=String(document.getElementById("appunto-testo")?.value||"").trim();
   if(!testo){ showToast("Scrivi la descrizione"); return; }
   if(btn){ btn.disabled=true; btn.textContent="Salvataggio…"; }
+  const prev = id ? findItem("noteComunicazioni", id) : null;
+  if(prev){
+    const upd = Object.assign({}, prev, {testo});
+    const saved0 = await upsertOneReturning("noteComunicazioni", upd);
+    if(!saved0){ if(btn){ btn.disabled=false; btn.textContent="Salva appunto"; } return; }
+    const k = state.noteComunicazioni.findIndex(x=>x.id===saved0.id);
+    if(k>=0) state.noteComunicazioni[k]=saved0;
+    closeModal();
+    if(currentView==="note") renderNote();
+    showToast("Appunto aggiornato");
+    return;
+  }
   const note={id:uid(), tipo:"Comunicazione", fatto:false, creatoIl:new Date().toISOString(), fattoIl:"", nomePersona:"Appunto", testo};
   const nomeUtente=String(currentUser?.nome||"").trim();
   const noto=NOTE_OPERATORS.find(o=>o.toLowerCase()===nomeUtente.toLowerCase());
@@ -6797,6 +6810,7 @@ function noteRowHTML(n){
     return `<div class="nota-row nota-appunto" title="${escapeHtml(noteDateLabel(n.creatoIl))}${n.operatore?` · ${escapeHtml(n.operatore)}`:""}">
       <div class="nota-c-text"><div class="nota-body">${escapeHtml(t)}</div></div>
       <div class="nota-c-actions">
+        <button class="btn btn-ghost btn-sm" title="Modifica" aria-label="Modifica" onclick="openAppuntoForm('${n.id}')">✎</button>
         <button class="btn btn-primary btn-sm" title="Fatto: elimina l'appunto" onclick="markNotaFatta('${n.id}')">FATTO</button>
       </div>
     </div>`;
