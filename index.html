@@ -6149,6 +6149,37 @@ function deleteWhatsappConversation(waId){
     showToast("Conversazione eliminata");
   });
 }
+async function downloadWhatsappMedia(rowId, btn){
+  const old = btn ? btn.textContent : "";
+  if(btn){ btn.disabled = true; btn.textContent = "Scarico…"; }
+  try{
+    const {data:sd} = await sb.auth.getSession();
+    const token = sd?.session?.access_token;
+    if(!token) throw new Error("Sessione del gestionale non disponibile.");
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-media`,{
+      method:"POST",
+      headers:{Authorization:`Bearer ${token}`, apikey:SUPABASE_KEY, "Content-Type":"application/json"},
+      body:JSON.stringify({id:rowId})
+    });
+    if(!res.ok){
+      let msg = `Errore ${res.status}`;
+      try{ const j = await res.json(); msg = j.error || msg; }catch(e){}
+      throw new Error(msg);
+    }
+    const name = decodeURIComponent(res.headers.get("X-File-Name") || "allegato");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name; a.style.display = "none";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 30000);
+  }catch(err){
+    console.error("Download allegato WhatsApp", err);
+    showToast(err?.message || "Impossibile scaricare il file");
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = old; }
+  }
+}
 function createNoteFromWhatsapp(waId){
   const conv=whatsappConversationGroups().find(x=>x.waId===waId);
   if(!conv) return;
@@ -6537,6 +6568,8 @@ function renderWhatsapp(){
 
               return `<div class="wa-bubble ${out?"out":"in"}">
                 <div style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(m.body||`[${m.messageType||"Messaggio"}]`)}</div>
+                ${!out && ["document","image","audio","video","sticker"].includes(String(m.messageType||"").toLowerCase())
+                  ? `<div style="margin-top:6px;"><button class="btn btn-outline btn-sm" onclick="downloadWhatsappMedia('${m.id}',this)">⬇ SCARICA FILE</button></div>` : ""}
                 <div class="wa-bubble-meta">
                   ${label}
                   <span>${waDateLabel(m.messageTimestamp||m.createdAt)}</span>
