@@ -2952,6 +2952,7 @@
   .app-topbar #topbarHeading{display:flex;align-items:center;gap:12px}
   .mob-logo{display:block;height:28px;width:auto;flex:0 0 auto;cursor:pointer;padding-right:12px;border-right:1px solid var(--border)}
   .mob-title-wrap{min-width:0}
+  #topbarActions .btn{min-height:40px!important;height:40px;padding:0 16px!important;font-size:13px!important;box-shadow:0 4px 12px rgba(20,29,43,.22)!important}
 }
 @media(max-width:760px){
   .wa-back{display:inline-flex;margin-bottom:8px}
@@ -7068,6 +7069,24 @@ function ensureNoteStyles(){
     .nota-c-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;}
     .nota-file{background:#EEF1F3;border:0;border-radius:999px;padding:4px 11px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--text);}
     @media(max-width:900px){.nota-row{grid-template-columns:1fr;}.nota-c-actions{justify-content:flex-start;}}
+    @media(max-width:760px){
+      .nota-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name actions" "contact contact" "text text";gap:4px 8px;padding:12px 4px;align-items:center;}
+      .nota-row .nota-c-name{grid-area:name;min-width:0}
+      .nota-row .nota-c-actions{grid-area:actions;flex-wrap:nowrap;gap:4px;justify-content:flex-end;align-items:center}
+      .nota-row .nota-c-contact{grid-area:contact;flex-direction:row;flex-wrap:wrap;gap:4px 14px;font-size:13px}
+      .nota-row .nota-c-contact:has(> .nota-foot){display:none}
+      .nota-row .nota-c-text{grid-area:text;font-size:14px;line-height:1.4;color:var(--text)}
+      .nota-c-actions .btn-sm{min-height:32px!important;height:32px;padding:0 12px;font-size:11.5px;letter-spacing:.02em;box-shadow:none}
+      .nota-c-actions .btn-ghost.btn-sm{width:32px;padding:0;font-size:15px;color:var(--muted)}
+      .nota-c-actions .btn-outline.btn-sm{border:none;background:transparent;padding:0 6px;color:var(--accent)}
+      .nota-c-actions .btn-primary.btn-sm{height:30px;min-height:30px!important;padding:0 11px;font-size:11px;border-radius:999px}
+      .nota-row.nota-appunto{grid-template-areas:none;grid-template-columns:minmax(0,1fr) auto;padding:10px 4px}
+      .nota-row.nota-appunto .nota-c-text,.nota-row.nota-appunto .nota-c-actions{grid-area:auto}
+      .nota-row.nota-appunto .nota-body{font-size:15px;font-weight:600}
+      .nota-row:nth-child(even){background:transparent}
+      .nota-c-name strong{font-size:15px}
+      .nota-foot{font-size:12px}
+    }
   </style>`);
 }
 function noteSortKey(a, b){
