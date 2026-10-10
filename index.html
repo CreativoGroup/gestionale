@@ -11652,7 +11652,7 @@ function openJobCard(orderId){
         <div class="job-v2-info-grid">
           <div class="job-v2-info-cell">
             <label>Cliente</label>
-            <div class="job-v2-info-main">${c?escapeHtml(clientDisplayName(c)):"—"}</div>
+            <div class="job-v2-info-main">${c?escapeHtml(clientDisplayName(c)):"—"} <button class="btn btn-ghost btn-sm" title="Cambia cliente" aria-label="Cambia cliente" style="padding:2px 8px;font-size:14px;line-height:1;vertical-align:middle;" onclick="openChangeOrderClient('${o.id}')">✎</button></div>
             ${c?.email?`<div class="job-v2-info-sub">${escapeHtml(c.email)}</div>`:""}
             ${c?.telefono?`<div class="job-v2-info-sub">${escapeHtml(c.telefono)}</div>`:""}
             ${c?`<button class="btn btn-outline btn-sm" style="margin-top:9px;" onclick="openClientHistory('${c.id}')">ANAGRAFICA CLIENTE</button>${waMePhone(c.telefono)?`<button class="btn btn-outline btn-sm" style="margin-top:9px;margin-left:6px;" onclick="openClientWhatsapp('${c.id}')">WHATSAPP</button>`:""}`:""}
@@ -12126,6 +12126,45 @@ async function updateOrderField(orderId, field, value){
   saveState('orders');
 }
 
+function openChangeOrderClient(orderId){
+  const o=findItem('orders',orderId); if(!o) return;
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="openJobCard('${orderId}')">×</button>
+    <h2 style="margin-bottom:6px;">Cambia cliente</h2>
+    <p class="helptext" style="margin-top:0;">Attuale: <b>${escapeHtml(clientName(o.clientId))}</b>. Cerca il nuovo cliente e toccalo.</p>
+    <div class="field"><input id="chg-client-q" type="search" autocomplete="off" placeholder="Scrivi il nome del cliente…" oninput="renderChangeOrderClientList('${orderId}')"></div>
+    <div id="chg-client-list"></div>
+    <div class="form-actions" style="margin-top:14px;"><button class="btn btn-outline" onclick="openJobCard('${orderId}')">Annulla</button></div>`;
+  document.getElementById("modalBackdrop").classList.add("open");
+  setTimeout(()=>document.getElementById("chg-client-q")?.focus(),50);
+}
+function renderChangeOrderClientList(orderId){
+  const box=document.getElementById("chg-client-list"); if(!box) return;
+  const n=clientSearchNorm(document.getElementById("chg-client-q")?.value||"");
+  if(!n){ box.innerHTML=""; return; }
+  const o=findItem('orders',orderId);
+  const list=state.clients.filter(c=>c.id!==o?.clientId && n.split(/\s+/).every(t=>clientSearchNorm([clientDisplayName(c),c.ragioneSociale,c.nomeCommerciale,c.refNome,c.refCognome,c.nome,c.cognome,c.telefono,c.email].join(" ")).includes(t))).slice(0,10);
+  box.innerHTML=list.length ? list.map(c=>`<div class="list-row" onclick="confirmChangeOrderClient('${orderId}','${c.id}')"><div><div class="lr-main">${escapeHtml(clientDisplayName(c))}</div><div class="lr-sub">${escapeHtml([c.telefono,c.email].filter(Boolean).join(" · "))}</div></div></div>`).join("") : `<p class="empty">Nessun cliente trovato.</p>`;
+}
+async function confirmChangeOrderClient(orderId, clientId){
+  const o=findItem('orders',orderId); if(!o) return;
+  if(!confirm(`Spostare questo ordine su ${clientName(clientId)}?\n\nI pagamenti già registrati seguono l'ordine. I file già salvati in Dropbox restano nella cartella del cliente precedente.`)) return;
+  const oldClient=o.clientId;
+  o.clientId=clientId;
+  const saved=await upsertOneReturning('orders',o);
+  if(!saved){ o.clientId=oldClient; showToast("Cliente non cambiato: riprova"); openJobCard(orderId); return; }
+  const i=state.orders.findIndex(x=>x.id===orderId);
+  if(i>=0) state.orders[i]=saved;
+  let pagCambiati=false;
+  (state.payments||[]).forEach(p=>{ if(p.orderId===orderId && p.clientId!==clientId){ p.clientId=clientId; pagCambiati=true; } });
+  if(pagCambiati) await saveState('payments');
+  if(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId){
+    jobCardEditSnapshot.order=JSON.parse(JSON.stringify(saved));
+  }
+  openJobCard(orderId);
+  renderCurrentView();
+  showToast(`Ordine spostato su ${clientName(clientId)}`);
+}
 async function setClienteAvvisatoFromCard(orderId, checked){
   const o=findItem('orders',orderId);
   if(!o) return;
