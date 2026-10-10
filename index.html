@@ -3088,7 +3088,6 @@
     <section class="view" id="view-posta"></section>
     <section class="view" id="view-whatsapp"></section>
     <section class="view" id="view-instagram"></section>
-    <section class="view" id="view-agenda"></section>
     <section class="view" id="view-leads"></section>
     <section class="view" id="view-leadOrdine"></section>
   </main>
@@ -3345,19 +3344,16 @@ function computeScorteMonitorate(){
 }
 
 /* ============ STATO ============ */
-let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[], leads:[], gmailActionStatus:[], noteComunicazioni:[], whatsappMessages:[], agenda:[]};
+let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expenses:[], fixedCosts:[], entrate:[], appuntamenti:[], leads:[], gmailActionStatus:[], noteComunicazioni:[], whatsappMessages:[]};
 let currentView = "dashboard";
 /* Colonne "extra" (jsonb) per dati aggiuntivi di preventivi e note: servono una colonna su Supabase (script SQL mostrato nell'app). */
 const DB_EXTRA = {quotes:false, noteComunicazioni:false};
-let DB_AGPERS = false; /* colonna agenda.persone presente su Supabase? */
 let DB_ALLEST = false; /* colonna orders.allestimento_indirizzo presente su Supabase? */
 let DB_CONSEGNATO = false; /* colonna orders.consegnato_il presente su Supabase? */
 const DB_CONSEGNATO_SQL = "alter table public.orders add column if not exists consegnato_il timestamptz;";
 const DB_ALLEST_SQL = "alter table public.orders add column if not exists allestimento_indirizzo text;";
 const DB_EXTRA_SQL = "alter table public.quotes add column if not exists extra jsonb default '{}'::jsonb;\nalter table public.note_comunicazioni add column if not exists extra jsonb default '{}'::jsonb;";
 async function probeDbExtraColumns(){
-  try{ const {error} = await sb.from("agenda").select("id,persone").limit(1); DB_AGPERS = !error; }
-  catch(e){ DB_AGPERS = false; }
   try{ const {error} = await sb.from("orders").select("id,allestimento_indirizzo").limit(1); DB_ALLEST = !error; }
   catch(e){ DB_ALLEST = false; }
   try{ const {error} = await sb.from("orders").select("id,consegnato_il").limit(1); DB_CONSEGNATO = !error; }
@@ -3367,7 +3363,7 @@ async function probeDbExtraColumns(){
     catch(e){ DB_EXTRA[coll] = false; }
   }
 }
-const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads", gmailActionStatus:"gmail_action_status", noteComunicazioni:"note_comunicazioni", whatsappMessages:"whatsapp_messages", agenda:"agenda"};
+const TABLES = {clients:"clients", quotes:"quotes", orders:"orders", warehouse:"warehouse", payments:"payments", expenses:"expenses", fixedCosts:"fixed_costs", entrate:"entrate", appuntamenti:"appuntamenti", leads:"leads", gmailActionStatus:"gmail_action_status", noteComunicazioni:"note_comunicazioni", whatsappMessages:"whatsapp_messages"};
 
 /* Sincronizzazione multi-dispositivo: salva solo le righe davvero cambiate e rilegge periodicamente Supabase. */
 const syncSnapshots = {};
@@ -3411,7 +3407,6 @@ function toDbRow(collection, o){
     case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, client_id:o.clientId||null, converted_order_id:o.convertedOrderId||null, converted_at:o.convertedAt||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
     case "noteComunicazioni": return {id:o.id, tipo:o.tipo||"Chiamata", nome_persona:o.nomePersona||null, testo:o.testo||null, operatore:o.operatore||null, fatto:!!o.fatto, creato_il:o.creatoIl||new Date().toISOString(), fatto_il:o.fattoIl||null, ...(DB_EXTRA.noteComunicazioni?{extra:o.extra||{}}:{})};
     case "gmailActionStatus": return {id:o.id, gmail_message_id:o.gmailMessageId, replied:!!o.replied, lead_generated:!!o.leadGenerated, order_generated:!!o.orderGenerated, updated_at:o.updatedAt||new Date().toISOString()};
-    case "agenda": return {id:o.id, tipo:o.tipo||"appuntamento", titolo:o.titolo||null, client_id:o.clientId||null, cliente_nome:o.clienteNome||null, data:o.data||null, ora:o.ora||null, luogo:o.luogo||null, stato:o.stato||"Da fare", note:o.note||null, misure:o.misure||[], foto:o.foto||[], order_id:o.orderId||null, created_at:o.createdAt||null, updated_at:o.updatedAt||null, ...(DB_AGPERS?{persone:o.persone||null}:{})};
     case "whatsappMessages": return {id:o.id, whatsapp_message_id:o.whatsappMessageId||null, wa_id:o.waId||null, contact_name:o.contactName||null, from_number:o.fromNumber||null, phone_number_id:o.phoneNumberId||null, display_phone_number:o.displayPhoneNumber||null, direction:o.direction||"inbound", message_type:o.messageType||null, body:o.body||null, message_timestamp:o.messageTimestamp||null, status:o.status||null, raw_payload:o.rawPayload||null, created_at:o.createdAt||null};
   }
 }
@@ -3441,7 +3436,6 @@ function fromDbRow(collection, r){
     case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
     case "noteComunicazioni": return {id:r.id, tipo:r.tipo||"Chiamata", nomePersona:r.nome_persona||"", testo:r.testo||"", operatore:r.operatore||"", fatto:!!r.fatto, creatoIl:r.creato_il||"", fattoIl:r.fatto_il||"", extra:r.extra||{}};
     case "gmailActionStatus": return {id:r.id, gmailMessageId:r.gmail_message_id||"", replied:!!r.replied, leadGenerated:!!r.lead_generated, orderGenerated:!!r.order_generated, updatedAt:r.updated_at||""};
-    case "agenda": return {id:r.id, tipo:r.tipo||"appuntamento", titolo:r.titolo||"", clientId:r.client_id||"", clienteNome:r.cliente_nome||"", data:r.data||"", ora:r.ora||"", luogo:r.luogo||"", stato:r.stato||"Da fare", note:r.note||"", misure:Array.isArray(r.misure)?r.misure:[], foto:Array.isArray(r.foto)?r.foto:[], orderId:r.order_id||"", persone:r.persone||"", createdAt:r.created_at||"", updatedAt:r.updated_at||""};
     case "whatsappMessages": return {id:r.id, whatsappMessageId:r.whatsapp_message_id||"", waId:r.wa_id||"", contactName:r.contact_name||"", fromNumber:r.from_number||"", phoneNumberId:r.phone_number_id||"", displayPhoneNumber:r.display_phone_number||"", direction:r.direction||"inbound", messageType:r.message_type||"", body:r.body||"", messageTimestamp:r.message_timestamp||r.created_at||"", status:r.status||"", rawPayload:r.raw_payload||null, createdAt:r.created_at||""};
   }
 }
@@ -4393,7 +4387,6 @@ const NAV = [
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
   {id:"lavoriCompletati", label:"Lavori completati", icon:"✓", subtitle:"Da consegnare e completati recenti", group:"Operativa", hidden:true},
 
-  {id:"agenda", label:"Agenda", icon:"▤", subtitle:"Appuntamenti, sopralluoghi e allestimenti", group:"Agenda"},
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Archivio"},
   {id:"dropbox", label:"Dropbox", icon:"☁", subtitle:"Archivio file collegato al gestionale", group:"Archivio"},
 
@@ -4471,7 +4464,7 @@ function navNuovoOrdine(){
 function renderNav(){
   const items = visibleNav();
   const current = NAV.find(n=>n.id===currentView) || items[0];
-  const groups = ["Dashboard","Traffico","Info e richieste","Agenda","Anagrafica","Operativa","Archivio","Amministrazione"];
+  const groups = ["Dashboard","Traffico","Info e richieste","Anagrafica","Operativa","Archivio","Amministrazione"];
 
   const groupedButtons = groups.map(group=>{
     const groupItems = items.filter(n=>n.group===group);
@@ -4512,7 +4505,7 @@ function renderNav(){
 }
 
 /* ===== MOBILE V2: barra in basso, scheda "Altro", tabelle a schede ===== */
-const MOB_TABS=[{id:"whatsapp",l:"WhatsApp",i:"◉"},{id:"instagram",l:"Instagram",i:"◎"},{id:"agenda",l:"Agenda",i:"▤"},{id:"note",l:"Note",i:"✎"},{id:"ordini",l:"Ordini",i:"▣"}];
+const MOB_TABS=[{id:"whatsapp",l:"WhatsApp",i:"◉"},{id:"instagram",l:"Instagram",i:"◎"},{id:"note",l:"Note",i:"✎"},{id:"ordini",l:"Ordini",i:"▣"}];
 function mobLabel(n){ return typeof n.label==="function"?n.label():n.label; }
 function renderMobBar(){
   const bar=document.getElementById("mobBar"), sh=document.getElementById("mobSheet");
@@ -4522,7 +4515,7 @@ function renderMobBar(){
   const inTabs=tabs.some(t=>t.id===currentView);
   bar.innerHTML=tabs.map(t=>`<button class="${t.id===currentView?'active':''}" onclick="mobGo('${t.id}')"><span class="ic">${t.i}</span>${t.l}${navBadgeHTML({id:t.id})}</button>`).join("")
     +`<button class="${!inTabs?'active':''}" onclick="openMobSheet()"><span class="ic">☰</span>Altro</button>`;
-  const groups=["Traffico","Info e richieste","Agenda","Anagrafica","Operativa","Archivio","Amministrazione"];
+  const groups=["Traffico","Info e richieste","Anagrafica","Operativa","Archivio","Amministrazione"];
   const MOB_ALTRO=["clienti","incassi","entrateUscite"];
   const rest=items.filter(n=>MOB_ALTRO.includes(n.id));
   const html=`<div class="mob-grid">${rest.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="mobGo('${n.id}')"><span class="ic">${n.icon}</span><span>${mobLabel(n)}</span></button>`).join("")}</div>`;
@@ -4781,7 +4774,7 @@ function renderCurrentView(){
   ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti,
     ordini:renderOrdini, flusso:renderFlusso,
     magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, dropbox:renderDropbox, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate, entrateUscite:renderEntrateUscite,
-    posta:renderPosta, whatsapp:renderWhatsapp, instagram:renderInstagram, agenda:renderAgenda, leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
+    posta:renderPosta, whatsapp:renderWhatsapp, instagram:renderInstagram, leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
 }
 let clientFormOpen = false;
 let quoteFormOpen = false;
@@ -6786,439 +6779,6 @@ function renderWhatsappInner(){
   if(active) scrollWhatsappToBottom();
 }
 
-/* ============ AGENDA: appuntamenti · sopralluoghi · allestimenti ============ */
-const AGENDA_TIPI={
-  appuntamento:{l:"Appuntamento",pl:"Appuntamenti",ic:"📅"},
-  sopralluogo:{l:"Sopralluogo",pl:"Sopralluoghi",ic:"📐"},
-  allestimento:{l:"Allestimento",pl:"Allestimenti",ic:"🛠"}
-};
-let agendaFilter="tutti", agendaShowDone=false, agendaDraft=null, pendingAgendaId=null;
-const agendaBlobCache=new Map(), agendaTimers={};
-function agendaStyles(){
-  if(document.getElementById("agendaStyles")) return;
-  document.head.insertAdjacentHTML("beforeend",`<style id="agendaStyles">
-  .ag-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-  .ag-chip{border:1px solid var(--border);background:var(--card);border-radius:999px;padding:8px 14px;font:inherit;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer}
-  .ag-chip.active{background:#111827;border-color:#111827;color:#fff}
-  .ag-sec{margin:18px 0 8px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-  .ag-sec.late{color:var(--danger)}
-  .ag-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;cursor:pointer}
-  .ag-row:hover{border-color:#cbd5e1}
-  .ag-row.done{opacity:.55}
-  .ag-ic{width:44px;height:44px;border-radius:12px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-size:22px}
-  .ag-main{min-width:0}
-  .ag-title{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ag-sub{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ag-when{text-align:right;font-weight:700;font-size:14px;white-space:nowrap}
-  .ag-when small{display:block;font-weight:500;color:var(--muted);font-size:12px}
-  .ag-acts{display:flex;gap:6px;align-items:center}
-  .ag-badge{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:#EEF2F7;color:#475569;margin-right:6px}
-  .ag-badge.late{background:#FEE2E2;color:#B91C1C}
-  .ag-auto{background:#E0F2FE;color:#0369A1}
-  .ag-types{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-  .ag-type{flex:1;min-width:110px;border:1px solid var(--border);background:var(--paper);border-radius:12px;padding:10px;font:inherit;font-weight:700;cursor:pointer;text-align:center}
-  .ag-type.active{border-color:var(--accent);background:rgba(232,85,47,.08);color:var(--accent)}
-  .ag-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .ag-grid .full{grid-column:1/-1}
-  .ag-box{margin-top:16px;padding:14px;border:1px solid var(--border);border-radius:14px;background:#FBFCFD}
-  .ag-box h4{margin:0 0 10px;font-size:14px}
-  .ag-fotos{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:10px}
-  .ag-fcard{border:1px solid var(--border);border-radius:14px;background:#fff;padding:10px;display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;align-items:start}
-  .ag-fcard .ag-foto{aspect-ratio:1/1}
-  .ag-ftxt{display:flex;flex-direction:column;gap:8px;min-width:0}
-  .modal .ag-ftxt input,.modal .ag-ftxt textarea{width:100%;border:1px solid var(--border);border-radius:12px;padding:8px 12px;font:inherit;background:#fff;min-width:0}
-  .ag-ftxt textarea{min-height:64px!important;resize:vertical}
-  @media(max-width:520px){.ag-fcard{grid-template-columns:96px minmax(0,1fr)}}
-  .ag-foto{position:relative;border-radius:10px;overflow:hidden;background:#E2E8F0;aspect-ratio:1/1}
-  .ag-foto img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
-  .ag-foto button{position:absolute;top:4px;right:4px;border:none;border-radius:8px;background:rgba(15,23,42,.65);color:#fff;width:28px;height:28px;cursor:pointer}
-  .ag-mis{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) 34px;gap:8px;margin-bottom:8px}
-  .modal .ag-mis input,.ag-mis input{min-height:42px;border:1px solid var(--border);border-radius:12px;padding:0 12px;font:inherit;background:#fff;min-width:0}
-  .ag-presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-  .ag-lightbox{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:14px}
-  .ag-lightbox img{max-width:100%;max-height:100%;border-radius:8px}
-  .ag-state{font-size:12px;color:var(--muted);text-align:right;min-height:16px}
-  @media(max-width:760px){
-    .ag-top h3,.ag-top .helptext{display:none}
-    .ag-top .ag-newbtns{display:grid!important;grid-template-columns:1fr 1fr;width:100%}
-    .ag-top .ag-newbtns .btn-primary{grid-column:1/-1}
-    .ag-top .btn{min-height:40px;height:40px;padding:0 8px;font-size:12px;white-space:nowrap;justify-content:center}
-    .ag-top>div{display:block!important}
-    .ag-bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-    .ag-chip{white-space:nowrap;padding:7px 12px}
-    .ag-row .btn{min-height:30px;height:30px;padding:0 10px;font-size:11px}
-    .ag-row .ag-badge{margin-bottom:2px}
-    .ag-row{grid-template-columns:40px minmax(0,1fr) auto;gap:6px 10px;padding:10px 12px}
-    .ag-row .ag-acts{grid-column:2/-1}
-    .ag-ic{width:40px;height:40px}
-    .ag-type{font-size:12px;padding:8px 2px;min-width:0}
-    .ag-mis{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 34px}
-  }
-  </style>`);
-}
-function agendaGet(id){
-  return (state.agenda||[]).find(a=>a.id===id) || (agendaDraft && agendaDraft.id===id ? agendaDraft : null);
-}
-function agendaTitle(a){
-  const c=a.clientId?state.clients.find(x=>x.id===a.clientId):null;
-  return a.titolo || (c?clientDisplayName(c):"") || a.clienteNome || AGENDA_TIPI[a.tipo]?.l || "Senza titolo";
-}
-function agendaClienteLabel(a){
-  const c=a.clientId?state.clients.find(x=>x.id===a.clientId):null;
-  return c?clientDisplayName(c):(a.clienteNome||"");
-}
-function agendaPersone(a){ return String(a.persone||"").split("|").map(x=>x.trim()).filter(Boolean); }
-function agendaTogglePersona(id,w){
-  const a=agendaGet(id); if(!a) return;
-  let l=agendaPersone(a); l=l.includes(w)?l.filter(x=>x!==w):[...l,w];
-  a.persone=l.join(" | ");
-  document.querySelectorAll(`#ag-pers .worker-chip`).forEach(b=>b.classList.toggle("selected",l.includes(b.dataset.w)));
-  agendaQueue(id);
-}
-function agendaIsLate(a){ return a.stato!=="Fatto" && a.data && a.data<today(); }
-function agendaAllestimentiOrdini(){
-  return state.orders.filter(o=>o.consegnaTipo==="Allestimento" && !o.spedito && o.stato!=="Consegnato");
-}
-function agendaUnifiedItems(){
-  const own=(state.agenda||[]).map(a=>({kind:"own",a,tipo:a.tipo,data:a.data||"",ora:a.ora||"",done:a.stato==="Fatto"}));
-  const orders=agendaAllestimentiOrdini().map(o=>({kind:"order",o,tipo:"allestimento",data:o.dataConsegna||"",ora:"",done:false}));
-  return [...own,...orders];
-}
-function renderAgenda(){
-  agendaStyles();
-  const root=document.getElementById("view-agenda"); if(!root) return;
-  let items=agendaUnifiedItems().filter(x=>agendaFilter==="tutti"||x.tipo===agendaFilter);
-  const todo=items.filter(x=>!x.done).sort((a,b)=>(a.data||"9999").localeCompare(b.data||"9999")||(a.ora||"").localeCompare(b.ora||""));
-  const done=items.filter(x=>x.done).sort((a,b)=>(b.data||"").localeCompare(a.data||"")).slice(0,40);
-  const oggi=today();
-  const late=todo.filter(x=>x.data && x.data<oggi), todayL=todo.filter(x=>x.data===oggi), next=todo.filter(x=>x.data>oggi), nodate=todo.filter(x=>!x.data);
-  const rowHtml=x=>{
-    if(x.kind==="order"){
-      const o=x.o;
-      return `<div class="ag-row" onclick="openJobCard('${o.id}')">
-        <div class="ag-ic">🛠</div>
-        <div class="ag-main"><div class="ag-title">${escapeHtml(clientName(o.clientId))}</div>
-          <div class="ag-sub"><span class="ag-badge ag-auto">DALL'ORDINE${o.numero?` #${escapeHtml(String(o.numero))}`:""}</span>${escapeHtml(orderAllestimentoIndirizzo(o)||"Indirizzo non indicato")}${orderWorkersList(o).length?` · 👤 ${escapeHtml(orderWorkersList(o).join(", "))}`:""}</div></div>
-        <div class="ag-when">${x.data?fmtDate(x.data):"—"}<small>Allestimento</small></div>
-        <div class="ag-acts"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();segnaAllestimentoCompletato('${o.id}')">COMPLETATO</button></div>
-      </div>`;
-    }
-    const a=x.a, t=AGENDA_TIPI[a.tipo]||AGENDA_TIPI.appuntamento;
-    const extra=a.tipo==="sopralluogo"?` · 📷 ${(a.foto||[]).length}`:"";
-    return `<div class="ag-row ${x.done?"done":""}" onclick="openAgendaItem('${a.id}')">
-      <div class="ag-ic">${t.ic}</div>
-      <div class="ag-main"><div class="ag-title">${escapeHtml(agendaTitle(a))}</div>
-        <div class="ag-sub">${agendaIsLate(a)?`<span class="ag-badge late">IN RITARDO</span>`:""}<span class="ag-badge">${t.l.toUpperCase()}</span>${escapeHtml(agendaClienteLabel(a)&&agendaClienteLabel(a)!==agendaTitle(a)?agendaClienteLabel(a)+" · ":"")}${escapeHtml(a.luogo||"")}${extra}${agendaPersone(a).length?` · 👤 ${escapeHtml(agendaPersone(a).join(", "))}`:""}</div></div>
-      <div class="ag-when">${a.data?fmtDate(a.data):"Senza data"}<small>${escapeHtml(a.ora||"")}</small></div>
-      <div class="ag-acts">
-        <button class="btn btn-outline btn-sm" title="${x.done?"Riapri":"Segna come fatto"}" onclick="event.stopPropagation();agendaToggleDone('${a.id}')">${x.done?"↺":"✓ FATTO"}</button>
-        <button class="btn btn-ghost btn-sm" title="Elimina" style="color:var(--danger)" onclick="event.stopPropagation();agendaDelete('${a.id}')">🗑</button>
-      </div>
-    </div>`;
-  };
-  const sec=(label,list,cls="")=>list.length?`<div class="ag-sec ${cls}">${label} (${list.length})</div>${list.map(rowHtml).join("")}`:"";
-  root.innerHTML=`
-    <div class="card ag-top" style="margin-bottom:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-        <div><h3 style="margin:0 0 4px;">Agenda</h3><p class="helptext" style="margin:0;">Appuntamenti, sopralluoghi e allestimenti. Nel sopralluogo trovi foto, misure e appunti.</p></div>
-        <div class="ag-newbtns" style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" onclick="openAgendaNew('sopralluogo')">+ SOPRALLUOGO</button>
-          <button class="btn btn-outline btn-sm" onclick="openAgendaNew('appuntamento')">+ APPUNTAMENTO</button>
-          <button class="btn btn-outline btn-sm" onclick="openAgendaNew('allestimento')">+ ALLESTIMENTO</button>
-        </div>
-      </div>
-    </div>
-    <div class="ag-bar">
-      ${["tutti","appuntamento","sopralluogo","allestimento"].map(f=>`<button class="ag-chip ${agendaFilter===f?"active":""}" onclick="agendaSetFilter('${f}')">${f==="tutti"?"Tutti":AGENDA_TIPI[f].pl}</button>`).join("")}
-    </div>
-    ${todo.length||done.length?`
-      ${sec("In ritardo",late,"late")}${sec("Oggi",todayL)}${sec("Prossimi",next)}${sec("Senza data",nodate)}
-      ${done.length?`<div class="ag-sec" style="cursor:pointer" onclick="agendaShowDone=!agendaShowDone;renderAgenda()">${agendaShowDone?"▼":"▶"} Fatti (${done.length})</div>${agendaShowDone?done.map(rowHtml).join(""):""}`:""}
-    `:`<div class="card"><p class="empty">Nessun elemento in agenda. Premi “+ SOPRALLUOGO” per iniziare.</p></div>`}`;
-}
-function agendaSetFilter(f){ agendaFilter=f; renderAgenda(); }
-async function agendaToggleDone(id){
-  const a=agendaGet(id); if(!a) return;
-  a.stato=a.stato==="Fatto"?"Da fare":"Fatto";
-  await agendaPersist(a); renderAgenda();
-  if(currentView==="dashboard") renderDashboard();
-}
-function agendaDelete(id){
-  const a=agendaGet(id); if(!a) return;
-  askConfirm(`Eliminare “${agendaTitle(a)}”? ${(a.foto||[]).length?"Le foto restano in Dropbox.":""}`,async()=>{
-    state.agenda=state.agenda.filter(x=>x.id!==id);
-    await dbDelete("agenda",id);
-    if(currentView==="agenda") renderAgenda(); else if(currentView==="dashboard") renderDashboard();
-  });
-}
-function agendaNewItem(tipo){
-  return {id:uid(),tipo,titolo:"",clientId:"",clienteNome:"",data:today(),ora:"",luogo:"",stato:"Da fare",note:"",misure:[],foto:[],orderId:"",persone:"",createdAt:new Date().toISOString(),updatedAt:""};
-}
-function openAgendaNew(tipo){ agendaDraft=agendaNewItem(tipo||"sopralluogo"); openAgendaItem(agendaDraft.id); }
-/* Salvataggio: in bozza finché non c'è qualcosa di scritto; poi automatico mentre scrivi */
-function agendaHasContent(a){ return !!(a.titolo||a.clientId||a.clienteNome||a.note||a.luogo||(a.foto||[]).length||(a.misure||[]).length); }
-async function agendaPersist(a,force=false){
-  if(!a) return null;
-  const inState=(state.agenda||[]).some(x=>x.id===a.id);
-  if(!inState){
-    if(!force) return null;
-    state.agenda.push(a); if(agendaDraft&&agendaDraft.id===a.id) agendaDraft=null;
-  }
-  a.updatedAt=new Date().toISOString();
-  const saved=await upsertOneReturning("agenda",a);
-  agendaSetStatus(saved?"Salvato":"Non salvato: controlla la tabella Agenda in Supabase");
-  return saved;
-}
-async function agendaCreate(id){
-  const a=agendaGet(id); if(!a) return;
-  if(!a.clientId && !a.clienteNome && !a.titolo){ showToast("Scrivi almeno il cliente o un titolo"); return; }
-  const saved=await agendaPersist(a,true);
-  if(!saved){ return; }
-  showToast(a.tipo==="sopralluogo"?"Sopralluogo creato: aprilo quando sei sul posto per foto e misure":"Creato in agenda");
-  closeModal();
-}
-function agendaSetStatus(t){ const el=document.getElementById("ag-state"); if(el) el.textContent=t; }
-function agendaQueue(id){
-  if(!(state.agenda||[]).some(x=>x.id===id)) return;
-  agendaSetStatus("Salvo…");
-  clearTimeout(agendaTimers[id]);
-  agendaTimers[id]=setTimeout(()=>{ const a=agendaGet(id); if(a) agendaPersist(a); },700);
-}
-function agendaSet(id,field,value){ const a=agendaGet(id); if(!a) return; a[field]=value; agendaQueue(id); }
-function agendaSetTipo(id,tipo){
-  const a=agendaGet(id); if(!a) return; a.tipo=tipo; agendaQueue(id); openAgendaItem(id,true);
-}
-function clientAddressLine(c){
-  if(!c) return "";
-  const citta=[[c.cap,c.citta].filter(Boolean).join(" "),c.provincia?`(${c.provincia})`:""].filter(Boolean).join(" ");
-  return [c.indirizzo,citta].filter(Boolean).join(", ");
-}
-function agendaPickClient(id,text){
-  const a=agendaGet(id); if(!a) return;
-  const t=String(text||"").trim().toLowerCase();
-  const c=t?state.clients.find(x=>clientDisplayName(x).trim().toLowerCase()===t):null;
-  if(c){ a.clientId=c.id; a.clienteNome=""; if(!a.luogo){ a.luogo=clientAddressLine(c); const l=document.getElementById("ag-luogo"); if(l) l.value=a.luogo; } }
-  else { a.clientId=""; a.clienteNome=String(text||"").trim(); }
-  agendaQueue(id); agendaRefreshMaps(id);
-}
-function agendaUseClientAddress(id){
-  const a=agendaGet(id); const c=a&&a.clientId?state.clients.find(x=>x.id===a.clientId):null;
-  if(!c||!clientAddressLine(c)){ showToast("Il cliente non ha un indirizzo salvato"); return; }
-  a.luogo=clientAddressLine(c); const l=document.getElementById("ag-luogo"); if(l) l.value=a.luogo; agendaQueue(id); agendaRefreshMaps(id);
-}
-function agendaMapsUrl(a){ return a&&a.luogo?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.luogo)}`:""; }
-function agendaRefreshMaps(id){
-  const a=agendaGet(id); const el=document.getElementById("ag-maps"); if(!el||!a) return;
-  const u=agendaMapsUrl(a); el.style.display=u?"":"none"; if(u) el.href=u;
-}
-function openAgendaItem(id,keepScroll){
-  agendaStyles();
-  const a=agendaGet(id); if(!a) return;
-  const isNew=!(state.agenda||[]).some(x=>x.id===a.id);
-  const sop=a.tipo==="sopralluogo" && !isNew;
-  const body=document.getElementById("modalBody");
-  const scroll=keepScroll?body.parentElement.scrollTop:0;
-  body.innerHTML=`
-    <button class="close-x" onclick="closeModal()">×</button>
-    <h2 style="margin-bottom:12px;">${AGENDA_TIPI[a.tipo].ic} ${isNew?"Nuovo ":""}${AGENDA_TIPI[a.tipo].l}</h2>
-    ${isNew?`<div class="ag-types">${Object.keys(AGENDA_TIPI).map(k=>`<button type="button" class="ag-type ${a.tipo===k?"active":""}" onclick="agendaSetTipo('${a.id}','${k}')">${AGENDA_TIPI[k].ic} ${AGENDA_TIPI[k].l}</button>`).join("")}</div>`:""}
-    <div class="ag-grid">
-      <div class="field full"><label>Titolo <span style="font-weight:500;color:var(--muted)">(facoltativo)</span></label>
-        <input value="${escapeHtml(a.titolo)}" placeholder="Es. Vetrina negozio, Fiera di ottobre…" oninput="agendaSet('${a.id}','titolo',this.value)"></div>
-      <div class="field full"><label>Cliente</label>
-        <input list="ag-cli-list" value="${escapeHtml(agendaClienteLabel(a))}" placeholder="Scrivi per cercare un cliente, oppure un nome libero" onchange="agendaPickClient('${a.id}',this.value)" oninput="agendaSet('${a.id}','clienteNome',this.value)">
-        <datalist id="ag-cli-list">${state.clients.map(c=>`<option value="${escapeHtml(clientDisplayName(c))}"></option>`).join("")}</datalist></div>
-      <div class="field"><label>Data</label><input type="date" value="${escapeHtml(a.data)}" onchange="agendaSet('${a.id}','data',this.value)"></div>
-      <div class="field"><label>Ora</label><input type="time" value="${escapeHtml(a.ora)}" onchange="agendaSet('${a.id}','ora',this.value)"></div>
-      <div class="field full"><label>Chi se ne occupa</label>
-        <div id="ag-pers" class="worker-chip-wrap">${WORKERS.map(w=>`<button type="button" data-w="${w}" class="worker-chip ${agendaPersone(a).includes(w)?"selected":""}" onclick="agendaTogglePersona('${a.id}','${w}')"><span class="worker-chip-dot"></span>${w}</button>`).join("")}</div>
-        ${DB_AGPERS?"":`<div class="helptext" style="margin-top:6px;color:var(--danger)">Per salvare le persone serve una riga SQL su Supabase (te la dà Claude).</div>`}</div>
-      <div class="field full"><label>Dove</label>
-        <input id="ag-luogo" value="${escapeHtml(a.luogo)}" placeholder="Indirizzo" oninput="agendaSet('${a.id}','luogo',this.value);agendaRefreshMaps('${a.id}')">
-        <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
-          ${a.clientId?`<button type="button" class="btn btn-outline btn-sm" onclick="agendaUseClientAddress('${a.id}')">Usa indirizzo del cliente</button>`:""}
-          <a id="ag-maps" class="btn btn-outline btn-sm" target="_blank" rel="noopener" href="${escapeHtml(agendaMapsUrl(a))}" style="${a.luogo?"":"display:none;"}text-decoration:none;">📍 Apri su Mappe</a>
-        </div></div>
-    </div>
-    ${sop?`
-    <div class="ag-box"><p class="helptext" style="margin:0;">Quando sei sul posto: scatta le foto e scrivi per ognuna descrizione e misura. Si salva da solo.</p></div>
-    <div class="ag-box"><h4>📷 Foto</h4>
-      <div id="ag-foto" class="ag-fotos"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <label class="btn btn-primary btn-sm" style="cursor:pointer;">📷 Scatta foto<input type="file" accept="image/*" capture="environment" hidden onchange="agendaAddPhotos('${a.id}',this.files);this.value=''"></label>
-        <label class="btn btn-outline btn-sm" style="cursor:pointer;">Scegli dalla galleria<input type="file" accept="image/*" multiple hidden onchange="agendaAddPhotos('${a.id}',this.files);this.value=''"></label>
-      </div>
-      <div class="helptext" style="margin-top:6px;">Le foto vanno su Dropbox, nella cartella SOPRALLUOGHI.</div>
-    </div>
-    `:""}
-    ${(isNew&&a.tipo==="sopralluogo")?"":`<div class="ag-box"><h4>📝 Appunti</h4>
-      <textarea rows="${sop?3:4}" style="width:100%" placeholder="${sop?"Cosa hai visto, cosa serve, accordi con il cliente…":"Note"}" oninput="agendaSet('${a.id}','note',this.value)">${escapeHtml(a.note)}</textarea>
-    </div>`}
-    <div class="ag-state" id="ag-state"></div>
-    <div class="form-actions" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-      ${isNew?`<button class="btn btn-primary" onclick="agendaCreate('${a.id}')">CREA ${AGENDA_TIPI[a.tipo].l.toUpperCase()}</button><button class="btn btn-ghost" onclick="closeModal()">Annulla</button>`:`
-      ${sop?agendaQuoteButton(a):""}
-      ${a.tipo==="allestimento"?`<button class="btn btn-primary" onclick="agendaCreateOrder('${a.id}')">CREA ORDINE</button><button class="btn btn-outline" onclick="agendaPickOrder('${a.id}')">INVIA A ORDINE ESISTENTE</button>`:""}
-      <button class="btn btn-outline" onclick="agendaToggleDone('${a.id}').then(()=>closeModal())">${a.stato==="Fatto"?"Riapri":"✓ Segna come fatto"}</button>
-      <button class="btn btn-ghost" onclick="closeModal()">Chiudi</button>`}
-    </div>`;
-  document.getElementById("modalBackdrop").classList.add("open");
-  if(keepScroll) body.parentElement.scrollTop=scroll;
-  if(sop){ agendaRenderFoto(a.id); }
-}
-/* ---- Misure ---- */
-function agendaRenderMisure(id){
-  const a=agendaGet(id), box=document.getElementById("ag-misure"); if(!a||!box) return;
-  box.innerHTML=(a.misure||[]).map(m=>`<div class="ag-mis">
-      <input value="${escapeHtml(m.label)}" placeholder="Cosa (es. Vetrina)" oninput="agendaMisuraSet('${id}','${m.id}','label',this.value)">
-      <input value="${escapeHtml(m.value)}" placeholder="Misura (es. 240 x 120 cm)" oninput="agendaMisuraSet('${id}','${m.id}','value',this.value)">
-      <button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="agendaMisuraDel('${id}','${m.id}')">×</button>
-    </div>`).join("")||`<p class="helptext" style="margin:0 0 8px;">Nessuna misura ancora. Usa i tasti qui sotto.</p>`;
-}
-function agendaMisuraAdd(id,label){
-  const a=agendaGet(id); if(!a) return;
-  const m={id:uid(),label:label||"",value:""}; a.misure=[...(a.misure||[]),m];
-  agendaRenderMisure(id); agendaQueue(id);
-  const inputs=document.querySelectorAll("#ag-misure .ag-mis"); const last=inputs[inputs.length-1];
-  if(last) last.querySelectorAll("input")[label?1:0].focus();
-}
-function agendaMisuraSet(id,mid,f,v){ const a=agendaGet(id); const m=a&&(a.misure||[]).find(x=>x.id===mid); if(!m) return; m[f]=v; agendaQueue(id); }
-function agendaMisuraDel(id,mid){ const a=agendaGet(id); if(!a) return; a.misure=a.misure.filter(x=>x.id!==mid); agendaRenderMisure(id); agendaQueue(id); }
-/* ---- Foto (su Dropbox) ---- */
-function agendaFolder(a){
-  const nome=dropboxSafePathPart(agendaClienteLabel(a)||a.titolo||"Sopralluogo");
-  return `/SOPRALLUOGHI/${a.data||today()} - ${nome} - ${String(a.id).slice(-5)}`;
-}
-function agendaResizeImage(file,max=1600,q=0.82){
-  return new Promise((resolve,reject)=>{
-    const url=URL.createObjectURL(file), img=new Image();
-    img.onload=()=>{
-      let {width:w,height:h}=img; const k=Math.min(1,max/Math.max(w,h)); w=Math.round(w*k); h=Math.round(h*k);
-      const c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(img,0,0,w,h);
-      URL.revokeObjectURL(url);
-      c.toBlob(b=>b?resolve(b):reject(new Error("Foto non leggibile")),"image/jpeg",q);
-    };
-    img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error("Foto non leggibile")); };
-    img.src=url;
-  });
-}
-async function agendaAddPhotos(id,fileList){
-  const a=agendaGet(id); const files=[...(fileList||[])]; if(!a||!files.length) return;
-  if(!dropboxIsConnected()){ showToast("Dropbox non collegato: collegalo dalla pagina Dropbox"); return; }
-  agendaSetStatus("Carico le foto…");
-  await agendaPersist(a,true);
-  let ok=0;
-  for(const f of files){
-    try{
-      let blob; try{ blob=await agendaResizeImage(f); }catch(e){ blob=f; }
-      const name=`foto-${Date.now().toString(36)}.jpg`;
-      const path=`${agendaFolder(a)}/${name}`;
-      await dropboxUploadBlob(path,blob);
-      a.foto=[...(a.foto||[]),{id:uid(),path,name,nota:"",ts:new Date().toISOString()}];
-      agendaBlobCache.set(path,URL.createObjectURL(blob));
-      ok++; agendaRenderFoto(id);
-    }catch(e){ console.error("Foto sopralluogo",e); const m=String(e?.message||e||"errore"); agendaSetStatus("Foto NON caricata: "+m.slice(0,160)); showToast("Foto non caricata: "+m.slice(0,80)); }
-  }
-  if(ok){ const sv=await agendaPersist(a); showToast(sv?(ok===1?"Foto salvata":`${ok} foto salvate`):"Foto su Dropbox, ma scheda non salvata: controlla la tabella Agenda"); }
-}
-async function agendaThumbUrl(path){
-  if(agendaBlobCache.has(path)) return agendaBlobCache.get(path);
-  const blob=await dropboxFetchContent(path,"files/download");
-  const u=URL.createObjectURL(blob); agendaBlobCache.set(path,u); return u;
-}
-function agendaRenderFoto(id){
-  const a=agendaGet(id), box=document.getElementById("ag-foto"); if(!a||!box) return;
-  box.innerHTML=(a.foto||[]).map(f=>`<div class="ag-fcard"><div class="ag-foto"><img data-p="${escapeHtml(f.path)}" alt="" onclick="agendaOpenPhoto(this)"><button type="button" title="Elimina foto" onclick="agendaDeletePhoto('${id}','${f.id}')">🗑</button></div>
-    <div class="ag-ftxt"><textarea rows="2" placeholder="Descrizione (cosa si vede, dove)" oninput="agendaPhotoSet('${id}','${f.id}','nota',this.value)">${escapeHtml(f.nota||"")}</textarea>
-    <input value="${escapeHtml(f.misura||"")}" placeholder="Misura (es. 240x120)" oninput="agendaPhotoSet('${id}','${f.id}','misura',this.value)"></div></div>`).join("");
-  box.querySelectorAll("img").forEach(img=>{ agendaThumbUrl(img.dataset.p).then(u=>{ img.src=u; }).catch(()=>{ img.alt="non disponibile"; }); });
-  box.style.display=(a.foto||[]).length?"grid":"none";
-}
-function agendaPhotoSet(id,fid,field,val){ const a=agendaGet(id); const f=a&&(a.foto||[]).find(x=>x.id===fid); if(!f) return; f[field]=val; agendaQueue(id); }
-function agendaOpenPhoto(img){
-  if(!img.src) return;
-  const d=document.createElement("div"); d.className="ag-lightbox"; d.onclick=()=>d.remove();
-  d.innerHTML=`<img src="${img.src}" alt="">`; document.body.appendChild(d);
-}
-function agendaDeletePhoto(id,fid){
-  const a=agendaGet(id); const f=a&&(a.foto||[]).find(x=>x.id===fid); if(!f) return;
-  askConfirm("Eliminare questa foto? Verrà tolta anche da Dropbox.",async()=>{
-    try{ await dropboxApi("files/delete_v2",{path:f.path}); }catch(e){ console.error(e); }
-    a.foto=a.foto.filter(x=>x.id!==fid); agendaBlobCache.delete(f.path);
-    await agendaPersist(a); openAgendaItem(id,true);
-  });
-}
-/* ---- Collegamento con gli ordini ---- */
-function agendaSummaryText(a){
-  const d=a.data?fmtDate(a.data):"";
-  const mis=(a.misure||[]).filter(m=>m.label||m.value).map(m=>`- ${m.label||"Misura"}: ${m.value||""}`).join("\n");
-  return [`— ${AGENDA_TIPI[a.tipo].l.toUpperCase()} del ${d} —`, a.luogo?`Dove: ${a.luogo}`:"", mis?`Misure:\n${mis}`:"", a.note?`Appunti: ${a.note}`:"", (a.foto||[]).length?`Foto (${(a.foto||[]).length}, nella cartella FILE RICEVUTI):\n`+(a.foto||[]).map((f,i)=>`- Foto ${i+1}${f.nota?`: ${f.nota}`:""}${f.misura?` — ${f.misura}`:""}`).join("\n"):""].filter(Boolean).join("\n");
-}
-async function agendaSendToOrder(id,orderId,silent){
-  const a=agendaGet(id), o=findItem("orders",orderId); if(!a||!o) return;
-  const marker=`[agenda:${a.id}]`;
-  const candidate={...o};
-  if(!String(o.descrizione||"").includes(marker)) candidate.descrizione=[String(o.descrizione||"").trim(),`${agendaSummaryText(a)}\n${marker}`].filter(Boolean).join("\n\n");
-  const saved=await upsertOneReturning("orders",candidate);
-  if(saved){ const i=state.orders.findIndex(x=>x.id===orderId); if(i>=0) state.orders[i]=saved; }
-  let copied=0;
-  if((a.foto||[]).length && dropboxIsConnected()){
-    try{
-      await jobDropboxEnsureStructure(o.id);
-      for(const f of a.foto){
-        try{
-          await dropboxApi("files/copy_v2",{from_path:f.path,to_path:`${jobDropboxBasePath(o)}/FILE RICEVUTI/${jobDropboxFileName(o,`sopralluogo-${f.name}`)}`,autorename:true});
-          copied++;
-        }catch(e){ console.error("Copia foto in ordine",e); }
-      }
-    }catch(e){ console.error(e); }
-  }
-  a.orderId=orderId; await agendaPersist(a);
-  if(!silent||true) showToast(`Inviato all'ordine${o.numero?` #${o.numero}`:""}: misure e appunti${copied?` + ${copied} foto in FILE RICEVUTI`:""}`);
-}
-function agendaPickOrder(id){
-  const a=agendaGet(id); if(!a) return;
-  let list=state.orders.filter(o=>o.stato!=="Consegnato");
-  const mine=a.clientId?list.filter(o=>o.clientId===a.clientId):[];
-  if(mine.length) list=mine;
-  list=list.sort((x,y)=>String(y.createdAt||"").localeCompare(String(x.createdAt||""))).slice(0,15);
-  if(!list.length){ showToast("Nessun ordine aperto: usa CREA ORDINE"); return; }
-  document.getElementById("modalBody").innerHTML=`
-    <button class="close-x" onclick="openAgendaItem('${id}')">×</button>
-    <h2 style="margin-bottom:6px;">A quale ordine?</h2>
-    <p class="helptext" style="margin-top:0;">Misure, appunti e foto vengono aggiunti alla scheda dell'ordine.</p>
-    ${list.map(o=>`<div class="list-row" onclick="agendaSendToOrder('${id}','${o.id}').then(()=>openAgendaItem('${id}'))"><div><div class="lr-main">${o.numero?`#${escapeHtml(String(o.numero))} · `:""}${escapeHtml(clientName(o.clientId))}</div><div class="lr-sub">${escapeHtml(String(o.descrizione||orderCategorieLabel(o)||"Ordine").slice(0,70))} · ${escapeHtml(o.stato||"")}</div></div></div>`).join("")}`;
-}
-function agendaQuoteFor(a){ return (state.quotes||[]).find(q=>q.extra&&q.extra.agendaId===a.id); }
-function agendaQuoteButton(a){
-  const q=agendaQuoteFor(a);
-  return q?`<button class="btn btn-primary" onclick="openQuoteDetail('${q.id}')">APRI PREVENTIVO${q.extra&&q.extra.numero?` #${escapeHtml(String(q.extra.numero))}`:""}</button>`
-          :`<button class="btn btn-primary" onclick="agendaCreateQuote('${a.id}')">CREA PREVENTIVO</button>`;
-}
-async function agendaCreateQuote(id){
-  const a=agendaGet(id); if(!a) return;
-  const ex=agendaQuoteFor(a); if(ex){ openQuoteDetail(ex.id); return; }
-  const qid=await createQuote(a.clientId||null, CATEGORIES[0], {agendaId:a.id, nomeLibero:a.clientId?"":(a.clienteNome||"")});
-  if(!qid) return;
-  const q=findItem("quotes",qid);
-  q.descrizione=a.titolo||"";
-  if(q.righe[0] && !q.righe[0].descrizione && a.titolo) q.righe[0].descrizione=a.titolo;
-  saveState("quotes");
-  await agendaPersist(a,true);
-  closeModal();
-  showToast("Preventivo creato: misure, appunti e foto passano all'ordine quando lo accetti");
-  openQuoteDetail(qid);
-}
-function agendaCreateOrder(id){
-  const a=agendaGet(id); if(!a) return;
-  if(!a.clientId){ showToast("Scegli prima un cliente già in anagrafica (oppure crealo da Clienti)"); return; }
-  agendaPersist(a,true);
-  pendingAgendaId=a.id;
-  closeModal();
-  newOrderForClient(a.clientId);
-  showToast("Quando salvi l'ordine, foto, misure e appunti del sopralluogo ci finiscono dentro");
-}
-
 /* ============ INSTAGRAM (messaggi diretti) ============ */
 let igMessages=[], igSelected="", igLoaded=false, igMobileChat=false;
 function isMobileUI(){ try{ return window.matchMedia("(max-width:760px)").matches; }catch(e){ return false; } }
@@ -8069,7 +7629,7 @@ function renderDashboard(){
     return clientName(a.clientId).localeCompare(clientName(b.clientId));
   });
   const ritiriDaFare = state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0);
-  const prossimiAgenda = (state.agenda||[]).filter(a=>a.stato!=="Fatto" && a.data && a.data>=oggi).map(a=>({a})).sort((x,y)=>((x.a.data||"")+(x.a.ora||"")).localeCompare((y.a.data||"")+(y.a.ora||""))).slice(0,6);
+  const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
   const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma" || l.stato==="Da ricontattare");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
 
@@ -8086,13 +7646,36 @@ function renderDashboard(){
 
     <div class="card" style="margin-bottom:16px;">
       <div class="section-header" style="margin-bottom:10px;">
-        <h3 style="margin:0;">Agenda</h3>
-        <div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="goTo('agenda')">Apri agenda</button><button class="btn btn-outline btn-sm" onclick="goTo('agenda');openAgendaNew('sopralluogo')">+ Sopralluogo</button></div>
+        <h3 style="margin:0;">Appuntamenti</h3>
+        <button class="btn btn-outline btn-sm" onclick="toggleForm('apptForm')">+ Nuovo appuntamento</button>
       </div>
-      ${prossimiAgenda.length ? prossimiAgenda.map(x=>{ const a=x.a, t=AGENDA_TIPI[a.tipo]||AGENDA_TIPI.appuntamento; return `<div class="list-row" style="cursor:pointer;" onclick="openAgendaItem('${a.id}')">
-          <div style="min-width:0;"><div class="lr-main">${t.ic} ${escapeHtml(agendaTitle(a))}</div><div class="lr-sub" style="margin-top:4px;">${escapeHtml(t.l)}${a.luogo?` · 📍 ${escapeHtml(a.luogo)}`:""}</div></div>
-          <div style="text-align:right;flex-shrink:0;"><div class="lr-main">${fmtDate(a.data)}</div><div class="lr-sub">${escapeHtml(a.ora||"")}</div></div>
-        </div>`; }).join("") : `<p class="empty">Niente in agenda nei prossimi giorni.</p>`}
+      <div class="form-panel" id="apptForm" style="margin-bottom:14px;">
+        <h3 id="apptFormTitle" style="margin:0 0 14px;">Nuovo appuntamento</h3>
+        <div class="form-grid">
+          <div class="field"><label>Nome</label><input id="af-titolo" placeholder="Nome persona / appuntamento"></div>
+          <div class="field"><label>Data</label><input id="af-data" type="date" value="${today()}"></div>
+          <div class="field"><label>Orario</label><input id="af-ora" type="time" value="09:00"></div>
+          <div class="field"><label>Luogo</label><input id="af-luogo" placeholder="Es. Studio, cliente, indirizzo..."></div>
+          <div class="field" style="grid-column:1/-1;"><label>Descrizione</label><textarea id="af-descrizione" rows="3" placeholder="Descrizione dell'appuntamento..."></textarea></div>
+        </div>
+        <div class="form-actions">
+          <button id="apptSaveBtn" class="btn btn-primary" onclick="addAppuntamento()">Salva appuntamento</button>
+          <button class="btn btn-outline" onclick="annullaModificaAppuntamento()">Annulla</button>
+        </div>
+      </div>
+      ${prossimiAppuntamenti.length ? prossimiAppuntamenti.map(a=>`
+        <div class="list-row" style="cursor:default;align-items:flex-start;">
+          <div style="min-width:0;">
+            <div class="lr-main">${escapeHtml(a.titolo||"")}</div>
+            <div class="lr-sub" style="margin-top:4px;">${a.luogo ? `📍 ${escapeHtml(a.luogo)}` : ""}</div>
+            ${a.note ? `<div class="lr-sub" style="margin-top:5px;white-space:normal;">${escapeHtml(a.note)}</div>` : ""}
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
+            <div style="text-align:right;"><div class="lr-main">${fmtDate(a.data)}</div><div class="lr-sub">${a.ora}</div></div>
+            <button class="btn btn-outline btn-sm" title="Modifica" aria-label="Modifica" style="padding:6px 10px;font-size:15px;line-height:1;" onclick="modificaAppuntamento('${a.id}')">✎</button>
+            <button class="btn btn-ghost btn-sm" title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" onclick="deleteAppuntamento('${a.id}')">🗑</button>
+          </div>
+        </div>`).join("") : `<p class="empty">Nessun appuntamento in programma.</p>`}
     </div>
 
     <div class="grid grid-2">
@@ -10351,7 +9934,6 @@ async function finalizeQuoteToOrder(quoteId, clientId){
   if(!okOrder) return;
 
   if(!state.orders.some(o=>o.id===order.id)) state.orders.push(order);
-  const agId=q.extra&&q.extra.agendaId; if(agId && agendaGet(agId)){ try{ await agendaSendToOrder(agId, order.id, true); }catch(err){ console.error("Agenda → ordine",err); } }
 
   q.clientId = clientId;
   q.convertito = true;
@@ -11416,14 +10998,6 @@ async function addOrderInner(){
     }catch(err){
       console.error("Import automatico allegati mail in Dropbox",err);
       gmailDropboxResult={uploaded:0,total:0,error:String(err?.message||err)};
-    }
-  }
-
-  if(pendingAgendaId){
-    const aid=pendingAgendaId; pendingAgendaId=null;
-    const ag=agendaGet(aid);
-    if(ag && ag.clientId===savedOrder.clientId){
-      try{ await agendaSendToOrder(aid,savedOrder.id,true); }catch(err){ console.error("Agenda → ordine",err); }
     }
   }
 
