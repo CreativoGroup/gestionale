@@ -6898,7 +6898,7 @@ function renderAgenda(){
       </div>`;
     }
     const a=x.a, t=AGENDA_TIPI[a.tipo]||AGENDA_TIPI.appuntamento;
-    const extra=a.tipo==="sopralluogo"?` · 📷 ${(a.foto||[]).length}`:"";
+    const extra=a.tipo==="sopralluogo"?` · 📷 ${(a.foto||[]).length} · 📏 ${(a.misure||[]).length}`:"";
     return `<div class="ag-row ${x.done?"done":""}" onclick="openAgendaItem('${a.id}')">
       <div class="ag-ic">${t.ic}</div>
       <div class="ag-main"><div class="ag-title">${escapeHtml(agendaTitle(a))}</div>
@@ -7035,7 +7035,7 @@ function openAgendaItem(id,keepScroll){
         </div></div>
     </div>
     ${sop?`
-    <div class="ag-box"><p class="helptext" style="margin:0;">Quando sei sul posto: scatta le foto e scrivi misure e appunti qui sotto. Si salva da solo.</p></div>
+    <div class="ag-box"><p class="helptext" style="margin:0;">Quando sei sul posto: scatta le foto e scrivi le misure e gli appunti qui sotto. Si salva da solo.</p></div>
     <div class="ag-box"><h4>📷 Foto</h4>
       <div id="ag-foto" class="ag-fotos"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -7044,9 +7044,14 @@ function openAgendaItem(id,keepScroll){
       </div>
       <div class="helptext" style="margin-top:6px;">Le foto vanno su Dropbox, nella cartella SOPRALLUOGHI.</div>
     </div>
-    `:""}
+    <div class="ag-box"><h4>📏 Misure</h4>
+      <div id="ag-misure"></div>
+      <div class="ag-presets">
+        ${["Larghezza","Altezza","Profondità","Altra misura"].map(l=>`<button type="button" class="btn btn-outline btn-sm" onclick="agendaMisuraAdd('${a.id}','${l==="Altra misura"?"":l}')">+ ${l}</button>`).join("")}
+      </div>
+    </div>`:""}
     ${(isNew&&a.tipo==="sopralluogo")?"":`<div class="ag-box"><h4>📝 Appunti</h4>
-      <textarea rows="${sop?6:4}" style="width:100%" placeholder="${sop?"Misure, cosa hai visto, cosa serve, accordi con il cliente…":"Note"}" oninput="agendaSet('${a.id}','note',this.value)">${escapeHtml(a.note)}</textarea>
+      <textarea rows="${sop?3:4}" style="width:100%" placeholder="${sop?"Cosa hai visto, cosa serve, accordi con il cliente…":"Note"}" oninput="agendaSet('${a.id}','note',this.value)">${escapeHtml(a.note)}</textarea>
     </div>`}
     <div class="ag-state" id="ag-state"></div>
     <div class="form-actions" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -7058,7 +7063,7 @@ function openAgendaItem(id,keepScroll){
     </div>`;
   document.getElementById("modalBackdrop").classList.add("open");
   if(keepScroll) body.parentElement.scrollTop=scroll;
-  if(sop){ agendaRenderFoto(a.id); }
+  if(sop){ agendaRenderMisure(a.id); agendaRenderFoto(a.id); }
 }
 /* ---- Misure ---- */
 function agendaRenderMisure(id){
@@ -7104,16 +7109,16 @@ async function agendaAddPhotos(id,fileList){
   let ok=0;
   for(const f of files){
     try{
-      const blob=await agendaResizeImage(f);
+      let blob; try{ blob=await agendaResizeImage(f); }catch(e){ blob=f; }
       const name=`foto-${Date.now().toString(36)}.jpg`;
       const path=`${agendaFolder(a)}/${name}`;
       await dropboxUploadBlob(path,blob);
       a.foto=[...(a.foto||[]),{id:uid(),path,name,nota:"",ts:new Date().toISOString()}];
       agendaBlobCache.set(path,URL.createObjectURL(blob));
       ok++; agendaRenderFoto(id);
-    }catch(e){ console.error("Foto sopralluogo",e); showToast(e?.message||"Foto non caricata"); }
+    }catch(e){ console.error("Foto sopralluogo",e); const m=String(e?.message||e||"errore"); agendaSetStatus("Foto NON caricata: "+m.slice(0,160)); showToast("Foto non caricata: "+m.slice(0,80)); }
   }
-  if(ok){ await agendaPersist(a); showToast(ok===1?"Foto salvata":`${ok} foto salvate`); }
+  if(ok){ const sv=await agendaPersist(a); showToast(sv?(ok===1?"Foto salvata":`${ok} foto salvate`):"Foto su Dropbox, ma scheda non salvata: controlla la tabella Agenda"); }
 }
 async function agendaThumbUrl(path){
   if(agendaBlobCache.has(path)) return agendaBlobCache.get(path);
