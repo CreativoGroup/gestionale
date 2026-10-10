@@ -2951,7 +2951,11 @@
 @media(max-width:760px){
   .app-topbar #topbarHeading{display:flex;align-items:center;gap:12px}
   .mob-logo{display:block;height:28px;width:auto;flex:0 0 auto;cursor:pointer;padding-right:12px;border-right:1px solid var(--border)}
-  .mob-title-wrap{min-width:0}
+  .mob-title-wrap{display:none}
+  .app-topbar .mob-logo{height:44px;max-width:240px;padding-right:0;border-right:none}
+  .app-topbar #dashboardHeaderLogo{height:44px!important;max-width:240px!important}
+  .app-topbar .mob-search-btn{display:none!important}
+  .app-topbar{padding-top:calc(8px + env(safe-area-inset-top))!important;padding-bottom:8px!important}
   #topbarActions .btn{min-height:40px!important;height:40px;padding:0 16px!important;font-size:13px!important;box-shadow:0 4px 12px rgba(20,29,43,.22)!important}
 }
 @media(max-width:760px){
