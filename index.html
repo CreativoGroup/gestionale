@@ -4488,14 +4488,11 @@ function renderMobBar(){
   bar.innerHTML=tabs.map(t=>`<button class="${t.id===currentView?'active':''}" onclick="mobGo('${t.id}')"><span class="ic">${t.i}</span>${t.l}${navBadgeHTML({id:t.id})}</button>`).join("")
     +`<button class="${!inTabs?'active':''}" onclick="openMobSheet()"><span class="ic">☰</span>Altro</button>`;
   const groups=["Traffico","Info e richieste","Anagrafica","Operativa","Archivio","Amministrazione"];
-  const rest=items.filter(n=>n.id!=="dashboard");
-  const html=groups.map(g=>{
-    const gi=rest.filter(n=>n.group===g);
-    if(!gi.length) return "";
-    return `<h4>${g}</h4><div class="mob-grid">${gi.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="mobGo('${n.id}')"><span class="ic">${n.icon}</span><span>${mobLabel(n)}</span></button>`).join("")}</div>`;
-  }).join("");
-  sh.innerHTML=`<div class="grab"></div><div class="mob-grid"><button class="${currentView==='dashboard'?'active':''}" onclick="mobGo('dashboard')"><span class="ic">⌂</span><span>Dashboard</span></button></div>${html}
-    <h4>Sistema</h4><div class="mob-grid"><button class="sys" onclick="closeMobSheet();exportBackup()"><span class="ic">↧</span><span>Esporta backup</span></button><button class="sys" onclick="closeMobSheet();signOut()"><span class="ic">↪</span><span>Esci</span></button></div>`;
+  const MOB_ALTRO=["clienti","incassi","entrateUscite"];
+  const rest=items.filter(n=>MOB_ALTRO.includes(n.id));
+  const html=`<div class="mob-grid">${rest.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="mobGo('${n.id}')"><span class="ic">${n.icon}</span><span>${mobLabel(n)}</span></button>`).join("")}</div>`;
+  sh.innerHTML=`<div class="grab"></div>${html}
+    <div class="mob-grid" style="margin-top:14px;"><button class="sys" onclick="closeMobSheet();signOut()"><span class="ic">↪</span><span>Esci</span></button></div>`;
 }
 function openMobSheet(){ document.body.classList.add("mob-sheet-open"); }
 function closeMobSheet(){ document.body.classList.remove("mob-sheet-open"); }
