@@ -6872,8 +6872,11 @@ async function segnaRitiroCompletato(orderId){
   let entries=(o.fasi||[]).filter(f=>f && f.key==="__ritiro_esterno__");
   if(entries.length){
     entries.forEach(e=>{ if(pendingIds.has(e.id)) e.status="RITIRATO"; });
+  }else{
+    const others=(o.fasi||[]).filter(f=>!(f && f.key==="__ritiro_esterno__"));
+    o.fasi=[...others,{key:"__ritiro_esterno__",id:uid(),status:"RITIRATO"}];
   }
-  (o.righe||[]).forEach(r=>{ if(r.categoria==="Lavorazioni Esterne" && r.ritiroEsterno==="DA RITIRARE") r.ritiroEsterno="RITIRATO"; });
+  (o.righe||[]).forEach(r=>{ if(r.categoria==="Lavorazioni Esterne" && (r.ritiroEsterno==="DA RITIRARE" || orderSupplierAutoPickup(o))) r.ritiroEsterno="RITIRATO"; });
   await saveState('orders');
   renderDashboard();
   showToast("Ritiro completato: ora il cliente è da avvisare");
@@ -10672,6 +10675,7 @@ function renderRitiroEsternoSection(o){
       </select>
     </div>
 
+    ${(!orderSupplierAutoPickup(o) && !entries.some(e=>e.status==="DA RITIRARE")) ? `<p class="helptext" style="margin:0;">Con questo fornitore non serve segnare il ritiro. Per Presstime, Former, 4C Serigrafia, Officine del Cotone e Ricamarte l'ordine va in DA RITIRARE in automatico.</p>` : `${orderSupplierAutoPickup(o)?`<p class="helptext" style="margin:0 0 8px;">Ordine in DA RITIRARE in automatico. Quando lo ritiri, spunta RITIRATO.</p>`:""}
     <div class="external-logistics-list">
       ${entries.map((e,idx)=>`<div class="external-logistics-row">
         <div class="external-logistics-head">
@@ -10684,7 +10688,7 @@ function renderRitiroEsternoSection(o){
       </div>`).join("")}
     </div>
 
-    <button class="btn btn-outline btn-sm external-logistics-add" onclick="addExternalLogisticsEntry('${o.id}')">+ AGGIUNGI CONSEGNA / RITIRO</button>
+    <button class="btn btn-outline btn-sm external-logistics-add" onclick="addExternalLogisticsEntry('${o.id}')">+ AGGIUNGI CONSEGNA / RITIRO</button>`}
   </div>`;
 }
 function updateFornitoreEsternoUnico(orderId,value){
@@ -10818,11 +10822,21 @@ function resetWorkStartDate(orderId){
   showToast("Data inizio ripristinata al calcolo automatico");
 }
 
+/* Fornitori da cui si ritira sempre: lo stato "DA RITIRARE" è automatico, senza spunta a mano. */
+const FORNITORI_RITIRO_AUTO = ["presstime","former","4c serigrafia","officine del cotone","ricamarte"];
+function orderSupplierName(o){
+  return String((o?.righe||[]).find(r=>r && r.categoria==="Lavorazioni Esterne" && String(r.fornitore||"").trim())?.fornitore||"").trim();
+}
+function orderSupplierAutoPickup(o){
+  return FORNITORI_RITIRO_AUTO.includes(orderSupplierName(o).toLowerCase());
+}
 function getExternalLogisticsEntries(order){
+  const auto = orderSupplierAutoPickup(order);
+  const eff = e => (auto && !String(e.status||"").trim()) ? Object.assign({}, e, {status:"DA RITIRARE"}) : e;
   const stored=(order?.fasi||[]).filter(f=>f && f.key==="__ritiro_esterno__");
-  if(stored.length) return stored;
+  if(stored.length) return stored.map(eff);
   const legacy=(order?.righe||[]).find(r=>r.categoria==="Lavorazioni Esterne" && String(r.ritiroEsterno||"").trim());
-  return [{key:"__ritiro_esterno__",id:"default",status:String(legacy?.ritiroEsterno||"")}];
+  return [eff({key:"__ritiro_esterno__",id:"default",status:String(legacy?.ritiroEsterno||"")})];
 }
 function updateExternalLogisticsStatus(orderId,entryId,status){
   const o=findItem("orders",orderId); if(!o) return;
