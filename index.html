@@ -2947,6 +2947,12 @@
 </style>
 <style id="mobileV3">
 .wa-back{display:none}
+.mob-logo{display:none}
+@media(max-width:760px){
+  .app-topbar #topbarHeading{display:flex;align-items:center;gap:12px}
+  .mob-logo{display:block;height:28px;width:auto;flex:0 0 auto;cursor:pointer;padding-right:12px;border-right:1px solid var(--border)}
+  .mob-title-wrap{min-width:0}
+}
 @media(max-width:760px){
   .wa-back{display:inline-flex;margin-bottom:8px}
   .wa-shell.m-list .wa-chat-card{display:none}
@@ -4693,7 +4699,8 @@ function renderViewHeading(){
       </div>
     `;
   }else{
-    wrap.innerHTML = `<h1 id="viewTitle">${meta?.label||""}</h1><p id="viewSubtitle">${meta?.subtitle||""}</p>`;
+    const logoSrc = document.querySelector(".brand-logo img")?.src || "";
+    wrap.innerHTML = `${logoSrc?`<img class="mob-logo" src="${logoSrc}" alt="Dashboard" title="Vai alla Dashboard" onclick="goTo('dashboard')">`:""}<div class="mob-title-wrap"><h1 id="viewTitle">${meta?.label||""}</h1><p id="viewSubtitle">${meta?.subtitle||""}</p></div>`;
   }
   setTimeout(syncMobileDashboardHeaderOrder,0);
 }
