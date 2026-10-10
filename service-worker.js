@@ -1,10 +1,10 @@
-const CACHE_NAME = "creativo-gestionale-v4";
+const CACHE_NAME = "creativo-gestionale-v5";
 const STATIC_ASSETS = [
-  "/manifest.webmanifest?v=4",
-  "/apple-touch-icon.png?v=4",
-  "/icon-192.png?v=4",
-  "/icon-512.png?v=4",
-  "/favicon-32.png?v=4"
+  "/manifest.webmanifest?v=5",
+  "/apple-touch-icon.png?v=5",
+  "/icon-192.png?v=5",
+  "/icon-512.png?v=5",
+  "/favicon-32.png?v=5"
 ];
 self.addEventListener("install", event => {
   self.skipWaiting();
