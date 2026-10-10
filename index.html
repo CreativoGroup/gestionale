@@ -10531,6 +10531,7 @@ let flussoFilters = {
   search:"",
   worker:"",
   delivery:"",
+  macchina:"",
   important:false,
   external:false
 };
@@ -10617,7 +10618,7 @@ function renderFlusso(){
         c?.telefono,
         o.numero,
         o.descrizione,
-        ...(o.righe||[]).flatMap(r=>[r.categoria,r.prodotto,r.descrizione,r.fornitore])
+        ...(o.righe||[]).flatMap(r=>[r.categoria,r.sottocategoria,r.prodotto,r.descrizione,r.fornitore])
       ].join(" ").toLowerCase();
       return hay.includes(q);
     });
@@ -10626,6 +10627,10 @@ function renderFlusso(){
   if(f.important) list=list.filter(o=>!!o.importante);
   if(f.external) list=list.filter(o=>flowStageOf(o)==="Produzione esterna" || (o.righe||[]).some(r=>isExternalCat(r.categoria)));
 
+  if(String(f.macchina||"").trim()){
+    const m=String(f.macchina).trim().toLowerCase();
+    list=list.filter(o=>(o.righe||[]).some(r=>[r.sottocategoria,r.fornitore,r.categoria].join(" ").toLowerCase().includes(m)));
+  }
   if(f.delivery==="today") list=list.filter(o=>flowDateKey(o.dataConsegna)===today);
   if(f.delivery==="soon") list=list.filter(o=>{
     const days=flowDaysFromToday(o.dataConsegna);
@@ -10715,12 +10720,10 @@ function renderFlusso(){
         ${WORKERS.map(w=>`<option value="${w}" ${f.worker===w?'selected':''}>${w}</option>`).join("")}
       </select>
 
-      <select class="flow-control" onchange="setFlowFilter('delivery',this.value)">
-        <option value="">Tutte le consegne</option>
-        <option value="today" ${f.delivery==="today"?'selected':''}>Consegna oggi</option>
-        <option value="soon" ${f.delivery==="soon"?'selected':''}>Entro 2 giorni</option>
-        <option value="overdue" ${f.delivery==="overdue"?'selected':''}>In ritardo</option>
-      </select>
+      <input id="flowMacchinaInput" class="flow-control" type="search" list="flowMacchinaList" autocomplete="off"
+        placeholder="Macchinario o fornitore (es. DTF, Brother)…" value="${escapeHtml(f.macchina||"")}"
+        oninput="flussoFilters.macchina=this.value; clearTimeout(window.__flowMacTimer); window.__flowMacTimer=setTimeout(()=>rerenderKeepingFocus(renderFlusso),180);">
+      <datalist id="flowMacchinaList">${[...new Set([...Object.values(SOTTOCATEGORIE).flat(), ...FORNITORI_PRINCIPALI, ...FORNITORI_ALTRI])].map(x=>`<option value="${escapeHtml(x)}"></option>`).join("")}</datalist>
 
       <button class="flow-toggle ${f.important?'active':''}" onclick="toggleFlowFilter('important')">★ Solo importanti</button>
       <button class="flow-toggle ${f.external?'active':''}" onclick="toggleFlowFilter('external')">▣ Lavorazioni esterne</button>
