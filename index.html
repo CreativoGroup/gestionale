@@ -6433,6 +6433,7 @@ async function sendWhatsappReply(waId){
     });
 
     if(textarea) textarea.value="";
+    waDrafts[waId]="";
     if(fileInput) fileInput.value="";
 
     selectedWhatsappWaId=waId;
@@ -6464,7 +6465,22 @@ function whatsappReplyKeydown(event,waId){
   }
 }
 
+/* Bozza della risposta per conversazione: l'aggiornamento automatico della pagina non deve cancellarla */
+const waDrafts = {};
 function renderWhatsapp(){
+  const ta=document.getElementById("whatsappReplyText");
+  const hadFocus = !!ta && document.activeElement===ta;
+  const selS = ta ? ta.selectionStart : null, selE = ta ? ta.selectionEnd : null;
+  const prevWa = ta ? ta.getAttribute("data-wa") : null;
+  if(ta && prevWa) waDrafts[prevWa]=ta.value;
+  renderWhatsappInner();
+  const ta2=document.getElementById("whatsappReplyText");
+  if(ta2 && hadFocus && ta2.getAttribute("data-wa")===prevWa){
+    ta2.focus();
+    try{ ta2.setSelectionRange(selS, selE); }catch(e){}
+  }
+}
+function renderWhatsappInner(){
   const root=document.getElementById("view-whatsapp");
   if(!root) return;
 
@@ -6621,9 +6637,11 @@ function renderWhatsapp(){
             <textarea
               id="whatsappReplyText"
               rows="4"
+              data-wa="${escapeHtml(active.waId)}"
               placeholder="Scrivi il messaggio..."
+              oninput="waDrafts['${escapeHtml(active.waId)}']=this.value"
               onkeydown="whatsappReplyKeydown(event,'${escapeHtml(active.waId)}')"
-            ></textarea>
+            >${escapeHtml(waDrafts[active.waId]||"")}</textarea>
 
             <div class="wa-file-row">
               <input
