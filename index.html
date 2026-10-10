@@ -3321,12 +3321,15 @@ let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expens
 let currentView = "dashboard";
 /* Colonne "extra" (jsonb) per dati aggiuntivi di preventivi e note: servono una colonna su Supabase (script SQL mostrato nell'app). */
 const DB_EXTRA = {quotes:false, noteComunicazioni:false};
+let DB_AGPERS = false; /* colonna agenda.persone presente su Supabase? */
 let DB_ALLEST = false; /* colonna orders.allestimento_indirizzo presente su Supabase? */
 let DB_CONSEGNATO = false; /* colonna orders.consegnato_il presente su Supabase? */
 const DB_CONSEGNATO_SQL = "alter table public.orders add column if not exists consegnato_il timestamptz;";
 const DB_ALLEST_SQL = "alter table public.orders add column if not exists allestimento_indirizzo text;";
 const DB_EXTRA_SQL = "alter table public.quotes add column if not exists extra jsonb default '{}'::jsonb;\nalter table public.note_comunicazioni add column if not exists extra jsonb default '{}'::jsonb;";
 async function probeDbExtraColumns(){
+  try{ const {error} = await sb.from("agenda").select("id,persone").limit(1); DB_AGPERS = !error; }
+  catch(e){ DB_AGPERS = false; }
   try{ const {error} = await sb.from("orders").select("id,allestimento_indirizzo").limit(1); DB_ALLEST = !error; }
   catch(e){ DB_ALLEST = false; }
   try{ const {error} = await sb.from("orders").select("id,consegnato_il").limit(1); DB_CONSEGNATO = !error; }
@@ -3380,7 +3383,7 @@ function toDbRow(collection, o){
     case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, client_id:o.clientId||null, converted_order_id:o.convertedOrderId||null, converted_at:o.convertedAt||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
     case "noteComunicazioni": return {id:o.id, tipo:o.tipo||"Chiamata", nome_persona:o.nomePersona||null, testo:o.testo||null, operatore:o.operatore||null, fatto:!!o.fatto, creato_il:o.creatoIl||new Date().toISOString(), fatto_il:o.fattoIl||null, ...(DB_EXTRA.noteComunicazioni?{extra:o.extra||{}}:{})};
     case "gmailActionStatus": return {id:o.id, gmail_message_id:o.gmailMessageId, replied:!!o.replied, lead_generated:!!o.leadGenerated, order_generated:!!o.orderGenerated, updated_at:o.updatedAt||new Date().toISOString()};
-    case "agenda": return {id:o.id, tipo:o.tipo||"appuntamento", titolo:o.titolo||null, client_id:o.clientId||null, cliente_nome:o.clienteNome||null, data:o.data||null, ora:o.ora||null, luogo:o.luogo||null, stato:o.stato||"Da fare", note:o.note||null, misure:o.misure||[], foto:o.foto||[], order_id:o.orderId||null, created_at:o.createdAt||null, updated_at:o.updatedAt||null};
+    case "agenda": return {id:o.id, tipo:o.tipo||"appuntamento", titolo:o.titolo||null, client_id:o.clientId||null, cliente_nome:o.clienteNome||null, data:o.data||null, ora:o.ora||null, luogo:o.luogo||null, stato:o.stato||"Da fare", note:o.note||null, misure:o.misure||[], foto:o.foto||[], order_id:o.orderId||null, created_at:o.createdAt||null, updated_at:o.updatedAt||null, ...(DB_AGPERS?{persone:o.persone||null}:{})};
     case "whatsappMessages": return {id:o.id, whatsapp_message_id:o.whatsappMessageId||null, wa_id:o.waId||null, contact_name:o.contactName||null, from_number:o.fromNumber||null, phone_number_id:o.phoneNumberId||null, display_phone_number:o.displayPhoneNumber||null, direction:o.direction||"inbound", message_type:o.messageType||null, body:o.body||null, message_timestamp:o.messageTimestamp||null, status:o.status||null, raw_payload:o.rawPayload||null, created_at:o.createdAt||null};
   }
 }
@@ -3410,7 +3413,7 @@ function fromDbRow(collection, r){
     case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
     case "noteComunicazioni": return {id:r.id, tipo:r.tipo||"Chiamata", nomePersona:r.nome_persona||"", testo:r.testo||"", operatore:r.operatore||"", fatto:!!r.fatto, creatoIl:r.creato_il||"", fattoIl:r.fatto_il||"", extra:r.extra||{}};
     case "gmailActionStatus": return {id:r.id, gmailMessageId:r.gmail_message_id||"", replied:!!r.replied, leadGenerated:!!r.lead_generated, orderGenerated:!!r.order_generated, updatedAt:r.updated_at||""};
-    case "agenda": return {id:r.id, tipo:r.tipo||"appuntamento", titolo:r.titolo||"", clientId:r.client_id||"", clienteNome:r.cliente_nome||"", data:r.data||"", ora:r.ora||"", luogo:r.luogo||"", stato:r.stato||"Da fare", note:r.note||"", misure:Array.isArray(r.misure)?r.misure:[], foto:Array.isArray(r.foto)?r.foto:[], orderId:r.order_id||"", createdAt:r.created_at||"", updatedAt:r.updated_at||""};
+    case "agenda": return {id:r.id, tipo:r.tipo||"appuntamento", titolo:r.titolo||"", clientId:r.client_id||"", clienteNome:r.cliente_nome||"", data:r.data||"", ora:r.ora||"", luogo:r.luogo||"", stato:r.stato||"Da fare", note:r.note||"", misure:Array.isArray(r.misure)?r.misure:[], foto:Array.isArray(r.foto)?r.foto:[], orderId:r.order_id||"", persone:r.persone||"", createdAt:r.created_at||"", updatedAt:r.updated_at||""};
     case "whatsappMessages": return {id:r.id, whatsappMessageId:r.whatsapp_message_id||"", waId:r.wa_id||"", contactName:r.contact_name||"", fromNumber:r.from_number||"", phoneNumberId:r.phone_number_id||"", displayPhoneNumber:r.display_phone_number||"", direction:r.direction||"inbound", messageType:r.message_type||"", body:r.body||"", messageTimestamp:r.message_timestamp||r.created_at||"", status:r.status||"", rawPayload:r.raw_payload||null, createdAt:r.created_at||""};
   }
 }
@@ -6830,6 +6833,14 @@ function agendaClienteLabel(a){
   const c=a.clientId?state.clients.find(x=>x.id===a.clientId):null;
   return c?clientDisplayName(c):(a.clienteNome||"");
 }
+function agendaPersone(a){ return String(a.persone||"").split("|").map(x=>x.trim()).filter(Boolean); }
+function agendaTogglePersona(id,w){
+  const a=agendaGet(id); if(!a) return;
+  let l=agendaPersone(a); l=l.includes(w)?l.filter(x=>x!==w):[...l,w];
+  a.persone=l.join(" | ");
+  document.querySelectorAll(`#ag-pers .worker-chip`).forEach(b=>b.classList.toggle("selected",l.includes(b.dataset.w)));
+  agendaQueue(id);
+}
 function agendaIsLate(a){ return a.stato!=="Fatto" && a.data && a.data<today(); }
 function agendaAllestimentiOrdini(){
   return state.orders.filter(o=>o.consegnaTipo==="Allestimento" && !o.spedito && o.stato!=="Consegnato");
@@ -6853,7 +6864,7 @@ function renderAgenda(){
       return `<div class="ag-row" onclick="openJobCard('${o.id}')">
         <div class="ag-ic">🛠</div>
         <div class="ag-main"><div class="ag-title">${escapeHtml(clientName(o.clientId))}</div>
-          <div class="ag-sub"><span class="ag-badge ag-auto">DALL'ORDINE${o.numero?` #${escapeHtml(String(o.numero))}`:""}</span>${escapeHtml(orderAllestimentoIndirizzo(o)||"Indirizzo non indicato")}</div></div>
+          <div class="ag-sub"><span class="ag-badge ag-auto">DALL'ORDINE${o.numero?` #${escapeHtml(String(o.numero))}`:""}</span>${escapeHtml(orderAllestimentoIndirizzo(o)||"Indirizzo non indicato")}${orderWorkersList(o).length?` · 👤 ${escapeHtml(orderWorkersList(o).join(", "))}`:""}</div></div>
         <div class="ag-when">${x.data?fmtDate(x.data):"—"}<small>Allestimento</small></div>
         <div class="ag-acts"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();segnaAllestimentoCompletato('${o.id}')">COMPLETATO</button></div>
       </div>`;
@@ -6863,7 +6874,7 @@ function renderAgenda(){
     return `<div class="ag-row ${x.done?"done":""}" onclick="openAgendaItem('${a.id}')">
       <div class="ag-ic">${t.ic}</div>
       <div class="ag-main"><div class="ag-title">${escapeHtml(agendaTitle(a))}</div>
-        <div class="ag-sub">${agendaIsLate(a)?`<span class="ag-badge late">IN RITARDO</span>`:""}<span class="ag-badge">${t.l.toUpperCase()}</span>${escapeHtml(agendaClienteLabel(a)&&agendaClienteLabel(a)!==agendaTitle(a)?agendaClienteLabel(a)+" · ":"")}${escapeHtml(a.luogo||"")}${extra}</div></div>
+        <div class="ag-sub">${agendaIsLate(a)?`<span class="ag-badge late">IN RITARDO</span>`:""}<span class="ag-badge">${t.l.toUpperCase()}</span>${escapeHtml(agendaClienteLabel(a)&&agendaClienteLabel(a)!==agendaTitle(a)?agendaClienteLabel(a)+" · ":"")}${escapeHtml(a.luogo||"")}${extra}${agendaPersone(a).length?` · 👤 ${escapeHtml(agendaPersone(a).join(", "))}`:""}</div></div>
       <div class="ag-when">${a.data?fmtDate(a.data):"Senza data"}<small>${escapeHtml(a.ora||"")}</small></div>
       <div class="ag-acts">
         <button class="btn btn-outline btn-sm" title="${x.done?"Riapri":"Segna come fatto"}" onclick="event.stopPropagation();agendaToggleDone('${a.id}')">${x.done?"↺":"✓ FATTO"}</button>
@@ -6907,7 +6918,7 @@ function agendaDelete(id){
   });
 }
 function agendaNewItem(tipo){
-  return {id:uid(),tipo,titolo:"",clientId:"",clienteNome:"",data:today(),ora:"",luogo:"",stato:"Da fare",note:"",misure:[],foto:[],orderId:"",createdAt:new Date().toISOString(),updatedAt:""};
+  return {id:uid(),tipo,titolo:"",clientId:"",clienteNome:"",data:today(),ora:"",luogo:"",stato:"Da fare",note:"",misure:[],foto:[],orderId:"",persone:"",createdAt:new Date().toISOString(),updatedAt:""};
 }
 function openAgendaNew(tipo){ agendaDraft=agendaNewItem(tipo||"sopralluogo"); openAgendaItem(agendaDraft.id); }
 /* Salvataggio: in bozza finché non c'è qualcosa di scritto; poi automatico mentre scrivi */
@@ -6985,6 +6996,9 @@ function openAgendaItem(id,keepScroll){
         <datalist id="ag-cli-list">${state.clients.map(c=>`<option value="${escapeHtml(clientDisplayName(c))}"></option>`).join("")}</datalist></div>
       <div class="field"><label>Data</label><input type="date" value="${escapeHtml(a.data)}" onchange="agendaSet('${a.id}','data',this.value)"></div>
       <div class="field"><label>Ora</label><input type="time" value="${escapeHtml(a.ora)}" onchange="agendaSet('${a.id}','ora',this.value)"></div>
+      <div class="field full"><label>Chi se ne occupa</label>
+        <div id="ag-pers" class="worker-chip-wrap">${WORKERS.map(w=>`<button type="button" data-w="${w}" class="worker-chip ${agendaPersone(a).includes(w)?"selected":""}" onclick="agendaTogglePersona('${a.id}','${w}')"><span class="worker-chip-dot"></span>${w}</button>`).join("")}</div>
+        ${DB_AGPERS?"":`<div class="helptext" style="margin-top:6px;color:var(--danger)">Per salvare le persone serve una riga SQL su Supabase (te la dà Claude).</div>`}</div>
       <div class="field full"><label>Dove</label>
         <input id="ag-luogo" value="${escapeHtml(a.luogo)}" placeholder="Indirizzo" oninput="agendaSet('${a.id}','luogo',this.value);agendaRefreshMaps('${a.id}')">
         <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
