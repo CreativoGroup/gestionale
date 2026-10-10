@@ -4292,7 +4292,7 @@ const NAV = [
 
   {id:"whatsappWeb", label:"WhatsApp Web", icon:"◉", subtitle:"Apre WhatsApp Web", group:"Traffico", externalUrl:"https://web.whatsapp.com/", hidden:true},
   {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico"},
-  {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico", hidden:true},
+  {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico"},
 
   {id:"note", label:"Note e lead", icon:"✎", subtitle:"Note da gestire, richieste (lead) e preventivi", group:"Info e richieste"},
   {id:"leads", label:"Lead e preventivi", icon:"◎", subtitle:"Richieste da seguire, preventivi e PDF", group:"Info e richieste", hidden:true},
@@ -4691,7 +4691,7 @@ function renderCurrentView(){
   ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti,
     ordini:renderOrdini, flusso:renderFlusso,
     magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, dropbox:renderDropbox, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate, entrateUscite:renderEntrateUscite,
-    posta:renderPosta, whatsapp:renderWhatsapp, instagram:()=>renderMetaChannel("instagram"), leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
+    posta:renderPosta, whatsapp:renderWhatsapp, instagram:renderInstagram, leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
 }
 let clientFormOpen = false;
 let quoteFormOpen = false;
@@ -6690,21 +6690,124 @@ function renderWhatsappInner(){
   if(active) scrollWhatsappToBottom();
 }
 
-function renderMetaChannel(channel){
-  const root=document.getElementById("view-"+channel);
-  if(!root) return;
-  const label=channel==="instagram"?"Instagram":"Meta";
+/* ============ INSTAGRAM (messaggi diretti) ============ */
+let igMessages=[], igSelected="", igLoaded=false;
+const igDrafts={};
+const IG_COLS="id,ig_user_id,username,contact_name,direction,message_type,body,message_timestamp,status,created_at";
+function igGroups(){
+  const map=new Map();
+  igMessages.forEach(m=>{
+    if(!map.has(m.ig_user_id)) map.set(m.ig_user_id,{id:m.ig_user_id,name:"",username:"",messages:[]});
+    const g=map.get(m.ig_user_id);
+    g.messages.push(m);
+    if(m.contact_name) g.name=m.contact_name;
+    if(m.username) g.username=m.username;
+  });
+  const out=[...map.values()];
+  out.forEach(g=>g.messages.sort((a,b)=>String(a.message_timestamp||a.created_at).localeCompare(String(b.message_timestamp||b.created_at))));
+  out.sort((a,b)=>{
+    const la=a.messages[a.messages.length-1], lb=b.messages[b.messages.length-1];
+    return String(lb.message_timestamp||lb.created_at).localeCompare(String(la.message_timestamp||la.created_at));
+  });
+  return out;
+}
+function igTitle(g){ return g.name||(g.username?"@"+g.username:"Utente Instagram"); }
+async function refreshInstagram(silent=true){
+  const {data,error}=await sb.from("instagram_messages").select(IG_COLS).order("message_timestamp",{ascending:false}).limit(800);
+  if(error){ console.error(error); if(!silent) showToast("Errore aggiornamento Instagram"); return; }
+  igMessages=data||[]; igLoaded=true;
+  if(currentView==="instagram") renderInstagram();
+  if(!silent) showToast("Instagram aggiornato");
+}
+setInterval(()=>{ if(currentView==="instagram" && !document.hidden) refreshInstagram(true); },20000);
+function selectInstagramConversation(id){ igSelected=String(id||""); renderInstagram(); }
+async function sendInstagramReply(id){
+  const ta=document.getElementById("igReplyText"); const btn=document.getElementById("igReplyBtn");
+  const text=String(ta?.value||"").trim();
+  if(!text){ showToast("Scrivi un messaggio"); return; }
+  try{
+    if(btn){btn.disabled=true;btn.textContent="INVIO...";}
+    const {data:sd}=await sb.auth.getSession();
+    if(!sd?.session) throw new Error("Sessione scaduta: accedi di nuovo");
+    const r=await fetch(`${SUPABASE_URL}/functions/v1/instagram-send-ts`,{method:"POST",headers:{"Authorization":`Bearer ${sd.session.access_token}`,"apikey":SUPABASE_KEY,"Content-Type":"application/json"},body:JSON.stringify({to:id,text})});
+    let j={}; try{ j=await r.json(); }catch(e){}
+    if(!r.ok||!j.ok) throw new Error(j.error||"Errore durante l'invio su Instagram");
+    igDrafts[id]=""; if(ta) ta.value="";
+    await refreshInstagram(true);
+    showToast("Messaggio Instagram inviato");
+  }catch(e){ console.error(e); showToast(e.message||"Errore invio Instagram"); }
+  finally{ const b=document.getElementById("igReplyBtn"); if(b){b.disabled=false;b.textContent="INVIA SU INSTAGRAM";} }
+}
+function deleteInstagramConversation(id){
+  askConfirm("Eliminare questa conversazione dal gestionale? Su Instagram resta.", async ()=>{
+    const {error}=await sb.from("instagram_messages").delete().eq("ig_user_id",id);
+    if(error){ showToast("Errore eliminazione"); return; }
+    igMessages=igMessages.filter(m=>m.ig_user_id!==id); igSelected="";
+    renderInstagram(); showToast("Conversazione eliminata");
+  });
+}
+function createNoteFromInstagram(id){
+  const g=igGroups().find(x=>x.id===id); if(!g) return;
+  const last=[...g.messages].reverse().find(m=>m.direction==="inbound")||g.messages[g.messages.length-1];
+  navigator.clipboard?.writeText?.(`Instagram ${igTitle(g)}: ${last?.body||""}`).catch(()=>{});
+  showToast("Testo copiato: incollalo in un nuovo appunto");
+}
+function renderInstagram(){
+  const root=document.getElementById("view-instagram"); if(!root) return;
+  if(!igLoaded){ root.innerHTML=`<div class="card"><p class="helptext">Caricamento messaggi Instagram...</p></div>`; refreshInstagram(true); return; }
+  const ta=document.getElementById("igReplyText");
+  const hadFocus=!!ta && document.activeElement===ta;
+  const prev=ta?ta.getAttribute("data-ig"):null;
+  if(ta && prev) igDrafts[prev]=ta.value;
+  const convs=igGroups();
+  if(!igSelected && convs.length) igSelected=convs[0].id;
+  if(igSelected && !convs.some(c=>c.id===igSelected)) igSelected=convs[0]?.id||"";
+  const active=convs.find(c=>c.id===igSelected)||null;
+  const lastIn=active?[...active.messages].reverse().find(m=>m.direction==="inbound"):null;
+  const expired=active && (!lastIn || (Date.now()-new Date(lastIn.message_timestamp||lastIn.created_at).getTime())>24*3600*1000);
   root.innerHTML=`
     <div class="card" style="margin-bottom:18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-        <div>
-          <h3 style="margin:0 0 6px;">${label}</h3>
-          <p class="helptext" style="margin:0;">Area predisposta per il traffico Meta. La connessione di questo canale non è ancora attiva.</p>
-        </div>
-        <span class="pill">NON COLLEGATO</span>
+        <div><h3 style="margin:0 0 6px;">Instagram</h3><p class="helptext" style="margin:0;">Messaggi diretti ricevuti sul profilo Creativò.</p></div>
+        <button class="btn btn-outline btn-sm" onclick="refreshInstagram(false)">AGGIORNA</button>
       </div>
     </div>
-    <div class="card"><h3 style="margin-top:0;">Conversazioni</h3><p class="empty">Nessun canale ${label} collegato.</p></div>`;
+    ${convs.length?`
+    <div class="wa-shell">
+      <div class="card wa-sidebar">
+        <div class="wa-sidebar-head"><div style="font-weight:850;">Conversazioni (${convs.length})</div></div>
+        <div class="wa-conv-list">
+          ${convs.map(c=>{const l=c.messages[c.messages.length-1];return `<button onclick="selectInstagramConversation('${escapeHtml(c.id)}')" class="wa-conv-btn ${c.id===igSelected?"active":""}">
+            <div class="wa-conv-top"><div class="wa-conv-name">${escapeHtml(igTitle(c))}</div><div class="wa-conv-time">${waDateLabel(l.message_timestamp||l.created_at)}</div></div>
+            ${c.username?`<div class="wa-conv-phone">@${escapeHtml(c.username)}</div>`:""}
+            <div class="wa-conv-last">${l.direction==="outbound"?"Tu: ":""}${escapeHtml(l.body||"[messaggio]")}</div></button>`;}).join("")}
+        </div>
+      </div>
+      <div class="card wa-chat-card">
+        ${active?`
+          <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:10px;">
+            <div><h3 style="margin:0 0 5px;">${escapeHtml(igTitle(active))}</h3>${active.username?`<div class="helptext" style="margin:0;">@${escapeHtml(active.username)}</div>`:""}</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-outline btn-sm" onclick="createNoteFromInstagram('${escapeHtml(active.id)}')">COPIA PER NOTA</button>
+              <button class="btn btn-ghost btn-sm" title="Elimina conversazione" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" onclick="deleteInstagramConversation('${escapeHtml(active.id)}')">🗑</button>
+            </div>
+          </div>
+          <div id="igChatScroll" class="wa-chat-scroll">
+            ${active.messages.map(m=>{const out=m.direction==="outbound";return `<div class="wa-bubble ${out?"out":"in"}">
+              <div style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(m.body||"[messaggio]")}</div>
+              <div class="wa-bubble-meta"><span>${waDateLabel(m.message_timestamp||m.created_at)}</span></div></div>`;}).join("")}
+          </div>
+          <div class="wa-compose">
+            <div style="font-weight:850;margin-bottom:8px;">Rispondi su Instagram</div>
+            ${expired?`<div class="notice" style="margin-bottom:8px;">Il cliente non ha scritto nelle ultime 24 ore: Instagram potrebbe rifiutare la risposta.</div>`:""}
+            <textarea id="igReplyText" rows="4" data-ig="${escapeHtml(active.id)}" placeholder="Scrivi il messaggio..." oninput="igDrafts['${escapeHtml(active.id)}']=this.value" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();sendInstagramReply('${escapeHtml(active.id)}')}">${escapeHtml(igDrafts[active.id]||"")}</textarea>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px;"><button id="igReplyBtn" class="btn btn-primary" onclick="sendInstagramReply('${escapeHtml(active.id)}')">INVIA SU INSTAGRAM</button></div>
+          </div>`:`<p class="empty">Seleziona una conversazione.</p>`}
+      </div>
+    </div>`:`<div class="card"><p class="empty">Nessun messaggio Instagram ancora ricevuto.</p></div>`}`;
+  const t2=document.getElementById("igReplyText");
+  if(t2 && hadFocus && t2.getAttribute("data-ig")===prev){ t2.focus(); try{t2.setSelectionRange(t2.value.length,t2.value.length);}catch(e){} }
+  requestAnimationFrame(()=>{const el=document.getElementById("igChatScroll"); if(el) el.scrollTop=el.scrollHeight;});
 }
 
 /* ============ NOTE / ATTIVITÀ DA GESTIRE ============ */
