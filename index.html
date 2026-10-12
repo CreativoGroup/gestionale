@@ -119,6 +119,15 @@
   .form-panel{background:var(--card);border:1px dashed var(--accent);border-radius:var(--radius-card);padding:18px;margin-bottom:18px;display:none;}
   .form-panel.open{display:block;}
   .form-panel h3{margin:0 0 14px;font-size:15px;}
+  #orderForm.open{padding:34px 40px 30px;border-width:2px;border-radius:22px;box-shadow:0 10px 40px rgba(232,85,47,.12);min-height:300px}
+  #orderForm h3{font-size:28px;margin-bottom:22px}
+  #orderForm .field label{font-size:15px;font-weight:800;margin-bottom:8px}
+  #orderForm #of-cliente-search{font-size:22px;min-height:68px;padding:12px 22px;border-radius:16px;border:2px solid var(--border)}
+  #orderForm #of-cliente-search:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 4px rgba(232,85,47,.15)}
+  #orderForm .client-pick{padding:16px 20px;font-size:18px}
+  #orderForm > .form-grid{grid-template-columns:1fr!important}
+  #orderForm .form-actions .btn{font-size:17px;padding:14px 28px;min-height:52px}
+  #orderForm .helptext{font-size:14px}
   .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
   @media(max-width:800px){.form-grid{grid-template-columns:1fr 1fr;}}
   @media(max-width:520px){.form-grid{grid-template-columns:1fr;}}
@@ -4474,7 +4483,8 @@ function navNuovoOrdine(){
   pendingLeadOrderConversion=null;
   orderFormOpen=true;
   const el=document.getElementById("orderForm");
-  if(el){ el.classList.add("open"); try{ el.scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){} }
+  if(el){ el.classList.add("open"); }
+  focusOrderForm();
 }
 function renderNav(){
   const items = visibleNav();
@@ -4849,12 +4859,31 @@ if(!window._globalEditingRenderGuardInstalled){
     },80);
   },true);
 }
+/* Niente suggerimenti automatici del browser (indirizzi, ecc.) mentre si scrive nei campi del gestionale */
+(function(){
+  const fix=el=>{
+    if(!el||el.nodeType!==1) return;
+    const list=el.matches&&el.matches("input,textarea")?[el]:[...(el.querySelectorAll?el.querySelectorAll("input,textarea"):[])];
+    list.forEach(i=>{
+      if(i.id==="login-email"||i.id==="login-password"||i.type==="password"||i.type==="file"||i.type==="checkbox"||i.type==="radio") return;
+      if(i.getAttribute("autocomplete")!=="nope") i.setAttribute("autocomplete","nope");
+    });
+  };
+  const start=()=>{ fix(document.body); new MutationObserver(m=>m.forEach(r=>r.addedNodes.forEach(fix))).observe(document.body,{childList:true,subtree:true}); };
+  if(document.body) start(); else document.addEventListener("DOMContentLoaded",start);
+})();
+function focusOrderForm(){
+  setTimeout(()=>{ const i=document.getElementById("of-cliente-search"); const f=document.getElementById("orderForm");
+    if(f&&f.classList.contains("open")){ try{ f.scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){} }
+    if(i&&!i.value){ try{ i.focus({preventScroll:true}); }catch(e){ i.focus(); } } },80);
+}
 function toggleForm(id){
   if(id==="clientForm") clientFormOpen = !clientFormOpen;
   if(id==="quoteForm") quoteFormOpen = !quoteFormOpen;
   if(id==="orderForm") orderFormOpen = !orderFormOpen;
   const el = document.getElementById(id);
   if(el) el.classList.toggle("open");
+  if(id==="orderForm" && orderFormOpen) focusOrderForm();
 }
 function closeClientForm(){
   clientFormOpen = false;
@@ -8832,19 +8861,28 @@ function orderClientPick(id){
   if(inp) inp.value=clientName(id);
   if(box) box.innerHTML="";
 }
+function looksLikeBusiness(t){
+  const x=String(t||"").toLowerCase();
+  if(/\b(s\.?r\.?l\.?s?|s\.?p\.?a\.?|s\.?n\.?c\.?|s\.?a\.?s\.?|a\.?s\.?d\.?|s\.?s\.?d\.?|soc\.?|societ[àa]|studio|ditta|associazione|hotel|bar|ristorante|pizzeria|centro|club|team|group|snc|srl|spa|asd|ssd|onlus|coop|cooperativa|lavanderia|palestra|scuola|chiesa|parrocchia|comune|agenzia|impresa|edil)\b/.test(x)) return true;
+  if(/[&0-9]/.test(x)) return true;
+  return x.trim().split(/\s+/).length>=3;
+}
 function orderClientNew(){
   const sel=document.getElementById("of-cliente"), inp=document.getElementById("of-cliente-search"), box=document.getElementById("of-cliente-results");
   if(!sel) return;
   const testo=String(inp?.value||"").trim();
   sel.value="__new__"; onClientSelectChange(sel,"of-newclient");
   const tipo=document.getElementById("ofnc-tipo");
+  if(tipo){ tipo.value=looksLikeBusiness(testo)?"Business":"Family"; toggleClientTypeFields("ofnc"); }
   if(tipo && tipo.value==="Business"){
     const f=document.getElementById("ofnc-nomecommerciale"); if(f) f.value=testo;
+    const r=document.getElementById("ofnc-ragsoc"); if(r) r.value=testo;
   }else{
     const parti=testo.split(/\s+/); const nome=document.getElementById("ofnc-nome"), cog=document.getElementById("ofnc-cognome");
     if(nome) nome.value=parti.shift()||""; if(cog) cog.value=parti.join(" ");
   }
   if(box) box.innerHTML="";
+  const tel=document.getElementById("ofnc-telefono"); if(tel){ try{ tel.focus(); }catch(e){} }
   document.getElementById("of-newclient")?.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 function onClientSelectChange(selectEl, wrapId){
