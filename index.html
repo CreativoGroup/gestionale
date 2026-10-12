@@ -4984,7 +4984,8 @@ function toggleLeadSection(which){
   renderLeads();
 }
 function leadQuotes(leadId){
-  return (state.quotes||[]).filter(q => q.extra && q.extra.leadId === leadId)
+  const lead=(state.leads||[]).find(x=>x.id===leadId);
+  return (state.quotes||[]).filter(q => (q.extra && q.extra.leadId === leadId) || (lead && lead.fonte===`preventivo:${q.id}`))
     .sort((a,b) => (Number(b.extra.numero)||0) - (Number(a.extra.numero)||0));
 }
 function leadAgeDays(l){
@@ -5090,6 +5091,28 @@ function openLeadWhatsapp(id){
   if(!url){ showToast("Numero WhatsApp non valido"); return; }
   openWaWindow(url);
 }
+const LEAD_SENT_LABELS = {mail:"✉ Mail", whatsapp:"WhatsApp", genya:"Genya"};
+function leadArchiveQuotesHTML(l){
+  const qs=leadQuotes(l.id);
+  const via=l.inviatoVia ? (LEAD_SENT_LABELS[l.inviatoVia]||l.inviatoVia) : "Manuale";
+  const ord=l.convertedOrderId ? (state.orders||[]).find(o=>o.id===l.convertedOrderId) : null;
+  if(!qs.length && !ord) return `<span style="color:var(--muted);">—</span>`;
+  return `<div class="arch-quotes">
+    ${qs.map(q=>`<div class="arch-q">
+      <span class="arch-q-main"><strong>${quoteNumberLabel(q)}</strong> · ${fmtMoney(quoteTotals(q).totale)} · ${escapeHtml(q.stato)}</span>
+      <span class="lead-via-pill via-${escapeHtml(l.inviatoVia||"manuale")}">${escapeHtml(via)}</span>
+      <button class="btn btn-outline btn-sm" onclick="openQuoteDetail('${q.id}')">Dettagli</button>
+      <button class="btn btn-outline btn-sm" onclick="downloadQuotePdf('${q.id}')">PDF</button>
+    </div>`).join("")}
+    ${ord ? `<div class="arch-q"><button class="btn btn-primary btn-sm" onclick="openJobCard('${ord.id}')">Ordine #${escapeHtml(String(ord.numero||""))}</button></div>` : ""}
+  </div>`;
+}
+function leadsWithoutQuoteLead(){
+  return (state.quotes||[]).filter(q=>{
+    if(q.extra && q.extra.leadId && (state.leads||[]).some(l=>l.id===q.extra.leadId)) return false;
+    return !(state.leads||[]).some(l=>l.fonte===`preventivo:${q.id}`);
+  });
+}
 function renderLeads(){
   ensureNoteStyles();
   if(!document.getElementById("leadBoardStyles")){
@@ -5101,6 +5124,13 @@ function renderLeads(){
       .lead-sent-chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:5px 11px;font:inherit;font-size:12px;font-weight:700;color:var(--text);cursor:pointer;}
       .lead-sent-chip:hover{border-color:#8EB0ED;background:#F4F8FF;}
       .lead-sent-chip.on{background:#2B7A8C;border-color:#2B7A8C;color:#fff;}
+      .arch-quotes{display:flex;flex-direction:column;gap:8px;min-width:260px;}
+      .arch-q{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+      .arch-q-main{font-size:13px;}
+      .lead-via-pill{border-radius:999px;padding:3px 10px;font-size:11.5px;font-weight:800;background:#E2E8F0;color:#475569;}
+      .lead-via-pill.via-mail{background:#fff;border:1.5px solid #EA4335;color:#D93025;}
+      .lead-via-pill.via-whatsapp{background:#25D366;color:#fff;}
+      .lead-via-pill.via-genya{background:#2C6E91;color:#fff;}
       .lead-arrows{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #EDF1F5;}
       .lead-arrows > span{flex:0 0 44px;}
       .lead-sent-select{flex:1 1 auto;min-width:0;height:34px;border:1px solid var(--border);border-radius:999px;background:#fff;padding:0 10px;font:inherit;font-size:12.5px;font-weight:700;color:var(--muted);text-align:center;cursor:pointer;}
@@ -5140,6 +5170,7 @@ function renderLeads(){
         ${l.stato==="Perso" && !l.clientId ? `<button class="btn btn-outline btn-sm" onclick="changeLeadStatusFromSelect('${l.id}','Nuovo')">Riapri</button>` : ""}
         <button title="Elimina" aria-label="Elimina" class="btn btn-ghost btn-sm" style="padding:6px 10px;font-size:15px;line-height:1;color:var(--danger);" onclick="deleteLead('${l.id}')">🗑</button>
       </div></td>
+      <td>${leadArchiveQuotesHTML(l)}</td>
     </tr>`).join("");
   const allQuotes = [...(state.quotes||[])].sort((a,b) => (Number(b.extra && b.extra.numero)||0) - (Number(a.extra && a.extra.numero)||0));
   const quoteRows = allQuotes.map(qt => {
@@ -5155,6 +5186,22 @@ function renderLeads(){
         <button class="btn btn-outline btn-sm" onclick="downloadQuotePdf('${qt.id}')">PDF</button>
         ${qt.convertito ? `<span class="pill pill-done">Convertito</span>` : ""}
         <button class="btn btn-ghost btn-sm" title="Elimina preventivo" aria-label="Elimina preventivo" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" onclick="deleteQuote('${qt.id}')">🗑</button>
+      </td></tr>`;
+  }).join("");
+  const orphanQuotes = leadsWithoutQuoteLead();
+  const orphanRows = orphanQuotes.sort((a,b) => (Number(b.extra && b.extra.numero)||0) - (Number(a.extra && a.extra.numero)||0)).map(qt => {
+    const r = quoteRecipient(qt);
+    return `<tr>
+      <td><strong>${quoteNumberLabel(qt)}</strong></td>
+      <td>${r.nome ? escapeHtml(r.nome) : `<span style="color:var(--muted);font-style:italic;">Senza destinatario</span>`}</td>
+      <td>${fmtMoney(quoteTotals(qt).totale)}</td>
+      <td>${fmtDate(qt.data)}</td>
+      <td>${escapeHtml(qt.stato)}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-primary btn-sm" onclick="transformQuoteToLead('${qt.id}')">Metti in bacheca</button>
+        <button class="btn btn-outline btn-sm" onclick="openQuoteDetail('${qt.id}')">Dettagli</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadQuotePdf('${qt.id}')">PDF</button>
+        ${qt.convertito ? `<span class="pill pill-done">Convertito</span>` : ""}
       </td></tr>`;
   }).join("");
   const stat = (label, n) => `<div class="lead-stat"><span>${label}</span><strong>${n}</strong></div>`;
@@ -5173,13 +5220,13 @@ function renderLeads(){
     <div class="lead-board">
       ${colonne.map(([stato, titolo]) => { const arr = col(stato); return `<div class="note-col"><h3>${titolo} <span class="pill">${arr.length}</span></h3>${arr.length ? arr.map(leadCardHTML).join("") : `<p class="empty" style="margin:6px 2px;">Nessun lead.</p>`}</div>`; }).join("")}
     </div>
-    <div class="card" style="margin-bottom:16px;">
-      <div class="lead-section-head" onclick="toggleLeadSection('quotes')"><span>PREVENTIVI <span class="pill">${allQuotes.length}</span></span><span>${leadQuotesOpen ? "▲" : "▼"}</span></div>
-      ${leadQuotesOpen ? `<div class="lead-table-wrap" style="margin-top:12px;">${allQuotes.length ? `<table class="lead-table"><thead><tr><th>N°</th><th>Destinatario</th><th>Totale (IVA incl.)</th><th>Data</th><th>Stato</th><th></th></tr></thead><tbody>${quoteRows}</tbody></table>` : `<p class="empty">Nessun preventivo.</p>`}</div>` : ""}
-    </div>
+    ${orphanQuotes.length ? `<div class="card" style="margin-bottom:16px;">
+      <div class="lead-section-head" onclick="toggleLeadSection('quotes')"><span>PREVENTIVI SENZA LEAD <span class="pill">${orphanQuotes.length}</span> <span style="font-weight:500;font-size:12px;color:var(--muted);">vecchi preventivi non ancora nella bacheca</span></span><span>${leadQuotesOpen ? "▲" : "▼"}</span></div>
+      ${leadQuotesOpen ? `<div class="lead-table-wrap" style="margin-top:12px;"><table class="lead-table"><thead><tr><th>N°</th><th>Destinatario</th><th>Totale (IVA incl.)</th><th>Data</th><th>Stato</th><th></th></tr></thead><tbody>${orphanRows}</tbody></table></div>` : ""}
+    </div>` : ""}
     <div class="card">
       <div class="lead-section-head" onclick="toggleLeadSection('archive')"><span>ARCHIVIO LEAD <span class="pill">${persi.length + archiviati.length}</span> <span style="font-weight:500;font-size:12px;color:var(--muted);">persi e già trasformati in cliente</span></span><span>${leadArchiveOpen ? "▲" : "▼"}</span></div>
-      ${leadArchiveOpen ? `<div class="lead-table-wrap" style="margin-top:12px;">${archRows ? `<table class="lead-table"><thead><tr><th>Nome / Azienda</th><th>Email</th><th>Oggetto</th><th>Stato</th><th>Data</th><th>Azioni</th></tr></thead><tbody>${archRows}</tbody></table>` : `<p class="empty">Archivio vuoto.</p>`}</div>` : ""}
+      ${leadArchiveOpen ? `<div class="lead-table-wrap" style="margin-top:12px;">${archRows ? `<table class="lead-table"><thead><tr><th>Nome / Azienda</th><th>Email</th><th>Oggetto</th><th>Stato</th><th>Data</th><th>Azioni</th><th>Preventivi</th></tr></thead><tbody>${archRows}</tbody></table>` : `<p class="empty">Archivio vuoto.</p>`}</div>` : ""}
     </div>
   `;
 }
@@ -5454,10 +5501,12 @@ function openLeadDetail(id){
           ? `<button class="btn btn-primary" style="border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" onclick="completeNewCustomerOrderWithClient('${l.id}','${linkedClient.id}')">✓ CREA ORDINE</button>`
           : `<button class="btn btn-primary" style="border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" onclick="transformLeadToClient('${l.id}', true)">✓ CREA CLIENTE E ORDINE</button>
              <button class="btn btn-outline" style="border-radius:999px;padding:11px 18px;font-weight:800;" onclick="linkLeadToExistingClient('${l.id}')">↗ USA CLIENTE ESISTENTE E CREA ORDINE</button>`
-      ) : (!isNewCustomerOrder && l.stato==="Accettato" && !l.clientId && !l.convertedOrderId ? `
+      ) : (!isNewCustomerOrder && l.stato==="Accettato" && !l.clientId && !l.convertedOrderId && leadQuotes(l.id).some(q=>q.clientId && !q.convertito) ? `
+        <button class="btn btn-primary" onclick="closeModal();convertToOrder('${leadQuotes(l.id).find(q=>q.clientId && !q.convertito).id}')">Crea ordine dal preventivo</button>
+      ` : (!isNewCustomerOrder && l.stato==="Accettato" && !l.clientId && !l.convertedOrderId ? `
         <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">Trasforma in cliente ed effettua ordine</button>
         <button class="btn btn-outline" onclick="linkLeadToExistingClient('${l.id}')">↗ COLLEGA A CLIENTE ESISTENTE E CREA ORDINE</button>
-      ` : "")}
+      ` : ""))}
 
       ${l.gmailMessageId && !isNewCustomerOrder ? `<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>` : ""}
       <button class="btn btn-ghost" style="${isNewCustomerOrder ? "border-radius:999px;padding:10px 16px;color:var(--muted);font-weight:700;" : ""}" onclick="discardLead('${l.id}');closeModal();">SCARTA</button>
@@ -10066,9 +10115,36 @@ async function createQuote(clientId, categoria, extraData){
   if(!state.quotes.some(q=>q.id===id)) state.quotes.push(quote);
   return id;
 }
+/* Un preventivo fatto direttamente per un cliente diventa anche un Lead "In attesa di conferma": così si segue tutto dalla stessa bacheca. */
+async function ensureLeadForQuote(q){
+  if(!q || (q.extra && q.extra.leadId)) return null;
+  if((state.leads||[]).some(l=>l.fonte===`preventivo:${q.id}`)) return null;
+  const c=state.clients.find(x=>x.id===q.clientId);
+  const business=c && String(c.tipo||"").toLowerCase()==="business";
+  const now=new Date().toISOString();
+  const lead={
+    id:uuid(),
+    nome:c ? (business ? `${c.refNome||""} ${c.refCognome||""}`.trim() : clientDisplayName(c)) : "",
+    azienda:c && business ? clientDisplayName(c) : "",
+    email:String(c?.email||"").trim().toLowerCase(),
+    telefono:String(c?.telefono||"").trim(),
+    oggettoRichiesta:`Preventivo ${quoteNumberLabel(q)}`,
+    richiesta:"Preventivo creato direttamente per un cliente già in anagrafica.",
+    stato:"In attesa di conferma",
+    fonte:`preventivo:${q.id}`,
+    creatoIl:now, aggiornatoIl:now
+  };
+  const ok=await upsertOne("leads",lead);
+  if(!ok) return null;
+  if(!state.leads.some(x=>x.id===lead.id)) state.leads.unshift(lead);
+  q.extra=Object.assign({},q.extra||{},{leadId:lead.id});
+  saveState("quotes");
+  return lead;
+}
 async function newQuoteForClient(clientId){
   const id = await createQuote(clientId, CATEGORIES[0]);
   if(!id){ if(!DB_EXTRA.quotes) goTo("leads"); return; }
+  if(clientId) await ensureLeadForQuote(findItem("quotes",id));
   showToast("Preventivo creato");
   openQuoteDetail(id);
 }
@@ -10274,7 +10350,9 @@ async function transformQuoteToLead(quoteId){
   const lead={id:uuid(),nome:c?.nome||'',azienda:c?.ragioneSociale||c?.azienda||'',email:c?.email||'',telefono:c?.telefono||'',oggettoRichiesta:`Preventivo - ${q.categoria||''}`.trim(),richiesta:`${q.descrizione||''}${q.descrizione&&righe?'\n':''}${righe}${righe?'\n':''}Totale: ${fmtMoney(quoteImponibile(q))}`.trim(),stato:'In attesa di conferma',fonte:`preventivo:${q.id}`,creatoIl:new Date().toISOString(),aggiornatoIl:new Date().toISOString()};
   const ok=await upsertOne('leads',lead); if(!ok)return;
   if(!state.leads.some(x=>x.id===lead.id)) state.leads.unshift(lead);
+  q.extra=Object.assign({},q.extra||{},{leadId:lead.id}); saveState('quotes');
   showToast('Lead creato: In attesa di conferma');
+  refreshQuoteViews();
   openQuoteDetail(quoteId);
 }
 
