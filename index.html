@@ -5508,6 +5508,7 @@ function openLeadDetail(id){
       ${l.gmailMessageId && !isNewCustomerOrder ? `<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>` : ""}
       <button class="btn btn-ghost" style="${isNewCustomerOrder ? "border-radius:999px;padding:10px 16px;color:var(--muted);font-weight:700;" : ""}" onclick="discardLead('${l.id}');closeModal();">SCARTA</button>
       <button title="Elimina" aria-label="Elimina" class="btn btn-ghost" style="padding:6px 10px;font-size:15px;line-height:1;color:var(--danger);" onclick="deleteLead('${l.id}')">🗑</button>
+      <button class="btn btn-outline" style="margin-left:auto;" onclick="closeModal();showToast('Lead salvato')">SALVA E CHIUDI</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
