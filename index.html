@@ -5556,6 +5556,7 @@ function openEditLead(id){
     <div class="form-actions" style="margin-top:16px;">
       <button class="btn btn-primary" onclick="saveLeadEdit('${l.id}')">SALVA MODIFICHE</button>
       <button class="btn btn-outline" onclick="openLeadDetail('${l.id}')">Annulla</button>
+      <button class="btn btn-outline" style="margin-left:auto;" onclick="saveLeadEdit('${l.id}',true)">SALVA E CHIUDI</button>
     </div>
   `;
 }
@@ -5579,7 +5580,7 @@ function leadClientPick(id){
   const lk=document.getElementById("edit-lead-linked"); if(lk) lk.textContent="✓ Cliente in anagrafica";
   const box=document.getElementById("edit-lead-results"); if(box) box.innerHTML="";
 }
-async function saveLeadEdit(id){
+async function saveLeadEdit(id,chiudi){
   const l=(state.leads||[]).find(x=>x.id===id);
   if(!l) return;
 
@@ -5614,7 +5615,7 @@ async function saveLeadEdit(id){
   if(currentView==="dashboard") renderDashboard();
 
   showToast("Lead aggiornato");
-  openLeadDetail(id);
+  if(chiudi) closeModal(); else openLeadDetail(id);
 }
 
 /* Lo stato del lead guida quello dei suoi preventivi (non ancora trasformati in ordine). */
