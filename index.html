@@ -7275,6 +7275,7 @@ function renderNote(){
     <div id="note-leads-part"></div>
   `;
   renderLeads();
+  if(currentView==="dashboard" && typeof renderDashboard==="function") renderDashboard();
 }
 async function openNoteAttachment(id){
   const n = findItem("noteComunicazioni", id);
@@ -7697,6 +7698,10 @@ function renderDashboard(){
   });
   const ritiriDaFare = state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0);
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
+  const isAdminDash = !!(currentUser && currentUser.role==="admin");
+  if(isAdminDash && typeof ensureNoteStyles==="function") ensureNoteStyles();
+  const dashNoteAll = isAdminDash ? (state.noteComunicazioni||[]).filter(n=>!n.fatto).sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))) : [];
+  const dashNoteAdmin = dashNoteAll.slice(0,8);
   const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma" || l.stato==="Da ricontattare");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
 
@@ -7710,6 +7715,19 @@ function renderDashboard(){
       <div class="card stat clickable" onclick="openDashboardList('scorte')"><p class="stat-label">Avvisi magazzino</p><p class="stat-value" style="${scorteBasse.length?'color:var(--danger)':''}">${scorteBasse.length}</p><p class="stat-sub">articoli a/scorta minima</p></div>
     </div>
 
+
+    ${dashNoteAdmin.length ? `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="section-header" style="margin-bottom:10px;">
+        <h3 style="margin:0;">Note <span class="nota-foot" style="font-weight:600;">· ${dashNoteAll.length}</span></h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" onclick="navNuovoAppunto()">+ Appunto</button>
+          <button class="btn btn-outline btn-sm" onclick="goTo('note')">Apri tutte</button>
+        </div>
+      </div>
+      <div class="nota-list">${dashNoteAdmin.map(noteRowHTML).join("")}</div>
+      ${dashNoteAll.length>dashNoteAdmin.length ? `<p class="helptext" style="margin:8px 4px 0;">Altre ${dashNoteAll.length-dashNoteAdmin.length} note in <a href="#" onclick="goTo('note');return false;">Note</a>.</p>` : ""}
+    </div>` : ""}
 
     <div class="card" style="margin-bottom:16px;">
       <div class="section-header" style="margin-bottom:10px;">
