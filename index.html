@@ -2582,7 +2582,7 @@
   .job-dropbox-status.error{color:#A63A2F;background:#FFF4F2;}
   .job-dropbox-folders{
     display:grid;
-    grid-template-columns:repeat(4,minmax(0,1fr));
+    grid-template-columns:repeat(3,minmax(0,1fr));
     gap:8px;
     padding:12px;
     background:#fff;
@@ -2604,6 +2604,19 @@
     background:#EEF4FF;
     box-shadow:0 0 0 2px rgba(77,125,232,.08);
   }
+  .job-dropbox-folder{display:flex;align-items:center;gap:8px;}
+  .job-dropbox-folder .jdb-check{
+    flex:0 0 auto;width:24px;height:24px;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:800;margin:0;
+    border:2px solid #CBD5E1;color:#CBD5E1;background:#fff;
+  }
+  .job-dropbox-folder[data-tone="red"] .jdb-check.has{background:#E5484D;border-color:#E5484D;color:#fff;}
+  .job-dropbox-folder[data-tone="yellow"] .jdb-check.has{background:#F5B800;border-color:#F5B800;color:#fff;}
+  .job-dropbox-folder[data-tone="green"] .jdb-check.has{background:#2FA66A;border-color:#2FA66A;color:#fff;}
+  .job-dropbox-folder[data-tone="red"] .jdb-check:not(.has){border-color:#F3B4B6;}
+  .job-dropbox-folder[data-tone="yellow"] .jdb-check:not(.has){border-color:#F4DC93;}
+  .job-dropbox-folder[data-tone="green"] .jdb-check:not(.has){border-color:#A9DDC3;}
   .job-dropbox-folder strong{
     display:block;
     font-size:12.5px;
@@ -2673,7 +2686,9 @@
     padding:7px 9px;
   }
   @media(max-width:760px){
-    .job-dropbox-folders{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .job-dropbox-folders{grid-template-columns:repeat(3,minmax(0,1fr));}
+    .job-dropbox-folder{padding:8px 6px;gap:5px;}
+    .job-dropbox-folder strong{font-size:11px;}
     .job-dropbox-upload-row{grid-template-columns:1fr;}
     .job-dropbox-file{grid-template-columns:1fr;}
   }
@@ -10650,6 +10665,31 @@ function jobDropboxBasePath(o){
   return `/${dropboxWorkYearFolderName(year)}/${year} - ${month}/CLIENTI/${cliente}`;
 }
 
+function jobDropboxTone(name){
+  return name==="FILE RICEVUTI"?"red":name==="FILE DEFINITIVI"?"yellow":"green";
+}
+
+function jobDropboxSetBadge(orderId,folder,count){
+  const idx=JOB_DROPBOX_SUBFOLDERS.indexOf(folder);
+  const el=document.getElementById(`jdbCheck-${orderId}-${idx}`);
+  if(!el) return;
+  const has=count>0;
+  el.classList.toggle("has",has);
+  el.textContent=has?(count>9?"9+":String(count)):"·";
+  el.title=has?`${count} file`:"Nessun file";
+}
+
+async function jobDropboxCountBadges(orderId){
+  const o=findItem("orders",orderId);
+  if(!o) return;
+  for(const folder of JOB_DROPBOX_SUBFOLDERS){
+    try{
+      const data=await dropboxApi("files/list_folder",{path:`${jobDropboxBasePath(o)}/${folder}`,recursive:false,include_deleted:false});
+      jobDropboxSetBadge(orderId,folder,(data.entries||[]).filter(x=>x[".tag"]==="file").length);
+    }catch(e){}
+  }
+}
+
 function jobDropboxCurrentFolder(orderId){
   return jobDropboxUiState[orderId]?.folder || "FILE RICEVUTI";
 }
@@ -10703,10 +10743,11 @@ function renderJobDropboxBlock(o,c){
 
       <div id="jobDropboxFolders-${o.id}" class="job-dropbox-folders">
         ${JOB_DROPBOX_SUBFOLDERS.map((name,i)=>`
-          <button class="job-dropbox-folder ${i===0?'active':''}" data-job-dropbox-folder="${escapeHtml(name)}"
+          <button class="job-dropbox-folder ${i===0?'active':''}" data-job-dropbox-folder="${escapeHtml(name)}" data-tone="${jobDropboxTone(name)}"
+            title="${escapeHtml(name)}"
             onclick="jobDropboxSelectFolder('${o.id}','${escapeHtml(name)}')">
-            <strong>📁 ${escapeHtml(name)}</strong>
-            <span>${name==="FILE RICEVUTI"?"Allegati e materiali ricevuti":name==="FILE DEFINITIVI"?"File approvati e definitivi":"File pronti per stampa / macchina"}</span>
+            <span class="jdb-check" id="jdbCheck-${o.id}-${i}">·</span>
+            <strong>${escapeHtml(name.replace("FILE ",""))}</strong>
           </button>`).join("")}
       </div>
 
@@ -10775,6 +10816,7 @@ async function jobDropboxInit(orderId){
       status.textContent="Cartella Dropbox pronta.";
     }
     await jobDropboxLoad(orderId,jobDropboxCurrentFolder(orderId));
+    jobDropboxCountBadges(orderId);
   }catch(err){
     console.error("Dropbox ordine init",err);
     if(status){
@@ -10808,6 +10850,8 @@ async function jobDropboxLoad(orderId,folder){
     const files=(data.entries||[]).filter(x=>x[".tag"]==="file")
       .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"it"));
 
+    jobDropboxSetBadge(orderId,selected,files.length);
+
     if(!files.length){
       box.innerHTML=`<div class="job-dropbox-empty">Nessun file in “${escapeHtml(selected)}”.</div>`;
       return;
@@ -10838,6 +10882,7 @@ async function jobDropboxLoad(orderId,folder){
 
 function jobDropboxRefresh(orderId){
   jobDropboxLoad(orderId,jobDropboxCurrentFolder(orderId));
+  jobDropboxCountBadges(orderId);
 }
 
 function jobDropboxToggleUpload(orderId){
