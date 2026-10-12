@@ -10660,7 +10660,6 @@ function openQuoteDetail(quoteId){
           <button class="btn btn-outline" onclick="printQuote('${q.id}')">Stampa scheda</button>
           <button class="btn btn-outline" onclick="openQuoteMail('${q.id}')">Invia per mail</button>
           ${waMePhone(quoteRecipient(q).telefono) ? `<button class="btn btn-outline" onclick="openQuoteWhatsapp('${q.id}')">Invia su WhatsApp</button>` : ""}
-          ${q.stato==="Accettato" && !q.convertito ? `<button class="btn btn-primary" onclick="convertToOrder('${q.id}')">Converti in ordine</button>` : ""}
           ${((state.leads||[]).some(l=>l.fonte===`preventivo:${q.id}`)||(q.extra&&q.extra.leadId))?'':`<button class="btn btn-outline" onclick="transformQuoteToLead('${q.id}')">Trasforma in Lead</button>`}
           <button class="btn btn-outline" onclick="closeModal(); showToast('Preventivo salvato')">Salva e chiudi</button>
         </div>
