@@ -5690,11 +5690,43 @@ async function markLeadLinkedToClient(leadId, clientId){
 }
 
 /* Un solo pulsante: il lead diventa ordine. Il cliente viene creato (o trovato) da solo; le righe del preventivo passano nell'ordine. */
+let _useClientResolve=null;
+function askUseExistingClient(c,l){
+  return new Promise(resolve=>{
+    _useClientResolve=resolve;
+    const motivo=(c.email && String(l.email||"").trim() && findClientByEmail(l.email)===c) ? `la stessa email (${escapeHtml(l.email)})` : `lo stesso telefono (${escapeHtml(l.telefono||"")})`;
+    document.getElementById("modalBody").innerHTML=`
+      <button class="close-x" onclick="_useClientAnswer(null)">×</button>
+      <h2>Hai già questo cliente</h2>
+      <p style="color:var(--muted);margin-top:0;">In anagrafica c'è già <strong>${escapeHtml(clientDisplayName(c))}</strong> con ${motivo}.</p>
+      <div class="modal-section" style="margin:12px 0;">
+        <div><strong>${escapeHtml(clientDisplayName(c))}</strong></div>
+        <div class="helptext" style="margin-top:4px;">${escapeHtml([c.telefono,c.email,c.citta].filter(Boolean).join(" · ")||"Nessun altro dato")}</div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="_useClientAnswer('use')">Sì, è lui: crea l'ordine</button>
+        <button class="btn btn-outline" onclick="_useClientAnswer('new')">No, crea un nuovo cliente</button>
+        <button class="btn btn-ghost" onclick="_useClientAnswer(null)">Annulla</button>
+      </div>`;
+    document.getElementById("modalBackdrop").classList.add("open");
+  });
+}
+function _useClientAnswer(v){
+  const r=_useClientResolve; _useClientResolve=null;
+  if(v===null) closeModal();
+  if(r) r(v);
+}
 async function ensureClientForLead(l){
   let c=l.clientId ? state.clients.find(x=>x.id===l.clientId) : null;
   if(!c){ const q=leadQuotes(l.id).find(x=>x.clientId); if(q) c=state.clients.find(x=>x.id===q.clientId); }
-  if(!c) c=findClientByEmail(l.email);
   if(c) return c.id;
+  /* cliente già in anagrafica con la stessa email o lo stesso telefono? lo faccio notare */
+  const simile=findClientByEmail(l.email) || (String(l.telefono||"").trim() ? findClientByWhatsappPhone(l.telefono) : null);
+  if(simile){
+    const scelta=await askUseExistingClient(simile,l);
+    if(scelta==="use") return simile.id;
+    if(scelta!=="new") return null;
+  }
   const pre=leadClientPrefill(l);
   const nuovo={id:uid(), tipo:"Family", settore:"", richiesta:"", archiviatoRecenti:false, ...pre};
   const saved=await upsertOneReturning("clients",nuovo);
