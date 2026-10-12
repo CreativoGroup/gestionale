@@ -11307,7 +11307,8 @@ function flowShortDescription(o){
 }
 function flowBozzaWaiting(o){
   const m=getBozzaMeta(o);
-  return m?.stato==="IN ATTESA DI RISPOSTA";
+  /* La bozza è "in attesa" solo finché l'ordine è ancora in grafica: se è passato in produzione (o oltre), il cliente ha già confermato. */
+  return m?.stato==="IN ATTESA DI RISPOSTA" && (o.stato==="Da fare" || o.stato==="In preparazione grafica" || o.stato==="In lavorazione");
 }
 function flowStageOf(o){
   const hasExternal=(o.righe||[]).some(r=>isExternalCat(r.categoria));
@@ -12685,6 +12686,12 @@ async function updateOrderField(orderId, field, value){
   const oldValue=o[field];
   o[field]=value;
   if(field==='stato'){
+    if(value!=="Da fare" && value!=="In preparazione grafica"){
+      const bm=getBozzaMeta(o);
+      if(bm && bm.stato==="IN ATTESA DI RISPOSTA"){
+        o.fasi=[{key:"__bozza__", scelta:bm.scelta, stato:"CONFERMATA"}, ...(o.fasi||[]).filter(f=>!(f && f.key==="__bozza__"))];
+      }
+    }
     if(value==="Consegnato" && oldValue!=="Consegnato") o.consegnatoIl=new Date().toISOString();
     else if(value!=="Consegnato") o.consegnatoIl="";
   }
