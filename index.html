@@ -1685,7 +1685,9 @@
 .job-v2-admin-residuo-pill{font-size:15px!important;padding:8px 14px!important;line-height:1.1;white-space:nowrap;}
 .job-v2-muted-label{font-size:11px;color:var(--muted);font-weight:800;margin-bottom:6px;}
 .job-v2-start{font-weight:900;color:#1e6bb8;}
-.job-v2-note{width:100%;min-height:110px;resize:vertical;}
+.job-v2-note{width:100%;min-height:110px;resize:vertical;font-family:inherit!important;font-size:14px;color:var(--text);}
+.job-v2-desc-block{margin-top:14px;}
+.job-v2-desc-label{display:block;font-weight:800;font-size:13px;margin-bottom:6px;color:var(--text);}
 @media(max-width:900px){
   .job-v2-info-grid,.job-v2-two,.job-v2-three{grid-template-columns:1fr;}
   .job-v2-info-cell{border-right:0;border-bottom:1px solid #edf0f4;}
@@ -2666,15 +2668,16 @@
   }
   .job-v2-note-full{
     width:100% !important;
-    min-height:260px !important;
+    min-height:120px !important;
     resize:vertical;
-    font-size:15px !important;
+    font-family:inherit !important;
+    font-size:14px !important;
     line-height:1.6;
     padding:16px !important;
   }
   @media(max-width:760px){
     .job-v2-note-full{
-      min-height:220px !important;
+      min-height:120px !important;
       font-size:16px !important;
     }
   }
@@ -4644,7 +4647,7 @@ td.n{color:#6B7280;width:24px;}
 <table><thead><tr><th>#</th><th>Lavorazione</th><th class="r">Q.tà</th><th class="r">Prezzo unit.</th><th class="r">Totale</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="grid" style="align-items:start;">
   <div>
-    <div class="box"><h3>Note integrative</h3><div class="note">${e(o.descrizione||"—")}</div></div>
+    <div class="box"><h3>Descrizione del lavoro</h3><div class="note">${e(o.descrizione||"—")}</div></div>
     ${pagamenti.length?`<div class="box pag"><h3>Pagamenti registrati</h3>${pagamenti.map(x=>`<div class="kv"><span>${fmtDate(x.data)}</span><b>${fmtMoney(x.importo)} · ${e(x.tipo||"")}${x.metodo?" · "+e(x.metodo):""}</b></div>`).join("")}</div>`:""}
   </div>
   <div class="tots">
@@ -10138,10 +10141,10 @@ function openQuoteDetail(quoteId){
 
       <section class="job-v2-card" style="--job-accent:#355db4;">
         <div class="job-v2-section-title">
-          <h3>Note integrative</h3>
-          <div class="job-v2-info-sub">Interne: restano nella scheda di lavorazione quando il preventivo diventa ordine</div>
+          <h3>Descrizione del lavoro</h3>
+          <div class="job-v2-info-sub">Passa nell'ordine quando il preventivo viene convertito</div>
         </div>
-        <textarea class="job-v2-note job-v2-note-full" placeholder="Indicazioni aggiuntive, dettagli tecnici, richieste del cliente…" onchange="updateQuoteField('${q.id}','descrizione',this.value)">${escapeHtml(q.descrizione||"")}</textarea>
+        <textarea class="job-v2-note job-v2-note-full" placeholder="Descrivi il lavoro: dettagli tecnici, richieste del cliente, informazioni utili…" onchange="updateQuoteField('${q.id}','descrizione',this.value)">${escapeHtml(q.descrizione||"")}</textarea>
       </section>
 
       <section class="job-v2-card" style="--job-accent:#ef5b4a;">
@@ -12171,6 +12174,10 @@ function openJobCard(orderId){
           <div class="job-v2-info-sub">Categoria predefinita · descrizione prodotto libera · dettagli espandibili</div>
         </div>
         ${orderLinesWithWarehouse(o)}
+        <div class="job-v2-desc-block">
+          <label class="job-v2-desc-label">Descrizione del lavoro</label>
+          <textarea class="job-v2-note job-v2-note-full" placeholder="Descrivi il lavoro: dettagli tecnici, richieste del cliente, informazioni utili…" onchange="updateOrderField('${o.id}','descrizione',this.value)">${escapeHtml(o.descrizione||"")}</textarea>
+        </div>
         ${renderRitiroEsternoSection(o)}
       </section>
 
@@ -12283,20 +12290,8 @@ function openJobCard(orderId){
           </section>
         </div>
       </details>
-      <section class="job-v2-card job-v2-notes-full" style="--job-accent:#355db4;">
-        <div class="job-v2-section-title">
-          <h3>Note integrative</h3>
-          <div class="job-v2-info-sub">Indicazioni aggiuntive, dettagli tecnici, richieste del cliente e informazioni utili alla lavorazione</div>
-        </div>
-        <textarea
-          class="job-v2-note job-v2-note-full"
-          placeholder="Inserisci qui tutte le note integrative della commessa…"
-          onchange="updateOrderField('${o.id}','descrizione',this.value)">${escapeHtml(o.descrizione||"")}</textarea>
-      </section>
-
       <div class="job-v2-bottom-actions">
         <div style="display:flex;gap:9px;flex-wrap:wrap;">
-          <button class="btn btn-outline" onclick="printJobCard('${o.id}')">Stampa</button>
           <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
           <button class="btn btn-primary" onclick="saveJobCard('${o.id}')">Salva</button>
           <button class="btn btn-outline" onclick="cancelJobCard('${o.id}')">Annulla</button>
