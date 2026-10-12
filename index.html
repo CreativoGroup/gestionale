@@ -5018,7 +5018,7 @@ function leadCardHTML(l){
     </div>
     <div class="lead-arrows">
       ${leadArrowLeft(l)}
-      <select class="lead-sent-select ${l.inviatoVia?'on':''}" title="Come è stato inviato il preventivo" onchange="setLeadSentVia('${l.id}',this.value)">
+      <select class="lead-sent-select ${l.inviatoVia?'on via-'+l.inviatoVia:''}" title="Come è stato inviato il preventivo" onchange="setLeadSentVia('${l.id}',this.value)">
         <option value="" ${!l.inviatoVia?'selected':''}>Inviato…</option>
         ${LEAD_SENT_OPTIONS.map(([k,lab])=>`<option value="${k}" ${l.inviatoVia===k?'selected':''}>${lab.replace('✉ ','')}</option>`).join("")}
       </select>
@@ -5077,6 +5077,10 @@ function renderLeads(){
       .lead-arrows > span{flex:0 0 44px;}
       .lead-sent-select{flex:1 1 auto;min-width:0;height:34px;border:1px solid var(--border);border-radius:999px;background:#fff;padding:0 10px;font:inherit;font-size:12.5px;font-weight:700;color:var(--muted);text-align:center;cursor:pointer;}
       .lead-sent-select.on{background:#2B7A8C;border-color:#2B7A8C;color:#fff;}
+      .lead-sent-select.via-mail{background:#fff;border:2px solid #EA4335;color:#D93025;}
+      .lead-sent-select.via-whatsapp{background:#25D366;border-color:#25D366;color:#fff;}
+      .lead-sent-select.via-genya{background:#2C6E91;border-color:#2C6E91;color:#fff;}
+      .lead-sent-select.on option{background:#fff;color:#1F2937;}
       .lead-arrow{border:1px solid var(--border);background:#fff;border-radius:999px;min-width:44px;height:34px;padding:0 14px;font:inherit;font-size:14px;font-weight:800;color:var(--text);cursor:pointer;}
       .lead-arrow:hover{background:#F4F8FF;border-color:#8EB0ED;}
       .lead-arrow-reopen{white-space:nowrap;padding:0 10px;font-size:11px;background:#2FA66A;border-color:#2FA66A;color:#fff;font-size:12px;letter-spacing:.04em;}
