@@ -4991,13 +4991,41 @@ function leadAgeDays(l){
   const t = new Date(l.aggiornatoIl || l.creatoIl || 0).getTime();
   return t ? Math.max(0, Math.floor((Date.now() - t) / 86400000)) : 0;
 }
+/* Allegato di un lead nato da una nota: il testo contiene "Allegato della nota: NOME (Dropbox › Allegati note)" */
+function leadReqParse(text){
+  const raw=String(text||"");
+  const m=raw.match(/\n*Allegato della nota: (.+?) \(Dropbox › Allegati note\)(?: \{\{ALL:(.+?)\}\})?/);
+  if(!m) return {text:raw,att:null};
+  return {text:raw.replace(m[0],"").trim(),att:{name:m[1].trim(),path:(m[2]||"").trim()}};
+}
+async function leadAttResolvePath(att){
+  if(att.path) return att.path;
+  const safe=att.name.replace(/[\/\\<>:"|?*\x00-\x1F]/g," ").replace(/\s+/g," ").trim().slice(-100);
+  const data=await dropboxApi("files/list_folder",{path:"/Allegati note",recursive:false,include_deleted:false});
+  const files=(data.entries||[]).filter(x=>x[".tag"]==="file" && (x.name===safe || String(x.name).endsWith("-"+safe) || String(x.name).endsWith(safe)));
+  files.sort((a,b)=>String(b.client_modified||"").localeCompare(String(a.client_modified||"")));
+  if(!files.length) throw new Error("File non trovato in Dropbox › Allegati note");
+  return files[0].path_display || files[0].path_lower || files[0].id;
+}
+async function leadAttOpen(leadId,mode){
+  const l=(state.leads||[]).find(x=>x.id===leadId); if(!l) return;
+  const att=leadReqParse(l.richiesta).att; if(!att) return;
+  try{
+    const path=await leadAttResolvePath(att);
+    if(mode==="download") await dropboxDownloadFile(path,att.name);
+    else await completedSheetPreviewDropboxFile(encodeURIComponent(path),encodeURIComponent(att.name));
+  }catch(err){
+    console.error("Allegato lead",err);
+    showToast(err?.message||"Impossibile aprire l'allegato");
+  }
+}
 function leadCardHTML(l){
   const quotes = leadQuotes(l.id);
   const days = Math.max(0, Math.floor((Date.now() - new Date(l.creatoIl || 0).getTime()) / 86400000));
   const waiting = l.stato === "In attesa di conferma";
   const stale = waiting ? leadAgeDays(l) : 0;
   const cls = ["nota-card", l.stato === "Nuovo" ? "urgente" : "", waiting && stale >= 5 ? "scaduta" : ""].join(" ");
-  const req = String(l.richiesta || "").replace(/\s+/g, " ").trim();
+  const req = String(leadReqParse(l.richiesta).text || "").replace(/\s+/g, " ").trim();
   return `<div class="${cls}">
     <div class="nota-top">
       <button class="nota-link" onclick="openLeadDetail('${l.id}')">${escapeHtml(leadDisplayName(l))}</button>
@@ -5027,7 +5055,7 @@ function leadCardHTML(l){
   </div>`;
 }
 const LEAD_FLOW = ["Nuovo","In attesa di conferma","Da ricontattare","Accettato"];
-const LEAD_SENT_OPTIONS = [["mail","✉ Mail"],["whatsapp","WhatsApp"],["genya","Genya"]];
+const LEAD_SENT_OPTIONS = [["mail","✉ Mail"],["whatsapp","WhatsApp"],["genya","Genya"],["manuale","Manuale"]];
 function leadFlowIndex(l){ const i=LEAD_FLOW.indexOf(l.stato); return i<0?0:i; }
 function leadArrowLeft(l){
   const i=leadFlowIndex(l);
@@ -5080,6 +5108,7 @@ function renderLeads(){
       .lead-sent-select.via-mail{background:#fff;border:2px solid #EA4335;color:#D93025;}
       .lead-sent-select.via-whatsapp{background:#25D366;border-color:#25D366;color:#fff;}
       .lead-sent-select.via-genya{background:#2C6E91;border-color:#2C6E91;color:#fff;}
+      .lead-sent-select.via-manuale{background:#64748B;border-color:#64748B;color:#fff;}
       .lead-sent-select.on option{background:#fff;color:#1F2937;}
       .lead-arrow{border:1px solid var(--border);background:#fff;border-radius:999px;min-width:44px;height:34px;padding:0 14px;font:inherit;font-size:14px;font-weight:800;color:var(--text);cursor:pointer;}
       .lead-arrow:hover{background:#F4F8FF;border-color:#8EB0ED;}
@@ -5407,7 +5436,7 @@ function openLeadDetail(id){
       <div class="lead-detail-box"><small>Telefono</small>${escapeHtml(l.telefono||"—")}</div>
       <div class="lead-detail-box"><small>Azienda</small>${escapeHtml(l.azienda||"—")}</div>
       <div class="lead-detail-box"><small>Oggetto</small>${escapeHtml(l.oggettoRichiesta||"—")}</div>
-      <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(l.richiesta||"—")}</div></div>
+      <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(leadReqParse(l.richiesta).text||"—")}</div>${(()=>{const a=leadReqParse(l.richiesta).att; return a?`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-weight:700;">📎 ${escapeHtml(a.name)}</span><button class="btn btn-outline btn-sm" onclick="leadAttOpen('${l.id}','view')">Apri</button><button class="btn btn-outline btn-sm" onclick="leadAttOpen('${l.id}','download')">Scarica</button></div>`:"";})()}</div>
     </div>
     ${l.gmailMessageId ? `<div id="lead-gm-att" style="margin-top:14px;"></div>` : ""}
     ${!isNewCustomerOrder ? `<div class="modal-section" style="margin:16px 0 0;padding:14px 18px;">
@@ -7606,7 +7635,7 @@ async function trasformaNotaInLead(id){
     email:String((c?c.email:e.email)||"").trim().toLowerCase(),
     telefono:String((c?c.telefono:e.telefono)||"").trim(),
     oggettoRichiesta:primaRiga ? (primaRiga.length>70 ? primaRiga.slice(0,67)+"…" : primaRiga) : `Nota - ${nome}`,
-    richiesta:testo + (all && all.name ? `\n\nAllegato della nota: ${all.name} (Dropbox › Allegati note)` : ""),
+    richiesta:testo + (all && all.name ? `\n\nAllegato della nota: ${all.name} (Dropbox › Allegati note)${all.path?` {{ALL:${all.path}}}`:""}` : ""),
     stato:"Nuovo",
     fonte:"nota",
     creatoIl:now,
