@@ -6290,6 +6290,36 @@ function openWhatsappCoexistence(){
   }
 }
 
+/* ---- "Letto" condiviso tra tutti i dispositivi (salvato su Supabase, riusando la tabella gmail_action_status) ----
+   Una riga per conversazione: gmail_message_id = "wa-read|<id>" oppure "ig-read|<id>"; updated_at = orario dell'ultimo messaggio letto. */
+function sharedReadAt(prefix,key){
+  const id=`${prefix}|${key}`;
+  const r=(state.gmailActionStatus||[]).find(x=>x.gmailMessageId===id);
+  const t=r?Date.parse(r.updatedAt||""):NaN;
+  return Number.isFinite(t)?t:0;
+}
+const _sharedReadPending={};
+async function sharedMarkRead(prefix,key,tsIso){
+  const t=Date.parse(tsIso||""); if(!Number.isFinite(t)) return;
+  if(sharedReadAt(prefix,key)>=t) return;
+  const id=`${prefix}|${key}`;
+  if(_sharedReadPending[id]>=t) return;
+  _sharedReadPending[id]=t;
+  const iso=new Date(t).toISOString();
+  const list=(state.gmailActionStatus=state.gmailActionStatus||[]);
+  const i=list.findIndex(x=>x.gmailMessageId===id);
+  if(i>=0) list[i]={...list[i],updatedAt:iso};
+  else list.push({id:null,gmailMessageId:id,replied:false,leadGenerated:false,orderGenerated:false,updatedAt:iso});
+  try{
+    const {data,error}=await sb.from("gmail_action_status")
+      .upsert({gmail_message_id:id,replied:false,lead_generated:false,order_generated:false,updated_at:iso},{onConflict:"gmail_message_id"})
+      .select("*").single();
+    if(error){ console.warn("Letto condiviso",error); return; }
+    const mapped=fromDbRow("gmailActionStatus",data);
+    const j=list.findIndex(x=>x.gmailMessageId===id);
+    if(j>=0) list[j]=mapped;
+  }catch(e){ console.warn("Letto condiviso",e); }
+}
 /* ---- Conversazioni WhatsApp non lette (memorizzato in questo browser) ---- */
 function waReadMap(){
   try{ return JSON.parse(localStorage.getItem("waReadMap")||"{}")||{}; }catch(e){ return {}; }
@@ -6300,6 +6330,7 @@ function waSaveReadMap(m){
 function waLastMessage(g){ const a=g.messages||[]; return a.length?a[a.length-1]:null; }
 function waMarkRead(g){
   const last=waLastMessage(g); if(!last) return;
+  sharedMarkRead("wa-read",g.waId,last.messageTimestamp||last.createdAt);
   const m=waReadMap();
   if(m[g.waId]===last.id) return;
   m[g.waId]=last.id; waSaveReadMap(m);
@@ -6321,6 +6352,8 @@ function whatsappUnreadCount(){
     const l=waLastMessage(g);
     if(!l || l.direction!=="inbound") return;
     if(g.waId===selectedWhatsappWaId && currentView==="whatsapp" && !document.hidden && (!isMobileUI()||waMobileChat)) return;
+    const lt=Date.parse(l.messageTimestamp||l.createdAt||"");
+    if(Number.isFinite(lt) && sharedReadAt("wa-read",g.waId)>=lt) return; /* già letto da un altro dispositivo */
     if(map[g.waId]!==l.id) n++;
   });
   return n;
@@ -6968,6 +7001,8 @@ function igUnreadCount(){
   last.forEach((m,k)=>{
     if(m.direction!=="inbound") return;
     if(k===igSelected && currentView==="instagram" && !document.hidden && (!isMobileUI()||igMobileChat)) return;
+    const lt=Date.parse(m.message_timestamp||m.created_at||"");
+    if(Number.isFinite(lt) && sharedReadAt("ig-read",k)>=lt) return; /* già letto da un altro dispositivo */
     if(map[k]!==m.id) n++;
   });
   return n;
@@ -7128,7 +7163,7 @@ function renderInstagram(){
   if(!igSelected && convs.length) igSelected=convs[0].id;
   if(igSelected && !convs.some(c=>c.id===igSelected)) igSelected=convs[0]?.id||"";
   const active=convs.find(c=>c.id===igSelected)||null;
-  if(active && !document.hidden && (!isMobileUI()||igMobileChat)){ const l=active.messages[active.messages.length-1]; if(l){ const rm=igReadMap(); if(rm[active.id]!==l.id){ rm[active.id]=l.id; igSaveReadMap(rm); } } igBadgeShown=-1; setTimeout(updateInstagramBadge,0); }
+  if(active && !document.hidden && (!isMobileUI()||igMobileChat)){ const l=active.messages[active.messages.length-1]; if(l){ sharedMarkRead("ig-read",active.id,l.message_timestamp||l.created_at); const rm=igReadMap(); if(rm[active.id]!==l.id){ rm[active.id]=l.id; igSaveReadMap(rm); } } igBadgeShown=-1; setTimeout(updateInstagramBadge,0); }
   const lastIn=active?[...active.messages].reverse().find(m=>m.direction==="inbound"):null;
   const expired=active && (!lastIn || (Date.now()-new Date(lastIn.message_timestamp||lastIn.created_at).getTime())>24*3600*1000);
   root.innerHTML=`
