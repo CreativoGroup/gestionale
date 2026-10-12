@@ -5491,7 +5491,7 @@ function openLeadDetail(id){
         <span><strong>${quoteNumberLabel(qt)}</strong> · ${fmtMoney(quoteTotals(qt).totale)} · ${escapeHtml(qt.stato)}</span>
         <span style="display:flex;gap:6px;"><button class="btn btn-outline btn-sm" onclick="openQuoteDetail('${qt.id}')">Apri</button><button class="btn btn-outline btn-sm" onclick="downloadQuotePdf('${qt.id}')">PDF</button></span>
       </div>`).join("") : `<p class="helptext" style="margin:0 0 8px;">Nessun preventivo per questo lead.</p>`}
-      <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="newQuoteForLead('${l.id}')">+ NUOVO PREVENTIVO</button>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="newQuoteForLead('${l.id}')">📄 NUOVO PREVENTIVO</button>
     </div>` : ""}
     <div class="form-actions" style="margin-top:16px;">
       <button class="btn btn-outline" style="${isNewCustomerOrder ? "border-radius:999px;padding:11px 18px;font-weight:800;" : ""}" onclick="openEditLead('${l.id}')">✎ ${isNewCustomerOrder?'MODIFICA DATI':'MODIFICA LEAD'}</button>
