@@ -7392,8 +7392,11 @@ function openNoteForm(id,prefill){
     <button class="close-x" onclick="closeModal()">×</button>
     <h2 style="margin-bottom:14px;">${n ? "Modifica nota" : "Nuova nota"}</h2>
     <div class="nota-form">
-      <div class="field span2"><label>Nome *</label>
-        <input id="nota-f-nome" placeholder="Nome e cognome / azienda" value="${escapeHtml(n ? (n.nomePersona||'') : (pf.nome||''))}"></div>
+      <div class="field span2" style="position:relative;"><label>Nome * <span style="font-weight:500;color:var(--muted);">(scrivi un nome oppure scegli un cliente già in anagrafica)</span></label>
+        <input id="nota-f-nome" placeholder="Nome e cognome / azienda" autocomplete="off" oninput="noteClientSearch(this.value)" onblur="setTimeout(()=>{const b=document.getElementById('nota-f-results');if(b)b.innerHTML=''},200)" value="${escapeHtml(c ? clientDisplayName(c) : (n ? (n.nomePersona||'') : (pf.nome||'')))}">
+        <input type="hidden" id="nota-f-client" value="${escapeHtml(c ? c.id : '')}">
+        <div id="nota-f-linked" style="font-size:12px;color:var(--teal);font-weight:700;margin-top:4px;">${c ? "✓ Cliente in anagrafica" : ""}</div>
+        <div id="nota-f-results" style="position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);overflow:hidden;margin-top:2px;"></div></div>
       <div class="field"><label>Telefono <span style="font-weight:500;color:var(--muted);">(facoltativo)</span></label>
         <input id="nota-f-tel" type="tel" inputmode="tel" placeholder="Es. 335 123 4567" value="${escapeHtml(tel||'')}"></div>
       <div class="field span2"><label>Email <span style="font-weight:500;color:var(--muted);">(facoltativa)</span></label>
@@ -7416,6 +7419,26 @@ function openNoteForm(id,prefill){
   setTimeout(() => document.getElementById("nota-f-nome")?.focus(), 50);
   const gmid = pf.gmailMessageId || (n && n.extra && n.extra.gmailMessageId) || "";
   if(gmid) gmAttLoadInto("nota-gm-att", gmid, {clientId:(e&&e.clientId)||"", email:(c?c.email:(e.email||pf.email))||""});
+}
+function noteClientSearch(q){
+  const box=document.getElementById("nota-f-results"); if(!box) return;
+  const hid=document.getElementById("nota-f-client"), lk=document.getElementById("nota-f-linked");
+  if(hid && hid.value){ hid.value=""; if(lk) lk.textContent=""; }
+  const n=clientSearchNorm(q);
+  if(!n){ box.innerHTML=""; return; }
+  const list=state.clients.filter(c=>{
+    const hay=clientSearchNorm([clientDisplayName(c),c.ragioneSociale,c.nomeCommerciale,c.refNome,c.refCognome,c.nome,c.cognome,c.telefono,c.email].join(" "));
+    return n.split(/\s+/).every(t=>hay.includes(t));
+  }).slice(0,6);
+  box.innerHTML=list.map(c=>`<div style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #EDF1F5;font-size:14px;" onmousedown="event.preventDefault();noteClientPick('${c.id}')"><b>${escapeHtml(clientDisplayName(c))}</b>${c.telefono?` <small style="color:var(--muted);">${escapeHtml(c.telefono)}</small>`:""}</div>`).join("");
+}
+function noteClientPick(id){
+  const c=state.clients.find(x=>x.id===id); if(!c) return;
+  const set=(i,v)=>{const el=document.getElementById(i); if(el) el.value=v;};
+  set("nota-f-nome",clientDisplayName(c)); set("nota-f-client",c.id);
+  set("nota-f-tel",c.telefono||""); set("nota-f-email",c.email||"");
+  const lk=document.getElementById("nota-f-linked"); if(lk) lk.textContent="✓ Cliente in anagrafica";
+  const box=document.getElementById("nota-f-results"); if(box) box.innerHTML="";
 }
 async function saveNoteForm(id){
   const btn = document.getElementById("nota-f-save");
@@ -7458,7 +7481,7 @@ async function saveNoteForm(id){
     note.operatore = noto || nomeUtente || String(currentUser?.email || "").split("@")[0] || "Gestionale";
   }
   if(ex){
-    const extra = Object.assign({}, (prev && prev.extra) || {}, {clientId:"", telefono, email});
+    const extra = Object.assign({}, (prev && prev.extra) || {}, {clientId:String(document.getElementById("nota-f-client")?.value||""), telefono, email});
     if(allegato) extra.allegato = allegato; else delete extra.allegato;
     const fonteNuova = String(document.getElementById("nota-f-fonte")?.value || "");
     if(fonteNuova && !extra.fonte) extra.fonte = fonteNuova;
@@ -7472,6 +7495,7 @@ async function saveNoteForm(id){
   if(i >= 0) state.noteComunicazioni[i] = saved; else state.noteComunicazioni.push(saved);
   closeModal();
   if(currentView === "note") renderNote();
+  else if(currentView === "dashboard") renderDashboard();
   showToast(prev ? "Nota aggiornata" : "Nota salvata");
 }
 async function setNotaStato(id, stato){
