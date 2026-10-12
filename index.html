@@ -1686,6 +1686,15 @@
 .job-v2-muted-label{font-size:11px;color:var(--muted);font-weight:800;margin-bottom:6px;}
 .job-v2-start{font-weight:900;color:#1e6bb8;}
 .job-v2-note{width:100%;min-height:110px;resize:vertical;font-family:inherit!important;font-size:14px;color:var(--text);}
+.rt-wrap{border:1px solid var(--border);border-radius:12px;background:#fff;overflow:hidden}
+.rt-bar{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:6px 8px;border-bottom:1px solid var(--border);background:#F8FAFC}
+.rt-b{min-width:32px;height:32px;border:1px solid transparent;background:transparent;border-radius:8px;cursor:pointer;font:inherit;font-size:14px;color:var(--text);display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.rt-b:hover{background:#E8EDF3}
+.rt-col span{width:16px;height:16px;border-radius:50%;display:block;border:1px solid rgba(0,0,0,.15)}
+.rt-sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+.rt-editor{min-height:120px;padding:12px 14px;font:inherit;font-size:14px;line-height:1.55;color:var(--text);outline:none;white-space:pre-wrap;word-break:break-word}
+.rt-editor:empty:before{content:attr(data-ph);color:var(--muted)}
+.rt-wrap:focus-within{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15)}
 .job-v2-desc-block{margin-top:14px;}
 .job-v2-desc-label{display:block;font-weight:800;font-size:13px;margin-bottom:6px;color:var(--text);}
 @media(max-width:900px){
@@ -3351,12 +3360,15 @@ let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expens
 let currentView = "dashboard";
 /* Colonne "extra" (jsonb) per dati aggiuntivi di preventivi e note: servono una colonna su Supabase (script SQL mostrato nell'app). */
 const DB_EXTRA = {quotes:false, noteComunicazioni:false};
+let DB_DESCHTML = false; /* colonne descrizione_html su orders/quotes presenti su Supabase? */
 let DB_ALLEST = false; /* colonna orders.allestimento_indirizzo presente su Supabase? */
 let DB_CONSEGNATO = false; /* colonna orders.consegnato_il presente su Supabase? */
 const DB_CONSEGNATO_SQL = "alter table public.orders add column if not exists consegnato_il timestamptz;";
 const DB_ALLEST_SQL = "alter table public.orders add column if not exists allestimento_indirizzo text;";
 const DB_EXTRA_SQL = "alter table public.quotes add column if not exists extra jsonb default '{}'::jsonb;\nalter table public.note_comunicazioni add column if not exists extra jsonb default '{}'::jsonb;";
 async function probeDbExtraColumns(){
+  try{ const a=await sb.from("orders").select("id,descrizione_html").limit(1); const b=await sb.from("quotes").select("id,descrizione_html").limit(1); DB_DESCHTML = !a.error && !b.error; }
+  catch(e){ DB_DESCHTML = false; }
   try{ const {error} = await sb.from("orders").select("id,allestimento_indirizzo").limit(1); DB_ALLEST = !error; }
   catch(e){ DB_ALLEST = false; }
   try{ const {error} = await sb.from("orders").select("id,consegnato_il").limit(1); DB_CONSEGNATO = !error; }
@@ -3399,8 +3411,8 @@ function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return localI
 function toDbRow(collection, o){
   switch(collection){
     case "clients": return {id:o.id, tipo:o.tipo, ragione_sociale:o.ragioneSociale||null, nome_commerciale:o.nomeCommerciale||null, ref_nome:o.refNome||null, ref_cognome:o.refCognome||null, nome:o.nome||null, cognome:o.cognome||null, telefono:o.telefono||null, email:o.email||null, settore:o.settore||null, richiesta:o.richiesta||null, carattere:o.carattere||null, archiviato_recenti:!!o.archiviatoRecenti, indirizzo:o.indirizzo||null, citta:o.citta||null, cap:o.cap||null, provincia:o.provincia||null, partita_iva:o.partitaIva||null, codice_fiscale:o.codiceFiscale||null, pec:o.pec||null, codice_sdi:o.codiceSDI||null, dropbox_folder_url:o.dropboxFolderUrl||null};
-    case "quotes": return {id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito, ...(DB_EXTRA.quotes?{extra:o.extra||{}}:{})};
-    case "orders": return {...(DB_ALLEST?{allestimento_indirizzo:o.allestimentoIndirizzo||null}:{}), ...(DB_CONSEGNATO?{consegnato_il:(o.stato==="Consegnato"?(o.consegnatoIl||null):null)}:{}), id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, avviso_metodo:o.avvisoMetodo||null, avvisato_il:o.avvisatoIl||null, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
+    case "quotes": return {...(DB_DESCHTML?{descrizione_html:o.descrizioneHtml||null}:{}), id:o.id, client_id:o.clientId||null, categoria:o.categoria||null, descrizione:o.descrizione||null, righe:o.righe||[], stato:o.stato||"Bozza", data:o.data||null, convertito:!!o.convertito, ...(DB_EXTRA.quotes?{extra:o.extra||{}}:{})};
+    case "orders": return {...(DB_DESCHTML?{descrizione_html:o.descrizioneHtml||null}:{}), ...(DB_ALLEST?{allestimento_indirizzo:o.allestimentoIndirizzo||null}:{}), ...(DB_CONSEGNATO?{consegnato_il:(o.stato==="Consegnato"?(o.consegnatoIl||null):null)}:{}), id:o.id, client_id:o.clientId||null, descrizione:o.descrizione||null, worker:o.worker||null, stato:o.stato||"Da fare", data_consegna:o.dataConsegna||null, consegna_tipo:o.consegnaTipo||"Ritiro in sede", spedito:!!o.spedito, iva_applicata:!!o.ivaApplicata, da_fatturare:!!o.daFatturare, importante:!!o.importante, cliente_avvisato:!!o.clienteAvvisato, avviso_metodo:o.avvisoMetodo||null, avvisato_il:o.avvisatoIl||null, fatturato:!!o.fatturato, sconto:Number(o.sconto)||0, costo_spedizione:Number(o.costoSpedizione)||0, righe:o.righe||[], fasi:o.fasi||[], magazzino:o.magazzino||[]};
     case "payments": return {id:o.id, order_id:o.orderId||null, client_id:o.clientId||null, tipo:o.tipo||null, importo:Number(o.importo)||0, data:o.data||null, metodo:o.metodo||null};
     case "warehouse": return {id:o.id, codice:o.codice||null, nome:o.nome||null, categoria:o.categoria||null, colore:o.colore||null, taglia:o.taglia||null, quantita:Number(o.quantita)||0, scorta_minima:Number(o.scortaMinima)||0, unita:o.unita||"pz"};
     case "expenses": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
@@ -3416,10 +3428,10 @@ function toDbRow(collection, o){
 function fromDbRow(collection, r){
   switch(collection){
     case "clients": return {id:r.id, numero:r.numero, tipo:r.tipo, ragioneSociale:r.ragione_sociale||"", nomeCommerciale:r.nome_commerciale||"", refNome:r.ref_nome||"", refCognome:r.ref_cognome||"", nome:r.nome||"", cognome:r.cognome||"", telefono:r.telefono||"", email:r.email||"", settore:r.settore||"", richiesta:r.richiesta||"", carattere:r.carattere||"", archiviatoRecenti:!!r.archiviato_recenti, creatoIl:r.creato_il||"", indirizzo:r.indirizzo||"", citta:r.citta||"", cap:r.cap||"", provincia:r.provincia||"", partitaIva:r.partita_iva||"", codiceFiscale:r.codice_fiscale||"", pec:r.pec||"", codiceSDI:r.codice_sdi||"", dropboxFolderUrl:r.dropbox_folder_url||""};
-    case "quotes": return {id:r.id, clientId:r.client_id, categoria:(migrateCategoriaVecchia(r.categoria,"")||{}).categoria||r.categoria, descrizione:r.descrizione||"", righe:migrateRighe(r.righe||[]), stato:r.stato, data:r.data, convertito:!!r.convertito, extra:r.extra||{}};
+    case "quotes": return {descrizioneHtml:r.descrizione_html||"", id:r.id, clientId:r.client_id, categoria:(migrateCategoriaVecchia(r.categoria,"")||{}).categoria||r.categoria, descrizione:r.descrizione||"", righe:migrateRighe(r.righe||[]), stato:r.stato, data:r.data, convertito:!!r.convertito, extra:r.extra||{}};
     case "orders": {
       const normalizedStatus = r.stato==="In lavorazione" ? "In preparazione grafica" : r.stato;
-      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:migrateRighe(r.righe||[]), fasi:r.fasi||[], magazzino:r.magazzino||[], allestimentoIndirizzo:r.allestimento_indirizzo||"", consegnatoIl:r.consegnato_il||"", createdAt:r.created_at};
+      const o = {id:r.id, numero:r.numero, clientId:r.client_id, descrizione:r.descrizione||"", descrizioneHtml:r.descrizione_html||"", worker:(r.worker==="Misto"?"":(r.worker||"")), stato:normalizedStatus, dataConsegna:r.data_consegna, consegnaTipo:r.consegna_tipo, spedito:!!r.spedito, ivaApplicata:!!r.iva_applicata, daFatturare:!!r.da_fatturare, importante:!!r.importante, clienteAvvisato:!!r.cliente_avvisato, avvisoMetodo:r.avviso_metodo||"", avvisatoIl:r.avvisato_il||"", fatturato:!!r.fatturato, sconto:Number(r.sconto)||0, costoSpedizione:Number(r.costo_spedizione)||0, righe:migrateRighe(r.righe||[]), fasi:r.fasi||[], magazzino:r.magazzino||[], allestimentoIndirizzo:r.allestimento_indirizzo||"", consegnatoIl:r.consegnato_il||"", createdAt:r.created_at};
       return o;
     }
     case "payments": return {id:r.id, orderId:r.order_id, clientId:r.client_id, tipo:r.tipo, importo:Number(r.importo)||0, data:r.data, metodo:normalizePaymentMethod(r.metodo)};
@@ -4647,7 +4659,7 @@ td.n{color:#6B7280;width:24px;}
 <table><thead><tr><th>#</th><th>Lavorazione</th><th class="r">Q.tà</th><th class="r">Prezzo unit.</th><th class="r">Totale</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="grid" style="align-items:start;">
   <div>
-    <div class="box"><h3>Descrizione del lavoro</h3><div class="note">${e(o.descrizione||"—")}</div></div>
+    <div class="box"><h3>Descrizione del lavoro</h3><div class="note">${o.descrizioneHtml?rtSanitize(o.descrizioneHtml):e(o.descrizione||"—")}</div></div>
     ${pagamenti.length?`<div class="box pag"><h3>Pagamenti registrati</h3>${pagamenti.map(x=>`<div class="kv"><span>${fmtDate(x.data)}</span><b>${fmtMoney(x.importo)} · ${e(x.tipo||"")}${x.metodo?" · "+e(x.metodo):""}</b></div>`).join("")}</div>`:""}
   </div>
   <div class="tots">
@@ -9928,6 +9940,7 @@ async function finalizeQuoteToOrder(quoteId, clientId){
   };});
 
   const order = mkOrder(uid(), clientId, q.descrizione, "", "Da fare", qe.dataConsegna||"", righe, qe.consegnaTipo);
+  order.descrizioneHtml = q.descrizioneHtml || "";
   const qt = quoteTotals(q);
   order.ivaApplicata = quoteIvaOn(q);
   order.importante = qe.importante;
@@ -10075,6 +10088,79 @@ function updateQuoteField(id, field, value){
   if(field === "stato") onQuoteStatusChanged(q);
   if(field === "clientId") openQuoteDetail(id);
 }
+/* ===== Descrizione del lavoro con formattazione (grassetto, sottolineato, dimensione, colore) ===== */
+const RT_COLORI=[["Nero","#1f2937"],["Rosso","#dc2626"],["Arancio","#ea580c"],["Blu","#2563eb"],["Verde","#16a34a"],["Viola","#7c3aed"]];
+const RT_SIZES=[["Piccolo","12px"],["Normale","14px"],["Grande","18px"],["Molto grande","24px"]];
+function rtSanitize(html){
+  const tpl=document.createElement("template"); tpl.innerHTML=String(html||"");
+  const OK={B:1,STRONG:1,U:1,I:1,EM:1,BR:1,DIV:1,P:1,SPAN:1,FONT:1,UL:1,OL:1,LI:1};
+  const walk=node=>{
+    [...node.childNodes].forEach(ch=>{
+      if(ch.nodeType===3) return;
+      if(ch.nodeType!==1){ ch.remove(); return; }
+      if(!OK[ch.tagName]){ const t=document.createTextNode(ch.textContent||""); ch.replaceWith(t); return; }
+      const st=[]; const css=ch.style;
+      if(ch.tagName==="FONT"){ const c=ch.getAttribute("color"); if(c) st.push("color:"+c); }
+      if(css){ if(css.color) st.push("color:"+css.color); if(css.fontSize) st.push("font-size:"+css.fontSize); if(css.fontWeight) st.push("font-weight:"+css.fontWeight); if(css.textDecorationLine||css.textDecoration) st.push("text-decoration:underline"); }
+      [...ch.attributes].forEach(a=>ch.removeAttribute(a.name));
+      const safe=st.filter(x=>/^(color:(#[0-9a-f]{3,8}|rgb\([\d\s,.]+\)|[a-z]+)|font-size:\d+(\.\d+)?px|font-weight:(bold|[5-9]00)|text-decoration:underline)$/i.test(x));
+      if(safe.length) ch.setAttribute("style",safe.join(";"));
+      walk(ch);
+    });
+  };
+  walk(tpl.content);
+  return tpl.innerHTML;
+}
+function rtPlain(el){ return String(el.innerText||"").replace(/\n{3,}/g,"\n\n").replace(/ /g," ").trim(); }
+function rtHtmlFor(item){
+  if(item && item.descrizioneHtml) return rtSanitize(item.descrizioneHtml);
+  return escapeHtml(item?.descrizione||"").replace(/\n/g,"<br>");
+}
+function rtToolbar(id){
+  return `<div class="rt-bar" onmousedown="event.preventDefault()">
+    <button type="button" class="rt-b" title="Grassetto" onclick="rtCmd('${id}','bold')"><b>B</b></button>
+    <button type="button" class="rt-b" title="Sottolineato" onclick="rtCmd('${id}','underline')"><u>S</u></button>
+    <button type="button" class="rt-b" title="Corsivo" onclick="rtCmd('${id}','italic')"><i>C</i></button>
+    <span class="rt-sep"></span>
+    ${RT_SIZES.map(([l,v])=>`<button type="button" class="rt-b rt-sz" title="Dimensione: ${l}" onclick="rtSize('${id}','${v}')" style="font-size:${Math.min(parseInt(v),17)}px">A</button>`).join("")}
+    <span class="rt-sep"></span>
+    ${RT_COLORI.map(([l,v])=>`<button type="button" class="rt-b rt-col" title="${l}" onclick="rtColor('${id}','${v}')"><span style="background:${v}"></span></button>`).join("")}
+    <span class="rt-sep"></span>
+    <button type="button" class="rt-b" title="Togli formattazione" onclick="rtCmd('${id}','removeFormat')">✕</button>
+  </div>`;
+}
+function rtEditorHtml(coll,item){
+  const id=`rt-${coll}-${item.id}`;
+  return `<div class="rt-wrap">${rtToolbar(id)}
+    <div id="${id}" class="rt-editor" contenteditable="true" data-ph="Descrivi il lavoro: dettagli tecnici, richieste del cliente, informazioni utili…"
+      oninput="rtQueue('${coll}','${item.id}')" onblur="rtSave('${coll}','${item.id}')" onpaste="rtPaste(event)">${rtHtmlFor(item)}</div>
+    ${DB_DESCHTML?"":`<div class="helptext" style="color:var(--danger);margin-top:6px;">Per mantenere la formattazione serve una riga SQL su Supabase (te la dà Claude): finché non c'è, il testo si salva ma senza grassetto e colori.</div>`}
+  </div>`;
+}
+function rtEl(id){ return document.getElementById(id); }
+function rtCmd(id,cmd){ const el=rtEl(id); if(!el) return; el.focus(); document.execCommand("styleWithCSS",false,true); document.execCommand(cmd,false,null); el.dispatchEvent(new Event("input")); }
+function rtColor(id,col){ const el=rtEl(id); if(!el) return; el.focus(); document.execCommand("styleWithCSS",false,true); document.execCommand("foreColor",false,col); el.dispatchEvent(new Event("input")); }
+function rtSize(id,px){
+  const el=rtEl(id); if(!el) return; el.focus();
+  const sel=window.getSelection(); if(!sel.rangeCount||sel.isCollapsed){ showToast("Seleziona prima il testo da ingrandire o rimpicciolire"); return; }
+  document.execCommand("styleWithCSS",false,false); document.execCommand("fontSize",false,"7");
+  el.querySelectorAll('font[size="7"]').forEach(f=>{ f.removeAttribute("size"); f.style.fontSize=px; });
+  el.dispatchEvent(new Event("input"));
+}
+function rtPaste(e){ e.preventDefault(); const t=(e.clipboardData||window.clipboardData).getData("text/plain"); document.execCommand("insertText",false,t); }
+const rtTimers={};
+function rtQueue(coll,id){ clearTimeout(rtTimers[coll+id]); rtTimers[coll+id]=setTimeout(()=>rtSave(coll,id),900); }
+function rtSave(coll,id){
+  clearTimeout(rtTimers[coll+id]);
+  const item=findItem(coll,id), el=rtEl(`rt-${coll}-${id}`); if(!item||!el) return;
+  const html=rtSanitize(el.innerHTML), plain=rtPlain(el);
+  const hasFmt=/<(b|strong|u|i|em|font|span|ul|ol)\b/i.test(html);
+  const newHtml=hasFmt?html:"";
+  if(plain===String(item.descrizione||"") && newHtml===String(item.descrizioneHtml||"")) return;
+  item.descrizione=plain; item.descrizioneHtml=newHtml;
+  saveState(coll);
+}
+
 /* I vecchi "Dettagli lavorazione" delle singole righe passano nella Descrizione del lavoro (una sola, sotto le righe). */
 function migrateRowDetails(coll, item){
   if(!item || !Array.isArray(item.righe)) return;
@@ -10083,7 +10169,7 @@ function migrateRowDetails(coll, item){
   const multi=item.righe.length>1;
   const add=con.map(r=>{ const t=String(r.descrizione).trim(); const nome=String(r.prodotto||"").trim(); return multi&&nome?`${nome}: ${t}`:t; }).join("\n");
   const cur=String(item.descrizione||"").trim();
-  if(!cur.includes(add)) item.descrizione=[cur,add].filter(Boolean).join("\n\n");
+  if(!cur.includes(add)){ item.descrizione=[cur,add].filter(Boolean).join("\n\n"); if(item.descrizioneHtml) item.descrizioneHtml=item.descrizioneHtml+"<br><br>"+escapeHtml(add).replace(/\n/g,"<br>"); }
   item.righe.forEach(r=>{ if(String(r.descrizione||"").trim()) r.descrizione=""; });
   saveState(coll);
 }
@@ -10157,7 +10243,7 @@ function openQuoteDetail(quoteId){
           <h3>Descrizione del lavoro</h3>
           <div class="job-v2-info-sub">Passa nell'ordine quando il preventivo viene convertito</div>
         </div>
-        <textarea class="job-v2-note job-v2-note-full" placeholder="Descrivi il lavoro: dettagli tecnici, richieste del cliente, informazioni utili…" onchange="updateQuoteField('${q.id}','descrizione',this.value)">${escapeHtml(q.descrizione||"")}</textarea>
+        ${rtEditorHtml('quotes',q)}
       </section>
 
       <section class="job-v2-card" style="--job-accent:#ef5b4a;">
@@ -12190,19 +12276,14 @@ function openJobCard(orderId){
         ${orderLinesWithWarehouse(o)}
         <div class="job-v2-desc-block">
           <label class="job-v2-desc-label">Descrizione del lavoro</label>
-          <textarea class="job-v2-note job-v2-note-full" placeholder="Descrivi il lavoro: dettagli tecnici, richieste del cliente, informazioni utili…" onchange="updateOrderField('${o.id}','descrizione',this.value)">${escapeHtml(o.descrizione||"")}</textarea>
+          ${rtEditorHtml('orders',o)}
+        </div>
+        <div class="job-v2-desc-block">
+          <label class="job-v2-desc-label" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">☁ File Dropbox
+            <span class="job-v2-pill" style="background:${dropboxIsConnected()?'#EAF8EF':'#F1F5F9'};color:${dropboxIsConnected()?'#187A44':'#64748B'};">${dropboxIsConnected()?'COLLEGATO':'NON COLLEGATO'}</span></label>
+          ${renderJobDropboxBlock(o,c)}
         </div>
         ${renderRitiroEsternoSection(o)}
-      </section>
-
-      <section class="job-v2-card" style="--job-accent:#0061FF;">
-        <div class="job-v2-section-title">
-          <h3>☁ File Dropbox</h3>
-          <span class="job-v2-pill" style="background:${dropboxIsConnected()?'#EAF8EF':'#F1F5F9'};color:${dropboxIsConnected()?'#187A44':'#64748B'};">
-            ${dropboxIsConnected()?'COLLEGATO':'NON COLLEGATO'}
-          </span>
-        </div>
-        ${renderJobDropboxBlock(o,c)}
       </section>
 
       <section class="job-v2-card" style="--job-accent:#20a857;">
@@ -16809,7 +16890,7 @@ async function saveCompletedOrderNotes(orderId,manual=false){
   setCompletedNoteStatus("saving","Salvataggio…");
 
   const previousValue=o.descrizione||"";
-  const candidate={...o,descrizione:newValue};
+  const candidate={...o,descrizione:newValue,descrizioneHtml:""};
 
   try{
     const saved=await upsertOneReturning("orders",candidate);
