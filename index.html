@@ -5540,7 +5540,7 @@ function openEditLead(id){
 
     <div class="form-grid">
       <div class="field"><label>Nome</label><input id="edit-lead-nome" value="${escapeHtml(l.nome||'')}"></div>
-      <div class="field"><label>Azienda</label><input id="edit-lead-azienda" value="${escapeHtml(l.azienda||'')}"></div>
+      <div class="field" style="position:relative;"><label>Azienda</label><input id="edit-lead-azienda" autocomplete="off" placeholder="Scrivi per cercare tra i tuoi clienti" value="${escapeHtml(l.azienda||'')}" oninput="leadClientSearch(this.value)" onblur="setTimeout(()=>{const b=document.getElementById('edit-lead-results');if(b)b.innerHTML='';},200)"><div id="edit-lead-results" style="position:absolute;left:0;right:0;top:100%;z-index:50;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);overflow:hidden;"></div><small id="edit-lead-linked" style="color:#1F8A55;font-weight:700;"></small></div>
       <div class="field"><label>Email</label><input id="edit-lead-email" type="email" value="${escapeHtml(l.email||'')}"></div>
       <div class="field"><label>Telefono</label><input id="edit-lead-telefono" value="${escapeHtml(l.telefono||'')}"></div>
       <div class="field" style="grid-column:1/-1;"><label>Oggetto</label><input id="edit-lead-oggetto" value="${escapeHtml(l.oggettoRichiesta||'')}"></div>
@@ -5560,6 +5560,25 @@ function openEditLead(id){
   `;
 }
 
+function leadClientSearch(q){
+  const box=document.getElementById("edit-lead-results"); if(!box) return;
+  const lk=document.getElementById("edit-lead-linked"); if(lk) lk.textContent="";
+  const n=clientSearchNorm(q);
+  if(!n){ box.innerHTML=""; return; }
+  const list=state.clients.filter(c=>{
+    const hay=clientSearchNorm([clientDisplayName(c),c.ragioneSociale,c.nomeCommerciale,c.refNome,c.refCognome,c.nome,c.cognome,c.telefono,c.email].join(" "));
+    return n.split(/\s+/).every(t=>hay.includes(t));
+  }).slice(0,6);
+  box.innerHTML=list.map(c=>`<div style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #EDF1F5;font-size:14px;" onmousedown="event.preventDefault();leadClientPick('${c.id}')"><b>${escapeHtml(clientDisplayName(c))}</b>${c.telefono?` <small style="color:var(--muted);">${escapeHtml(c.telefono)}</small>`:""}</div>`).join("");
+}
+function leadClientPick(id){
+  const c=state.clients.find(x=>x.id===id); if(!c) return;
+  const set=(i,v,onlyEmpty)=>{const el=document.getElementById(i); if(el && (!onlyEmpty || !String(el.value||"").trim())) el.value=v;};
+  set("edit-lead-azienda",clientDisplayName(c));
+  set("edit-lead-email",c.email||"",true); set("edit-lead-telefono",c.telefono||"",true);
+  const lk=document.getElementById("edit-lead-linked"); if(lk) lk.textContent="✓ Cliente in anagrafica";
+  const box=document.getElementById("edit-lead-results"); if(box) box.innerHTML="";
+}
 async function saveLeadEdit(id){
   const l=(state.leads||[]).find(x=>x.id===id);
   if(!l) return;
@@ -5721,7 +5740,8 @@ async function ensureClientForLead(l){
   if(!c){ const q=leadQuotes(l.id).find(x=>x.clientId); if(q) c=state.clients.find(x=>x.id===q.clientId); }
   if(c) return c.id;
   /* cliente già in anagrafica con la stessa email o lo stesso telefono? lo faccio notare */
-  const simile=findClientByEmail(l.email) || (String(l.telefono||"").trim() ? findClientByWhatsappPhone(l.telefono) : null);
+  const nomeAz=clientSearchNorm(l.azienda||"");
+  const simile=findClientByEmail(l.email) || (String(l.telefono||"").trim() ? findClientByWhatsappPhone(l.telefono) : null) || (nomeAz ? (state.clients||[]).find(c=>clientSearchNorm(clientDisplayName(c))===nomeAz) : null);
   if(simile){
     const scelta=await askUseExistingClient(simile,l);
     if(scelta==="use") return simile.id;
