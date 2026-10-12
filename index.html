@@ -7716,16 +7716,17 @@ function renderDashboard(){
     </div>
 
 
-    ${dashNoteAdmin.length ? `
+    ${isAdminDash ? `
     <div class="card" style="margin-bottom:16px;">
       <div class="section-header" style="margin-bottom:10px;">
         <h3 style="margin:0;">Note <span class="nota-foot" style="font-weight:600;">· ${dashNoteAll.length}</span></h3>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="openNoteForm()">+ Crea nota</button>
           <button class="btn btn-outline btn-sm" onclick="navNuovoAppunto()">+ Appunto</button>
           <button class="btn btn-outline btn-sm" onclick="goTo('note')">Apri tutte</button>
         </div>
       </div>
-      <div class="nota-list">${dashNoteAdmin.map(noteRowHTML).join("")}</div>
+      ${dashNoteAdmin.length ? `<div class="nota-list">${dashNoteAdmin.map(noteRowHTML).join("")}</div>` : `<p class="empty" style="margin:6px 0 0;">Nessuna nota.</p>`}
       ${dashNoteAll.length>dashNoteAdmin.length ? `<p class="helptext" style="margin:8px 4px 0;">Altre ${dashNoteAll.length-dashNoteAdmin.length} note in <a href="#" onclick="goTo('note');return false;">Note</a>.</p>` : ""}
     </div>` : ""}
 
