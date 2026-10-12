@@ -5501,12 +5501,9 @@ function openLeadDetail(id){
           ? `<button class="btn btn-primary" style="border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" onclick="completeNewCustomerOrderWithClient('${l.id}','${linkedClient.id}')">✓ CREA ORDINE</button>`
           : `<button class="btn btn-primary" style="border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" onclick="transformLeadToClient('${l.id}', true)">✓ CREA CLIENTE E ORDINE</button>
              <button class="btn btn-outline" style="border-radius:999px;padding:11px 18px;font-weight:800;" onclick="linkLeadToExistingClient('${l.id}')">↗ USA CLIENTE ESISTENTE E CREA ORDINE</button>`
-      ) : (!isNewCustomerOrder && l.stato==="Accettato" && !l.clientId && !l.convertedOrderId && leadQuotes(l.id).some(q=>q.clientId && !q.convertito) ? `
-        <button class="btn btn-primary" onclick="closeModal();convertToOrder('${leadQuotes(l.id).find(q=>q.clientId && !q.convertito).id}')">Crea ordine dal preventivo</button>
-      ` : (!isNewCustomerOrder && l.stato==="Accettato" && !l.clientId && !l.convertedOrderId ? `
-        <button class="btn btn-primary" onclick="transformLeadToClient('${l.id}', true)">Trasforma in cliente ed effettua ordine</button>
-        <button class="btn btn-outline" onclick="linkLeadToExistingClient('${l.id}')">↗ COLLEGA A CLIENTE ESISTENTE E CREA ORDINE</button>
-      ` : ""))}
+      ) : (!isNewCustomerOrder && !l.convertedOrderId ? `
+        <button class="btn btn-primary" onclick="convertLeadToOrder('${l.id}')">Converti in ordine</button>
+      ` : "")}
 
       ${l.gmailMessageId && !isNewCustomerOrder ? `<button class="btn btn-outline" onclick="closeModal();goTo('posta');setTimeout(()=>openGmailMessage('${l.gmailMessageId}'),250);">Apri mail</button>` : ""}
       <button class="btn btn-ghost" style="${isNewCustomerOrder ? "border-radius:999px;padding:10px 16px;color:var(--muted);font-weight:700;" : ""}" onclick="discardLead('${l.id}');closeModal();">SCARTA</button>
@@ -5601,6 +5598,18 @@ async function saveLeadEdit(id){
   openLeadDetail(id);
 }
 
+/* Lo stato del lead guida quello dei suoi preventivi (non ancora trasformati in ordine). */
+function syncQuotesFromLeadStatus(l,status){
+  let changed=false;
+  leadQuotes(l.id).filter(q=>!q.convertito).forEach(q=>{
+    let target=null;
+    if(status==="Accettato") target="Accettato";
+    else if(status==="Perso") target="Rifiutato";
+    else if(q.stato==="Accettato" || q.stato==="Rifiutato") target="Inviato";
+    if(target && q.stato!==target){ q.stato=target; changed=true; }
+  });
+  if(changed) saveState("quotes");
+}
 async function setLeadStatus(id,status){
   const l=(state.leads||[]).find(x=>x.id===id);
   if(!l) return;
@@ -5614,6 +5623,7 @@ async function setLeadStatus(id,status){
     showToast("Errore aggiornamento Lead");
     return;
   }
+  syncQuotesFromLeadStatus(l,status);
   showToast("Lead aggiornato");
   if(currentView==="leads"||currentView==="note") renderLeads();
   if(currentView==="leadOrdine"||currentView==="ordini") renderLeadOrdine();
@@ -5679,6 +5689,40 @@ async function markLeadLinkedToClient(leadId, clientId){
   return true;
 }
 
+/* Un solo pulsante: il lead diventa ordine. Il cliente viene creato (o trovato) da solo; le righe del preventivo passano nell'ordine. */
+async function ensureClientForLead(l){
+  let c=l.clientId ? state.clients.find(x=>x.id===l.clientId) : null;
+  if(!c){ const q=leadQuotes(l.id).find(x=>x.clientId); if(q) c=state.clients.find(x=>x.id===q.clientId); }
+  if(!c) c=findClientByEmail(l.email);
+  if(c) return c.id;
+  const pre=leadClientPrefill(l);
+  const nuovo={id:uid(), tipo:"Family", settore:"", richiesta:"", archiviatoRecenti:false, ...pre};
+  const saved=await upsertOneReturning("clients",nuovo);
+  if(!saved) return null;
+  if(!state.clients.some(x=>x.id===saved.id)) state.clients.push(saved);
+  return saved.id;
+}
+async function convertLeadToOrder(leadId){
+  const l=(state.leads||[]).find(x=>x.id===leadId); if(!l) return;
+  const existing=l.convertedOrderId ? (state.orders||[]).find(o=>o.id===l.convertedOrderId) : null;
+  if(existing){ closeModal(); openJobCard(existing.id); return; }
+  const clientId=await ensureClientForLead(l); if(!clientId) return;
+  const qs=leadQuotes(l.id).filter(q=>!q.convertito);
+  const q=qs.find(x=>x.stato==="Accettato")||qs[0];
+  closeModal();
+  if(q){
+    let changed=false;
+    if(q.clientId!==clientId){ q.clientId=clientId; changed=true; }
+    if(!q.extra || q.extra.leadId!==l.id){ q.extra=Object.assign({},q.extra||{},{leadId:l.id}); changed=true; }
+    if(changed){ const ok=await upsertOne("quotes",q); if(!ok) return; }
+    const orderId=await finalizeQuoteToOrder(q.id,clientId);
+    if(orderId) openJobCard(orderId);
+    return;
+  }
+  const linked=await markLeadLinkedToClient(l.id,clientId);
+  if(!linked) return;
+  newOrderForClient(clientId,l.id);
+}
 function transformLeadToClient(id, inserisciOrdine=false){
   const l=(state.leads||[]).find(x=>x.id===id);
   if(!l) return;
@@ -10229,7 +10273,7 @@ async function finalizeQuoteToOrder(quoteId, clientId){
     return {prodotto:full.slice(0,cut).trim(), descrizione:[resto, dettagli].filter(Boolean).join("\n")};
   };
   const righe = q.righe.map(r=>{
-    const sp = splitVoce(r.prodotto, r.descrizione||"");
+    const sp = {prodotto:String(r.prodotto||"").trim(), descrizione:r.descrizione||""}; /* le righe passano identiche, senza tagli */
     return {
     id:uid(),
     descrizione:sp.descrizione,
@@ -10258,14 +10302,15 @@ async function finalizeQuoteToOrder(quoteId, clientId){
   q.convertito = true;
   const okQuote = await upsertOne('quotes', q);
   if(!okQuote) return;
-  if(q.extra && q.extra.leadId){
-    const ld = (state.leads||[]).find(x => x.id === q.extra.leadId);
+  {
+    const ld = (state.leads||[]).find(x => (q.extra && q.extra.leadId && x.id === q.extra.leadId) || x.fonte===`preventivo:${q.id}`);
     if(ld && !ld.convertedOrderId) await markLeadConvertedToOrder(ld.id, clientId, order.id);
   }
 
   closeModal();
   refreshQuoteViews();
   showToast("Ordine creato dal preventivo");
+  return order.id;
 }
 
 let quoteMailAttachments=[];
