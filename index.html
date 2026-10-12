@@ -10877,7 +10877,7 @@ async function jobDropboxLoad(orderId,folder){
           <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;">
             <button class="btn btn-outline btn-sm" onclick="completedSheetPreviewDropboxFile('${safePath}','${safeName}')">Visualizza</button>
             <button class="btn btn-outline btn-sm" onclick="jobDropboxDownloadEncoded('${safePath}','${safeName}')">Scarica</button>
-            ${JOB_DROPBOX_SUBFOLDERS.filter(f=>f!==selected).map(f=>`<button class="jdb-mv" data-tone="${jobDropboxTone(f)}" title="Sposta in ${escapeHtml(f.replace("FILE ","").toLowerCase())}" onclick="jobDropboxMove('${orderId}','${safePath}','${safeName}','${escapeHtml(selected)}','${escapeHtml(f)}')">➜ <i></i>${escapeHtml(f.replace("FILE ",""))}</button>`).join("")}
+            ${JOB_DROPBOX_SUBFOLDERS.filter(f=>f!==selected).map(f=>`<button class="jdb-mv" data-tone="${jobDropboxTone(f)}" title="Copia anche in ${escapeHtml(f.replace("FILE ","").toLowerCase())}" onclick="jobDropboxMove('${orderId}','${safePath}','${safeName}','${escapeHtml(selected)}','${escapeHtml(f)}')">➜ <i></i>${escapeHtml(f.replace("FILE ",""))}</button>`).join("")}
           </div>
         </div>`;
     }).join("");
@@ -10893,18 +10893,15 @@ async function jobDropboxMove(orderId,pathEnc,nameEnc,fromFolder,toFolder){
   const name=decodeURIComponent(nameEnc);
   const base=jobDropboxBasePath(o);
   try{
-    showToast("Sposto il file…");
-    await dropboxApi("files/move_v2",{
-      from_path:`${base}/${fromFolder}/${name}`,
-      to_path:`${base}/${toFolder}/${name}`,
-      autorename:true
-    });
-    showToast(`Spostato in ${toFolder.replace("FILE ","").toLowerCase()}`);
-    jobDropboxLoad(orderId,fromFolder);
+    showToast("Copio il file…");
+    // La funzione Dropbox del gestionale non permette di spostare: scarico e ricarico nell'altra cartella.
+    const blob=await dropboxFetchContent(decodeURIComponent(pathEnc));
+    await dropboxUploadBlob(`${base}/${toFolder}/${name}`,blob);
+    showToast(`Copiato anche in ${toFolder.replace("FILE ","").toLowerCase()}`);
     jobDropboxCountBadges(orderId);
   }catch(err){
-    console.error("Dropbox sposta",err);
-    showToast("Non riesco a spostare il file: "+(err?.message||"errore Dropbox"));
+    console.error("Dropbox copia",err);
+    showToast("Non riesco a copiare il file: "+(err?.message||"errore Dropbox"));
   }
 }
 
