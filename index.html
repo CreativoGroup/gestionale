@@ -5010,10 +5010,6 @@ function leadCardHTML(l){
     ${req ? `<div class="nota-foot" style="margin-bottom:6px;">${escapeHtml(req.slice(0,130))}${req.length > 130 ? "…" : ""}</div>` : ""}
     ${quotes.length ? `<div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;">${quotes.map(q => `<button class="nota-badge" style="border:0;cursor:pointer;" onclick="openQuoteDetail('${q.id}')">📄 ${quoteNumberLabel(q)} · ${fmtMoney(quoteTotals(q).totale)} · ${escapeHtml(q.stato)}</button>`).join("")}</div>` : ""}
     <div class="nota-foot">${fmtLeadDate(l.creatoIl)}${days ? ` · ${days} gg fa` : " · oggi"}</div>
-    <div class="lead-sent">
-      <span class="lead-sent-label">Inviato con</span>
-      ${LEAD_SENT_OPTIONS.map(([k,lab])=>`<button class="lead-sent-chip ${l.inviatoVia===k?'on':''}" data-via="${k}" onclick="setLeadSentVia('${l.id}','${k}')">${lab}</button>`).join("")}
-    </div>
     <div class="nota-actions">
       <button class="btn btn-outline btn-sm" title="Nuovo preventivo" aria-label="Nuovo preventivo" style="padding:6px 10px;font-size:15px;line-height:1;" onclick="newQuoteForLead('${l.id}')">📄</button>
       <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">APRI</button>
@@ -5022,6 +5018,10 @@ function leadCardHTML(l){
     </div>
     <div class="lead-arrows">
       ${leadArrowLeft(l)}
+      <select class="lead-sent-select ${l.inviatoVia?'on':''}" title="Come è stato inviato il preventivo" onchange="setLeadSentVia('${l.id}',this.value)">
+        <option value="" ${!l.inviatoVia?'selected':''}>Inviato…</option>
+        ${LEAD_SENT_OPTIONS.map(([k,lab])=>`<option value="${k}" ${l.inviatoVia===k?'selected':''}>${lab.replace('✉ ','')}</option>`).join("")}
+      </select>
       ${leadArrowRight(l)}
     </div>
   </div>`;
@@ -5049,7 +5049,7 @@ async function leadMove(id,dir){
 async function setLeadSentVia(id,via){
   const l=(state.leads||[]).find(x=>x.id===id); if(!l) return;
   if(!DB_LEADSENT){ showToast("Per salvare come è stato inviato serve una riga SQL su Supabase (te la dà Claude)"); return; }
-  const nuovo = l.inviatoVia===via ? "" : via;
+  const nuovo = via||"";
   const old=l.inviatoVia; l.inviatoVia=nuovo;
   const {error}=await sb.from("leads").update({inviato_via:nuovo||null}).eq("id",id);
   if(error){ l.inviatoVia=old; console.error(error); showToast("Errore nel salvataggio"); return; }
@@ -5073,10 +5073,13 @@ function renderLeads(){
       .lead-sent-chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:5px 11px;font:inherit;font-size:12px;font-weight:700;color:var(--text);cursor:pointer;}
       .lead-sent-chip:hover{border-color:#8EB0ED;background:#F4F8FF;}
       .lead-sent-chip.on{background:#2B7A8C;border-color:#2B7A8C;color:#fff;}
-      .lead-arrows{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #EDF1F5;}
+      .lead-arrows{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #EDF1F5;}
+      .lead-arrows > span{flex:0 0 44px;}
+      .lead-sent-select{flex:1 1 auto;min-width:0;height:34px;border:1px solid var(--border);border-radius:999px;background:#fff;padding:0 10px;font:inherit;font-size:12.5px;font-weight:700;color:var(--muted);text-align:center;cursor:pointer;}
+      .lead-sent-select.on{background:#2B7A8C;border-color:#2B7A8C;color:#fff;}
       .lead-arrow{border:1px solid var(--border);background:#fff;border-radius:999px;min-width:44px;height:34px;padding:0 14px;font:inherit;font-size:14px;font-weight:800;color:var(--text);cursor:pointer;}
       .lead-arrow:hover{background:#F4F8FF;border-color:#8EB0ED;}
-      .lead-arrow-reopen{background:#2FA66A;border-color:#2FA66A;color:#fff;font-size:12px;letter-spacing:.04em;}
+      .lead-arrow-reopen{white-space:nowrap;padding:0 10px;font-size:11px;background:#2FA66A;border-color:#2FA66A;color:#fff;font-size:12px;letter-spacing:.04em;}
       .lead-arrow-reopen:hover{background:#268a57;border-color:#268a57;}
     </style>`);
   }
