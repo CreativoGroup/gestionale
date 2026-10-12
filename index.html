@@ -7515,7 +7515,6 @@ function noteRowHTML(n){
         : `<div class="nota-body">${escapeHtml(t)}</div>`;
     })()}${all ? `<div style="margin-top:6px;"><button class="nota-file" onclick="openNoteAttachment('${n.id}')">📎 ${escapeHtml(all.name || "Allegato")}</button></div>` : ""}</div>
     <div class="nota-c-actions">
-      <button class="btn btn-primary btn-sm" title="Fatto: elimina la nota" onclick="markNotaFatta('${n.id}')">FATTO</button>
       <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">LEAD</button>
       <button class="btn btn-ghost btn-sm" title="Modifica" onclick="openNoteForm('${n.id}')">✎</button>
     </div>
@@ -7684,6 +7683,7 @@ function openNoteForm(id,prefill){
     <div class="form-actions" style="margin-top:18px;">
       <button class="btn btn-primary" id="nota-f-save" onclick="saveNoteForm('${n ? n.id : ''}')">Salva nota</button>
       <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+      ${n ? `<button class="btn btn-outline" style="margin-left:auto;border-color:var(--danger);color:var(--danger);" onclick="deleteNota('${n.id}')">Elimina definitivamente</button>` : ""}
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
