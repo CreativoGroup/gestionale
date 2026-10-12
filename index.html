@@ -7153,7 +7153,7 @@ function ensureNoteStyles(){
     .nota-row:last-child{border-bottom:0;}
     .nota-row.nota-appunto{grid-template-columns:1fr auto;align-items:center;}
     .nota-row.nota-appunto .nota-body{font-size:14px;font-weight:400;line-height:1.45;}
-    .nota-row.nota-appunto,.nota-row.nota-appunto:nth-child(even){background:#FFF6D6;box-shadow:inset 4px 0 0 #F5B800;}
+    .nota-row.nota-appunto,.nota-row.nota-appunto:nth-child(even){background:#FFFAEA;box-shadow:inset 3px 0 0 #EBD28A;}
     .nota-c-text .nota-body{white-space:pre-wrap;word-break:break-word;}
     .nota-c-text .nota-body.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
     .nota-more{background:none;border:0;padding:4px 0 0;color:var(--accent,#F05B37);font-weight:700;font-size:12.5px;cursor:pointer;}
@@ -7178,7 +7178,7 @@ function ensureNoteStyles(){
       .nota-row.nota-appunto{grid-template-areas:none;grid-template-columns:minmax(0,1fr) auto;padding:10px 4px}
       .nota-row.nota-appunto .nota-c-text,.nota-row.nota-appunto .nota-c-actions{grid-area:auto}
       .nota-row.nota-appunto .nota-body{font-size:14px;font-weight:400}
-      .nota-row.nota-appunto,.nota-row.nota-appunto:nth-child(even){background:#FFF6D6;padding-left:12px}
+      .nota-row.nota-appunto,.nota-row.nota-appunto:nth-child(even){background:#FFFAEA;padding-left:12px}
       .nota-row:nth-child(even){background:transparent}
       .nota-c-name strong{font-size:15px}
       .nota-foot{font-size:12px}
@@ -7213,6 +7213,11 @@ function noteFonteIcon(n){
   return "";
 }
 function noteIsAppunto(n){ return noteExtra(n).fonte==="appunto" || (String(n.nomePersona||"")==="Appunto" && !noteExtra(n).telefono && !noteExtra(n).email); }
+function noteSortAppuntiFirst(a,b){
+  const pa=noteIsAppunto(a)?0:1, pb=noteIsAppunto(b)?0:1;
+  if(pa!==pb) return pa-pb;
+  return String(b.creatoIl||"").localeCompare(String(a.creatoIl||""));
+}
 function noteRowHTML(n){
   if(noteIsAppunto(n)){
     const t=String(n.testo||"");
@@ -7260,7 +7265,7 @@ function renderNote(){
       const e = noteExtra(n), c = e.clientId ? state.clients.find(x => x.id === e.clientId) : null;
       return `${n.nomePersona||""} ${n.testo||""} ${e.telefono||""} ${e.email||""} ${c ? clientDisplayName(c) : ""}`.toLowerCase().includes(needle);
     })
-    .sort((a,b) => String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
+    .sort(noteSortAppuntiFirst);
   document.getElementById("view-note").innerHTML = `
     ${dbExtraBanner("noteComunicazioni")}
     <div class="note-toolbar">
@@ -7724,7 +7729,7 @@ function renderDashboard(){
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
   const isAdminDash = !!(currentUser && currentUser.role==="admin");
   if(isAdminDash && typeof ensureNoteStyles==="function") ensureNoteStyles();
-  const dashNoteAll = isAdminDash ? (state.noteComunicazioni||[]).filter(n=>!n.fatto).sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))) : [];
+  const dashNoteAll = isAdminDash ? (state.noteComunicazioni||[]).filter(n=>!n.fatto).sort(noteSortAppuntiFirst) : [];
   const dashNoteAdmin = dashNoteAll.slice(0,8);
   const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma" || l.stato==="Da ricontattare");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
