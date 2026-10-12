@@ -2617,6 +2617,12 @@
   .job-dropbox-folder[data-tone="red"] .jdb-check:not(.has){border-color:#F3B4B6;}
   .job-dropbox-folder[data-tone="yellow"] .jdb-check:not(.has){border-color:#F4DC93;}
   .job-dropbox-folder[data-tone="green"] .jdb-check:not(.has){border-color:#A9DDC3;}
+  .jdb-mv{border:1px solid #DDE6F0;background:#fff;border-radius:999px;padding:5px 10px 5px 8px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;color:#334155;}
+  .jdb-mv i{width:10px;height:10px;border-radius:50%;display:inline-block;}
+  .jdb-mv[data-tone="red"] i{background:#E5484D;}
+  .jdb-mv[data-tone="yellow"] i{background:#F5B800;}
+  .jdb-mv[data-tone="green"] i{background:#2FA66A;}
+  .jdb-mv:hover{background:#F4F8FF;border-color:#8EB0ED;}
   .job-dropbox-folder strong{
     display:block;
     font-size:12.5px;
@@ -10868,15 +10874,37 @@ async function jobDropboxLoad(orderId,folder){
             <div class="job-dropbox-file-name">📄 ${escapeHtml(file.name||"")}</div>
             <div class="job-dropbox-file-meta">${dropboxFormatBytes(file.size)}${file.client_modified?` · ${new Date(file.client_modified).toLocaleString("it-IT")}`:""}</div>
           </div>
-          <div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;">
             <button class="btn btn-outline btn-sm" onclick="completedSheetPreviewDropboxFile('${safePath}','${safeName}')">Visualizza</button>
             <button class="btn btn-outline btn-sm" onclick="jobDropboxDownloadEncoded('${safePath}','${safeName}')">Scarica</button>
+            ${JOB_DROPBOX_SUBFOLDERS.filter(f=>f!==selected).map(f=>`<button class="jdb-mv" data-tone="${jobDropboxTone(f)}" title="Sposta in ${escapeHtml(f.replace("FILE ","").toLowerCase())}" onclick="jobDropboxMove('${orderId}','${safePath}','${safeName}','${escapeHtml(selected)}','${escapeHtml(f)}')">➜ <i></i>${escapeHtml(f.replace("FILE ",""))}</button>`).join("")}
           </div>
         </div>`;
     }).join("");
   }catch(err){
     console.error("Dropbox ordine list",err);
     box.innerHTML=`<div class="job-dropbox-empty" style="color:var(--danger);">Errore nel caricamento dei file.</div>`;
+  }
+}
+
+async function jobDropboxMove(orderId,pathEnc,nameEnc,fromFolder,toFolder){
+  const o=findItem("orders",orderId);
+  if(!o) return;
+  const name=decodeURIComponent(nameEnc);
+  const base=jobDropboxBasePath(o);
+  try{
+    showToast("Sposto il file…");
+    await dropboxApi("files/move_v2",{
+      from_path:`${base}/${fromFolder}/${name}`,
+      to_path:`${base}/${toFolder}/${name}`,
+      autorename:true
+    });
+    showToast(`Spostato in ${toFolder.replace("FILE ","").toLowerCase()}`);
+    jobDropboxLoad(orderId,fromFolder);
+    jobDropboxCountBadges(orderId);
+  }catch(err){
+    console.error("Dropbox sposta",err);
+    showToast("Non riesco a spostare il file: "+(err?.message||"errore Dropbox"));
   }
 }
 
