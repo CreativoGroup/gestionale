@@ -3390,6 +3390,7 @@ let state = {clients:[], quotes:[], orders:[], warehouse:[], payments:[], expens
 let currentView = "dashboard";
 /* Colonne "extra" (jsonb) per dati aggiuntivi di preventivi e note: servono una colonna su Supabase (script SQL mostrato nell'app). */
 const DB_EXTRA = {quotes:false, noteComunicazioni:false};
+let DB_LEADSENT = false; /* colonna inviato_via su leads presente? */
 let DB_DESCHTML = false; /* colonne descrizione_html su orders/quotes presenti su Supabase? */
 let DB_ALLEST = false; /* colonna orders.allestimento_indirizzo presente su Supabase? */
 let DB_CONSEGNATO = false; /* colonna orders.consegnato_il presente su Supabase? */
@@ -3399,6 +3400,8 @@ const DB_EXTRA_SQL = "alter table public.quotes add column if not exists extra j
 async function probeDbExtraColumns(){
   try{ const a=await sb.from("orders").select("id,descrizione_html").limit(1); const b=await sb.from("quotes").select("id,descrizione_html").limit(1); DB_DESCHTML = !a.error && !b.error; }
   catch(e){ DB_DESCHTML = false; }
+  try{ const {error} = await sb.from("leads").select("id,inviato_via").limit(1); DB_LEADSENT = !error; }
+  catch(e){ DB_LEADSENT = false; }
   try{ const {error} = await sb.from("orders").select("id,allestimento_indirizzo").limit(1); DB_ALLEST = !error; }
   catch(e){ DB_ALLEST = false; }
   try{ const {error} = await sb.from("orders").select("id,consegnato_il").limit(1); DB_CONSEGNATO = !error; }
@@ -3449,7 +3452,7 @@ function toDbRow(collection, o){
     case "fixedCosts": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null, file_path:o.filePath||null, file_name:o.fileName||null};
     case "entrate": return {id:o.id, descrizione:o.descrizione||null, importo:Number(o.importo)||0, metodo:o.metodo||null, data:o.data||null};
     case "appuntamenti": return {id:o.id, titolo:o.titolo||null, client_id:o.clientId||null, data:o.data||null, ora:o.ora||null, luogo:o.luogo||null, note:o.note||null};
-    case "leads": return {id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, client_id:o.clientId||null, converted_order_id:o.convertedOrderId||null, converted_at:o.convertedAt||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
+    case "leads": return {...(DB_LEADSENT?{inviato_via:o.inviatoVia||null}:{}), id:o.id, nome:o.nome||null, azienda:o.azienda||null, email:o.email||"", telefono:o.telefono||null, oggetto_richiesta:o.oggettoRichiesta||null, richiesta:o.richiesta||null, stato:o.stato||"Nuovo", fonte:o.fonte||"gmail", gmail_message_id:o.gmailMessageId||null, gmail_thread_id:o.gmailThreadId||null, client_id:o.clientId||null, converted_order_id:o.convertedOrderId||null, converted_at:o.convertedAt||null, creato_il:o.creatoIl||null, aggiornato_il:o.aggiornatoIl||new Date().toISOString()};
     case "noteComunicazioni": return {id:o.id, tipo:o.tipo||"Chiamata", nome_persona:o.nomePersona||null, testo:o.testo||null, operatore:o.operatore||null, fatto:!!o.fatto, creato_il:o.creatoIl||new Date().toISOString(), fatto_il:o.fattoIl||null, ...(DB_EXTRA.noteComunicazioni?{extra:o.extra||{}}:{})};
     case "gmailActionStatus": return {id:o.id, gmail_message_id:o.gmailMessageId, replied:!!o.replied, lead_generated:!!o.leadGenerated, order_generated:!!o.orderGenerated, updated_at:o.updatedAt||new Date().toISOString()};
     case "whatsappMessages": return {id:o.id, whatsapp_message_id:o.whatsappMessageId||null, wa_id:o.waId||null, contact_name:o.contactName||null, from_number:o.fromNumber||null, phone_number_id:o.phoneNumberId||null, display_phone_number:o.displayPhoneNumber||null, direction:o.direction||"inbound", message_type:o.messageType||null, body:o.body||null, message_timestamp:o.messageTimestamp||null, status:o.status||null, raw_payload:o.rawPayload||null, created_at:o.createdAt||null};
@@ -3478,7 +3481,7 @@ function fromDbRow(collection, r){
     case "fixedCosts": return {id:r.id, descrizione:r.descrizione||"", importo:Number(r.importo)||0, metodo:normalizePaymentMethod(r.metodo), data:r.data, filePath:r.file_path||"", fileName:r.file_name||"", createdAt:r.created_at};
     case "entrate": return {id:r.id, descrizione:r.descrizione, importo:Number(r.importo)||0, metodo:normalizePaymentMethod(r.metodo), data:r.data};
     case "appuntamenti": return {id:r.id, titolo:r.titolo, clientId:r.client_id, data:r.data, ora:r.ora, luogo:r.luogo||"", note:r.note||""};
-    case "leads": return {id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
+    case "leads": return {inviatoVia:r.inviato_via||"", id:r.id, nome:r.nome||"", azienda:r.azienda||"", email:r.email||"", telefono:r.telefono||"", oggettoRichiesta:r.oggetto_richiesta||"", richiesta:r.richiesta||"", stato:r.stato||"Nuovo", fonte:r.fonte||"gmail", gmailMessageId:r.gmail_message_id||"", gmailThreadId:r.gmail_thread_id||"", clientId:r.client_id||"", convertedOrderId:r.converted_order_id||"", convertedAt:r.converted_at||"", creatoIl:r.creato_il||"", aggiornatoIl:r.aggiornato_il||""};
     case "noteComunicazioni": return {id:r.id, tipo:r.tipo||"Chiamata", nomePersona:r.nome_persona||"", testo:r.testo||"", operatore:r.operatore||"", fatto:!!r.fatto, creatoIl:r.creato_il||"", fattoIl:r.fatto_il||"", extra:r.extra||{}};
     case "gmailActionStatus": return {id:r.id, gmailMessageId:r.gmail_message_id||"", replied:!!r.replied, leadGenerated:!!r.lead_generated, orderGenerated:!!r.order_generated, updatedAt:r.updated_at||""};
     case "whatsappMessages": return {id:r.id, whatsappMessageId:r.whatsapp_message_id||"", waId:r.wa_id||"", contactName:r.contact_name||"", fromNumber:r.from_number||"", phoneNumberId:r.phone_number_id||"", displayPhoneNumber:r.display_phone_number||"", direction:r.direction||"inbound", messageType:r.message_type||"", body:r.body||"", messageTimestamp:r.message_timestamp||r.created_at||"", status:r.status||"", rawPayload:r.raw_payload||null, createdAt:r.created_at||""};
@@ -5007,15 +5010,51 @@ function leadCardHTML(l){
     ${req ? `<div class="nota-foot" style="margin-bottom:6px;">${escapeHtml(req.slice(0,130))}${req.length > 130 ? "…" : ""}</div>` : ""}
     ${quotes.length ? `<div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;">${quotes.map(q => `<button class="nota-badge" style="border:0;cursor:pointer;" onclick="openQuoteDetail('${q.id}')">📄 ${quoteNumberLabel(q)} · ${fmtMoney(quoteTotals(q).totale)} · ${escapeHtml(q.stato)}</button>`).join("")}</div>` : ""}
     <div class="nota-foot">${fmtLeadDate(l.creatoIl)}${days ? ` · ${days} gg fa` : " · oggi"}</div>
+    <div class="lead-sent">
+      <span class="lead-sent-label">Inviato con</span>
+      ${LEAD_SENT_OPTIONS.map(([k,lab])=>`<button class="lead-sent-chip ${l.inviatoVia===k?'on':''}" data-via="${k}" onclick="setLeadSentVia('${l.id}','${k}')">${lab}</button>`).join("")}
+    </div>
     <div class="nota-actions">
-      <select class="inline" onchange="changeLeadStatusFromSelect('${l.id}',this.value)" title="Sposta">
-        ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s => `<option value="${s}" ${l.stato === s ? "selected" : ""}>${s}</option>`).join("")}
-      </select>
       <button class="btn btn-outline btn-sm" title="Nuovo preventivo" aria-label="Nuovo preventivo" style="padding:6px 10px;font-size:15px;line-height:1;" onclick="newQuoteForLead('${l.id}')">📄</button>
       <button class="btn btn-outline btn-sm" onclick="openLeadDetail('${l.id}')">APRI</button>
       <button class="btn btn-ghost btn-sm" title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" onclick="deleteLead('${l.id}')">🗑</button>
+      <button class="btn btn-ghost btn-sm" title="Segna come perso" style="color:var(--muted);font-size:11.5px;" onclick="changeLeadStatusFromSelect('${l.id}','Perso')">Perso</button>
+    </div>
+    <div class="lead-arrows">
+      ${leadArrowLeft(l)}
+      ${leadArrowRight(l)}
     </div>
   </div>`;
+}
+const LEAD_FLOW = ["Nuovo","In attesa di conferma","Da ricontattare","Accettato"];
+const LEAD_SENT_OPTIONS = [["mail","✉ Mail"],["whatsapp","WhatsApp"],["genya","Genya"]];
+function leadFlowIndex(l){ const i=LEAD_FLOW.indexOf(l.stato); return i<0?0:i; }
+function leadArrowLeft(l){
+  const i=leadFlowIndex(l);
+  if(i===0) return `<span></span>`;
+  if(l.stato==="Accettato") return `<button class="lead-arrow lead-arrow-reopen" title="Riapri il preventivo: torna in “${LEAD_FLOW[i-1]}”" onclick="leadMove('${l.id}',-1)">◀ RIAPRI</button>`;
+  return `<button class="lead-arrow" title="Sposta indietro: “${LEAD_FLOW[i-1]}”" aria-label="Sposta a sinistra" onclick="leadMove('${l.id}',-1)">◀</button>`;
+}
+function leadArrowRight(l){
+  const i=leadFlowIndex(l);
+  if(i>=LEAD_FLOW.length-1) return `<span></span>`;
+  return `<button class="lead-arrow" title="Sposta avanti: “${LEAD_FLOW[i+1]}”" aria-label="Sposta a destra" onclick="leadMove('${l.id}',1)">▶</button>`;
+}
+async function leadMove(id,dir){
+  const l=(state.leads||[]).find(x=>x.id===id); if(!l) return;
+  const i=leadFlowIndex(l)+dir;
+  if(i<0||i>=LEAD_FLOW.length) return;
+  await setLeadStatus(id,LEAD_FLOW[i]);
+}
+async function setLeadSentVia(id,via){
+  const l=(state.leads||[]).find(x=>x.id===id); if(!l) return;
+  if(!DB_LEADSENT){ showToast("Per salvare come è stato inviato serve una riga SQL su Supabase (te la dà Claude)"); return; }
+  const nuovo = l.inviatoVia===via ? "" : via;
+  const old=l.inviatoVia; l.inviatoVia=nuovo;
+  const {error}=await sb.from("leads").update({inviato_via:nuovo||null}).eq("id",id);
+  if(error){ l.inviatoVia=old; console.error(error); showToast("Errore nel salvataggio"); return; }
+  if(currentView==="leads"||currentView==="note") renderLeads();
+  if(currentView==="dashboard") renderDashboard();
 }
 function openLeadWhatsapp(id){
   const l = (state.leads||[]).find(x => x.id === id); if(!l) return;
@@ -5029,6 +5068,16 @@ function renderLeads(){
     document.head.insertAdjacentHTML("beforeend", `<style id="leadBoardStyles">
       .lead-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:14px;align-items:start;margin-bottom:18px;}
       .lead-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;font-weight:800;}
+      .lead-sent{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0 2px;}
+      .lead-sent-label{flex-basis:100%;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-right:2px;}
+      .lead-sent-chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:5px 11px;font:inherit;font-size:12px;font-weight:700;color:var(--text);cursor:pointer;}
+      .lead-sent-chip:hover{border-color:#8EB0ED;background:#F4F8FF;}
+      .lead-sent-chip.on{background:#2B7A8C;border-color:#2B7A8C;color:#fff;}
+      .lead-arrows{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #EDF1F5;}
+      .lead-arrow{border:1px solid var(--border);background:#fff;border-radius:999px;min-width:44px;height:34px;padding:0 14px;font:inherit;font-size:14px;font-weight:800;color:var(--text);cursor:pointer;}
+      .lead-arrow:hover{background:#F4F8FF;border-color:#8EB0ED;}
+      .lead-arrow-reopen{background:#2FA66A;border-color:#2FA66A;color:#fff;font-size:12px;letter-spacing:.04em;}
+      .lead-arrow-reopen:hover{background:#268a57;border-color:#268a57;}
     </style>`);
   }
   const root = document.getElementById("note-leads-part") || document.getElementById("view-leads");
