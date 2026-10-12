@@ -10075,8 +10075,21 @@ function updateQuoteField(id, field, value){
   if(field === "stato") onQuoteStatusChanged(q);
   if(field === "clientId") openQuoteDetail(id);
 }
+/* I vecchi "Dettagli lavorazione" delle singole righe passano nella Descrizione del lavoro (una sola, sotto le righe). */
+function migrateRowDetails(coll, item){
+  if(!item || !Array.isArray(item.righe)) return;
+  const con=item.righe.filter(r=>String(r.descrizione||"").trim());
+  if(!con.length) return;
+  const multi=item.righe.length>1;
+  const add=con.map(r=>{ const t=String(r.descrizione).trim(); const nome=String(r.prodotto||"").trim(); return multi&&nome?`${nome}: ${t}`:t; }).join("\n");
+  const cur=String(item.descrizione||"").trim();
+  if(!cur.includes(add)) item.descrizione=[cur,add].filter(Boolean).join("\n\n");
+  item.righe.forEach(r=>{ if(String(r.descrizione||"").trim()) r.descrizione=""; });
+  saveState(coll);
+}
 function openQuoteDetail(quoteId){
   const q = findItem('quotes', quoteId); if(!q) return;
+  migrateRowDetails('quotes', q);
   const e = quoteExtra(q), P = e.pagamento;
   const rcp = quoteRecipient(q);
   const stBg = {Bozza:"#eef1f5", Inviato:"#fff2cd", Accettato:"#2E9D57", Rifiutato:"#C0392B"}[q.stato] || "#eef1f5";
@@ -12075,6 +12088,7 @@ function setJobAdminPanelOpen(orderId,isOpen){
 function openJobCard(orderId){
   const o = findItem('orders', orderId);
   if(!o) return;
+  migrateRowDetails('orders', o);
 
   if(!jobCardEditSnapshot || jobCardEditSnapshot.orderId!==orderId){
     jobCardEditSnapshot={
