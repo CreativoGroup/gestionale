@@ -9269,8 +9269,8 @@ function moveWorkDescriptionOverflow(orderId, lineId, inputEl){
   if(!r) return;
 
   let value=String(inputEl.value||"");
-  if(coll==="quotes"){
-    // Nei preventivi la riga è libera, senza limite di caratteri: il testo oltre i 30
+  if(true){
+    // Le righe sono libere, senza limite di caratteri: il testo oltre i 30
     // caratteri viene spostato nei dettagli solo quando il preventivo diventa lavorazione.
     value=value.replace(/\s*\n\s*/g," ");
     if(inputEl.tagName==="TEXTAREA"){ inputEl.style.height="auto"; inputEl.style.height=inputEl.scrollHeight+"px"; }
@@ -9332,7 +9332,7 @@ function linesEditor(collection, id, righe, options={}){
                   </select>` : ""}
                 </td>
                 <td class="job-v2-product">
-                  ${collection==='quotes' ? `<textarea class="desc-input" rows="1" style="resize:vertical;min-height:40px;overflow:hidden;"
+                  ${true ? `<textarea class="desc-input" rows="1" style="resize:vertical;min-height:40px;overflow:hidden;"
                     placeholder="Descrizione della voce · scrivi liberamente, senza limite"
                     oninput="moveWorkDescriptionOverflow('${id}','${r.id}',this)"
                     onchange="moveWorkDescriptionOverflow('${id}','${r.id}',this)">${escapeHtml(r.prodotto||'')}</textarea>` : `<input class="desc-input"
@@ -9340,12 +9340,12 @@ function linesEditor(collection, id, righe, options={}){
                     placeholder="Descrizione breve · max 30 caratteri"
                     oninput="moveWorkDescriptionOverflow('${id}','${r.id}',this)"
                     onchange="moveWorkDescriptionOverflow('${id}','${r.id}',this)">`}
-                  <details class="job-v2-desc-toggle">
+                  ${r.descrizione?`<details class="job-v2-desc-toggle">
                     <summary>Dettagli lavorazione ${r.descrizione?`· ${escapeHtml(String(r.descrizione).slice(0,55))}${String(r.descrizione).length>55?'…':''}`:""}</summary>
                     <textarea id="work-detail-${r.id}" class="desc-input" rows="4"
                       placeholder="Materiali, misure, colori, posizione stampa/ricamo, note operative…"
                       onchange="updateRigaField('${collection}','${id}','${r.id}','descrizione',this.value)">${escapeHtml(r.descrizione||'')}</textarea>
-                  </details>
+                  </details>`:""}
                 </td>
                 <td class="num">
                   <input class="num job-v2-qty-input" type="number" min="0" step="1" value="${r.quantita}"
@@ -10134,7 +10134,7 @@ function openQuoteDetail(quoteId){
       <section class="job-v2-card" style="--job-accent:#8a56e8;">
         <div class="job-v2-section-title">
           <h3><span class="job-v2-num">2</span> Lavorazioni (${(q.righe||[]).length})</h3>
-          <div class="job-v2-info-sub">Stesse righe della scheda di lavorazione: categoria · descrizione prodotto · dettagli espandibili</div>
+          <div class="job-v2-info-sub">Stesse righe dell’ordine: categoria · descrizione libera</div>
         </div>
         ${linesEditor('quotes', q.id, q.righe)}
       </section>
@@ -12171,7 +12171,7 @@ function openJobCard(orderId){
       <section class="job-v2-card" style="--job-accent:#8a56e8;">
         <div class="job-v2-section-title">
           <h3><span class="job-v2-num">2</span> Lavorazioni (${(o.righe||[]).length})</h3>
-          <div class="job-v2-info-sub">Categoria predefinita · descrizione prodotto libera · dettagli espandibili</div>
+          <div class="job-v2-info-sub">Categoria · descrizione libera, senza limite</div>
         </div>
         ${orderLinesWithWarehouse(o)}
         <div class="job-v2-desc-block">
@@ -12292,6 +12292,7 @@ function openJobCard(orderId){
       </details>
       <div class="job-v2-bottom-actions">
         <div style="display:flex;gap:9px;flex-wrap:wrap;">
+          <button class="btn btn-outline" onclick="printJobCard('${o.id}')">Stampa</button>
           <button class="btn btn-outline" onclick="duplicateOrder('${o.id}')">Duplica</button>
           <button class="btn btn-primary" onclick="saveJobCard('${o.id}')">Salva</button>
           <button class="btn btn-outline" onclick="cancelJobCard('${o.id}')">Annulla</button>
