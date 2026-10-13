@@ -3640,7 +3640,7 @@ const rawSyncSignatures = {};
 let lastSharedRefresh = 0; /* evita riletture ravvicinate (es. tornando più volte sulla finestra): riduce il traffico verso Supabase */
 async function refreshSharedDataFromSupabase(render=true){
   if(!currentUser || dataSyncBusy || activeDbWrites>0) return;
-  if(Date.now()-lastSharedRefresh < 30000) return;
+  if(Date.now()-lastSharedRefresh < 120000) return;
   lastSharedRefresh=Date.now();
   dataSyncBusy=true;
   try{
@@ -3670,7 +3670,7 @@ function startDataAutoRefresh(){
   if(dataSyncTimer) clearInterval(dataSyncTimer);
   dataSyncTimer=setInterval(()=>{
     if(document.visibilityState==="visible") refreshSharedDataFromSupabase(true);
-  },60000);
+  },180000);
   if(!dataSyncListenersInstalled){
     dataSyncListenersInstalled=true;
     window.addEventListener("focus",()=>refreshSharedDataFromSupabase(true));
@@ -6631,7 +6631,7 @@ setInterval(()=>{
   if(currentView==="whatsapp" && !document.hidden){
     refreshWhatsappInbox(true);
   }
-},20000);
+},60000);
 function deleteWhatsappConversation(waId){
   const conv=whatsappConversationGroups().find(x=>x.waId===waId);
   if(!conv) return;
@@ -7250,7 +7250,7 @@ async function refreshInstagram(silent=true){
   if(currentView==="instagram") renderInstagram();
   if(!silent) showToast("Instagram aggiornato");
 }
-setInterval(()=>{ if(currentView==="instagram" && !document.hidden) refreshInstagram(true); },20000);
+setInterval(()=>{ if(currentView==="instagram" && !document.hidden) refreshInstagram(true); },60000);
 function selectInstagramConversation(id){ igSelected=String(id||""); igMobileChat=true; renderInstagram(); }
 function igBack(){ igMobileChat=false; renderInstagram(); }
 async function sendInstagramReply(id){
