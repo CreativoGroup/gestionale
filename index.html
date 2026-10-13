@@ -4118,7 +4118,7 @@ function openBozzaMail(orderId){
 
   const email=String(c.email||'').trim();
   const riferimento=String(o.numero||o.id);
-  const subject=`Bozza grafica · ordine ${riferimento}`;
+  const subject=`Bozza grafica - ordine ${riferimento}`;
   const body=bozzaText(salutoCliente(c));
 
   document.getElementById("modalBody").innerHTML=`
