@@ -11309,11 +11309,26 @@ async function jobDropboxMove(orderId,pathEnc,nameEnc,fromFolder,toFolder){
   const name=decodeURIComponent(nameEnc);
   const base=jobDropboxBasePath(o);
   try{
+    const fromPath=decodeURIComponent(pathEnc);
+    const toPath=`${base}/${toFolder}/${name}`;
+    let moved=false;
+    try{
+      showToast("Sposto il file…");
+      await dropboxApi("files/move_v2",{from_path:fromPath,to_path:toPath,autorename:true});
+      moved=true;
+    }catch(e){
+      console.warn("Spostamento Dropbox non disponibile, copio",e);
+    }
+    if(moved){
+      showToast(`Spostato in ${toFolder.replace("FILE ","").toLowerCase()}`);
+      jobDropboxRefresh(orderId);
+      return;
+    }
+    // Se la funzione Dropbox non permette di spostare, ripiego sulla copia (scarico e ricarico).
     showToast("Copio il file…");
-    // La funzione Dropbox del gestionale non permette di spostare: scarico e ricarico nell'altra cartella.
-    const blob=await dropboxFetchContent(decodeURIComponent(pathEnc));
-    await dropboxUploadBlob(`${base}/${toFolder}/${name}`,blob);
-    showToast(`Copiato anche in ${toFolder.replace("FILE ","").toLowerCase()}`);
+    const blob=await dropboxFetchContent(fromPath);
+    await dropboxUploadBlob(toPath,blob);
+    showToast(`Copiato anche in ${toFolder.replace("FILE ","").toLowerCase()} (l'originale resta)`);
     jobDropboxCountBadges(orderId);
   }catch(err){
     console.error("Dropbox copia",err);
