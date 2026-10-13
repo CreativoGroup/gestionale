@@ -2226,6 +2226,10 @@
   .wa-conv-btn{width:100%;text-align:left;border:0;border-bottom:1px solid var(--border);padding:14px 16px;cursor:pointer;background:#fff}
   .wa-conv-btn:hover{background:#F8FAFC}
   .wa-conv-btn.active{background:#F0FDF4}
+  .wa-conv-btn.unread{background:#EAF3FF;box-shadow:inset 4px 0 0 #2F80ED}
+  .wa-conv-btn.unread:hover{background:#DFEDFF}
+  .wa-conv-btn.unread .wa-conv-name,.wa-conv-btn.unread .wa-conv-last{color:#173B6B;font-weight:800}
+  .wa-conv-btn.unread.active{background:#F0FDF4}
   .wa-conv-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
   .wa-conv-name{font-weight:850;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .wa-conv-time{font-size:10.5px;color:var(--muted);white-space:nowrap}
@@ -6482,6 +6486,24 @@ function waMarkRead(g){
   if(m[g.waId]===last.id) return;
   m[g.waId]=last.id; waSaveReadMap(m);
 }
+function waConvUnread(g){
+  try{
+    const l=waLastMessage(g); if(!l || l.direction!=="inbound") return false;
+    if(g.waId===selectedWhatsappWaId && currentView==="whatsapp" && !document.hidden && (!isMobileUI()||waMobileChat)) return false;
+    const lt=Date.parse(l.messageTimestamp||l.createdAt||"");
+    if(Number.isFinite(lt) && sharedReadAt("wa-read",g.waId)>=lt) return false;
+    return waReadMap()[g.waId]!==l.id;
+  }catch(e){ return false; }
+}
+function igConvUnread(c){
+  try{
+    const m=c.messages[c.messages.length-1]; if(!m || m.direction!=="inbound") return false;
+    if(c.id===igSelected && currentView==="instagram" && !document.hidden && (!isMobileUI()||igMobileChat)) return false;
+    const lt=Date.parse(m.message_timestamp||m.created_at||"");
+    if(Number.isFinite(lt) && sharedReadAt("ig-read",c.id)>=lt) return false;
+    return igReadMap()[c.id]!==m.id;
+  }catch(e){ return false; }
+}
 function whatsappUnreadCount(){
   if(!(state.whatsappMessages||[]).length) return 0;
   const groups=whatsappConversationGroups();
@@ -7000,7 +7022,7 @@ function renderWhatsappInner(){
 
             return `<button
               onclick="selectWhatsappConversation('${escapeHtml(c.waId)}')"
-              class="wa-conv-btn ${isActive?"active":""}"
+              class="wa-conv-btn ${isActive?"active":""} ${waConvUnread(c)?"unread":""}"
             >
               <div class="wa-conv-top">
                 <div class="wa-conv-name">${escapeHtml(c.name||c.phone||c.waId)}</div>
@@ -7325,7 +7347,7 @@ function renderInstagram(){
       <div class="card wa-sidebar">
         <div class="wa-sidebar-head"><div style="font-weight:850;">Conversazioni (${convs.length})</div></div>
         <div class="wa-conv-list">
-          ${convs.map(c=>{const l=c.messages[c.messages.length-1];return `<button onclick="selectInstagramConversation('${escapeHtml(c.id)}')" class="wa-conv-btn ${c.id===igSelected?"active":""}">
+          ${convs.map(c=>{const l=c.messages[c.messages.length-1];return `<button onclick="selectInstagramConversation('${escapeHtml(c.id)}')" class="wa-conv-btn ${c.id===igSelected?"active":""} ${igConvUnread(c)?"unread":""}">
             <div class="wa-conv-top"><div class="wa-conv-name">${escapeHtml(igTitle(c))}</div><div class="wa-conv-time">${waDateLabel(l.message_timestamp||l.created_at)}</div></div>
             ${c.username?`<div class="wa-conv-phone">@${escapeHtml(c.username)}</div>`:""}
             <div class="wa-conv-last">${l.direction==="outbound"?"Tu: ":""}${escapeHtml(l.body||"[messaggio]")}</div></button>`;}).join("")}
