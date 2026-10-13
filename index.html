@@ -4998,10 +4998,18 @@ function leadAgeDays(l){
 }
 /* Allegato di un lead nato da una nota: il testo contiene "Allegato della nota: NOME (Dropbox › Allegati note)" */
 function leadReqParse(text){
+  let raw=String(text||""); const files=[];
+  raw=raw.replace(/\n*\{\{FILE:(.+?)\|\|(.*?)\}\}/g,(m,p,n)=>{ files.push({path:p.trim(),name:(n||"").trim()||"allegato"}); return ""; });
+  const m=raw.match(/\n*Allegato della nota: (.+?) \(Dropbox › Allegati note\)(?: \{\{ALL:(.+?)\}\})?/);
+  if(m){ files.unshift({name:m[1].trim(),path:(m[2]||"").trim()}); raw=raw.replace(m[0],""); }
+  return {text:raw.trim(),att:files[0]||null,files};
+}
+/* la parte finale della richiesta che contiene gli allegati (da conservare quando si modifica il testo) */
+function leadReqTail(text){
   const raw=String(text||"");
   const m=raw.match(/\n*Allegato della nota: (.+?) \(Dropbox › Allegati note\)(?: \{\{ALL:(.+?)\}\})?/);
-  if(!m) return {text:raw,att:null};
-  return {text:raw.replace(m[0],"").trim(),att:{name:m[1].trim(),path:(m[2]||"").trim()}};
+  const f=raw.match(/\{\{FILE:.+?\|\|.*?\}\}/g)||[];
+  return (m?"\n\n"+m[0].trim():"")+f.map(x=>"\n"+x).join("");
 }
 async function leadAttResolvePath(att){
   if(att.path) return att.path;
@@ -5012,9 +5020,9 @@ async function leadAttResolvePath(att){
   if(!files.length) throw new Error("File non trovato in Dropbox › Allegati note");
   return files[0].path_display || files[0].path_lower || files[0].id;
 }
-async function leadAttOpen(leadId,mode){
+async function leadAttOpen(leadId,mode,idx){
   const l=(state.leads||[]).find(x=>x.id===leadId); if(!l) return;
-  const att=leadReqParse(l.richiesta).att; if(!att) return;
+  const att=leadReqParse(l.richiesta).files[Number(idx)||0]; if(!att) return;
   try{
     const path=await leadAttResolvePath(att);
     if(mode==="download") await dropboxDownloadFile(path,att.name);
@@ -5023,6 +5031,47 @@ async function leadAttOpen(leadId,mode){
     console.error("Allegato lead",err);
     showToast(err?.message||"Impossibile aprire l'allegato");
   }
+}
+async function leadAttAdd(leadId,input){
+  const l=(state.leads||[]).find(x=>x.id===leadId);
+  const files=Array.from(input?.files||[]); if(!l||!files.length) return;
+  showToast("Carico l'allegato su Dropbox…");
+  const before=l.richiesta; let add="";
+  try{
+    for(const f of files){
+      const safe=(typeof dropboxSafePathPart==="function"?dropboxSafePathPart(f.name):f.name).replace(/\s+/g," ").trim().slice(-100)||"allegato";
+      const path=`/Allegati lead/${new Date().toISOString().slice(0,10)}-${Date.now()}-${safe}`;
+      await dropboxUploadBlob(path,f);
+      add+=`\n{{FILE:${path}||${f.name.replace(/[{}|]/g," ")}}}`;
+    }
+  }catch(err){
+    console.error("Allegato lead",err);
+    showToast(err?.message||"Impossibile caricare l'allegato su Dropbox");
+    if(!add) return;
+  }
+  l.richiesta=String(l.richiesta||"")+add;
+  const saved=await upsertOneReturning("leads",l);
+  if(!saved){ l.richiesta=before; showToast("Errore salvataggio allegato"); return; }
+  const i=state.leads.findIndex(x=>x.id===leadId); if(i>=0) state.leads[i]=saved;
+  showToast("Allegato aggiunto");
+  openLeadDetail(leadId);
+}
+async function leadAttRemove(leadId,idx){
+  const l=(state.leads||[]).find(x=>x.id===leadId); if(!l) return;
+  const f=leadReqParse(l.richiesta).files[Number(idx)]; if(!f) return;
+  askConfirm(`Togliere "${f.name}" da questo lead? Il file resta su Dropbox.`,async()=>{
+    const before=l.richiesta;
+    const esc=x=>String(x).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+    let r=String(l.richiesta||"");
+    const re1=new RegExp("\\n*\\{\\{FILE:"+esc(f.path)+"\\|\\|.*?\\}\\}");
+    if(re1.test(r)) r=r.replace(re1,"");
+    else r=r.replace(/\n*Allegato della nota: (.+?) \(Dropbox › Allegati note\)(?: \{\{ALL:(.+?)\}\})?/,"");
+    l.richiesta=r;
+    const saved=await upsertOneReturning("leads",l);
+    if(!saved){ l.richiesta=before; showToast("Errore"); return; }
+    const k=state.leads.findIndex(x=>x.id===leadId); if(k>=0) state.leads[k]=saved;
+    openLeadDetail(leadId);
+  });
 }
 function leadCardHTML(l){
   const quotes = leadQuotes(l.id);
@@ -5041,6 +5090,7 @@ function leadCardHTML(l){
     <div class="nota-foot">${escapeHtml([l.email, l.telefono].filter(Boolean).join(" · ") || "—")}</div>
     ${l.oggettoRichiesta ? `<div class="nota-text" style="margin-bottom:4px;"><strong>${escapeHtml(l.oggettoRichiesta)}</strong></div>` : ""}
     ${req ? `<div class="nota-foot" style="margin-bottom:6px;">${escapeHtml(req.slice(0,130))}${req.length > 130 ? "…" : ""}</div>` : ""}
+    ${leadReqParse(l.richiesta).files.length ? `<div class="nota-foot" style="margin:4px 0;">📎 ${leadReqParse(l.richiesta).files.length} allegat${leadReqParse(l.richiesta).files.length>1?"i":"o"}</div>` : ""}
     ${quotes.length ? `<div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;">${quotes.map(q => `<button class="nota-badge" style="border:0;cursor:pointer;" onclick="openQuoteDetail('${q.id}')">📄 ${quoteNumberLabel(q)} · ${fmtMoney(quoteTotals(q).totale)} · ${escapeHtml(q.stato)}</button>`).join("")}</div>` : ""}
     <div class="nota-foot">${fmtLeadDate(l.creatoIl)}${days ? ` · ${days} gg fa` : " · oggi"}</div>
     <div class="nota-actions">
@@ -5486,7 +5536,7 @@ function openLeadDetail(id){
       <div class="lead-detail-box"><small>Telefono</small>${escapeHtml(l.telefono||"—")}</div>
       <div class="lead-detail-box"><small>Azienda</small>${escapeHtml(l.azienda||"—")}</div>
       <div class="lead-detail-box"><small>Oggetto</small>${escapeHtml(l.oggettoRichiesta||"—")}</div>
-      <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(leadReqParse(l.richiesta).text||"—")}</div>${(()=>{const a=leadReqParse(l.richiesta).att; return a?`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-weight:700;">📎 ${escapeHtml(a.name)}</span><button class="btn btn-outline btn-sm" onclick="leadAttOpen('${l.id}','view')">Apri</button><button class="btn btn-outline btn-sm" onclick="leadAttOpen('${l.id}','download')">Scarica</button></div>`:"";})()}</div>
+      <div class="lead-detail-box" style="grid-column:1/-1;"><small>Richiesta</small><div class="lead-detail-request">${escapeHtml(leadReqParse(l.richiesta).text||"—")}</div>${(()=>{const fs=leadReqParse(l.richiesta).files; return `<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">${fs.map((a,k)=>`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-weight:700;">📎 ${escapeHtml(a.name)}</span><button class="btn btn-outline btn-sm" onclick="leadAttOpen('${l.id}','view',${k})">Apri</button><button class="btn btn-outline btn-sm" onclick="leadAttOpen('${l.id}','download',${k})">Scarica</button><button class="btn btn-ghost btn-sm" title="Togli dal lead" onclick="leadAttRemove('${l.id}',${k})">✕</button></div>`).join("")}<div><input type="file" multiple id="lead-att-input" style="display:none" onchange="leadAttAdd('${l.id}',this)"><button class="btn btn-outline btn-sm" onclick="document.getElementById('lead-att-input').click()">📎 Allega file</button></div></div>`;})()}</div>
     </div>
     ${l.gmailMessageId ? `<div id="lead-gm-att" style="margin-top:14px;"></div>` : ""}
     ${!isNewCustomerOrder ? `<div class="modal-section" style="margin:16px 0 0;padding:14px 18px;">
@@ -5555,7 +5605,7 @@ function openEditLead(id){
           ${["Nuovo","In attesa di conferma","Da ricontattare","Accettato","Perso"].map(s=>`<option value="${s}" ${l.stato===s?"selected":""}>${s}</option>`).join("")}
         </select>
       </div>
-      <div class="field" style="grid-column:1/-1;"><label>Richiesta</label><textarea id="edit-lead-richiesta" rows="5">${escapeHtml(l.richiesta||'')}</textarea></div>
+      <div class="field" style="grid-column:1/-1;"><label>Richiesta</label><textarea id="edit-lead-richiesta" rows="5">${escapeHtml(leadReqParse(l.richiesta).text||'')}</textarea></div>
     </div>
 
     <div class="form-actions" style="margin-top:16px;">
@@ -5596,7 +5646,7 @@ async function saveLeadEdit(id,chiudi){
   l.email=String(document.getElementById("edit-lead-email")?.value||"").trim().toLowerCase();
   l.telefono=String(document.getElementById("edit-lead-telefono")?.value||"").trim();
   l.oggettoRichiesta=String(document.getElementById("edit-lead-oggetto")?.value||"").trim();
-  l.richiesta=String(document.getElementById("edit-lead-richiesta")?.value||"").trim();
+  l.richiesta=String(document.getElementById("edit-lead-richiesta")?.value||"").trim()+leadReqTail(before.richiesta);
 
   if(!l.clientId && !l.convertedOrderId){
     l.stato=String(document.getElementById("edit-lead-stato")?.value||l.stato||"Nuovo");
