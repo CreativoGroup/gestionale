@@ -5554,7 +5554,7 @@ function openLeadDetail(id){
         linkedClient
           ? `<button class="btn btn-primary" style="border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" onclick="completeNewCustomerOrderWithClient('${l.id}','${linkedClient.id}')">✓ CREA ORDINE</button>`
           : `<button class="btn btn-primary" style="border-radius:999px;padding:12px 20px;font-weight:900;box-shadow:0 6px 16px rgba(240,91,55,.20);" onclick="transformLeadToClient('${l.id}', true)">✓ CREA CLIENTE E ORDINE</button>
-             <button class="btn btn-outline" style="border-radius:999px;padding:11px 18px;font-weight:800;" onclick="linkLeadToExistingClient('${l.id}')">↗ USA CLIENTE ESISTENTE E CREA ORDINE</button>`
+             <button class="btn btn-outline" style="border-radius:999px;padding:11px 18px;font-weight:800;" onclick="linkLeadToExistingClient('${l.id}')">↗ COLLEGA CLIENTE E CREA ORDINE</button>`
       ) : (!isNewCustomerOrder && !l.convertedOrderId ? `
         <button class="btn btn-primary" onclick="convertLeadToOrder('${l.id}')">Converti in ordine</button>
       ` : "")}
