@@ -9315,19 +9315,17 @@ function magazzinoAllowedCategorie(o){
   (o.righe||[]).forEach(r=>{
     const prodotto=String(r.prodotto||"").trim();
 
-    // STAMPA: mostra Prodotto/Magazzino per TUTTI,
-    // esclusivamente quando il prodotto è "Tessuto del cliente".
+    // STAMPA: il Prodotto/Magazzino è sempre disponibile (anche con tessuto del cliente o riga ancora vuota).
     if(r.categoria==="Stampa"){
-      if(!prodotto || prodotto==="Tessuto del cliente") return;
+      if(!prodotto || prodotto==="Tessuto del cliente"){ set.add("*"); return; }
       if(prodotto==="Altro") set.add("Altro tessuto");
       else if(directMap.has(prodotto)) set.add(prodotto);
       else set.add("*");
     }
 
-    // RICAMO: mostra Prodotto/Magazzino per TUTTI,
-    // esclusivamente quando il prodotto è "Patch".
+    // RICAMO: il Prodotto/Magazzino è sempre disponibile (anche con patch o riga ancora vuota).
     if(r.categoria==="Ricamo"){
-      if(!prodotto || prodotto==="Patch") return;
+      if(!prodotto || prodotto==="Patch"){ set.add("*"); return; }
       if(prodotto==="Altro") set.add("Altro tessuto");
       else if(directMap.has(prodotto)) set.add(prodotto);
       else set.add("*");
