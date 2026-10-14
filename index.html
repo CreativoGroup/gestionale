@@ -11294,7 +11294,7 @@ async function jobDropboxLoad(orderId,folder){
           <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;">
             <button class="btn btn-outline btn-sm" onclick="completedSheetPreviewDropboxFile('${safePath}','${safeName}')">Visualizza</button>
             <button class="btn btn-outline btn-sm" onclick="jobDropboxDownloadEncoded('${safePath}','${safeName}')">Scarica</button>
-            <button class="btn btn-ghost btn-sm" title="Elimina definitivamente" aria-label="Elimina definitivamente" style="color:var(--danger);" onclick="jobDropboxDelete('${orderId}','${safePath}','${safeName}')">🗑</button>
+            <button class="btn btn-outline btn-sm" title="Elimina definitivamente" aria-label="Elimina definitivamente" style="border-color:var(--danger);color:var(--danger);" onclick="jobDropboxDelete('${orderId}','${safePath}','${safeName}')">🗑 Elimina</button>
             ${JOB_DROPBOX_SUBFOLDERS.filter(f=>f!==selected).map(f=>`<button class="jdb-mv" data-tone="${jobDropboxTone(f)}" title="Copia anche in ${escapeHtml(f.replace("FILE ","").toLowerCase())}" onclick="jobDropboxMove('${orderId}','${safePath}','${safeName}','${escapeHtml(selected)}','${escapeHtml(f)}')">➜ <i></i>${escapeHtml(f.replace("FILE ",""))}</button>`).join("")}
           </div>
         </div>`;
