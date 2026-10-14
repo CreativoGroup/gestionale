@@ -5450,7 +5450,7 @@ function openManualLeadForm(prefill={}){
     <p style="color:var(--muted);margin-top:0;">Inserisci i dati della richiesta.</p>
     <div class="lead-form-grid">
       <div class="lead-field"><label>Nome / referente</label><input id="manual-lead-nome" value="${escapeHtml(prefill.nome||'')}"></div>
-      <div class="lead-field"><label>Azienda</label><input id="manual-lead-azienda" value="${escapeHtml(prefill.azienda||'')}"></div>
+      <div class="lead-field" style="position:relative;"><label>Azienda</label><input id="manual-lead-azienda" autocomplete="off" placeholder="Scrivi o scegli tra i tuoi clienti" value="${escapeHtml(prefill.azienda||'')}" oninput="leadClientSearch(this.value,'manual-lead')" onfocus="leadClientSearch(this.value,'manual-lead',true)" onblur="setTimeout(()=>{const b=document.getElementById('manual-lead-results');if(b)b.innerHTML='';},200)"><div id="manual-lead-results" style="position:absolute;left:0;right:0;top:100%;z-index:50;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);overflow:hidden;"></div><small id="manual-lead-linked" style="color:#1F8A55;font-weight:700;"></small></div>
       <div class="lead-field"><label>Email</label><input id="manual-lead-email" type="email" value="${escapeHtml(prefill.email||'')}"></div>
       <div class="lead-field"><label>Telefono</label><input id="manual-lead-telefono" value="${escapeHtml(prefill.telefono||'')}"></div>
       <div class="lead-field full"><label>Oggetto richiesta</label><input id="manual-lead-oggetto" value="${escapeHtml(prefill.oggettoRichiesta||'')}"></div>
@@ -5595,7 +5595,7 @@ function openEditLead(id){
 
     <div class="form-grid">
       <div class="field"><label>Nome</label><input id="edit-lead-nome" value="${escapeHtml(l.nome||'')}"></div>
-      <div class="field" style="position:relative;"><label>Azienda</label><input id="edit-lead-azienda" autocomplete="off" placeholder="Scrivi per cercare tra i tuoi clienti" value="${escapeHtml(l.azienda||'')}" oninput="leadClientSearch(this.value)" onblur="setTimeout(()=>{const b=document.getElementById('edit-lead-results');if(b)b.innerHTML='';},200)"><div id="edit-lead-results" style="position:absolute;left:0;right:0;top:100%;z-index:50;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);overflow:hidden;"></div><small id="edit-lead-linked" style="color:#1F8A55;font-weight:700;"></small></div>
+      <div class="field" style="position:relative;"><label>Azienda</label><input id="edit-lead-azienda" autocomplete="off" placeholder="Scrivi per cercare tra i tuoi clienti" value="${escapeHtml(l.azienda||'')}" oninput="leadClientSearch(this.value,'edit-lead')" onfocus="leadClientSearch(this.value,'edit-lead',true)" onblur="setTimeout(()=>{const b=document.getElementById('edit-lead-results');if(b)b.innerHTML='';},200)"><div id="edit-lead-results" style="position:absolute;left:0;right:0;top:100%;z-index:50;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);overflow:hidden;"></div><small id="edit-lead-linked" style="color:#1F8A55;font-weight:700;"></small></div>
       <div class="field"><label>Email</label><input id="edit-lead-email" type="email" value="${escapeHtml(l.email||'')}"></div>
       <div class="field"><label>Telefono</label><input id="edit-lead-telefono" value="${escapeHtml(l.telefono||'')}"></div>
       <div class="field" style="grid-column:1/-1;"><label>Oggetto</label><input id="edit-lead-oggetto" value="${escapeHtml(l.oggettoRichiesta||'')}"></div>
@@ -5616,24 +5616,30 @@ function openEditLead(id){
   `;
 }
 
-function leadClientSearch(q){
-  const box=document.getElementById("edit-lead-results"); if(!box) return;
-  const lk=document.getElementById("edit-lead-linked"); if(lk) lk.textContent="";
+function leadClientSearch(q,pre,showAll){
+  pre=pre||"edit-lead";
+  const box=document.getElementById(pre+"-results"); if(!box) return;
+  const lk=document.getElementById(pre+"-linked"); if(lk) lk.textContent="";
   const n=clientSearchNorm(q);
-  if(!n){ box.innerHTML=""; return; }
-  const list=state.clients.filter(c=>{
+  if(!n && !showAll){ box.innerHTML=""; return; }
+  let list=(state.clients||[]).filter(c=>{
+    if(!n) return true;
     const hay=clientSearchNorm([clientDisplayName(c),c.ragioneSociale,c.nomeCommerciale,c.refNome,c.refCognome,c.nome,c.cognome,c.telefono,c.email].join(" "));
     return n.split(/\s+/).every(t=>hay.includes(t));
-  }).slice(0,6);
-  box.innerHTML=list.map(c=>`<div style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #EDF1F5;font-size:14px;" onmousedown="event.preventDefault();leadClientPick('${c.id}')"><b>${escapeHtml(clientDisplayName(c))}</b>${c.telefono?` <small style="color:var(--muted);">${escapeHtml(c.telefono)}</small>`:""}</div>`).join("");
+  });
+  if(!n) list=list.sort((a,b)=>clientDisplayName(a).localeCompare(clientDisplayName(b),"it"));
+  list=list.slice(0,8);
+  box.innerHTML=list.length ? list.map(c=>`<div style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #EDF1F5;font-size:14px;" onmousedown="event.preventDefault();leadClientPick('${c.id}','${pre}')"><b>${escapeHtml(clientDisplayName(c))}</b>${c.telefono?` <small style="color:var(--muted);">${escapeHtml(c.telefono)}</small>`:""}</div>`).join("") : `<div style="padding:9px 12px;font-size:13px;color:var(--muted);">Nessun cliente trovato</div>`;
 }
-function leadClientPick(id){
+function leadClientPick(id,pre){
+  pre=pre||"edit-lead";
   const c=state.clients.find(x=>x.id===id); if(!c) return;
-  const set=(i,v,onlyEmpty)=>{const el=document.getElementById(i); if(el && (!onlyEmpty || !String(el.value||"").trim())) el.value=v;};
-  set("edit-lead-azienda",clientDisplayName(c));
-  set("edit-lead-email",c.email||"",true); set("edit-lead-telefono",c.telefono||"",true);
-  const lk=document.getElementById("edit-lead-linked"); if(lk) lk.textContent="✓ Cliente in anagrafica";
-  const box=document.getElementById("edit-lead-results"); if(box) box.innerHTML="";
+  const set=(k,v,onlyEmpty)=>{const el=document.getElementById(pre+"-"+k); if(el && (!onlyEmpty || !String(el.value||"").trim())) el.value=v;};
+  set("azienda",clientDisplayName(c));
+  set("nome",[c.refNome,c.refCognome].filter(Boolean).join(" "),true);
+  set("email",c.email||"",true); set("telefono",c.telefono||"",true);
+  const lk=document.getElementById(pre+"-linked"); if(lk) lk.textContent="✓ Cliente in anagrafica";
+  const box=document.getElementById(pre+"-results"); if(box) box.innerHTML="";
 }
 async function saveLeadEdit(id,chiudi){
   const l=(state.leads||[]).find(x=>x.id===id);
