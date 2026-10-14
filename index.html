@@ -10938,7 +10938,8 @@ async function dropboxLoadFolder(path=""){
   try{
     const data=await dropboxApi("files/list_folder",{path:dropboxCurrentPath,recursive:false,include_deleted:false});
     dropboxServerConnected=true;
-    const entries=(data.entries||[]).sort((a,b)=>{
+    const atRoot=!dropboxCurrentPath || dropboxCurrentPath==="/";
+    const entries=(data.entries||[]).filter(x=>!(atRoot && x[".tag"]==="folder" && ["allegati lead","allegati note"].includes(String(x.name||"").toLowerCase()))).sort((a,b)=>{
       const af=a[".tag"]==="folder"?0:1, bf=b[".tag"]==="folder"?0:1;
       return af-bf || String(a.name||"").localeCompare(String(b.name||""),"it");
     });
@@ -11293,6 +11294,7 @@ async function jobDropboxLoad(orderId,folder){
           <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;">
             <button class="btn btn-outline btn-sm" onclick="completedSheetPreviewDropboxFile('${safePath}','${safeName}')">Visualizza</button>
             <button class="btn btn-outline btn-sm" onclick="jobDropboxDownloadEncoded('${safePath}','${safeName}')">Scarica</button>
+            <button class="btn btn-ghost btn-sm" title="Elimina definitivamente" aria-label="Elimina definitivamente" style="color:var(--danger);" onclick="jobDropboxDelete('${orderId}','${safePath}','${safeName}')">🗑</button>
             ${JOB_DROPBOX_SUBFOLDERS.filter(f=>f!==selected).map(f=>`<button class="jdb-mv" data-tone="${jobDropboxTone(f)}" title="Copia anche in ${escapeHtml(f.replace("FILE ","").toLowerCase())}" onclick="jobDropboxMove('${orderId}','${safePath}','${safeName}','${escapeHtml(selected)}','${escapeHtml(f)}')">➜ <i></i>${escapeHtml(f.replace("FILE ",""))}</button>`).join("")}
           </div>
         </div>`;
@@ -11303,6 +11305,54 @@ async function jobDropboxLoad(orderId,folder){
   }
 }
 
+function jobDropboxDelete(orderId,pathEnc,nameEnc){
+  const name=decodeURIComponent(nameEnc);
+  askConfirm(`Eliminare definitivamente "${name}" da Dropbox? L'operazione non si può annullare dal gestionale.`,async()=>{
+    try{
+      await dropboxApi("files/delete_v2",{path:decodeURIComponent(pathEnc)});
+      showToast("File eliminato");
+      jobDropboxRefresh(orderId);
+    }catch(err){
+      console.error("Dropbox elimina",err);
+      const msg=String(err?.message||"");
+      showToast(/non consentita/i.test(msg) ? "Eliminazione non ancora abilitata: aggiorna la funzione dropbox-api su Supabase" : "Non riesco a eliminare il file: "+(msg||"errore Dropbox"));
+    }
+  });
+}
+/* Alla conversione di un lead in ordine, i suoi allegati passano nella cartella dell'ordine (FILE RICEVUTI). */
+async function leadFilesToOrder(leadId,orderId,tentativo=0){
+  try{
+    const l=(state.leads||[]).find(x=>x.id===leadId); if(!l) return;
+    const files=leadReqParse(l.richiesta).files; if(!files.length) return;
+    const o=findItem("orders",orderId);
+    if(!o){ if(tentativo<4) setTimeout(()=>leadFilesToOrder(leadId,orderId,tentativo+1),2000); return; }
+    if(typeof dropboxIsConnected==="function" && !dropboxIsConnected()) return;
+    let spostati=0, rest=String(l.richiesta||"");
+    for(const f of files){
+      try{
+        const from=await leadAttResolvePath(f);
+        const to=`${jobDropboxBasePath(o)}/FILE RICEVUTI/${jobDropboxFileName(o,f.name)}`;
+        try{
+          await dropboxApi("files/move_v2",{from_path:from,to_path:to,autorename:true});
+        }catch(e){
+          const blob=await dropboxFetchContent(from);
+          await dropboxUploadBlob(to,blob);
+        }
+        spostati++;
+        const esc=x=>String(x).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+        const re1=new RegExp("\\n*\\{\\{FILE:"+esc(f.path)+"\\|\\|.*?\\}\\}");
+        if(re1.test(rest)) rest=rest.replace(re1,"");
+        else rest=rest.replace(/\n*Allegato della nota: (.+?) \(Dropbox › Allegati note\)(?: \{\{ALL:(.+?)\}\})?/,"");
+      }catch(err){ console.warn("Allegato lead → ordine",f.name,err); }
+    }
+    if(spostati){
+      l.richiesta=rest;
+      await upsertOne("leads",l);
+      showToast(`${spostati} allegat${spostati>1?"i":"o"} spostat${spostati>1?"i":"o"} nell'ordine (File ricevuti)`);
+      jobDropboxRefresh(orderId);
+    }
+  }catch(err){ console.warn("leadFilesToOrder",err); }
+}
 async function jobDropboxMove(orderId,pathEnc,nameEnc,fromFolder,toFolder){
   const o=findItem("orders",orderId);
   if(!o) return;
@@ -11574,6 +11624,7 @@ async function markLeadConvertedToOrder(leadId, clientId, orderId){
   l.convertedOrderId=orderId;
   l.convertedAt=nowIso;
   l.aggiornatoIl=nowIso;
+  setTimeout(()=>leadFilesToOrder(leadId,orderId),1500);
   return true;
 }
 
