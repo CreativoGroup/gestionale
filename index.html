@@ -11310,19 +11310,19 @@ async function jobDropboxLoad(orderId,folder){
   }
 }
 
-function jobDropboxDelete(orderId,pathEnc,nameEnc){
+async function jobDropboxDelete(orderId,pathEnc,nameEnc){
   const name=decodeURIComponent(nameEnc);
-  askConfirm(`Eliminare definitivamente "${name}" da Dropbox? L'operazione non si può annullare dal gestionale.`,async()=>{
-    try{
-      await dropboxApi("files/delete_v2",{path:decodeURIComponent(pathEnc)});
-      showToast("File eliminato");
-      jobDropboxRefresh(orderId);
-    }catch(err){
-      console.error("Dropbox elimina",err);
-      const msg=String(err?.message||"");
-      showToast(/non consentita/i.test(msg) ? "Eliminazione non ancora abilitata: aggiorna la funzione dropbox-api su Supabase" : "Non riesco a eliminare il file: "+(msg||"errore Dropbox"));
-    }
-  });
+  /* conferma semplice del browser: la scheda di lavoro resta aperta */
+  if(!window.confirm(`Eliminare definitivamente "${name}" da Dropbox?\nL'operazione non si può annullare dal gestionale.`)) return;
+  try{
+    await dropboxApi("files/delete_v2",{path:decodeURIComponent(pathEnc)});
+    showToast("File eliminato");
+    jobDropboxRefresh(orderId);
+  }catch(err){
+    console.error("Dropbox elimina",err);
+    const msg=String(err?.message||"");
+    showToast(/non consentita/i.test(msg) ? "Eliminazione non ancora abilitata: aggiorna la funzione dropbox-api su Supabase" : "Non riesco a eliminare il file: "+(msg||"errore Dropbox"));
+  }
 }
 /* Alla conversione di un lead in ordine, i suoi allegati passano nella cartella dell'ordine (FILE RICEVUTI). */
 async function leadFilesToOrder(leadId,orderId,tentativo=0){
