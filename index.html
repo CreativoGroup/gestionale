@@ -11086,6 +11086,13 @@ function jobDropboxBasePath(o){
   return `/${dropboxWorkYearFolderName(year)}/${year} - ${month}/CLIENTI/${cliente}`;
 }
 
+/* La cartella Dropbox è per cliente e mese: l'elenco di un ordine nasconde i file che portano il numero di un altro ordine. */
+function jobDropboxFileBelongs(o,fileName){
+  const m=String(fileName||"").match(/^(.+?) - /); if(!m) return true;
+  const tok=m[1].trim();
+  if(tok===String(o?.numero||o?.id||"")) return true;
+  return !(state.orders||[]).some(x=>x.id!==o?.id && String(x.numero||x.id)===tok);
+}
 function jobDropboxTone(name){
   return name==="FILE RICEVUTI"?"red":name==="FILE DEFINITIVI"?"yellow":"green";
 }
@@ -11106,7 +11113,7 @@ async function jobDropboxCountBadges(orderId){
   for(const folder of JOB_DROPBOX_SUBFOLDERS){
     try{
       const data=await dropboxApi("files/list_folder",{path:`${jobDropboxBasePath(o)}/${folder}`,recursive:false,include_deleted:false});
-      jobDropboxSetBadge(orderId,folder,(data.entries||[]).filter(x=>x[".tag"]==="file").length);
+      jobDropboxSetBadge(orderId,folder,(data.entries||[]).filter(x=>x[".tag"]==="file" && jobDropboxFileBelongs(o,x.name)).length);
     }catch(e){}
   }
 }
@@ -11268,7 +11275,7 @@ async function jobDropboxLoad(orderId,folder){
 
   try{
     const data=await dropboxApi("files/list_folder",{path,recursive:false,include_deleted:false});
-    const files=(data.entries||[]).filter(x=>x[".tag"]==="file")
+    const files=(data.entries||[]).filter(x=>x[".tag"]==="file" && jobDropboxFileBelongs(o,x.name))
       .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"it"));
 
     jobDropboxSetBadge(orderId,selected,files.length);
