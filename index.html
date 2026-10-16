@@ -17401,6 +17401,12 @@ async function completedSheetPreviewDropboxFile(pathEncoded,nameEncoded){
       return;
     }
 
+    // Dropbox restituisce spesso un tipo generico: senza il tipo giusto Chrome scarica il file invece di mostrarlo
+    if(kind==="pdf" && blob.type!=="application/pdf") blob=new Blob([blob],{type:"application/pdf"});
+    else if(kind==="image" && !String(blob.type).startsWith("image/")){
+      const ext=dropboxPreviewExtension(name);
+      blob=new Blob([blob],{type:ext==="svg"?"image/svg+xml":ext==="jpg"?"image/jpeg":"image/"+(ext||"png")});
+    }
     currentDropboxPreviewUrl=URL.createObjectURL(blob);
 
     if(kind==="image"){
