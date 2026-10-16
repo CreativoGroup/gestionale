@@ -13882,13 +13882,21 @@ function applyMagazzinoFilters(){
 function setMagazzinoColorFilter(v){ magazzinoColorFilter=v||""; applyMagazzinoFilters(); }
 function setMagazzinoTagliaFilter(v){ magazzinoTagliaFilter=v||""; applyMagazzinoFilters(); }
 function filteredMagazzinoRows(q){
-  q = (q||"").toLowerCase();
+  const norm = x => String(x==null?"":x).toLowerCase().replace(/[^a-z0-9àèéìòù]/g,"");
+  const qn = norm(q);
+  const words = String(q||"").toLowerCase().split(/\s+/).filter(Boolean);
+  const hit = w => {
+    const hay = [w.codice,w.nome,w.categoria,w.colore,canonicalWarehouseColor(w.colore),w.taglia];
+    const hayN = hay.map(norm).join(" ");
+    const hayAll = norm(hay.join(" "));
+    return hayN.includes(qn) || words.every(t=>hayAll.includes(norm(t)));
+  };
   return state.warehouse
     .filter(w => Number(w.quantita)>0
       && (w.warehouseGroup||"Tessile")===magazzinoGroupFilter
-      && (!magazzinoColorFilter || warehouseColorKey(w.colore)===warehouseColorKey(magazzinoColorFilter))
-      && (!magazzinoTagliaFilter || String(w.taglia||"").trim().toUpperCase()===String(magazzinoTagliaFilter).trim().toUpperCase())
-      && (!q || (w.codice||"").toLowerCase().includes(q) || (w.nome||"").toLowerCase().includes(q) || ((w.colore||"").toLowerCase().includes(q) || canonicalWarehouseColor(w.colore).toLowerCase().includes(q)) || (w.taglia||"").toLowerCase().includes(q)))
+      && (qn || !magazzinoColorFilter || warehouseColorKey(w.colore)===warehouseColorKey(magazzinoColorFilter))
+      && (qn || !magazzinoTagliaFilter || String(w.taglia||"").trim().toUpperCase()===String(magazzinoTagliaFilter).trim().toUpperCase())
+      && (!qn || hit(w)))
     .sort((a,b)=>{
       const codeCmp = String(a.codice||a.nome||"").localeCompare(String(b.codice||b.nome||""),"it",{numeric:true,sensitivity:"base"});
       if(codeCmp!==0) return codeCmp;
