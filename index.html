@@ -3828,7 +3828,12 @@ async function prepareCatalogDatalistForOrder(orderId){
 }
 
 /* ============ HELPER CLIENTI ============ */
-function clientDisplayName(c){ if(!c) return "—"; return c.tipo==="Business" ? (String(c.nomeCommerciale||"").trim() || String(c.ragioneSociale||"").trim() || "—") : `${c.nome||""} ${c.cognome||""}`.trim(); }
+const FAMILY_OSP_SEP=" @ ";
+function familyRichiestaBase(c){ return String((c&&c.richiesta)||"").split(FAMILY_OSP_SEP)[0].trim(); }
+function familyOspedale(c){ const p=String((c&&c.richiesta)||"").split(FAMILY_OSP_SEP); return p.length>1?p.slice(1).join(FAMILY_OSP_SEP).trim():""; }
+function clientDisplayNameBase(c){ if(!c) return "—"; return c.tipo==="Business" ? (String(c.nomeCommerciale||"").trim() || String(c.ragioneSociale||"").trim() || "—") : `${c.nome||""} ${c.cognome||""}`.trim(); }
+function clientDisplayName(c){ const b=clientDisplayNameBase(c); if(c&&c.tipo==="Family"){ const o=familyOspedale(c); if(o) return `${b} (${o})`; } return b; }
+function clientDisplayName_old(c){ if(!c) return "—"; return c.tipo==="Business" ? (String(c.nomeCommerciale||"").trim() || String(c.ragioneSociale||"").trim() || "—") : `${c.nome||""} ${c.cognome||""}`.trim(); }
 function clientName(id){ const c = state.clients.find(x=>x.id===id); return clientDisplayName(c); }
 
 /* ============ HELPER RIGHE / TOTALI ============ */
@@ -8696,7 +8701,8 @@ function clientFieldsHTML(prefix, existing){
       <div class="field"><label>Telefono</label><input id="${prefix}-telefono" value="${e.telefono||''}"></div>
       <div class="field">${emailListFieldHtml(prefix, e.email)}</div>
       <div class="field" id="${prefix}-settore-wrap"><label>Settore merceologico <span id="${prefix}-settore-req">*</span></label><select id="${prefix}-settore">${settoreOptions(e.settore)}</select></div>
-      <div class="field" id="${prefix}-richiesta-wrap" style="display:none;"><label>RICHIESTA</label><select id="${prefix}-richiesta">${familyRichiestaOptions(e.richiesta)}</select></div>
+      <div class="field" id="${prefix}-richiesta-wrap" style="display:none;"><label>RICHIESTA</label><select id="${prefix}-richiesta" onchange="toggleOspedaleField('${prefix}')">${familyRichiestaOptions(familyRichiestaBase(e))}</select></div>
+      <div class="field" id="${prefix}-ospedale-wrap" style="display:none;"><label>NOME OSPEDALE / STRUTTURA <span style="color:var(--danger);">*</span></label><input id="${prefix}-ospedale" placeholder="Es. San Raffaele" value="${escapeHtml(familyOspedale(e))}" autocomplete="off"></div>
     </div>
     <p class="helptext" style="margin-top:10px;margin-bottom:18px;">Compila almeno telefono o email. Business: settore obbligatorio. Family: seleziona la richiesta prima di archiviare la scheda tra i clienti completati.</p>
 
@@ -8796,6 +8802,12 @@ function goToClientById(id){
   dd.style.display = "none"; dd.innerHTML = "";
   globalSearchMap = {};
 }
+function toggleOspedaleField(prefix){
+  const w=document.getElementById(`${prefix}-ospedale-wrap`); if(!w) return;
+  const tipo=document.getElementById(`${prefix}-tipo`)?.value;
+  const r=document.getElementById(`${prefix}-richiesta`)?.value;
+  w.style.display = (tipo==="Family" && r==="Felpe per reparti") ? "block" : "none";
+}
 function toggleClientTypeFields(prefix){
   const tipo = document.getElementById(`${prefix}-tipo`).value;
   document.getElementById(`${prefix}-business`).style.display = tipo==="Business" ? "grid" : "none";
@@ -8806,6 +8818,7 @@ function toggleClientTypeFields(prefix){
   if(settoreWrap) settoreWrap.style.display = tipo==="Business" ? "block" : "none";
   if(richiestaWrap) richiestaWrap.style.display = tipo==="Family" ? "block" : "none";
   if(req) req.style.display = tipo==="Business" ? "inline" : "none";
+  toggleOspedaleField(prefix);
 }
 /* Legge i campi anagrafici comuni (indirizzo, città, piva, ecc.) da un dato prefisso */
 function readCommonClientFields(prefix){
@@ -8850,7 +8863,12 @@ async function createClientFromPrefix(prefix, existingId){
   } else {
     const nome = document.getElementById(`${prefix}-nome`).value.trim();
     if(!nome){ showToast("Inserisci il nome della persona"); return null; }
-    const richiesta = document.getElementById(`${prefix}-richiesta`)?.value || "";
+    let richiesta = document.getElementById(`${prefix}-richiesta`)?.value || "";
+    if(richiesta==="Felpe per reparti"){
+      const osp = (document.getElementById(`${prefix}-ospedale`)?.value||"").trim();
+      if(!osp){ showToast("Per «Felpe per reparti» scrivi il nome dell'ospedale"); document.getElementById(`${prefix}-ospedale`)?.focus(); return null; }
+      richiesta = richiesta+FAMILY_OSP_SEP+osp;
+    }
     payload = {
       tipo, nome,
       cognome:document.getElementById(`${prefix}-cognome`).value.trim(),
@@ -8886,7 +8904,7 @@ function clientFatturato(clientId){ return state.orders.filter(o=>o.clientId===c
 let clientiFilters = {search:"", settore:"", tipo:"", fatturatoMin:""};
 
 function clientSpecLabel(c){
-  if(c.tipo==="Family") return c.richiesta || "Richiesta da inserire";
+  if(c.tipo==="Family") return familyRichiestaBase(c) || "Richiesta da inserire";
   return c.settore || "Settore da inserire";
 }
 function clientReadyForArchive(c){
@@ -9021,7 +9039,7 @@ function openClientHistory(clientId){
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>${clientDisplayName(c)}</h2>
-    <p style="color:var(--muted);margin-top:0;">${c.tipo==="Family" ? (c.richiesta||"Richiesta da inserire") : (c.settore||"Settore da assegnare")} — Fatturato totale ${fmtMoney(totale)} <span style="font-size:9.5px;color:var(--border);">${c.numero?('#'+c.numero):''}</span></p>
+    <p style="color:var(--muted);margin-top:0;">${c.tipo==="Family" ? (familyRichiestaBase(c)||"Richiesta da inserire") : (c.settore||"Settore da assegnare")} — Fatturato totale ${fmtMoney(totale)} <span style="font-size:9.5px;color:var(--border);">${c.numero?('#'+c.numero):''}</span></p>
     <div class="ticket-meta">
       <div><span>Indirizzo</span>${indirizzoCompleto||"—"}</div>
       <div><span>Telefono</span>${c.telefono||"—"}</div>
@@ -11088,7 +11106,7 @@ function dropboxWorkYearFolderName(year){
 
 function jobDropboxBasePath(o){
   const c=state.clients.find(x=>x.id===o.clientId);
-  const cliente=dropboxSafePathPart(c?clientDisplayName(c):"Cliente");
+  const cliente=dropboxSafePathPart(c?clientDisplayNameBase(c):"Cliente");
   const d=jobDropboxArchiveDate(o);
   const year=d.getFullYear();
   const month=String(d.getMonth()+1).padStart(2,"0");
@@ -11220,7 +11238,7 @@ async function jobDropboxEnsureStructure(orderId){
   if(!jobDropboxUsesChronologicalArchive(o)) return null;
 
   const c=state.clients.find(x=>x.id===o.clientId);
-  const cliente=dropboxSafePathPart(c?clientDisplayName(c):"Cliente");
+  const cliente=dropboxSafePathPart(c?clientDisplayNameBase(c):"Cliente");
   const d=jobDropboxArchiveDate(o);
   const year=d.getFullYear();
   const month=String(d.getMonth()+1).padStart(2,"0");
