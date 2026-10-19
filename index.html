@@ -4513,7 +4513,7 @@ async function saveAppunto(id){
 }
 function navNuovoOrdine(){
   goTo("ordini");
-  pendingLeadOrderConversion=null;
+  pendingLeadOrderConversion=null; pendingOrderDescription="";
   orderFormOpen=true;
   const el=document.getElementById("orderForm");
   if(el){ el.classList.add("open"); }
@@ -4810,7 +4810,7 @@ function renderTopbarActions(){
   const map = {
     note: `<button class="btn btn-primary" onclick="openNoteForm()">+ Nuova nota</button>`,
     clienti: `<button class="btn btn-primary" onclick="toggleForm('clientForm')">+ Nuovo cliente</button>`,
-    ordini: `<button class="btn btn-primary" onclick="pendingLeadOrderConversion=null;toggleForm('orderForm')">+ Nuovo ordine</button>`,
+    ordini: `<button class="btn btn-primary" onclick="pendingLeadOrderConversion=null;pendingOrderDescription='';toggleForm('orderForm')">+ Nuovo ordine</button>`,
     magazzino: ``,
     lavoriCompletati: ``,
     dropbox: `<button class="btn btn-outline" onclick="dropboxRefresh()">↻ Aggiorna</button>`,
@@ -7330,7 +7330,7 @@ function igPickClient(id,then,q){
 }
 function igPickDone(id,clientId,then){
   igSetLink(id,clientId); closeModal();
-  if(then==="order") newOrderForClient(clientId);
+  if(then==="order"){ pendingOrderDescription=""; newOrderForClient(clientId); }
   else if(String(then).startsWith("save:")){ const [,mid]=then.split(":"); igSaveMediaToOrder(mid,id); }
   else renderInstagram();
 }
@@ -9077,6 +9077,7 @@ function openClientHistory(clientId){
   document.getElementById("modalBackdrop").classList.add("open");
 }
 let pendingLeadOrderConversion = null;
+let pendingOrderDescription = "";
 
 function newOrderForClient(clientId, leadId=null){
   if(leadId){
@@ -9089,6 +9090,15 @@ function newOrderForClient(clientId, leadId=null){
     }
   }
   pendingLeadOrderConversion = leadId ? {leadId, clientId} : null;
+  if(leadId){
+    pendingOrderDescription = "";
+    const _ld=(state.leads||[]).find(x=>x.id===leadId);
+    const _t=_ld ? String(leadReqParse(_ld.richiesta).text||"").trim() : "";
+    if(_ld && _t && /^gmail/.test(String(_ld.fonte||""))){
+      const _s=String(_ld.oggettoRichiesta||"").trim();
+      pendingOrderDescription=(_s?`Richiesta ricevuta via Gmail: ${_s}\n\n`:"")+_t;
+    }
+  }
 
   // Solo le richieste d'ordine nate da Gmail (fonte tecnica "gmail_ordine") portano gli allegati
   // nell'ordine. I Lead normali Gmail restano esclusi.
@@ -11717,14 +11727,15 @@ async function addOrderInner(){
       pendingLeadOrderConversion=null;
       await markLeadConvertedToOrder(ctx.leadId, clientId, dup.id);
     }
-    pendingGmailOrderMessageId=null; pendingGmailOrderContext=null;
+    pendingGmailOrderMessageId=null; pendingGmailOrderContext=null; pendingOrderDescription="";
     try{ if(orderFormOpen) toggleForm('orderForm'); }catch(_){}
     openJobCard(dup.id);
     return;
   }
 
   const id = uid();
-  const order = mkOrder(id, clientId, "", "", "Da fare", "", undefined, undefined);
+  const order = mkOrder(id, clientId, pendingOrderDescription||"", "", "Da fare", "", undefined, undefined);
+  pendingOrderDescription="";
 
   // Salva prima su Supabase e usa la riga restituita dal database.
   // In questo modo recuperiamo subito anche il numero ordine assegnato dal database.
@@ -16538,6 +16549,11 @@ function createOrderFromGmail(){
 
   const email=gmailExtractAddress(m.from||"");
   const existing=findClientByEmail(email);
+  {
+    const _body=String(m.bodyText||m.snippet||"").trim().slice(0,6000);
+    const _subj=String(m.subject||"").trim();
+    pendingOrderDescription=_body ? ((_subj?`Richiesta ricevuta via Gmail: ${_subj}\n\n`:"")+_body) : "";
+  }
 
   if(existing){
     closeGmailMessage();
