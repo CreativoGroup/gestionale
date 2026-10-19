@@ -8079,7 +8079,10 @@ function renderDashboard(){
   const isAdminDash = !!(currentUser && currentUser.role==="admin");
   if(isAdminDash && typeof ensureNoteStyles==="function") ensureNoteStyles();
   const dashNoteAll = isAdminDash ? (state.noteComunicazioni||[]).filter(n=>!n.fatto).sort(noteSortAppuntiFirst) : [];
-  const dashNoteAdmin = dashNoteAll.slice(0,8);
+  const dashAppunti = dashNoteAll.filter(n=>noteIsAppunto(n));
+  const dashMailNotes = dashNoteAll.filter(n=>!noteIsAppunto(n) && noteFonte(n)==="gmail");
+  const dashMailLeads = isAdminDash ? (state.leads||[]).filter(l=>isOrderLeadSource(l.fonte) && !leadOrderStatus(l).done).sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))) : [];
+  const dashMailOrders = isAdminDash ? state.orders.filter(o=>o.stato==="Da fare" && /^Richiesta ricevuta via Gmail/.test(String(o.descrizione||"")) && (Date.now()-(Date.parse(o.createdAt)||0))<10*86400000).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))) : [];
   const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma" || l.stato==="Da ricontattare");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
 
@@ -8094,17 +8097,32 @@ function renderDashboard(){
 
 
     ${isAdminDash ? `
-    <div class="card" style="margin-bottom:16px;">
+    <div class="card" style="margin-bottom:16px;border-left:4px solid var(--accent);">
       <div class="section-header" style="margin-bottom:10px;">
-        <h3 style="margin:0;">Note <span class="nota-foot" style="font-weight:600;">· ${dashNoteAll.length}</span></h3>
+        <h3 style="margin:0;">✉ Dalla mail <span class="nota-foot" style="font-weight:600;">· ${dashMailLeads.length+dashMailOrders.length+dashMailNotes.length} da gestire</span></h3>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" onclick="openNoteForm()">+ Crea nota</button>
-          <button class="btn btn-outline btn-sm" onclick="navNuovoAppunto()">+ Appunto</button>
-          <button class="btn btn-outline btn-sm" onclick="goTo('note')">Apri tutte</button>
+          <button class="btn btn-outline btn-sm" onclick="openNoteForm()">+ Crea nota</button>
+          <button class="btn btn-ghost btn-sm" onclick="goTo('note')">Tutte le note</button>
         </div>
       </div>
-      ${dashNoteAdmin.length ? `<div class="nota-list">${dashNoteAdmin.map(noteRowHTML).join("")}</div>` : `<p class="empty" style="margin:6px 0 0;">Nessuna nota.</p>`}
-      ${dashNoteAll.length>dashNoteAdmin.length ? `<p class="helptext" style="margin:8px 4px 0;">Altre ${dashNoteAll.length-dashNoteAdmin.length} note in <a href="#" onclick="goTo('note');return false;">Note</a>.</p>` : ""}
+      ${dashMailLeads.length ? `<p class="nota-foot" style="margin:8px 0 4px;font-weight:700;text-transform:uppercase;">Nuovo cliente + ordine · ${dashMailLeads.length}</p>
+        ${dashMailLeads.slice(0,8).map(l=>{
+          const lc=l.clientId ? (state.clients||[]).find(c=>c.id===l.clientId) : findClientByEmail(l.email);
+          return `<div class="nota-row"><div class="nota-c-name"><strong>${escapeHtml(leadDisplayName(l))}</strong><div class="nota-foot">${fmtLeadDate(l.creatoIl)}${lc?" · anagrafica presente":" · cliente da creare"}</div></div><div class="nota-c-text"><div class="nota-body">${escapeHtml(l.oggettoRichiesta||"—")}</div></div><div class="nota-c-actions"><button class="btn btn-primary btn-sm" onclick="openLeadDetail('${l.id}')">✦ ${lc?'CREA ORDINE':'APRI E CREA ORDINE'}</button><button class="btn btn-outline btn-sm" title="L'ordine è già stato fatto" onclick="markLeadOrderDone('${l.id}')">GIÀ FATTO</button></div></div>`;
+        }).join("")}` : ""}
+      ${dashMailOrders.length ? `<p class="nota-foot" style="margin:12px 0 4px;font-weight:700;text-transform:uppercase;">Nuovo ordine · cliente esistente · ${dashMailOrders.length}</p>
+        ${dashMailOrders.slice(0,8).map(o=>`<div class="nota-row"><div class="nota-c-name"><strong>${escapeHtml(clientName(o.clientId))}</strong><div class="nota-foot">${o.numero?"Ordine #"+escapeHtml(String(o.numero))+" · ":""}${escapeHtml(noteDateLabel(o.createdAt))}</div></div><div class="nota-c-text"><div class="nota-body clamp">${escapeHtml(String(o.descrizione||"").replace(/^Richiesta ricevuta via Gmail:\s*/,""))}</div></div><div class="nota-c-actions"><button class="btn btn-primary btn-sm" onclick="openJobCard('${o.id}')">APRI SCHEDA</button></div></div>`).join("")}` : ""}
+      ${dashMailNotes.length ? `<p class="nota-foot" style="margin:12px 0 4px;font-weight:700;text-transform:uppercase;">Note · ${dashMailNotes.length}</p>
+        <div class="nota-list">${dashMailNotes.slice(0,8).map(noteRowHTML).join("")}</div>` : ""}
+      ${(dashMailLeads.length+dashMailOrders.length+dashMailNotes.length)?"":`<p class="empty" style="margin:6px 0 0;">Niente da gestire dalla mail.</p>`}
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="section-header" style="margin-bottom:10px;">
+        <h3 style="margin:0;">Appunti <span class="nota-foot" style="font-weight:600;">· ${dashAppunti.length}</span></h3>
+        <button class="btn btn-outline btn-sm" onclick="navNuovoAppunto()">+ Appunto</button>
+      </div>
+      ${dashAppunti.length ? `<div class="nota-list">${dashAppunti.slice(0,8).map(noteRowHTML).join("")}</div>` : `<p class="empty" style="margin:6px 0 0;">Nessun appunto.</p>`}
     </div>` : ""}
 
     <div class="card" style="margin-bottom:16px;">
