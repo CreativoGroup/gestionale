@@ -10474,11 +10474,38 @@ function openQuoteWhatsapp(quoteId){
   const q=findItem('quotes',quoteId); if(!q) return;
   const rcp=quoteRecipient(q);
   const c=rcp.client || {tipo:'Family',nome:rcp.nome,cognome:'',email:rcp.email};
-  const testo=`${salutoCliente(c)}\n\nti inviamo il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)}.\nRestiamo a disposizione per qualsiasi chiarimento.`;
-  const url=waMeUrl(rcp.telefono, testo);
-  if(!url){ showToast('Numero WhatsApp non valido'); return; }
-  openWaWindow(url);
-  showToast('Il PDF non si allega da solo: scaricalo con SCARICA PDF e trascinalo nella chat');
+  if(!normalizeWaPhone(rcp.telefono||"")){ showToast('Numero WhatsApp non valido'); return; }
+  const testo=`${salutoCliente(c)}\n\nti inviamo in allegato il preventivo n. ${quoteNumberLabel(q)} del ${fmtDate(q.data)}.\nRestiamo a disposizione per qualsiasi chiarimento.`;
+  document.getElementById('modalBody').innerHTML=`
+    <button class="close-x" onclick="openQuoteDetail('${q.id}')">×</button>
+    <h2>Invia preventivo su WhatsApp</h2>
+    <p style="margin-top:0;color:var(--muted);">Parte direttamente dal WhatsApp collegato al gestionale, con il PDF allegato.</p>
+    <div class="field"><label>A</label><input id="quote-wa-to" value="${escapeHtml(rcp.telefono||'')}" readonly></div>
+    <div class="field"><label>Messaggio</label><textarea id="quote-wa-body" rows="6">${escapeHtml(testo)}</textarea></div>
+    <div class="field"><label>Allegato</label><div style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:#fff;">📄 ${escapeHtml(quotePdfFileName(q))}</div></div>
+    <div id="quote-wa-status" class="helptext"></div>
+    <div class="form-actions"><button id="quote-wa-send" class="btn btn-primary" onclick="sendQuoteWhatsapp('${q.id}')">Invia su WhatsApp</button><button class="btn btn-outline" onclick="openQuoteDetail('${q.id}')">Indietro</button></div>`;
+}
+async function sendQuoteWhatsapp(quoteId){
+  const q=findItem('quotes',quoteId); if(!q) return;
+  const rcp=quoteRecipient(q);
+  const message=String(document.getElementById('quote-wa-body')?.value||'').trim();
+  const status=document.getElementById('quote-wa-status'); const btn=document.getElementById('quote-wa-send');
+  if(!message){ showToast('Scrivi il messaggio'); return; }
+  if(btn) btn.disabled=true; if(status) status.textContent='Invio in corso…';
+  try{
+    const bytes=buildQuotePdf(q);
+    const file=new File([bytes],quotePdfFileName(q),{type:'application/pdf'});
+    await sendWhatsappRequest({to:rcp.telefono,message,contactName:rcp.nome||'',file});
+    if(q.stato==='Bozza'){ q.stato='Inviato'; saveState('quotes'); }
+    await onQuoteStatusChanged(q);
+    openQuoteDetail(quoteId);
+    showToast('Preventivo inviato su WhatsApp');
+  }catch(err){
+    console.error('Invio preventivo WhatsApp',err);
+    if(status) status.innerHTML=`Errore: ${escapeHtml(err?.message||'invio non riuscito')}<br>Se il cliente non ti scrive da più di 24 ore WhatsApp può rifiutare l'invio libero. <a href="#" onclick="event.preventDefault();openWaWindow(waMeUrl(quoteRecipient(findItem('quotes','${q.id}')).telefono,document.getElementById('quote-wa-body').value));showToast('Scarica il PDF e trascinalo nella chat')">Apri WhatsApp Web senza allegato</a>`;
+    if(btn) btn.disabled=false;
+  }
 }
 function quoteMailClient(q){
   const rcp=quoteRecipient(q);
