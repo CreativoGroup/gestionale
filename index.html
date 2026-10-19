@@ -11751,53 +11751,54 @@ async function addOrderInner(){
     await markLeadConvertedToOrder(ctx.leadId, clientId, savedOrder.id);
   }
 
-  let gmailDropboxResult=null;
+  // La scheda si apre SUBITO: la copia degli allegati in Dropbox (lenta) continua in background.
+  let gmailCtx=null;
   if(pendingGmailOrderMessageId || pendingGmailOrderContext){
-    const ctx=pendingGmailOrderContext || {
+    gmailCtx=pendingGmailOrderContext || {
       messageId:pendingGmailOrderMessageId,
       attachments:null,
       source:"gmail_order"
     };
     pendingGmailOrderMessageId=null;
     pendingGmailOrderContext=null;
-
-    try{
-      gmailDropboxResult=await copyGmailOrderAttachmentsToDropbox(savedOrder,ctx);
-    }catch(err){
-      console.error("Import automatico allegati mail in Dropbox",err);
-      gmailDropboxResult={uploaded:0,total:0,error:String(err?.message||err)};
-    }
   }
 
   orderFormOpen = false;
   const orderFormEl=document.getElementById('orderForm');
   if(orderFormEl) orderFormEl.classList.remove('open');
   renderOrdini();
-
-  if(gmailDropboxResult?.uploaded>0){
-    const failed=(gmailDropboxResult.total||0)-gmailDropboxResult.uploaded;
-    showToast(
-      failed>0
-        ? `Ordine creato · ${gmailDropboxResult.uploaded}/${gmailDropboxResult.total} allegati copiati in Dropbox > FILE RICEVUTI`
-        : `Ordine creato · ${gmailDropboxResult.uploaded} allegat${gmailDropboxResult.uploaded===1?'o':'i'} copiati in Dropbox > FILE RICEVUTI`
-    );
-  }else if(gmailDropboxResult?.reason==="dropbox_not_connected"){
-    showToast("Ordine creato · Dropbox non collegato: allegati mail non copiati");
-  }else if(gmailDropboxResult?.reason==="no_attachments"){
-    showToast("Ordine creato · nessun allegato trovato nella mail");
-  }else if(gmailDropboxResult?.error || gmailDropboxResult?.errors?.length){
-    showToast("Ordine creato · allegati mail non copiati: controlla Dropbox");
-  }else{
-    showToast(savedOrder.numero ? `Ordine #${savedOrder.numero} creato` : "Ordine creato");
-  }
-
-  if(gmailDropboxResult?.uploaded>0){
-    jobDropboxUiState[savedOrder.id]={folder:"FILE RICEVUTI"};
-  }
   openJobCard(savedOrder.id);
-  if(gmailDropboxResult?.uploaded>0){
-    setTimeout(()=>jobDropboxSelectFolder(savedOrder.id,"FILE RICEVUTI"),450);
+
+  if(!gmailCtx){
+    showToast(savedOrder.numero ? `Ordine #${savedOrder.numero} creato` : "Ordine creato");
+    return;
   }
+  showToast(savedOrder.numero ? `Ordine #${savedOrder.numero} creato · copio gli allegati in Dropbox…` : "Ordine creato · copio gli allegati in Dropbox…");
+  (async()=>{
+    let gmailDropboxResult=null;
+    try{
+      gmailDropboxResult=await copyGmailOrderAttachmentsToDropbox(savedOrder,gmailCtx);
+    }catch(err){
+      console.error("Import automatico allegati mail in Dropbox",err);
+      gmailDropboxResult={uploaded:0,total:0,error:String(err?.message||err)};
+    }
+    if(gmailDropboxResult?.uploaded>0){
+      const failed=(gmailDropboxResult.total||0)-gmailDropboxResult.uploaded;
+      showToast(
+        failed>0
+          ? `${gmailDropboxResult.uploaded}/${gmailDropboxResult.total} allegati copiati in Dropbox > FILE RICEVUTI`
+          : `${gmailDropboxResult.uploaded} allegat${gmailDropboxResult.uploaded===1?'o':'i'} copiati in Dropbox > FILE RICEVUTI`
+      );
+      jobDropboxUiState[savedOrder.id]={folder:"FILE RICEVUTI"};
+      try{ jobDropboxSelectFolder(savedOrder.id,"FILE RICEVUTI"); }catch(_){}
+    }else if(gmailDropboxResult?.reason==="dropbox_not_connected"){
+      showToast("Dropbox non collegato: allegati mail non copiati");
+    }else if(gmailDropboxResult?.reason==="no_attachments"){
+      showToast("Nessun allegato trovato nella mail");
+    }else if(gmailDropboxResult?.error || gmailDropboxResult?.errors?.length){
+      showToast("Allegati mail non copiati: controlla Dropbox");
+    }
+  })();
 }
 function deleteOrderFromCreditiCliente(orderId, clientId){
   askConfirm("Eliminare questo ordine? Verranno rimossi anche gli incassi collegati e la merce riservata verrà restituita al magazzino.", async ()=>{
