@@ -8268,7 +8268,7 @@ function compareOrdersNewestFirst(a,b){
 }
 function creditiApertiRaggruppati(){
   const map = new Map();
-  state.orders.filter(o=>o.stato==="Consegnato").forEach(o=>{
+  state.orders.filter(o=>o.stato==="Consegnato" && !o.daFatturare && !o.fatturato).forEach(o=>{
     const saldo = orderSaldo(o);
     if(saldo<=0.001) return;
     if(!map.has(o.clientId)) map.set(o.clientId, []);
@@ -8288,7 +8288,7 @@ function creditiApertiRaggruppati(){
 }
 function openCreditiCliente(clientId){
   const orders = state.orders
-    .filter(o=>o.clientId===clientId && o.stato==="Consegnato")
+    .filter(o=>o.clientId===clientId && o.stato==="Consegnato" && !o.daFatturare && !o.fatturato)
     .map(o=>({o, saldo:orderSaldo(o)}))
     .filter(x=>x.saldo>0.001)
     .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
@@ -9084,13 +9084,13 @@ function openClientHistory(clientId){
         ? `<button class="btn btn-outline btn-sm" onclick="openClientDropbox('${c.id}')">APRI DROPBOX</button><button class="btn btn-outline btn-sm" onclick="setClientDropboxFolder('${c.id}')">Modifica Dropbox</button>`
         : `<button class="btn btn-outline btn-sm" onclick="setClientDropboxFolder('${c.id}')">COLLEGA DROPBOX</button>`}
     </div>
-    ${(()=>{const dovuto=orders.reduce((t,o)=>t+Math.max(0,orderSaldo(o)),0); return dovuto>0.005 ? `<div style="margin:0 0 14px;padding:10px 14px;border-radius:12px;background:#FFF1EE;color:var(--danger);font-weight:800;">Da incassare in totale: ${fmtMoney(dovuto)}</div>` : "";})()}
+    ${(()=>{const dovuto=orders.filter(o=>!o.daFatturare && !o.fatturato).reduce((t,o)=>t+Math.max(0,orderSaldo(o)),0); return dovuto>0.005 ? `<div style="margin:0 0 14px;padding:10px 14px;border-radius:12px;background:#FFF1EE;color:var(--danger);font-weight:800;">Da incassare in totale: ${fmtMoney(dovuto)}</div>` : "";})()}
     <h3>Storico ordini</h3>
     ${orders.length ? orders.map(o=>`
       <div class="list-row" onclick="openJobCard('${o.id}')">
         <div><div class="lr-main">${o.importante?'★ ':''}${orderCategorieLabel(o)}</div><div class="lr-sub">${fmtDate(o.dataConsegna)} — ${orderWorkersLabel(o)}</div></div>
         <div style="display:flex;align-items:center;gap:10px;">
-          ${(()=>{const sd=orderSaldo(o); if(sd<=0.005) return o.stato==="Consegnato" ? `<span class="pill pill-done">Pagato</span>` : ""; const late=o.stato==="Consegnato"; return `<span style="font-size:12px;font-weight:800;white-space:nowrap;color:${late?"var(--danger)":"var(--muted)"};">Da incassare ${fmtMoney(sd)}</span>`;})()}
+          ${(()=>{if(o.daFatturare||o.fatturato) return ""; const sd=orderSaldo(o); if(sd<=0.005) return o.stato==="Consegnato" ? `<span class="pill pill-done">Pagato</span>` : ""; const late=o.stato==="Consegnato"; return `<span style="font-size:12px;font-weight:800;white-space:nowrap;color:${late?"var(--danger)":"var(--muted)"};">Da incassare ${fmtMoney(sd)}</span>`;})()}
           ${o.fatturato?`<span class="pill pill-done">Fatturato</span>`:(o.daFatturare?`<span class="pill pill-open">Da fatturare</span>`:"")}
           <span>${fmtMoney(orderTotale(o))}</span>
           <span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span>
@@ -11859,7 +11859,7 @@ function deleteOrderFromCreditiCliente(orderId, clientId){
     await reloadWarehouseFromDb();
 
     const rimasti = state.orders
-      .filter(o=>o.clientId===clientId && o.stato==="Consegnato")
+      .filter(o=>o.clientId===clientId && o.stato==="Consegnato" && !o.daFatturare && !o.fatturato)
       .map(o=>({o,saldo:orderSaldo(o)}))
       .filter(x=>x.saldo>0.001);
 
@@ -14967,7 +14967,7 @@ function renderIncassi(){
   const incassatoNonFatturatoMese = pagamentiNonFatturatiMese
     .reduce((s,p)=>s+Number(p.importo||0),0);
   const creditiAperti = state.orders
-    .filter(o=>o.stato==="Consegnato")
+    .filter(o=>o.stato==="Consegnato" && !o.daFatturare && !o.fatturato)
     .map(o=>({o, saldo:orderSaldo(o)}))
     .filter(x=>x.saldo>0.001)
     .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
