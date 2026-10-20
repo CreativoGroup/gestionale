@@ -14728,7 +14728,7 @@ const GIORNI_IT = ["domenica","lunedì","martedì","mercoledì","giovedì","vene
 function dayLabelIt(dateStr){ const d = new Date(dateStr+"T00:00:00"); return `${GIORNI_IT[d.getDay()]} ${fmtDate(dateStr)}`; }
 function paymentIsFatturato(p){
   const o=findItem("orders",p.orderId);
-  return !!(o && o.fatturato);
+  return false; // la fatturazione si gestisce in un altro gestionale
 }
 function statsInRange(startDate, endDate){
   // Gli incassi di schede già fatturate non entrano nei report giornaliero/settimanale
@@ -14770,13 +14770,9 @@ function buildMonthlyRows(year){
     // - "Pagamenti" = incassi collegati a schede NON fatturate
     // - "Pagamenti fatturati" = incassi collegati a schede fatturate
     const paymentsFatturati = paymentsInMonth.filter(p=>{
-      const ordine=findItem("orders",p.orderId);
-      return !!(ordine && ordine.fatturato);
+      return false;
     });
-    const paymentsNonFatturati = paymentsInMonth.filter(p=>{
-      const ordine=findItem("orders",p.orderId);
-      return !(ordine && ordine.fatturato);
-    });
+    const paymentsNonFatturati = paymentsInMonth;
 
     const contanti = paymentsNonFatturati.filter(p=>p.metodo==="Contanti").reduce((s,p)=>s+Number(p.importo),0);
     const carta = paymentsNonFatturati.filter(p=>normalizePaymentMethod(p.metodo)==="Carta di Pagamento").reduce((s,p)=>s+Number(p.importo),0);
@@ -15083,11 +15079,6 @@ function renderIncassi(){
         <p class="stat-sub">tutti i pagamenti registrati nel mese corrente</p>
       </div>
 
-      <div class="card stat">
-        <p class="stat-label">Incassato mensile NON fatturato</p>
-        <p class="stat-value">${fmtMoney(incassatoNonFatturatoMese)}</p>
-        <p class="stat-sub">${pagamentiNonFatturatiMese.length} pagamenti su schede non segnate come Fatturato</p>
-      </div>
 
       <div class="card stat">
         <p class="stat-label">Crediti aperti</p>
@@ -15114,63 +15105,6 @@ function renderIncassi(){
     </div>
     ${reportHtml}
 
-
-    <div class="card" style="margin-bottom:22px;">
-      <div class="section-header" style="margin-bottom:10px;">
-        <div>
-          <h3 style="margin:0;">Ordini FATTURATI</h3>
-          <p class="helptext" style="margin:5px 0 0;">
-            Qui trovi esclusivamente gli ordini segnati come <strong>Fatturato</strong>.
-            Questa sezione è separata dallo storico pagamenti: un ordine può essere fatturato ma avere ancora un saldo da incassare.
-          </p>
-        </div>
-        <span class="pill pill-done">${ordiniFatturati.length} fatturati</span>
-      </div>
-
-      <div class="grid grid-auto" style="margin-bottom:14px;">
-        <div class="card stat">
-          <p class="stat-label">Valore ordini fatturati</p>
-          <p class="stat-value">${fmtMoney(totaleOrdiniFatturati)}</p>
-        </div>
-        <div class="card stat">
-          <p class="stat-label">Incassato su fatturati</p>
-          <p class="stat-value">${fmtMoney(incassatoOrdiniFatturati)}</p>
-        </div>
-        <div class="card stat">
-          <p class="stat-label">Saldo ancora da incassare</p>
-          <p class="stat-value" style="${saldoOrdiniFatturati>0?'color:var(--danger)':''}">${fmtMoney(saldoOrdiniFatturati)}</p>
-        </div>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Ordine</th>
-              <th>Cliente</th>
-              <th>Stato</th>
-              <th>Totale</th>
-              <th>Incassato</th>
-              <th>Saldo</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${ordiniFatturati.length ? ordiniFatturati.map(o=>`
-              <tr>
-                <td style="font-weight:800;">${o.numero?`#${o.numero}`:"—"}</td>
-                <td>${clientName(o.clientId)}</td>
-                <td><span class="pill ${STATUS_CLASS[o.stato]||''}">${statusDot(o.stato)}${o.stato||"—"}</span></td>
-                <td style="font-weight:800;">${fmtMoney(orderTotale(o))}</td>
-                <td>${fmtMoney(orderIncassato(o))}</td>
-                <td style="${orderSaldo(o)>0.001?'color:var(--danger);font-weight:800;':'color:var(--ok);font-weight:800;'}">${fmtMoney(orderSaldo(o))}</td>
-                <td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">APRI SCHEDA</button></td>
-              </tr>
-            `).join("") : `<tr><td colspan="7" class="empty">Nessun ordine fatturato.</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-    </div>
 
     <div class="section-header">
       <h3 style="margin:0;">Storico pagamenti</h3>
