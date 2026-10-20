@@ -8075,7 +8075,7 @@ function renderDashboard(){
     return clientName(a.clientId).localeCompare(clientName(b.clientId));
   });
   const ritiriDaFare = state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0);
-  const produzioniEsterne = state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato" && (o.righe||[]).some(r=>isExternalCat(r.categoria)));
+  const produzioniEsterne = state.orders.filter(o=>o.stato!=="Da fare" && o.stato!=="Consegnato" && o.stato!=="Completato" && (o.righe||[]).some(r=>isExternalCat(r.categoria)));
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
   const isAdminDash = !!(currentUser && currentUser.role==="admin");
   if(isAdminDash && typeof ensureNoteStyles==="function") ensureNoteStyles();
@@ -8606,7 +8606,7 @@ function openDashboardList(type){
     fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato && (o.stato==="Completato" || o.stato==="Consegnato")), isFatturare:true},
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
     materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
-    esterne: {title:"Produzioni esterne", items: state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato" && (o.righe||[]).some(r=>isExternalCat(r.categoria))).sort((a,b)=>String(a.dataConsegna||"9999").localeCompare(String(b.dataConsegna||"9999"))), isEsterne:true},
+    esterne: {title:"Produzioni esterne", items: state.orders.filter(o=>o.stato!=="Da fare" && o.stato!=="Consegnato" && o.stato!=="Completato" && (o.righe||[]).some(r=>isExternalCat(r.categoria))).sort((a,b)=>String(a.dataConsegna||"9999").localeCompare(String(b.dataConsegna||"9999"))), isEsterne:true},
     ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0), isRitirare:true},
     avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato && orderPendingPickupRows(o).length===0)},
     scorte: {title:"Articoli sotto scorta", items: computeScorteMonitorate(), isStock:true}
