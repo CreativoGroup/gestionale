@@ -8075,6 +8075,7 @@ function renderDashboard(){
     return clientName(a.clientId).localeCompare(clientName(b.clientId));
   });
   const ritiriDaFare = state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0);
+  const produzioniEsterne = state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato" && (o.righe||[]).some(r=>isExternalCat(r.categoria)));
   const prossimiAppuntamenti = [...(state.appuntamenti||[])].filter(a=>a.data>=oggi).sort((a,b)=> (a.data+a.ora).localeCompare(b.data+b.ora));
   const isAdminDash = !!(currentUser && currentUser.role==="admin");
   if(isAdminDash && typeof ensureNoteStyles==="function") ensureNoteStyles();
@@ -8091,7 +8092,7 @@ function renderDashboard(){
       <div class="card stat clickable" onclick="openDashboardList('attivi')"><p class="stat-label">Ordini attivi</p><p class="stat-value">${ordiniInLavorazione.length}</p><p class="stat-sub">su ${state.orders.length} totali</p></div>
       <div class="card stat clickable" onclick="openDashboardList('fatturare')"><p class="stat-label">Schede da fatturare</p><p class="stat-value" style="${daFatturare.length?'color:var(--accent)':''}">${daFatturare.length}</p><p class="stat-sub">contrassegnate "da fatturare"</p></div>
       <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${pezziDaOrdinare?'color:var(--teal)':''}">${pezziDaOrdinare}</p><p class="stat-sub">pezzi confermati da ordinare</p></div>
-      <div class="card stat clickable" onclick="openDashboardList('ritirare')"><p class="stat-label">Ordini da ritirare</p><p class="stat-value" style="${ritiriDaFare.length?'color:var(--warn)':''}">${ritiriDaFare.length}</p><p class="stat-sub">lavorazioni esterne da ritirare</p></div>
+      <div class="card stat clickable" onclick="openDashboardList('esterne')"><p class="stat-label">Produzioni esterne</p><p class="stat-value" style="${produzioniEsterne.length?'color:var(--warn)':''}">${produzioniEsterne.length}</p><p class="stat-sub">ordini in lavorazione dai fornitori</p></div>
       <div class="card stat clickable" onclick="openDashboardList('scorte')"><p class="stat-label">Avvisi magazzino</p><p class="stat-value" style="${scorteBasse.length?'color:var(--danger)':''}">${scorteBasse.length}</p><p class="stat-sub">articoli a/scorta minima</p></div>
     </div>
 
@@ -8605,6 +8606,7 @@ function openDashboardList(type){
     fatturare: {title:"Schede da fatturare", items: state.orders.filter(o=>o.daFatturare && !o.fatturato && (o.stato==="Completato" || o.stato==="Consegnato")), isFatturare:true},
     importanti: {title:"Ordini importanti", items: state.orders.filter(o=>o.importante && o.stato!=="Consegnato")},
     materiale: {title:"Materiale da ordinare", items: computeMagazzinoDaOrdinare(), isMagazzino:true},
+    esterne: {title:"Produzioni esterne", items: state.orders.filter(o=>o.stato!=="Consegnato" && o.stato!=="Completato" && (o.righe||[]).some(r=>isExternalCat(r.categoria))).sort((a,b)=>String(a.dataConsegna||"9999").localeCompare(String(b.dataConsegna||"9999"))), isEsterne:true},
     ritirare: {title:"Ordini da ritirare", items: state.orders.filter(o=>o.stato==="Completato" && orderPendingPickupRows(o).length>0), isRitirare:true},
     avvisare: {title:"Cliente da avvisare", items: state.orders.filter(o=>o.stato==="Completato" && !o.clienteAvvisato && orderPendingPickupRows(o).length===0)},
     scorte: {title:"Articoli sotto scorta", items: computeScorteMonitorate(), isStock:true}
@@ -8640,6 +8642,13 @@ function openDashboardList(type){
           <button class="btn btn-primary btn-sm" onclick="segnaComeFatturato('${o.id}')">FATTURATO</button>
         </div>
       </div>`).join("");
+  } else if(cfg.isEsterne){
+    rows = cfg.items.map(o=>{
+      const forn=[...new Set((o.righe||[]).filter(r=>isExternalCat(r.categoria)).map(r=>String(r.fornitore||r.sottocategoria||"").trim()).filter(Boolean))].map(escapeHtml).join(", ") || "Fornitore non indicato";
+      return `<div class="list-row" onclick="openJobCard('${o.id}')">
+        <div><div class="lr-main">${clientName(o.clientId)} <span style="font-size:9px;font-weight:400;color:var(--border);">${o.numero?('#'+o.numero):''}</span></div><div class="lr-sub">${forn} — consegna ${fmtDate(o.dataConsegna)}</div></div>
+        <span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span>
+      </div>`;}).join("");
   } else if(cfg.isRitirare){
     rows = cfg.items.map(o=>`
       <div class="list-row" style="cursor:default;">
