@@ -13978,8 +13978,8 @@ function filteredMagazzinoRows(q){
   return state.warehouse
     .filter(w => Number(w.quantita)>0
       && (w.warehouseGroup||"Tessile")===magazzinoGroupFilter
-      && (qn || !magazzinoColorFilter || warehouseColorKey(w.colore)===warehouseColorKey(magazzinoColorFilter))
-      && (qn || !magazzinoTagliaFilter || String(w.taglia||"").trim().toUpperCase()===String(magazzinoTagliaFilter).trim().toUpperCase())
+      && (!magazzinoColorFilter || warehouseColorKey(w.colore)===warehouseColorKey(magazzinoColorFilter))
+      && (!magazzinoTagliaFilter || String(w.taglia||"").trim().toUpperCase()===String(magazzinoTagliaFilter).trim().toUpperCase())
       && (!qn || hit(w)))
     .sort((a,b)=>{
       const codeCmp = String(a.codice||a.nome||"").localeCompare(String(b.codice||b.nome||""),"it",{numeric:true,sensitivity:"base"});
