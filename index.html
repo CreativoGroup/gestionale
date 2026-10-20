@@ -8020,6 +8020,7 @@ function completedOrderStageButton(o){
   return `<button class="btn btn-outline btn-sm" style="border-color:var(--ok);color:var(--ok);" onclick="openAvvisaCliente('${o.id}')">AVVISATO</button>${o.avvisoMetodo ? `<div class="lr-sub" style="margin-top:4px;text-align:center;">${escapeHtml(o.avvisoMetodo)}</div>` : ``}`;
 }
 function completedOrderInvoiceButton(o){
+  return ``; // fatturazione gestita in un altro gestionale
   if(o.fatturato){
     return `<button class="btn btn-sm" style="background:#0B4F2F;border:1px solid #0B4F2F;color:#FFFFFF;font-weight:900;cursor:default;" onclick="event.stopPropagation()">FATTURATO</button>`;
   }
@@ -8090,7 +8091,6 @@ function renderDashboard(){
   document.getElementById("view-dashboard").innerHTML = `
     <div class="grid grid-auto" style="margin-bottom:18px;">
       <div class="card stat clickable" onclick="openDashboardList('attivi')"><p class="stat-label">Ordini attivi</p><p class="stat-value">${ordiniInLavorazione.length}</p><p class="stat-sub">su ${state.orders.length} totali</p></div>
-      <div class="card stat clickable" onclick="openDashboardList('fatturare')"><p class="stat-label">Schede da fatturare</p><p class="stat-value" style="${daFatturare.length?'color:var(--accent)':''}">${daFatturare.length}</p><p class="stat-sub">contrassegnate "da fatturare"</p></div>
       <div class="card stat clickable" onclick="openDashboardList('materiale')"><p class="stat-label">Materiale da ordinare</p><p class="stat-value" style="${pezziDaOrdinare?'color:var(--teal)':''}">${pezziDaOrdinare}</p><p class="stat-sub">pezzi confermati da ordinare</p></div>
       <div class="card stat clickable" onclick="openDashboardList('esterne')"><p class="stat-label">Produzioni esterne</p><p class="stat-value" style="${produzioniEsterne.length?'color:var(--warn)':''}">${produzioniEsterne.length}</p><p class="stat-sub">ordini in lavorazione dai fornitori</p></div>
       <div class="card stat clickable" onclick="openDashboardList('scorte')"><p class="stat-label">Avvisi magazzino</p><p class="stat-value" style="${scorteBasse.length?'color:var(--danger)':''}">${scorteBasse.length}</p><p class="stat-sub">articoli a/scorta minima</p></div>
@@ -8268,7 +8268,7 @@ function compareOrdersNewestFirst(a,b){
 }
 function creditiApertiRaggruppati(){
   const map = new Map();
-  state.orders.filter(o=>o.stato==="Consegnato" && !o.daFatturare && !o.fatturato).forEach(o=>{
+  state.orders.filter(o=>o.stato==="Consegnato").forEach(o=>{
     const saldo = orderSaldo(o);
     if(saldo<=0.001) return;
     if(!map.has(o.clientId)) map.set(o.clientId, []);
@@ -8288,7 +8288,7 @@ function creditiApertiRaggruppati(){
 }
 function openCreditiCliente(clientId){
   const orders = state.orders
-    .filter(o=>o.clientId===clientId && o.stato==="Consegnato" && !o.daFatturare && !o.fatturato)
+    .filter(o=>o.clientId===clientId && o.stato==="Consegnato")
     .map(o=>({o, saldo:orderSaldo(o)}))
     .filter(x=>x.saldo>0.001)
     .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
@@ -11859,7 +11859,7 @@ function deleteOrderFromCreditiCliente(orderId, clientId){
     await reloadWarehouseFromDb();
 
     const rimasti = state.orders
-      .filter(o=>o.clientId===clientId && o.stato==="Consegnato" && !o.daFatturare && !o.fatturato)
+      .filter(o=>o.clientId===clientId && o.stato==="Consegnato")
       .map(o=>({o,saldo:orderSaldo(o)}))
       .filter(x=>x.saldo>0.001);
 
@@ -13053,9 +13053,6 @@ function openJobCard(orderId){
           <div class="job-v2-soft">
             <h4>Fatturazione</h4>
             <label class="checkfield" style="margin-bottom:10px;"><input type="checkbox" ${o.ivaApplicata?'checked':''} onchange="updateOrderCheck('${o.id}','ivaApplicata',this.checked)"> Applica IVA 22%</label>
-            <label class="checkfield"><input type="checkbox" ${o.daFatturare?'checked':''} onchange="updateOrderCheck('${o.id}','daFatturare',this.checked)"> Da fatturare</label>
-            ${o.daFatturare?`<label class="checkfield" style="margin-top:10px;"><input type="checkbox" ${o.fatturato?'checked':''} onchange="updateOrderCheck('${o.id}','fatturato',this.checked)"> Fatturato</label>`:""}
-            <div class="job-v2-info-sub" style="margin-top:16px;">Lo stato di fatturazione viene usato anche nei report Incassi.</div>
           </div>
 
           <div class="job-v2-soft">
@@ -13175,7 +13172,7 @@ function openAddPaymentModal(orderId){
       <div style="font-weight:800;margin-bottom:12px;">Fatturazione e totale</div>
 
       <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
-        <label class="checkfield">
+        <label class="checkfield" style="display:none;">
           <input id="ap-da-fatturare" type="checkbox" ${o.daFatturare?'checked':''} onchange="refreshAddPaymentTotals('${orderId}')">
           Da fatturare
         </label>
@@ -14972,7 +14969,7 @@ function renderIncassi(){
   const incassatoNonFatturatoMese = pagamentiNonFatturatiMese
     .reduce((s,p)=>s+Number(p.importo||0),0);
   const creditiAperti = state.orders
-    .filter(o=>o.stato==="Consegnato" && !o.daFatturare && !o.fatturato)
+    .filter(o=>o.stato==="Consegnato")
     .map(o=>({o, saldo:orderSaldo(o)}))
     .filter(x=>x.saldo>0.001)
     .sort((a,b)=>compareOrdersNewestFirst(a.o,b.o));
