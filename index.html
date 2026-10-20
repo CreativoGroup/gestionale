@@ -13053,6 +13053,7 @@ function openJobCard(orderId){
           <div class="job-v2-soft">
             <h4>Fatturazione</h4>
             <label class="checkfield" style="margin-bottom:10px;"><input type="checkbox" ${o.ivaApplicata?'checked':''} onchange="updateOrderCheck('${o.id}','ivaApplicata',this.checked)"> Applica IVA 22%</label>
+            <label class="checkfield"><input type="checkbox" ${o.daFatturare?'checked':''} onchange="updateOrderCheck('${o.id}','daFatturare',this.checked)"> Da fatturare</label>
           </div>
 
           <div class="job-v2-soft">
