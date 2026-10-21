@@ -17192,31 +17192,30 @@ if("serviceWorker" in navigator){
 
 window.addEventListener("error",e=>{ try{ showToast("Errore: "+(e.message||"sconosciuto")); }catch(_){} });
 /* Etichetta versione (in basso a sinistra, piccola) per capire quale versione è aperta */
-(function(){ const d=document.createElement("div"); d.textContent="v. 21/10 18:30"; d.style.cssText="position:fixed;left:8px;bottom:4px;font:600 10px Inter,system-ui,sans-serif;color:#8a94a3;opacity:.75;z-index:50;pointer-events:none;"; window.addEventListener("load",()=>document.body.appendChild(d)); })();
+(function(){ const d=document.createElement("div"); d.textContent="v. 21/10 18:45"; d.style.cssText="position:fixed;left:8px;bottom:4px;font:600 10px Inter,system-ui,sans-serif;color:#8a94a3;opacity:.75;z-index:50;pointer-events:none;"; window.addEventListener("load",()=>document.body.appendChild(d)); })();
 
-/* Avviso "nuova versione disponibile": le schede lasciate aperte per giorni non vedono gli aggiornamenti */
+/* Avviso "nuova versione disponibile": compare solo se la versione online cambia davvero (2 controlli di fila uguali) */
 (function(){
-  let first=null, shown=false;
+  let first=null, pending=null, shown=false;
   async function tag(){
     try{
       const r=await fetch(location.pathname,{method:"HEAD",cache:"no-store"});
-      return (r.headers.get("etag")||"")+"|"+(r.headers.get("last-modified")||"")+"|"+(r.headers.get("content-length")||"");
-    }catch(_){ return null; }
+      return r.headers.get("etag")||"";
+    }catch(_){ return ""; }
   }
   async function check(){
     if(shown || document.hidden) return;
-    const t=await tag(); if(!t || t==="||") return;
+    const t=await tag(); if(!t) return;
     if(first===null){ first=t; return; }
-    if(t!==first){
-      shown=true;
-      const bar=document.createElement("div");
-      bar.style.cssText="position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;background:#111827;color:#fff;padding:12px 18px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.25);font:700 14px Inter,system-ui,sans-serif;display:flex;gap:12px;align-items:center;";
-      bar.innerHTML='Nuova versione del gestionale disponibile <button style="background:#F05B37;color:#fff;border:0;border-radius:999px;padding:7px 14px;font-weight:800;cursor:pointer;" onclick="location.reload()">AGGIORNA</button>';
-      document.body.appendChild(bar);
-    }
+    if(t===first){ pending=null; return; }
+    if(pending!==t){ pending=t; return; } // serve una seconda conferma
+    shown=true;
+    const bar=document.createElement("div");
+    bar.style.cssText="position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;background:#111827;color:#fff;padding:12px 18px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.25);font:700 14px Inter,system-ui,sans-serif;display:flex;gap:12px;align-items:center;";
+    bar.innerHTML='Nuova versione del gestionale disponibile <button style="background:#F05B37;color:#fff;border:0;border-radius:999px;padding:7px 14px;font-weight:800;cursor:pointer;" onclick="location.reload()">AGGIORNA</button><button style="background:transparent;color:#9aa4b2;border:0;font-size:16px;cursor:pointer;" title="Nascondi" onclick="this.parentNode.remove()">✕</button>';
+    document.body.appendChild(bar);
   }
-  window.addEventListener("load",()=>{ setTimeout(check,3000); setInterval(check,180000); });
-  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) check(); });
+  window.addEventListener("load",()=>{ setTimeout(check,3000); setInterval(check,300000); });
 })();
 
 /* ============ SCHEDA RAPIDA LAVORI COMPLETATI ============ */
