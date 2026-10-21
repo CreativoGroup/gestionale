@@ -11001,7 +11001,7 @@ function renderDropbox(){
         </div>
 
         <div id="dropboxUploadBox" class="dropbox-upload-box">
-          <input id="dropboxFileInput" type="file">
+          <input id="dropboxFileInput" type="file" multiple>
           <div style="margin-top:10px;">
             <button class="btn btn-primary btn-sm" onclick="dropboxUploadSelected()">Carica su Dropbox</button>
           </div>
@@ -11090,20 +11090,25 @@ async function dropboxPromptCreateFolder(){
 
 async function dropboxUploadSelected(){
   const input=document.getElementById("dropboxFileInput");
-  const file=input?.files?.[0];
-  if(!file){ showToast("Scegli un file da caricare"); return; }
-
-  const path=(dropboxCurrentPath?dropboxCurrentPath:"")+"/"+file.name;
-  try{
-    await dropboxUploadBlob(path,file);
+  const files=Array.from(input?.files||[]);
+  if(!files.length){ showToast("Scegli almeno un file da caricare"); return; }
+  let ok=0, errors=[];
+  for(let i=0;i<files.length;i++){
+    showToast(`Carico ${i+1} di ${files.length}…`);
+    try{
+      await dropboxUploadBlob((dropboxCurrentPath?dropboxCurrentPath:"")+"/"+files[i].name,files[i]);
+      ok++;
+    }catch(err){
+      console.error("Dropbox upload",err);
+      errors.push(files[i].name+": "+(err?.message||"errore"));
+    }
+  }
+  if(ok){
     input.value="";
     document.getElementById("dropboxUploadBox")?.classList.remove("open");
-    showToast("File caricato su Dropbox");
     dropboxLoadFolder(dropboxCurrentPath);
-  }catch(err){
-    console.error("Dropbox upload",err);
-    showToast(err?.message||"Errore upload Dropbox");
   }
+  showToast(errors.length ? `Caricati ${ok} di ${files.length}. Errore: ${errors[0]}` : (ok>1?`${ok} file caricati su Dropbox`:"File caricato su Dropbox"));
 }
 
 async function dropboxDownloadFile(fileRef,name){
@@ -11276,7 +11281,7 @@ function renderJobDropboxBlock(o,c){
 
       <div id="jobDropboxUpload-${o.id}" class="job-dropbox-upload">
         <div class="job-dropbox-upload-row">
-          <input id="jobDropboxFile-${o.id}" type="file">
+          <input id="jobDropboxFile-${o.id}" type="file" multiple>
           <select id="jobDropboxDest-${o.id}">
             ${JOB_DROPBOX_SUBFOLDERS.map(name=>`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
           </select>
@@ -11495,22 +11500,28 @@ async function jobDropboxUpload(orderId){
   const o=findItem("orders",orderId);
   const input=document.getElementById(`jobDropboxFile-${orderId}`);
   const dest=document.getElementById(`jobDropboxDest-${orderId}`);
-  const file=input?.files?.[0];
-  if(!o || !file){ showToast("Scegli un file da caricare"); return; }
+  const files=Array.from(input?.files||[]);
+  if(!o || !files.length){ showToast("Scegli almeno un file da caricare"); return; }
 
   const folder=dest?.value||"FILE RICEVUTI";
-  const finalName=jobDropboxFileName(o,file.name);
-  const path=`${jobDropboxBasePath(o)}/${folder}/${finalName}`;
-  try{
-    await dropboxUploadBlob(path,file);
+  let ok=0, errors=[];
+  for(let i=0;i<files.length;i++){
+    const file=files[i];
+    showToast(`Carico ${i+1} di ${files.length}…`);
+    try{
+      await dropboxUploadBlob(`${jobDropboxBasePath(o)}/${folder}/${jobDropboxFileName(o,file.name)}`,file);
+      ok++;
+    }catch(err){
+      console.error("Dropbox ordine upload",err);
+      errors.push(file.name+": "+(err?.message||"errore"));
+    }
+  }
+  if(ok){
     input.value="";
     jobDropboxUiState[orderId]={...(jobDropboxUiState[orderId]||{}),folder};
     jobDropboxSelectFolder(orderId,folder);
-    showToast(`File caricato in ${folder}`);
-  }catch(err){
-    console.error("Dropbox ordine upload",err);
-    showToast(err?.message||"Errore upload Dropbox");
   }
+  showToast(errors.length ? `Caricati ${ok} di ${files.length}. Errore: ${errors[0]}` : (ok>1?`${ok} file caricati in ${folder}`:`File caricato in ${folder}`));
 }
 
 function jobDropboxDownloadEncoded(pathEncoded,nameEncoded){
