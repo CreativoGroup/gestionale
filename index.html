@@ -9678,6 +9678,10 @@ function awDefaultColorCode(colore){
   const w=name.split(/[\s-]+/).filter(Boolean);
   return (w.length>1 ? w.map(x=>x[0]).join("").slice(0,2) : name.slice(0,2)).toLowerCase();
 }
+function awColorCodeFor(codice,colore,saved){
+  saved=saved||awColorCodesLoad();
+  return saved[codice+"|"+colore] || saved[colore] || awDefaultColorCode(colore);
+}
 function awExportRows(){
   const map=new Map();
   computeMagazzinoDaOrdinare().forEach(({entry})=>{
@@ -9692,13 +9696,13 @@ function openAwExport(){
   const rows=awExportRows();
   if(!rows.length){ showToast("Niente da esportare"); return; }
   const saved=awColorCodesLoad();
-  const colors=[...new Set(rows.map(r=>r.colore))];
+  const colors=[...new Map(rows.map(r=>[r.codice+"|"+r.colore,{codice:r.codice,colore:r.colore}])).values()];
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>Esporta per Action Wear</h2>
-    <p style="color:var(--muted);margin-top:0;">Controlla la <b>sigla colore</b> (quella che Action Wear vuole nel file). Se la correggi, il gestionale se la ricorda per le prossime volte.</p>
-    <table><thead><tr><th>Colore</th><th>Sigla</th></tr></thead><tbody>
-    ${colors.map((c,i)=>`<tr><td>${escapeHtml(c)}</td><td><input id="aw-col-${i}" data-colore="${escapeHtml(c)}" value="${escapeHtml(saved[c]||awDefaultColorCode(c))}" style="width:80px;"></td></tr>`).join("")}
+    <p style="color:var(--muted);margin-top:0;">Controlla la <b>sigla colore</b> di ogni articolo (quella che Action Wear vuole nel file: lo stesso colore può avere sigle diverse su articoli diversi). Se la correggi, il gestionale se la ricorda per le prossime volte.</p>
+    <table><thead><tr><th>Articolo</th><th>Colore</th><th>Sigla</th></tr></thead><tbody>
+    ${colors.map((c,i)=>`<tr><td>${escapeHtml(c.codice.toUpperCase())}</td><td>${escapeHtml(c.colore)}</td><td><input id="aw-col-${i}" data-key="${escapeHtml(c.codice+"|"+c.colore)}" value="${escapeHtml(awColorCodeFor(c.codice,c.colore,saved))}" style="width:80px;"></td></tr>`).join("")}
     </tbody></table>
     <p class="helptext" style="margin:14px 0 6px;">Righe del file: ${rows.length} · pezzi: ${rows.reduce((t,r)=>t+r.qty,0)}</p>
     <div style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;">
@@ -9712,10 +9716,10 @@ function downloadAwCsv(){
   const codes=awColorCodesLoad();
   document.querySelectorAll('[id^="aw-col-"]').forEach(inp=>{
     const v=String(inp.value||"").trim().toLowerCase();
-    if(v) codes[inp.dataset.colore]=v;
+    if(v) codes[inp.dataset.key]=v;
   });
   awColorCodesSave(codes);
-  const csv=rows.map(r=>[r.codice,(codes[r.colore]||awDefaultColorCode(r.colore)),r.taglia,r.qty].join(",")).join("\n")+"\n";
+  const csv=rows.map(r=>[r.codice,awColorCodeFor(r.codice,r.colore,codes),r.taglia,r.qty].join(",")).join("\n")+"\n";
   const blob=new Blob([csv],{type:"text/csv"});
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a"); a.href=url; a.download="ordine-actionwear-"+today()+".csv"; a.style.display="none";
