@@ -15090,6 +15090,7 @@ function renderIncassi(){
   // Incassi del mese corrente: comprende TUTTI i pagamenti registrati,
   // indipendentemente dal fatto che la scheda sia fatturata oppure no.
   const incassatoMeseCorrente = state.payments
+    .filter(p=>{ const od=findItem("orders",p.orderId); return !(od && (od.fatturato || od.daFatturare)); })
     .filter(p=>p.data && p.data.slice(0,7)===meseCorrente)
     .reduce((s,p)=>s+Number(p.importo||0),0);
 
@@ -15214,7 +15215,7 @@ function renderIncassi(){
       <div class="card stat">
         <p class="stat-label">Totale incassato MENSILE</p>
         <p class="stat-value">${fmtMoney(incassatoMeseCorrente)}</p>
-        <p class="stat-sub">tutti i pagamenti registrati nel mese corrente</p>
+        <p class="stat-sub">pagamenti del mese corrente, esclusi gli ordini fatturati / da fatturare</p>
       </div>
 
 
