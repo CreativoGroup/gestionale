@@ -8032,7 +8032,7 @@ function completedOrderInvoiceButton(o){
 function completedOrderAmountButton(o){
   const saldo=Math.max(0, Math.round(orderSaldo(o)*100)/100);
   if(saldo<=0.005 && o.stato==="Completato"){
-    return `<button class="btn btn-sm" style="background:var(--ok,#1F8A4C);border:1px solid var(--ok,#1F8A4C);color:#fff;font-size:17px;line-height:1;padding:7px 12px;white-space:nowrap;" title="Pagato: clic per segnare CONSEGNATO" aria-label="Segna come consegnato" onclick="segnaConsegnatoDaLista('${o.id}')">🤲📦</button>`;
+    return `<button class="btn btn-sm" style="background:var(--ok,#1F8A4C);border:1px solid var(--ok,#1F8A4C);color:#fff;font-size:17px;line-height:1;padding:7px 12px;white-space:nowrap;" title="Pagato: clic per segnare CONSEGNATO" aria-label="Segna come consegnato" onclick="segnaConsegnatoDaLista('${o.id}')">🤝</button>`;
   }
   return `<button class="btn btn-outline btn-sm" style="font-weight:850;white-space:nowrap;color:#111827;border-color:#DDE3EA;" title="Residuo da incassare · clic per aggiungere un pagamento" onclick="openCompletedOrderPayment('${o.id}')">${fmtMoney(saldo)}</button>`;
 }
