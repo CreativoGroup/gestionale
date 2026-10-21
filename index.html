@@ -13333,6 +13333,7 @@ function openAddPaymentModal(orderId, fromList){
       <button class="btn btn-outline" onclick="closeAddPaymentModal('${orderId}')">Annulla</button>
     </div>
   `;
+  document.getElementById("modalBackdrop").classList.add("open");
 }
 
 async function submitAddPayment(orderId){
