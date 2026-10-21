@@ -13231,8 +13231,13 @@ function duplicateOrder(orderId){
 }
 
 function openCompletedOrderPayment(orderId){
-  // Apre il modal e porta subito l'utente al form AGGIUNGI PAGAMENTO.
-  openAddPaymentModal(orderId, true);
+  // Apre direttamente il popup AGGIUNGI PAGAMENTO (senza passare dalla scheda lavoro).
+  try{
+    openAddPaymentModal(orderId, true);
+  }catch(err){
+    console.error("Apri pagamento",err);
+    showToast("Errore apertura pagamento: "+(err&&err.message||err));
+  }
 }
 
 function addPaymentPreviewOrder(orderId){
@@ -17182,6 +17187,9 @@ if("serviceWorker" in navigator){
     });
   });
 }
+
+/* Etichetta versione (in basso a sinistra, piccola) per capire quale versione è aperta */
+(function(){ const d=document.createElement("div"); d.textContent="v. 21/10 18:15"; d.style.cssText="position:fixed;left:8px;bottom:4px;font:600 10px Inter,system-ui,sans-serif;color:#8a94a3;opacity:.75;z-index:50;pointer-events:none;"; window.addEventListener("load",()=>document.body.appendChild(d)); })();
 
 /* Avviso "nuova versione disponibile": le schede lasciate aperte per giorni non vedono gli aggiornamenti */
 (function(){
