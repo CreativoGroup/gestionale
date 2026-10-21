@@ -17113,6 +17113,30 @@ if("serviceWorker" in navigator){
   });
 }
 
+/* Avviso "nuova versione disponibile": le schede lasciate aperte per giorni non vedono gli aggiornamenti */
+(function(){
+  let first=null, shown=false;
+  async function tag(){
+    try{
+      const r=await fetch(location.pathname,{method:"HEAD",cache:"no-store"});
+      return (r.headers.get("etag")||"")+"|"+(r.headers.get("last-modified")||"")+"|"+(r.headers.get("content-length")||"");
+    }catch(_){ return null; }
+  }
+  async function check(){
+    if(shown || document.hidden) return;
+    const t=await tag(); if(!t || t==="||") return;
+    if(first===null){ first=t; return; }
+    if(t!==first){
+      shown=true;
+      const bar=document.createElement("div");
+      bar.style.cssText="position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;background:#111827;color:#fff;padding:12px 18px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.25);font:700 14px Inter,system-ui,sans-serif;display:flex;gap:12px;align-items:center;";
+      bar.innerHTML='Nuova versione del gestionale disponibile <button style="background:#F05B37;color:#fff;border:0;border-radius:999px;padding:7px 14px;font-weight:800;cursor:pointer;" onclick="location.reload()">AGGIORNA</button>';
+      document.body.appendChild(bar);
+    }
+  }
+  window.addEventListener("load",()=>{ setTimeout(check,3000); setInterval(check,180000); });
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) check(); });
+})();
 
 /* ============ SCHEDA RAPIDA LAVORI COMPLETATI ============ */
 let completedSheetOrderId = null;
