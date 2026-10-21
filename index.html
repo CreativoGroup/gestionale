@@ -3845,7 +3845,7 @@ function orderIva(o){ return o.ivaApplicata ? (orderImponibile(o) + orderSpedizi
 function orderTotale(o){ const base = orderImponibile(o) + orderSpedizioneCosto(o) + orderIva(o) - (Number(o.sconto)||0); return Math.max(0, base); }
 function orderIncassato(o){ return state.payments.filter(p=>p.orderId===o.id).reduce((s,p)=>s+Number(p.importo),0); }
 function orderSaldo(o){ return orderTotale(o) - orderIncassato(o); }
-function paymentsTotaleMese(mese){ return state.payments.filter(p=>p.data.slice(0,7)===mese).reduce((s,p)=>s+Number(p.importo),0); }
+function paymentsTotaleMese(mese){ return state.payments.filter(p=>p.data.slice(0,7)===mese && !paymentIsFatturato(p)).reduce((s,p)=>s+Number(p.importo),0); }
 function entrateTotaleMese(mese){ return (state.entrate||[]).filter(e=>e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
 function speseTotaleMese(mese){ return state.expenses.filter(e=>e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
 function costiFissiTotaleMese(mese){ return (state.fixedCosts||[]).filter(e=>e.data && e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
@@ -14864,9 +14864,10 @@ function mondayOf(dateStr){
 const MESI_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const GIORNI_IT = ["domenica","lunedì","martedì","mercoledì","giovedì","venerdì","sabato"];
 function dayLabelIt(dateStr){ const d = new Date(dateStr+"T00:00:00"); return `${GIORNI_IT[d.getDay()]} ${fmtDate(dateStr)}`; }
+// Gli ordini fatturati / da fatturare sono gestiti nel gestionale di fatturazione: fuori da tutti i conti qui.
+function orderFuoriConti(o){ return !!(o && (o.fatturato || o.daFatturare)); }
 function paymentIsFatturato(p){
-  const o=findItem("orders",p.orderId);
-  return false; // la fatturazione si gestisce in un altro gestionale
+  return orderFuoriConti(findItem("orders",p.orderId));
 }
 function statsInRange(startDate, endDate){
   // Gli incassi di schede già fatturate non entrano nei report giornaliero/settimanale
@@ -14901,8 +14902,8 @@ function buildMonthlyRows(year){
   return MESI_IT.map((nome,idx)=>{
     const mm = String(idx+1).padStart(2,"0");
     const monthKey = `${year}-${mm}`;
-    const ordersInMonth = state.orders.filter(o=>o.createdAt && o.createdAt.slice(0,7)===monthKey);
-    const paymentsInMonth = state.payments.filter(p=>p.data && p.data.slice(0,7)===monthKey);
+    const ordersInMonth = state.orders.filter(o=>o.createdAt && o.createdAt.slice(0,7)===monthKey && !orderFuoriConti(o));
+    const paymentsInMonth = state.payments.filter(p=>p.data && p.data.slice(0,7)===monthKey && !paymentIsFatturato(p));
 
     // Separazione richiesta:
     // - "Pagamenti" = incassi collegati a schede NON fatturate
@@ -14998,7 +14999,7 @@ function monthMovementRows(key, kind){
     const o=findItem("orders",p.orderId);
     return {data:p.data, tipo:"Incasso", descrizione:`${clientName(p.clientId)} — ${p.tipo||"Pagamento"}${o&&o.numero?` · ordine #${o.numero}`:""}`, metodo:normalizePaymentMethod(p.metodo), importo:Number(p.importo)||0, orderId:p.orderId};
   });
-  const pays=state.payments.filter(p=>inP(p.data));
+  const pays=state.payments.filter(p=>inP(p.data) && !paymentIsFatturato(p));
   const nonFatt=pays.filter(p=>!paymentIsFatturato(p));
   const fatt=pays.filter(p=>paymentIsFatturato(p));
   const ent=(state.entrate||[]).filter(e=>inP(e.data)).map(e=>({data:e.data,tipo:"Entrata",descrizione:e.descrizione,metodo:e.metodo,importo:Number(e.importo)||0}));
@@ -15090,7 +15091,7 @@ function renderIncassi(){
   // Incassi del mese corrente: comprende TUTTI i pagamenti registrati,
   // indipendentemente dal fatto che la scheda sia fatturata oppure no.
   const incassatoMeseCorrente = state.payments
-    .filter(p=>{ const od=findItem("orders",p.orderId); return !(od && (od.fatturato || od.daFatturare)); })
+    .filter(p=>!paymentIsFatturato(p))
     .filter(p=>p.data && p.data.slice(0,7)===meseCorrente)
     .reduce((s,p)=>s+Number(p.importo||0),0);
 
@@ -15118,7 +15119,7 @@ function renderIncassi(){
   const saldoOrdiniFatturati = ordiniFatturati.reduce((s,o)=>s+Math.max(0,orderSaldo(o)),0);
 
   const guadagno = (paymentsTotaleMese(f.mese) + entrateTotaleMese(f.mese)) - speseTotaleMese(f.mese) - costiFissiTotaleMese(f.mese);
-  const filtered = state.payments.filter(p => (!f.metodo||p.metodo===f.metodo) && paymentMatchesCategoria(p,f.categoria) && (!f.mese||p.data.slice(0,7)===f.mese));
+  const filtered = state.payments.filter(p => !paymentIsFatturato(p) && (!f.metodo||p.metodo===f.metodo) && paymentMatchesCategoria(p,f.categoria) && (!f.mese||p.data.slice(0,7)===f.mese));
 
   let reportHtml = "";
   if(f.view==="giorno"){
