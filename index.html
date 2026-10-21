@@ -3274,7 +3274,7 @@ function normalizePaymentMethod(v){
 const PAY_TIPI = ["Acconto","Saldo"];
 const CLIENT_TYPES = ["Business","Family"];
 const CARATTERE_OPTIONS = ["Tra i migliori","Buon cliente","Potenziale","Ripetitivo","Grande ordine","Da coccolare","Dormiente","Da evitare"];
-const SETTORI = ["Abbigliamento", "Agenzia Viaggi/Auto/Funebre", "Architetti", "Arte", "Associazione Sportiva", "Automotive", "Cinema/Spettacolo", "Creativi", "Cura Persona", "Danza", "Edile", "Editoria", "Ente e Associazioni", "Eventi / Marketing", "Fisioterapia", "Hotellerie", "Immobiliare", "Legale/Tributario/Assicurativo", "Lusso", "Medicina Estetica", "Medico", "Ospedale", "Palestra", "Piccolo Commerciante", "Ristorazione", "Scuola/Parrocchia", "Settore Politica", "Studio Professionale", "Tecnologico", "Università"];
+const SETTORI = ["Abbigliamento", "Agenzia Viaggi/Auto/Funebre", "Architetti", "Arte", "Associazione Sportiva", "Automotive", "Cinema/Spettacolo", "Creativi", "Cura Persona", "Danza", "Edile", "Editoria", "Ente e Associazioni", "Eventi / Marketing", "Fisioterapia", "Hotellerie", "Immobiliare", "Legale/Tributario/Assicurativo", "Lusso", "Medicina Estetica", "Medico", "Ospedale", "Palestra", "Piccolo Commerciante", "Ristorazione", "Scuola/Parrocchia", "Settore Politica", "Studio Professionale", "Tecnologico", "Università", "Artigiani", "Altro"];
 const CONSEGNA_TIPI = ["Ritiro in sede","Spedizione","Allestimento"];
 function orderAllestimentoIndirizzo(o){
   if(o.allestimentoIndirizzo && String(o.allestimentoIndirizzo).trim()) return String(o.allestimentoIndirizzo).trim();
