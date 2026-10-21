@@ -8862,7 +8862,13 @@ function readCommonClientFields(prefix){
 }
 /* Crea (o aggiorna, se existingId è passato) un cliente leggendo i campi con un dato prefisso.
    IMPORTANTE: ritorna l'id solo DOPO che Supabase ha confermato il salvataggio. */
+let createClientBusy=false;
 async function createClientFromPrefix(prefix, existingId){
+  if(createClientBusy) return null;
+  createClientBusy=true;
+  try{ return await createClientFromPrefixInner(prefix, existingId); } finally{ createClientBusy=false; }
+}
+async function createClientFromPrefixInner(prefix, existingId){
   const tipo = document.getElementById(`${prefix}-tipo`).value;
   const telefono = document.getElementById(`${prefix}-telefono`).value.trim();
   emailListSync(prefix);
@@ -8917,6 +8923,14 @@ async function createClientFromPrefix(prefix, existingId){
     return existingId;
   }
 
+  // Anti-doppione: stesso nome e stessa email/telefono di un cliente già presente → uso quello.
+  {
+    const nn=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+    const nameKey=nn(clientDisplayNameBase(payload));
+    const mailKey=nn(payload.email), telKey=String(payload.telefono||"").replace(/\D/g,"");
+    const dup=state.clients.find(c=>nn(clientDisplayNameBase(c))===nameKey && nameKey && ((mailKey && nn(c.email)===mailKey) || (telKey && String(c.telefono||"").replace(/\D/g,"")===telKey)));
+    if(dup){ showToast("Cliente già presente in anagrafica: uso quello esistente"); return dup.id; }
+  }
   const id = uid();
   const nuovo = {id, ...payload, archiviatoRecenti:false};
   const saved = await upsertOneReturning('clients', nuovo);
