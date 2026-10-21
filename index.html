@@ -8030,7 +8030,23 @@ function completedOrderInvoiceButton(o){
   return `<button class="btn btn-outline btn-sm" style="border-color:#C62828;color:#C62828;font-weight:900;" onclick="segnaFatturatoDaCompletati('${o.id}')">DA FATTURARE</button>`;
 }
 function completedOrderAmountButton(o){
-  return `<button class="btn btn-outline btn-sm" style="font-weight:850;white-space:nowrap;color:#111827;border-color:#DDE3EA;" title="Residuo da incassare · clic per aggiungere un pagamento" onclick="openCompletedOrderPayment('${o.id}')">${fmtMoney(Math.max(0, Math.round(orderSaldo(o)*100)/100))}</button>`;
+  const saldo=Math.max(0, Math.round(orderSaldo(o)*100)/100);
+  if(saldo<=0.005 && o.stato==="Completato"){
+    return `<button class="btn btn-sm" style="background:var(--ok,#1F8A4C);border:1px solid var(--ok,#1F8A4C);color:#fff;font-size:17px;line-height:1;padding:7px 12px;white-space:nowrap;" title="Pagato: clic per segnare CONSEGNATO" aria-label="Segna come consegnato" onclick="segnaConsegnatoDaLista('${o.id}')">🤲📦</button>`;
+  }
+  return `<button class="btn btn-outline btn-sm" style="font-weight:850;white-space:nowrap;color:#111827;border-color:#DDE3EA;" title="Residuo da incassare · clic per aggiungere un pagamento" onclick="openCompletedOrderPayment('${o.id}')">${fmtMoney(saldo)}</button>`;
+}
+async function segnaConsegnatoDaLista(orderId){
+  const o=findItem("orders",orderId);
+  if(!o || o.stato==="Consegnato") return;
+  const oldState=o.stato;
+  o.stato="Consegnato"; o.consegnatoIl=new Date().toISOString();
+  const saved=await upsertOneReturning("orders",o);
+  if(!saved){ o.stato=oldState; o.consegnatoIl=""; showToast("Impossibile segnare come consegnato"); return; }
+  const i=state.orders.findIndex(x=>x.id===orderId);
+  if(i>=0) state.orders[i]=saved;
+  renderCurrentView();
+  showToast("Ordine CONSEGNATO");
 }
 async function segnaFatturatoDaCompletati(orderId){
   const o=findItem('orders',orderId);
@@ -13147,8 +13163,7 @@ function duplicateOrder(orderId){
 
 function openCompletedOrderPayment(orderId){
   // Apre il modal e porta subito l'utente al form AGGIUNGI PAGAMENTO.
-  openJobCard(orderId);
-  openAddPaymentModal(orderId);
+  openAddPaymentModal(orderId, true);
 }
 
 function addPaymentPreviewOrder(orderId){
@@ -13188,13 +13203,19 @@ function refreshAddPaymentTotals(orderId){
   if(importoEl) importoEl.value=saldo>0 ? saldo.toFixed(2) : "";
 }
 
-function openAddPaymentModal(orderId){
+let addPaymentFromList=false;
+function closeAddPaymentModal(orderId){
+  if(addPaymentFromList){ addPaymentFromList=false; closeModal(); }
+  else openJobCard(orderId);
+}
+function openAddPaymentModal(orderId, fromList){
+  addPaymentFromList=!!fromList;
   const o = findItem('orders', orderId);
   const saldo = orderSaldo(o);
   const totale = orderTotale(o);
 
   document.getElementById("modalBody").innerHTML = `
-    <button class="close-x" onclick="openJobCard('${orderId}')">×</button>
+    <button class="close-x" onclick="closeAddPaymentModal('${orderId}')">×</button>
     <h2>Aggiungi pagamento</h2>
     <p id="ap-help" class="helptext" style="margin-top:0;">Importo suggerito in base al saldo ancora da incassare: ${fmtMoney(saldo)}.</p>
 
@@ -13240,7 +13261,7 @@ function openAddPaymentModal(orderId){
 
     <div class="form-actions">
       <button class="btn btn-primary" onclick="submitAddPayment('${orderId}')">Salva</button>
-      <button class="btn btn-outline" onclick="openJobCard('${orderId}')">Annulla</button>
+      <button class="btn btn-outline" onclick="closeAddPaymentModal('${orderId}')">Annulla</button>
     </div>
   `;
 }
@@ -13287,6 +13308,12 @@ async function submitAddPayment(orderId){
 
   state.payments.push(savedPayment);
   showToast("Pagamento registrato");
+  if(addPaymentFromList){
+    addPaymentFromList=false;
+    closeModal();
+    renderCurrentView();
+    return;
+  }
   openJobCard(orderId);
 }
 
