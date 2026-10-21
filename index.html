@@ -8696,6 +8696,7 @@ function openDashboardList(type){
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>${cfg.title}</h2>
     <p style="color:var(--muted);margin-top:0;">${cfg.items.length} elemento/i — clicca per aprire la scheda</p>
+    ${cfg.isMagazzino && cfg.items.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button class="btn btn-primary btn-sm" onclick="openAwExport()">⬇ Esporta CSV Action Wear</button><button class="btn btn-outline btn-sm" onclick="segnaTuttoNelCarrello()">Segna tutto nel carrello</button></div>` : ""}
     <div style="margin-top:14px;">${rows || `<p class="empty">Nessun elemento.</p>`}</div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
@@ -9664,6 +9665,74 @@ function confermaOrdineMagazzino(orderId, rigaId){
   saveState('orders');
   openJobCard(orderId);
   showToast(`${entry.daOrdinareQty} pz aggiunti a Materiale da ordinare`);
+}
+/* ===== Export CSV Action Wear (carrello da CSV): codice articolo, sigla colore, taglia, quantità ===== */
+function awColorCodesLoad(){ try{ return JSON.parse(localStorage.getItem("aw_color_codes")||"{}")||{}; }catch(_){ return {}; } }
+function awColorCodesSave(m){ try{ localStorage.setItem("aw_color_codes",JSON.stringify(m)); }catch(_){} }
+function awDefaultColorCode(colore){
+  const name=canonicalWarehouseColor(colore);
+  const key=name.toLowerCase();
+  // sigla già nota nella mappa colori del magazzino (2 lettere), altrimenti iniziali delle parole
+  const known=Object.keys(WAREHOUSE_COLOR_MAP).find(k=>WAREHOUSE_COLOR_MAP[k].toLowerCase()===key && /^[A-Z]{2}$/.test(k));
+  if(known) return known.toLowerCase();
+  const w=name.split(/[\s-]+/).filter(Boolean);
+  return (w.length>1 ? w.map(x=>x[0]).join("").slice(0,2) : name.slice(0,2)).toLowerCase();
+}
+function awExportRows(){
+  const map=new Map();
+  computeMagazzinoDaOrdinare().forEach(({entry})=>{
+    const col=canonicalWarehouseColor(entry.colore);
+    const k=[String(entry.codice).toLowerCase(),col.toLowerCase(),String(entry.taglia).toLowerCase()].join("|");
+    const r=map.get(k)||{codice:String(entry.codice).trim().toLowerCase(),colore:col,taglia:String(entry.taglia).trim().toLowerCase(),qty:0};
+    r.qty+=Number(entry.daOrdinareQty)||0; map.set(k,r);
+  });
+  return [...map.values()].sort((a,b)=>a.codice.localeCompare(b.codice)||a.colore.localeCompare(b.colore));
+}
+function openAwExport(){
+  const rows=awExportRows();
+  if(!rows.length){ showToast("Niente da esportare"); return; }
+  const saved=awColorCodesLoad();
+  const colors=[...new Set(rows.map(r=>r.colore))];
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2>Esporta per Action Wear</h2>
+    <p style="color:var(--muted);margin-top:0;">Controlla la <b>sigla colore</b> (quella che Action Wear vuole nel file). Se la correggi, il gestionale se la ricorda per le prossime volte.</p>
+    <table><thead><tr><th>Colore</th><th>Sigla</th></tr></thead><tbody>
+    ${colors.map((c,i)=>`<tr><td>${escapeHtml(c)}</td><td><input id="aw-col-${i}" data-colore="${escapeHtml(c)}" value="${escapeHtml(saved[c]||awDefaultColorCode(c))}" style="width:80px;"></td></tr>`).join("")}
+    </tbody></table>
+    <p class="helptext" style="margin:14px 0 6px;">Righe del file: ${rows.length} · pezzi: ${rows.reduce((t,r)=>t+r.qty,0)}</p>
+    <div style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;">
+      ${rows.map(r=>`<div>${escapeHtml(r.codice.toUpperCase())} · ${escapeHtml(r.colore)} · ${escapeHtml(r.taglia.toUpperCase())} · <b>${r.qty}</b> pz</div>`).join("")}
+    </div>
+    <div class="form-actions"><button class="btn btn-primary" onclick="downloadAwCsv()">Scarica CSV</button><button class="btn btn-outline" onclick="closeModal()">Chiudi</button></div>`;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+function downloadAwCsv(){
+  const rows=awExportRows();
+  const codes=awColorCodesLoad();
+  document.querySelectorAll('[id^="aw-col-"]').forEach(inp=>{
+    const v=String(inp.value||"").trim().toLowerCase();
+    if(v) codes[inp.dataset.colore]=v;
+  });
+  awColorCodesSave(codes);
+  const csv=rows.map(r=>[r.codice,(codes[r.colore]||awDefaultColorCode(r.colore)),r.taglia,r.qty].join(",")).join("\n")+"\n";
+  const blob=new Blob([csv],{type:"text/csv"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="ordine-actionwear-"+today()+".csv"; a.style.display="none";
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ try{a.remove();}catch(_){} URL.revokeObjectURL(url); },60000);
+  showToast("CSV scaricato: caricalo su Action Wear > Ordine da CSV");
+}
+function segnaTuttoNelCarrello(){
+  const list=computeMagazzinoDaOrdinare();
+  if(!list.length) return;
+  if(!confirm(`Segnare tutti i ${list.length} articoli come inseriti nel carrello?`)) return;
+  list.forEach(({entry})=>{
+    entry.quantitaRichiesta=Math.max(Number(entry.quantitaRichiesta)||0,Number(entry.quantita)||0,(Number(entry._reservedQty)||0)+(Number(entry.daOrdinareQty)||0));
+    entry.quantita=entry.quantitaRichiesta; entry.inCarrello=true; entry.inCarrelloAt=new Date().toISOString();
+  });
+  saveState('orders'); renderDashboard(); openDashboardList('materiale');
+  showToast("Articoli segnati come inseriti nel carrello");
 }
 function segnaInseritoNelCarrello(orderId, rigaId){
   const o = findItem('orders', orderId);
