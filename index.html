@@ -6019,6 +6019,9 @@ let whatsappFilter = "all";
 function setWhatsappSearch(value){
   whatsappSearchQuery=String(value||"");
   renderWhatsapp();
+  // La lista si ridisegna a ogni lettera: rimetto il cursore nella casella di ricerca
+  const el=document.querySelector(".wa-search");
+  if(el){ el.focus(); try{ el.setSelectionRange(el.value.length,el.value.length); }catch(_){} }
 }
 function setWhatsappFilter(value){
   whatsappFilter=String(value||"all");
