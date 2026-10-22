@@ -9678,9 +9678,20 @@ function awDefaultColorCode(colore){
   const w=name.split(/[\s-]+/).filter(Boolean);
   return (w.length>1 ? w.map(x=>x[0]).join("").slice(0,2) : name.slice(0,2)).toLowerCase();
 }
+// Sigle colore specifiche per articolo (prese dalle schede prodotto Action Wear)
+const AW_ARTICLE_COLOR_CODES={
+  bctu03t:{black:"bl002",navy:"na003",royalblue:"rb450",red:"re004",sportgrey:"sg620",white:"wh001",
+    apricot:"ap220",ash:"as600",burgundy:"bu370",chocolate:"ch140",darkgrey:"dg670",gold:"go210",
+    kellygreen:"kg520",natural:"na100",orchidgreen:"og511",orange:"or235",pacificgrey:"pg874",
+    radiantpurple:"rp351",sand:"sa120",skyblue:"sb410",stoneblue:"sb460",urbankhaki:"uk552"}
+};
 function awColorCodeFor(codice,colore,saved){
   saved=saved||awColorCodesLoad();
-  return saved[codice+"|"+colore] || saved[colore] || awDefaultColorCode(colore);
+  if(saved[codice+"|"+colore]) return saved[codice+"|"+colore];
+  const art=AW_ARTICLE_COLOR_CODES[String(codice).toLowerCase()];
+  const k=String(colore).toLowerCase().replace(/[^a-z0-9]/g,"");
+  if(art && art[k]) return art[k];
+  return saved[colore] || awDefaultColorCode(colore);
 }
 function awExportRows(){
   const map=new Map();
