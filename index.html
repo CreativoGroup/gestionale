@@ -9680,10 +9680,25 @@ function awDefaultColorCode(colore){
 }
 // Sigle colore specifiche per articolo (prese dalle schede prodotto Action Wear)
 const AW_ARTICLE_COLOR_CODES={
-  bctu03t:{black:"bl002",navy:"na003",royalblue:"rb450",red:"re004",sportgrey:"sg620",white:"wh001",
-    apricot:"ap220",ash:"as600",burgundy:"bu370",chocolate:"ch140",darkgrey:"dg670",gold:"go210",
-    kellygreen:"kg520",natural:"na100",orchidgreen:"og511",orange:"or235",pacificgrey:"pg874",
-    radiantpurple:"rp351",sand:"sa120",skyblue:"sb410",stoneblue:"sb460",urbankhaki:"uk552"}
+  bcpk001:{"black":"bl002","navy":"na003","royalblue":"rb450","red":"re004","sportgrey":"sg620","white":"wh001"},
+  bcpu424:{"black":"bl002","darkgrey":"dg670","navy":"na003","royalblue":"rb450","sportgrey":"sg620","white":"wh001","applegreen":"ag515","blushblue":"bb406","blushmint":"bm504","blushpink":"bp299","burgundy":"bu370","camogreen":"cg554","darkforest":"df547","ivygreen":"ig531","lavander":"la339","lotuspink":"lp313","mastic":"ma121","metafuchsia":"mf312","metagold":"mg211","metalilac":"ml349","metaorange":"mo226","metaturquoise":"mt439","navypure":"np009","offwhite":"ow101","pixellime":"pl986","pureorange":"po233","roastedcoffee":"rc142","red":"re004","radiantpurple":"rp351","solaryellow":"sy201"},
+  bctk002:{"black":"bl002","gold":"go210","navy":"na003","royalblue":"rb450","red":"re004","white":"wh001"},
+  bctu03t:{"black":"bl002","navy":"na003","royalblue":"rb450","red":"re004","sportgrey":"sg620","white":"wh001","apricot":"ap220","ash":"as600","burgundy":"bu370","chocolate":"ch140","darkgrey":"dg670","gold":"go210","kellygreen":"kg520","natural":"na100","orchidgreen":"og511","orange":"or235","pacificgrey":"pg874","radiantpurple":"rp351","sand":"sa120","skyblue":"sb410","stoneblue":"sb460","urbankhaki":"uk552"},
+  bctw04t:{"black":"bl002","navy":"na003","royalblue":"rb450","red":"re004","sportgrey":"sg620","white":"wh001","apricot":"ap220","ash":"as600","burgundy":"bu370","chocolate":"ch140","darkgrey":"dg670","gold":"go210","kellygreen":"kg520","natural":"na100","orchidgreen":"og511","orange":"or235","pacificgrey":"pg874","radiantpurple":"rp351","sand":"sa120","skyblue":"sb410","sorbet":"so311","urbankhaki":"uk552"},
+  bs010:{"black":"bk","darkgrey":"dg","greyheather":"gy","navy":"ny","orange":"or","royalblue":"rb","red":"rd","safetyorange":"safo","safetyyellow":"safy","white":"wh","burgundy":"bu","chocolate":"ch","denim":"de","forestgreen":"fg","fuchsia":"fu","gold":"go","kellygreen":"kg","lime":"li","mineralblue":"mb","olive":"ol","offwhite":"ow","purple":"pu","sage":"sa","sky":"sk","turquoise":"tu","zinc":"zi","seabreeze":"sb","sprintrose":"sr"},
+  bs025:{"black":"bk","white":"wh"},
+  bs050:{"black":"bk","navy":"ny","offwhite":"ow","white":"wh","darkgrey":"dg","forestgreen":"fg","greyheather":"gy","royalblue":"rb","red":"rd","burgundy":"bu","chocolate":"ch","dustypink":"dp","dustygreen":"du","earthygreen":"eg","fuchsia":"fu","gold":"go","inkblue":"ib","kellygreen":"kg","lightgrey":"lg","lime":"li","mineralblue":"mb","mustard":"mu","oceanblue":"ob","orange":"or","rust":"ru","turquoise":"tu"},
+  bs053:{"almondcream":"ac","black":"bk","darkgrey":"dg","earthygreen":"eg","white":"wh"},
+  bs331:{"black":"bk","burgundy":"bu","chocolate":"ch","darkgrey":"dg","forestgreen":"fg","gold":"go","greyheather":"gy","mineralblue":"mb","navy":"ny","olive":"ol","orange":"or","offwhite":"ow","royalblue":"rb","red":"rd","rose":"ro","sage":"sa","white":"wh","sunyellow":"sy"},
+  bs332:{"black":"bk","burgundy":"bu","chocolate":"ch","darkgrey":"dg","forestgreen":"fg","gold":"go","greyheather":"gy","mineralblue":"mb","navy":"ny","olive":"ol","orange":"or","offwhite":"ow","purple":"pu","royalblue":"rb","red":"rd","rose":"ro","sage":"sa","white":"wh","seabreeze":"sb","cardinal":"ca","inkblue":"ib","irishgreen":"ig","petroleum":"pe","sprintrose":"sr","urbanslate":"us"},
+  bs333:{"black":"bk","burgundy":"bu","darkgrey":"dg","greyheather":"gy","navy":"ny","olive":"ol","offwhite":"ow","royalblue":"rb","red":"rd","white":"wh","irishgreen":"ig"},
+  bs334:{"black":"bk","burgundy":"bu","darkgrey":"dg","greyheather":"gy","navy":"ny","olive":"ol","royalblue":"rb","red":"rd","white":"wh"},
+  bs412:{"black":"bk","darkgrey":"dg","navy":"ny","royalblue":"rb"},
+  bs555:{"black":"bk","navy":"ny"},
+  bs557:{"black":"bk","darkgrey":"dg","military":"mi","navy":"ny","royalblue":"rb","red":"rd"},
+  bs901:{"bottlegreen":"bg","black":"bk","burgundy":"bu","dustypink":"dp","dustygreen":"du","earthygreen":"eg","fuchsia":"fu","gold":"go","graphitegrey":"gp","inkblue":"ib","kellygreen":"kg","lavander":"la","lightgrey":"lg","lime":"li","mineralblue":"mb","mustard":"mu","natural":"na","navy":"ny","oceanblue":"ob","orange":"or","royalblue":"rb","red":"rd","rose":"ro","rust":"ru","sage":"sa","sky":"sk","turquoise":"tu","white":"wh","freshmint":"fm","olive":"ol","sprintrose":"sr"},
+  bsk010:{"black":"bk","burgundy":"bu","denim":"de","darkgrey":"dg","forestgreen":"fg","fuchsia":"fu","gold":"go","greyheather":"gy","kellygreen":"kg","lime":"li","mineralblue":"mb","navy":"ny","olive":"ol","orange":"or","offwhite":"ow","purple":"pu","royalblue":"rb","red":"rd","sage":"sa","sky":"sk","turquoise":"tu","white":"wh","zinc":"zi","seabreeze":"sb","sprintrose":"sr","lightrose":"lr"},
+  bsk050:{"black":"bk","fuchsia":"fu","gold":"go","greyheather":"gy","kellygreen":"kg","lime":"li","mineralblue":"mb","mustard":"mu","navy":"ny","orange":"or","offwhite":"ow","royalblue":"rb","red":"rd","turquoise":"tu","white":"wh"}
 };
 function awColorCodeFor(codice,colore,saved){
   saved=saved||awColorCodesLoad();
