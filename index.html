@@ -8031,10 +8031,9 @@ function completedOrderInvoiceButton(o){
 }
 function completedOrderAmountButton(o){
   const saldo=Math.max(0, Math.round(orderSaldo(o)*100)/100);
-  if(saldo<=0.005 && o.stato==="Completato"){
-    return `<button class="btn btn-sm" style="background:var(--ok,#1F8A4C);border:1px solid var(--ok,#1F8A4C);color:#fff;font-size:17px;line-height:1;padding:7px 12px;white-space:nowrap;" title="Pagato: clic per segnare CONSEGNATO" aria-label="Segna come consegnato" onclick="segnaConsegnatoDaLista('${o.id}')">🤝</button>`;
-  }
-  return `<button class="btn btn-outline btn-sm" style="font-weight:850;white-space:nowrap;color:#111827;border-color:#DDE3EA;" title="Residuo da incassare · clic per aggiungere un pagamento" onclick="openCompletedOrderPayment('${o.id}')">${fmtMoney(saldo)}</button>`;
+  const mani=o.stato==="Completato" ? `<button type="button" style="background:none;border:none;box-shadow:none;font-size:22px;line-height:1;padding:2px 6px;cursor:pointer;vertical-align:middle;" title="Segna CONSEGNATO" aria-label="Segna come consegnato" onclick="segnaConsegnatoDaLista('${o.id}')">🤝</button>` : "";
+  if(saldo<=0.005) return mani;
+  return `<button class="btn btn-outline btn-sm" style="font-weight:850;white-space:nowrap;color:#111827;border-color:#DDE3EA;" title="Residuo da incassare · clic per aggiungere un pagamento" onclick="openCompletedOrderPayment('${o.id}')">${fmtMoney(saldo)}</button>${mani}`;
 }
 async function segnaConsegnatoDaLista(orderId){
   const o=findItem("orders",orderId);
@@ -8187,7 +8186,7 @@ function renderDashboard(){
             <td>${clientName(o.clientId)}</td>
             <td class="mobile-hide">${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : ""}</td>
             <td style="white-space:nowrap;">${completedOrderInvoiceButton(o)}</td>
-            <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button></td>
+            <td style="white-space:nowrap;"><button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openJobCard('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button></td>
             <td>${completedOrderStageButton(o)}</td>
             <td style="white-space:nowrap;">${completedOrderAmountButton(o)}</td>
           </tr>
@@ -11705,7 +11704,7 @@ function renderCompletedDeliveryRows(list){
             <td>${orderPendingPickupRows(o).length ? (orderPendingPickupSuppliers(o).map(escapeHtml).join(", ") || "Fornitore non indicato") : "—"}</td>
             <td style="white-space:nowrap;">${completedOrderInvoiceButton(o)}</td>
             <td style="white-space:nowrap;">
-              <button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button>
+              <button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openJobCard('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button>
             </td>
             <td>${completedOrderStageButton(o)}</td>
             <td style="white-space:nowrap;">${completedOrderAmountButton(o)}</td>
@@ -11750,7 +11749,7 @@ function renderLavoriCompletati(){
                 <td>${orderCategorieLabel(o)}</td>
                 <td>${d}</td>
                 <td><span class="pill pill-delivered">CONSEGNATO</span></td>
-                <td><button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openCompletedOrderSheet('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button></td>
+                <td><button class="btn btn-outline btn-sm completed-sheet-btn" onclick="openJobCard('${o.id}')"><span class="sheet-icon">▤</span> Scheda</button></td>
               </tr>`;
             }).join("")}</tbody>
           </table>
