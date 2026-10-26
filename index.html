@@ -4301,7 +4301,11 @@ async function sendBozzaMail(orderId){
     showToast("Bozza inviata via Gmail");
   }catch(err){
     console.error("Invio bozza Gmail",err);
-    if(status) status.textContent=`Errore: ${err?.message||"invio non riuscito"}`;
+    const em=String(err?.message||"");
+    const troppoPesante=/compute resources|memory limit|payload too large|413|WORKER_LIMIT/i.test(em);
+    if(status) status.textContent=troppoPesante
+      ? "Il file è troppo pesante per essere inviato dal gestionale. Riducilo (es. PDF più leggero sotto i 6-8 MB) oppure mandalo con un link Dropbox."
+      : `Errore: ${em||"invio non riuscito"}`;
     if(btn) btn.disabled=false;
   }
 }
