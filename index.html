@@ -3217,7 +3217,7 @@ const PRODOTTI_PER_CATEGORIA = {
   "Stampante Xerox": ["Biglietti da visita","A4","A3","Carta adesiva","Altro"],
   "Lavorazioni Esterne": ["Tipografia","Serigrafia","Grande Formato","Biglietti da visita","Volantini","Pieghevoli","Cartelline","Blocco appunti","Gadget","Altro"]
 };
-const WORKERS = ["Mattia","Patrizio","Sara","Francess","Simone"];
+const WORKERS = ["Mattia","Patrizio","Sara","Francess","Daniele"];
 const NOTE_OPERATORS = [...WORKERS];
 const FAMILY_RICHIESTE = ["Felpe per reparti","Tessuti","Allestimenti","Poster ospedali","Gadget","Altro"];
 const STATUSES = ["Da fare","In preparazione grafica","In produzione","Completato","Consegnato"];
@@ -4369,7 +4369,7 @@ function orderCategorieLabel(o){ const c = orderCategorie(o); return c.length ? 
 function orderWorkersList(o){
   const raw=String(o?.worker||"").trim();
   if(!raw || raw==="Misto") return [];
-  return raw.split(/\s*\|\s*/).map(x=>x.trim()).filter(x=>WORKERS.includes(x));
+  return raw.split(/\s*\|\s*/).map(x=>x.trim()).map(x=>x==="Simone"?"Daniele":x).filter(x=>WORKERS.includes(x));
 }
 function orderWorkersLabel(o){
   const list=orderWorkersList(o);
@@ -7606,6 +7606,7 @@ function noteRowHTML(n){
     })()}${all ? `<div style="margin-top:6px;"><button class="nota-file" onclick="openNoteAttachment('${n.id}')">📎 ${escapeHtml(all.name || "Allegato")}</button></div>` : ""}</div>
     <div class="nota-c-actions">
       <button class="btn btn-outline btn-sm" onclick="trasformaNotaInLead('${n.id}')">LEAD</button>
+      <button class="btn btn-outline btn-sm" title="Già gestita: elimina la nota" onclick="markNotaFatta('${n.id}')">GIÀ FATTO</button>
       <button class="btn btn-ghost btn-sm" title="Modifica" onclick="openNoteForm('${n.id}')">✎</button>
     </div>
   </div>`;
@@ -7921,12 +7922,16 @@ async function trasformaNotaInLead(id){
   showToast("Nota spostata nei Lead");
 }
 
+function markMailOrderSeen(orderId,refresh){
+  sharedMarkRead("mail-order-done",orderId,new Date().toISOString());
+  if(refresh){ renderCurrentView(); showToast("Tolto dalla dashboard"); }
+}
 async function markNotaFatta(id){
   const n=findItem("noteComunicazioni",id);
   if(!n) return;
   await dbDelete("noteComunicazioni", id);
   state.noteComunicazioni=state.noteComunicazioni.filter(x=>x.id!==id);
-  renderNote();
+  renderCurrentView();
   showToast("Nota fatta ed eliminata");
 }
 async function cleanupOldNoteComunicazioni(){
@@ -8105,7 +8110,7 @@ function renderDashboard(){
   const dashAppunti = dashNoteAll.filter(n=>noteIsAppunto(n));
   const dashMailNotes = dashNoteAll.filter(n=>!noteIsAppunto(n) && noteFonte(n)==="gmail");
   const dashMailLeads = isAdminDash ? (state.leads||[]).filter(l=>isOrderLeadSource(l.fonte) && !leadOrderStatus(l).done).sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))) : [];
-  const dashMailOrders = isAdminDash ? state.orders.filter(o=>o.stato==="Da fare" && /^Richiesta ricevuta via Gmail/.test(String(o.descrizione||"")) && (Date.now()-(Date.parse(o.createdAt)||0))<10*86400000).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))) : [];
+  const dashMailOrders = isAdminDash ? state.orders.filter(o=>o.stato==="Da fare" && /^Richiesta ricevuta via Gmail/.test(String(o.descrizione||"")) && (Date.now()-(Date.parse(o.createdAt)||0))<10*86400000 && !sharedReadAt("mail-order-done",o.id)).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))) : [];
   const leadDaConfermare = (state.leads||[]).filter(l=>l.stato==="Nuovo" || l.stato==="In attesa di conferma" || l.stato==="Da ricontattare");
   const leadRecenti = [...leadDaConfermare].sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||""))).slice(0,5);
 
@@ -8134,7 +8139,7 @@ function renderDashboard(){
           return `<div class="nota-row"><div class="nota-c-name"><strong>${escapeHtml(leadDisplayName(l))}</strong><div class="nota-foot">${fmtLeadDate(l.creatoIl)}${lc?" · anagrafica presente":" · cliente da creare"}</div></div><div class="nota-c-text"><div class="nota-body">${escapeHtml(l.oggettoRichiesta||"—")}</div></div><div class="nota-c-actions"><button class="btn btn-primary btn-sm" onclick="openLeadDetail('${l.id}')">✦ ${lc?'CREA ORDINE':'APRI E CREA ORDINE'}</button><button class="btn btn-outline btn-sm" title="L'ordine è già stato fatto" onclick="markLeadOrderDone('${l.id}')">GIÀ FATTO</button></div></div>`;
         }).join("")}` : ""}
       ${dashMailOrders.length ? `<p class="nota-foot" style="margin:12px 0 4px;font-weight:700;text-transform:uppercase;">Nuovo ordine · cliente esistente · ${dashMailOrders.length}</p>
-        ${dashMailOrders.slice(0,8).map(o=>`<div class="nota-row"><div class="nota-c-name"><strong>${escapeHtml(clientName(o.clientId))}</strong><div class="nota-foot">${o.numero?"Ordine #"+escapeHtml(String(o.numero))+" · ":""}${escapeHtml(noteDateLabel(o.createdAt))}</div></div><div class="nota-c-text"><div class="nota-body clamp">${escapeHtml(String(o.descrizione||"").replace(/^Richiesta ricevuta via Gmail:\s*/,""))}</div></div><div class="nota-c-actions"><button class="btn btn-primary btn-sm" onclick="openJobCard('${o.id}')">APRI SCHEDA</button></div></div>`).join("")}` : ""}
+        ${dashMailOrders.slice(0,8).map(o=>`<div class="nota-row"><div class="nota-c-name"><strong>${escapeHtml(clientName(o.clientId))}</strong><div class="nota-foot">${o.numero?"Ordine #"+escapeHtml(String(o.numero))+" · ":""}${escapeHtml(noteDateLabel(o.createdAt))}</div></div><div class="nota-c-text"><div class="nota-body clamp">${escapeHtml(String(o.descrizione||"").replace(/^Richiesta ricevuta via Gmail:\s*/,""))}</div></div><div class="nota-c-actions"><button class="btn btn-primary btn-sm" onclick="markMailOrderSeen('${o.id}');openJobCard('${o.id}')">APRI SCHEDA</button><button class="btn btn-outline btn-sm" title="Già gestito: toglilo da qui" onclick="markMailOrderSeen('${o.id}',true)">GIÀ FATTO</button></div></div>`).join("")}` : ""}
       ${dashMailNotes.length ? `<p class="nota-foot" style="margin:12px 0 4px;font-weight:700;text-transform:uppercase;">Note · ${dashMailNotes.length}</p>
         <div class="nota-list">${dashMailNotes.slice(0,8).map(noteRowHTML).join("")}</div>` : ""}
       ${(dashMailLeads.length+dashMailOrders.length+dashMailNotes.length)?"":`<p class="empty" style="margin:6px 0 0;">Niente da gestire dalla mail.</p>`}
