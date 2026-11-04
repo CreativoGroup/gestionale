@@ -3138,7 +3138,7 @@
     <section class="view" id="view-leadOrdine"></section>
   </main>
 </div>
-<div class="modal-backdrop" id="modalBackdrop"><button class="mob-modal-x" onclick="closeModal()" aria-label="Chiudi">✕</button><div class="modal" id="modalBody"></div></div>
+<div class="modal-backdrop" id="modalBackdrop"><button class="mob-modal-x" onclick="if(jobCardEditSnapshot&&jobCardNeedsWorker(findItem('orders',jobCardEditSnapshot.orderId))){jobCardWorkerBlock(jobCardEditSnapshot.orderId);return;}closeModal()" aria-label="Chiudi">✕</button><div class="modal" id="modalBody"></div></div>
 <nav class="mob-bar" id="mobBar"></nav>
 <div class="mob-sheet-bg" onclick="closeMobSheet()"></div>
 <div class="mob-sheet" id="mobSheet"></div>
