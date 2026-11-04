@@ -12395,7 +12395,26 @@ function aggregateReservedByArticle(order){
   return map;
 }
 
+function jobCardNeedsWorker(o){
+  if(!o) return false;
+  if(o.stato==="Consegnato" || o.stato==="Completato") return false;
+  return orderWorkersList(o).length===0;
+}
+function jobCardWorkerBlock(orderId){
+  showToast("Assegna almeno un operatore prima di salvare la scheda");
+  const el=document.getElementById(`worker-picker-${orderId}`);
+  if(el){
+    el.classList.add("open");
+    el.scrollIntoView({behavior:"smooth",block:"center"});
+    const b=el.querySelector(".worker-picker-summary");
+    if(b){ b.style.borderColor="#C62828"; b.style.boxShadow="0 0 0 3px rgba(198,40,40,.18)"; }
+  }
+}
 async function cancelJobCard(orderId){
+  if(jobCardNeedsWorker(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId ? jobCardEditSnapshot.order : findItem("orders",orderId))){
+    jobCardWorkerBlock(orderId);
+    return;
+  }
   if(!jobCardEditSnapshot || jobCardEditSnapshot.orderId!==orderId){
     closeModal();
     return;
@@ -12445,6 +12464,10 @@ async function cancelJobCard(orderId){
 }
 
 function saveJobCard(orderId){
+  if(jobCardNeedsWorker(findItem("orders",orderId))){
+    jobCardWorkerBlock(orderId);
+    return;
+  }
   if(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId){
     jobCardEditSnapshot=null;
   }
