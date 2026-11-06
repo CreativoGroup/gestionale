@@ -4439,9 +4439,8 @@ const NAV = [
   {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico"},
   {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico"},
 
-  {id:"note", label:"Note e lead", icon:"✎", subtitle:"Note da gestire, richieste (lead) e preventivi", group:"Info e richieste"},
-  {id:"preventivi", label:"Preventivi", icon:"📄", subtitle:"Preventivi e richieste da seguire", group:"Info e richieste"},
-  {id:"leads", label:"Lead e preventivi", icon:"◎", subtitle:"Richieste da seguire, preventivi e PDF", group:"Info e richieste", hidden:true},
+  {id:"note", label:"Note", icon:"✎", subtitle:"Note e appunti da gestire", group:"Info e richieste"},
+  {id:"leads", label:"Preventivi e lead", icon:"📄", subtitle:"Richieste da seguire, preventivi e PDF", group:"Info e richieste"},
 
   {id:"leadOrdine", label:"NUOVI CLIENTI CON ORDINE", icon:"◆", subtitle:"Ordini ricevuti da clienti non ancora presenti o da completare", group:"Operativa", hidden:true},
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
@@ -4535,7 +4534,7 @@ function renderNav(){
     return `
       <div class="nav-group nav-group-${group.toLowerCase().replace(/\s+/g,"-")}">
         ${group==="Dashboard" ? "" : `<div class="nav-group-title">${group}</div>`}
-        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}${navBadgeHTML(n)}${n.id==="ordini"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo ordine" onclick="event.stopPropagation();navNuovoOrdine()">+ NUOVO</span>`:""}${n.id==="note"?`<span class="nav-mini-btn" role="button" title="Scrivi un appunto veloce" onclick="event.stopPropagation();navNuovoAppunto()">+ APPUNTI</span>`:""}${n.id==="preventivi"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo preventivo" onclick="event.stopPropagation();openNuovoPreventivo()">+ NUOVO</span>`:""}</button>`).join("")}
+        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}${navBadgeHTML(n)}${n.id==="ordini"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo ordine" onclick="event.stopPropagation();navNuovoOrdine()">+ NUOVO</span>`:""}${n.id==="note"?`<span class="nav-mini-btn" role="button" title="Scrivi un appunto veloce" onclick="event.stopPropagation();navNuovoAppunto()">+ APPUNTI</span>`:""}${n.id==="leads"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo preventivo" onclick="event.stopPropagation();openNuovoPreventivo()">+ NUOVO</span>`:""}</button>`).join("")}
       </div>
     `;
   }).join("");
@@ -4798,13 +4797,7 @@ function renderViewHeading(){
   setTimeout(syncMobileDashboardHeaderOrder,0);
 }
 function goTo(id){
-  if(id==="preventivi"){
-    goTo("note");
-    setTimeout(()=>{ const el=document.getElementById("note-leads-part"); if(el) el.scrollIntoView({behavior:"smooth",block:"start"}); },60);
-    return;
-  }
   if(id==="leadOrdine") id="ordini";
-  if(id==="leads") id="note"; // Note e Lead sono ora nella stessa pagina
   const navItem = NAV.find(n=>n.id===id);
   if(navItem && navItem.action==="waMode"){ toggleWaOpenMode(); return; }
   if(navItem && navItem.externalUrl){ openWaWindow(""); return; }
@@ -7637,11 +7630,7 @@ function renderNote(){
     <div class="nota-list">
       ${list.length ? list.map(noteRowHTML).join("") : `<p class="empty" style="margin:14px 4px;">Nessuna nota.</p>`}
     </div>
-    <h2 style="margin:32px 0 6px;font-size:20px;">Lead e preventivi</h2>
-    <p class="helptext" style="margin:0 0 14px;">Le richieste da seguire. Premendo LEAD su una nota, la nota passa qui sotto.</p>
-    <div id="note-leads-part"></div>
   `;
-  renderLeads();
   if(currentView==="dashboard" && typeof renderDashboard==="function") renderDashboard();
 }
 async function openNoteAttachment(id){
