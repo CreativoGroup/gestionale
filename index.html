@@ -4440,6 +4440,7 @@ const NAV = [
   {id:"instagram", label:"Instagram", icon:"◎", subtitle:"Messaggi Instagram", group:"Traffico"},
 
   {id:"note", label:"Note e lead", icon:"✎", subtitle:"Note da gestire, richieste (lead) e preventivi", group:"Info e richieste"},
+  {id:"preventivi", label:"Preventivi", icon:"📄", subtitle:"Preventivi e richieste da seguire", group:"Info e richieste"},
   {id:"leads", label:"Lead e preventivi", icon:"◎", subtitle:"Richieste da seguire, preventivi e PDF", group:"Info e richieste", hidden:true},
 
   {id:"leadOrdine", label:"NUOVI CLIENTI CON ORDINE", icon:"◆", subtitle:"Ordini ricevuti da clienti non ancora presenti o da completare", group:"Operativa", hidden:true},
@@ -4534,7 +4535,7 @@ function renderNav(){
     return `
       <div class="nav-group nav-group-${group.toLowerCase().replace(/\s+/g,"-")}">
         ${group==="Dashboard" ? "" : `<div class="nav-group-title">${group}</div>`}
-        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}${navBadgeHTML(n)}${n.id==="ordini"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo ordine" onclick="event.stopPropagation();navNuovoOrdine()">+ NUOVO</span>`:""}${n.id==="note"?`<span class="nav-mini-btn" role="button" title="Scrivi un appunto veloce" onclick="event.stopPropagation();navNuovoAppunto()">+ APPUNTI</span>`:""}</button>`).join("")}
+        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}${navBadgeHTML(n)}${n.id==="ordini"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo ordine" onclick="event.stopPropagation();navNuovoOrdine()">+ NUOVO</span>`:""}${n.id==="note"?`<span class="nav-mini-btn" role="button" title="Scrivi un appunto veloce" onclick="event.stopPropagation();navNuovoAppunto()">+ APPUNTI</span>`:""}${n.id==="preventivi"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo preventivo" onclick="event.stopPropagation();openNuovoPreventivo()">+ NUOVO</span>`:""}</button>`).join("")}
       </div>
     `;
   }).join("");
@@ -4797,6 +4798,11 @@ function renderViewHeading(){
   setTimeout(syncMobileDashboardHeaderOrder,0);
 }
 function goTo(id){
+  if(id==="preventivi"){
+    goTo("note");
+    setTimeout(()=>{ const el=document.getElementById("note-leads-part"); if(el) el.scrollIntoView({behavior:"smooth",block:"start"}); },60);
+    return;
+  }
   if(id==="leadOrdine") id="ordini";
   if(id==="leads") id="note"; // Note e Lead sono ora nella stessa pagina
   const navItem = NAV.find(n=>n.id===id);
@@ -10533,6 +10539,54 @@ async function ensureLeadForQuote(q){
   q.extra=Object.assign({},q.extra||{},{leadId:lead.id});
   saveState("quotes");
   return lead;
+}
+function openNuovoPreventivo(){
+  const clients=[...(state.clients||[])].map(c=>clientDisplayName(c)).filter(Boolean).sort((a,b)=>a.localeCompare(b,"it"));
+  document.getElementById("modalBody").innerHTML=`
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h2 style="margin-top:0;">Nuovo preventivo</h2>
+    <p class="helptext">Scegli un cliente già in anagrafica, oppure scrivi un nome nuovo: il preventivo finisce tra i lead.</p>
+    <div class="field"><label>Cliente</label>
+      <input id="np-cliente" type="text" list="np-clienti" placeholder="Cerca o scrivi il nome…" autocomplete="off">
+      <datalist id="np-clienti">${clients.map(n=>`<option value="${escapeHtml(n)}"></option>`).join("")}</datalist>
+    </div>
+    <div id="np-extra">
+      <div class="field"><label>Telefono (se nuovo)</label><input id="np-tel" type="text"></div>
+      <div class="field"><label>Email (se nuovo)</label><input id="np-mail" type="text"></div>
+    </div>
+    <div class="field"><label>Oggetto della richiesta</label><input id="np-oggetto" type="text" placeholder="Es. 50 magliette con logo"></div>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="btn btn-primary" id="np-ok" onclick="submitNuovoPreventivo()">Crea preventivo</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    </div>`;
+  document.getElementById("modalBackdrop").classList.add("open");
+  setTimeout(()=>document.getElementById("np-cliente")?.focus(),50);
+}
+async function submitNuovoPreventivo(){
+  const nome=String(document.getElementById("np-cliente")?.value||"").trim();
+  const oggetto=String(document.getElementById("np-oggetto")?.value||"").trim();
+  if(!nome){ showToast("Scrivi il nome del cliente"); return; }
+  const btn=document.getElementById("np-ok"); if(btn) btn.disabled=true;
+  const found=(state.clients||[]).find(c=>clientDisplayName(c).toLowerCase()===nome.toLowerCase());
+  if(found){
+    const id=await createQuote(found.id,CATEGORIES[0]);
+    if(!id){ if(btn) btn.disabled=false; return; }
+    const q=findItem("quotes",id);
+    if(oggetto){ q.descrizione=oggetto; if(q.righe[0] && !q.righe[0].descrizione) q.righe[0].descrizione=oggetto; saveState("quotes"); }
+    await ensureLeadForQuote(q);
+    const lead=(state.leads||[]).find(l=>l.fonte===`preventivo:${id}`);
+    if(lead && oggetto){ lead.oggettoRichiesta=oggetto; await upsertOne("leads",lead); }
+    showToast("Preventivo creato");
+    openQuoteDetail(id);
+    return;
+  }
+  const now=new Date().toISOString();
+  const lead={id:uuid(), nome, azienda:"", email:String(document.getElementById("np-mail")?.value||"").trim().toLowerCase(), telefono:String(document.getElementById("np-tel")?.value||"").trim(),
+    oggettoRichiesta:oggetto||"Preventivo", richiesta:"Preventivo creato direttamente dal gestionale.", stato:"In attesa di conferma", fonte:"manuale", creatoIl:now, aggiornatoIl:now};
+  const ok=await upsertOne("leads",lead);
+  if(!ok){ showToast("Impossibile creare il preventivo"); if(btn) btn.disabled=false; return; }
+  if(!state.leads.some(x=>x.id===lead.id)) state.leads.unshift(lead);
+  await newQuoteForLead(lead.id);
 }
 async function newQuoteForClient(clientId){
   const id = await createQuote(clientId, CATEGORIES[0]);
