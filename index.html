@@ -3138,7 +3138,7 @@
     <section class="view" id="view-leadOrdine"></section>
   </main>
 </div>
-<div class="modal-backdrop" id="modalBackdrop"><button class="mob-modal-x" onclick="if(jobCardEditSnapshot&&jobCardNeedsWorker(findItem('orders',jobCardEditSnapshot.orderId))){jobCardWorkerBlock(jobCardEditSnapshot.orderId);return;}closeModal()" aria-label="Chiudi">✕</button><div class="modal" id="modalBody"></div></div>
+<div class="modal-backdrop" id="modalBackdrop"><button class="mob-modal-x" onclick="if(jobCardEditSnapshot){var _o=findItem('orders',jobCardEditSnapshot.orderId);if(jobCardMissingFilo(_o)){jobCardFiloBlock(_o);return;}if(jobCardNeedsWorker(_o)){jobCardWorkerBlock(jobCardEditSnapshot.orderId);return;}}closeModal()" aria-label="Chiudi">✕</button><div class="modal" id="modalBody"></div></div>
 <nav class="mob-bar" id="mobBar"></nav>
 <div class="mob-sheet-bg" onclick="closeMobSheet()"></div>
 <div class="mob-sheet" id="mobSheet"></div>
@@ -10016,6 +10016,12 @@ function linesEditor(collection, id, righe, options={}){
                     placeholder="Descrizione breve · max 30 caratteri"
                     oninput="moveWorkDescriptionOverflow('${id}','${r.id}',this)"
                     onchange="moveWorkDescriptionOverflow('${id}','${r.id}',this)">`}
+                  ${(isOrder && r.categoria==="Ricamo") ? `<div style="margin-top:8px;">
+                    <label style="display:block;font-size:12px;font-weight:800;color:${String(r.codiceFilo||"").trim()?"#475569":"#C62828"};margin-bottom:3px;">Codice filo ricamo * <span style="font-weight:600;">(scrivi "bianco" oppure il codice del filo)</span></label>
+                    <input type="text" id="filo-${r.id}" class="desc-input" value="${escapeHtml(r.codiceFilo||"")}" placeholder="Es. bianco · oppure codice filo (es. 1234, rosso 1147…)"
+                      style="${String(r.codiceFilo||"").trim()?"":"border-color:#C62828;"}"
+                      onchange="updateRigaField('${collection}','${id}','${r.id}','codiceFilo',this.value.trim())">
+                  </div>` : ""}
                   ${r.descrizione?`<details class="job-v2-desc-toggle">
                     <summary>Dettagli lavorazione ${r.descrizione?`· ${escapeHtml(String(r.descrizione).slice(0,55))}${String(r.descrizione).length>55?'…':''}`:""}</summary>
                     <textarea id="work-detail-${r.id}" class="desc-input" rows="4"
@@ -12438,6 +12444,17 @@ function aggregateReservedByArticle(order){
   return map;
 }
 
+function jobCardMissingFilo(o){
+  if(!o) return false;
+  if(o.stato==="Consegnato" || o.stato==="Completato") return false;
+  return (o.righe||[]).some(r=>r && r.categoria==="Ricamo" && !String(r.codiceFilo||"").trim());
+}
+function jobCardFiloBlock(o){
+  showToast("Scrivi il codice del filo (o \"bianco\") nella riga di ricamo prima di salvare");
+  const r=(o.righe||[]).find(x=>x && x.categoria==="Ricamo" && !String(x.codiceFilo||"").trim());
+  const el=r && document.getElementById("filo-"+r.id);
+  if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); el.focus(); el.style.borderColor="#C62828"; el.style.boxShadow="0 0 0 3px rgba(198,40,40,.18)"; }
+}
 function jobCardNeedsWorker(o){
   if(!o) return false;
   if(o.stato==="Consegnato" || o.stato==="Completato") return false;
@@ -12454,6 +12471,8 @@ function jobCardWorkerBlock(orderId){
   }
 }
 async function cancelJobCard(orderId){
+  { const cur=jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId ? jobCardEditSnapshot.order : findItem("orders",orderId);
+    if(jobCardMissingFilo(cur)){ jobCardFiloBlock(findItem("orders",orderId)||cur); return; } }
   if(jobCardNeedsWorker(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId ? jobCardEditSnapshot.order : findItem("orders",orderId))){
     jobCardWorkerBlock(orderId);
     return;
@@ -12507,6 +12526,10 @@ async function cancelJobCard(orderId){
 }
 
 function saveJobCard(orderId){
+  if(jobCardMissingFilo(findItem("orders",orderId))){
+    jobCardFiloBlock(findItem("orders",orderId));
+    return;
+  }
   if(jobCardNeedsWorker(findItem("orders",orderId))){
     jobCardWorkerBlock(orderId);
     return;
