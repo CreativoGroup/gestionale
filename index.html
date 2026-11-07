@@ -10016,12 +10016,6 @@ function linesEditor(collection, id, righe, options={}){
                     placeholder="Descrizione breve · max 30 caratteri"
                     oninput="moveWorkDescriptionOverflow('${id}','${r.id}',this)"
                     onchange="moveWorkDescriptionOverflow('${id}','${r.id}',this)">`}
-                  ${(isOrder && r.categoria==="Ricamo") ? `<div style="margin-top:8px;">
-                    <label style="display:block;font-size:12px;font-weight:800;color:${String(r.codiceFilo||"").trim()?"#475569":"#C62828"};margin-bottom:3px;">Codice filo ricamo * <span style="font-weight:600;">(scrivi "bianco" oppure il codice del filo)</span></label>
-                    <input type="text" id="filo-${r.id}" class="desc-input" value="${escapeHtml(r.codiceFilo||"")}" placeholder="Es. bianco · oppure codice filo (es. 1234, rosso 1147…)"
-                      style="${String(r.codiceFilo||"").trim()?"":"border-color:#C62828;"}"
-                      onchange="updateRigaField('${collection}','${id}','${r.id}','codiceFilo',this.value.trim())">
-                  </div>` : ""}
                   ${r.descrizione?`<details class="job-v2-desc-toggle">
                     <summary>Dettagli lavorazione ${r.descrizione?`· ${escapeHtml(String(r.descrizione).slice(0,55))}${String(r.descrizione).length>55?'…':''}`:""}</summary>
                     <textarea id="work-detail-${r.id}" class="desc-input" rows="4"
@@ -10891,7 +10885,7 @@ function rtHtmlFor(item){
   if(item && item.descrizioneHtml) return rtSanitize(item.descrizioneHtml);
   return escapeHtml(item?.descrizione||"").replace(/\n/g,"<br>");
 }
-function rtToolbar(id){
+function rtToolbar(id,extraHtml){
   return `<div class="rt-bar" onmousedown="event.preventDefault()">
     <button type="button" class="rt-b" title="Grassetto" onclick="rtCmd('${id}','bold')"><b>B</b></button>
     <button type="button" class="rt-b" title="Sottolineato" onclick="rtCmd('${id}','underline')"><u>S</u></button>
@@ -10902,11 +10896,53 @@ function rtToolbar(id){
     ${RT_COLORI.map(([l,v])=>`<button type="button" class="rt-b rt-col" title="${l}" onclick="rtColor('${id}','${v}')"><span style="background:${v}"></span></button>`).join("")}
     <span class="rt-sep"></span>
     <button type="button" class="rt-b" title="Togli formattazione" onclick="rtCmd('${id}','removeFormat')">✕</button>
+    ${extraHtml||""}
   </div>`;
+}
+/* ===== Codice filo ricamo: nella barra della descrizione, con + per aggiungere altre caselle ===== */
+function orderHasRicamo(o){ return (o && o.righe||[]).some(r=>r && r.categoria==="Ricamo"); }
+function filoRiga(o){ return (o.righe||[]).find(r=>r && r.categoria==="Ricamo"); }
+function filoList(o){
+  const r=filoRiga(o); if(!r) return [];
+  if(Array.isArray(r.codiciFilo) && r.codiciFilo.length) return r.codiciFilo.map(x=>String(x||""));
+  const old=(o.righe||[]).map(x=>String(x&&x.codiceFilo||"").trim()).filter(Boolean);
+  return old.length ? old : [""];
+}
+function filoHasValue(o){ return filoList(o).some(x=>String(x).trim()); }
+function filoGroupHtml(o){
+  const list=filoList(o);
+  return `<span class="rt-sep"></span><span class="rt-filo" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;" onmousedown="event.stopPropagation()">
+    <span style="font-size:12px;font-weight:800;color:${filoHasValue(o)?"#475569":"#C62828"};">Filo ricamo *</span>
+    ${list.map((v,i)=>`<span style="display:inline-flex;align-items:center;gap:2px;"><input type="text" id="filo-${i}" value="${escapeHtml(v)}" placeholder="bianco o codice"
+      style="width:120px;height:30px;border:1.5px solid ${String(v).trim()?"#CBD5E1":"#C62828"};border-radius:8px;padding:0 8px;font:inherit;font-size:13px;"
+      oninput="filoSet('${o.id}',${i},this.value)">${list.length>1?`<button type="button" class="rt-b" style="min-width:24px;height:30px;" title="Togli questa casella" onclick="filoRemove('${o.id}',${i})">×</button>`:""}</span>`).join("")}
+    <button type="button" class="rt-b" style="border:1px solid var(--border);" title="Aggiungi un altro codice filo" onclick="filoAdd('${o.id}')"><b>+</b></button>
+  </span>`;
+}
+function filoRefresh(o){ const g=document.getElementById("filo-group-"+o.id); if(g) g.innerHTML=filoGroupHtml(o); }
+function filoSave(o,list){ const r=filoRiga(o); if(!r) return; r.codiciFilo=list; delete r.codiceFilo; (o.righe||[]).forEach(x=>{ if(x!==r) delete x.codiceFilo; }); saveState("orders"); }
+function filoSet(orderId,i,val){
+  const o=findItem("orders",orderId); if(!o) return;
+  const list=filoList(o); list[i]=String(val||"");
+  const had=filoHasValue(o);
+  filoSave(o,list);
+  const inp=document.getElementById("filo-"+i); if(inp) inp.style.borderColor=String(val).trim()?"#CBD5E1":"#C62828";
+  if(had!==filoHasValue(o)){ const lab=document.querySelector("#filo-group-"+orderId+" .rt-filo > span"); if(lab) lab.style.color=filoHasValue(o)?"#475569":"#C62828"; }
+}
+function filoAdd(orderId){
+  const o=findItem("orders",orderId); if(!o) return;
+  const list=filoList(o); list.push(""); filoSave(o,list); filoRefresh(o);
+  const inp=document.getElementById("filo-"+(list.length-1)); if(inp) inp.focus();
+}
+function filoRemove(orderId,i){
+  const o=findItem("orders",orderId); if(!o) return;
+  const list=filoList(o); list.splice(i,1); if(!list.length) list.push("");
+  filoSave(o,list); filoRefresh(o);
 }
 function rtEditorHtml(coll,item){
   const id=`rt-${coll}-${item.id}`;
-  return `<div class="rt-wrap">${rtToolbar(id)}
+  const filo = (coll==="orders" && orderHasRicamo(item)) ? `<span id="filo-group-${item.id}" style="display:inline-flex;">${filoGroupHtml(item)}</span>` : "";
+  return `<div class="rt-wrap">${rtToolbar(id,filo)}
     <div id="${id}" class="rt-editor" contenteditable="true" data-ph="Descrivi il lavoro: dettagli tecnici, richieste del cliente, informazioni utili…"
       oninput="rtQueue('${coll}','${item.id}')" onblur="rtSave('${coll}','${item.id}')" onpaste="rtPaste(event)">${rtHtmlFor(item)}</div>
     ${DB_DESCHTML?"":`<div class="helptext" style="color:var(--danger);margin-top:6px;">Per mantenere la formattazione serve una riga SQL su Supabase (te la dà Claude): finché non c'è, il testo si salva ma senza grassetto e colori.</div>`}
@@ -12447,12 +12483,12 @@ function aggregateReservedByArticle(order){
 function jobCardMissingFilo(o){
   if(!o) return false;
   if(o.stato==="Consegnato" || o.stato==="Completato") return false;
-  return (o.righe||[]).some(r=>r && r.categoria==="Ricamo" && !String(r.codiceFilo||"").trim());
+  return orderHasRicamo(o) && !filoHasValue(o);
 }
 function jobCardFiloBlock(o){
-  showToast("Scrivi il codice del filo (o \"bianco\") nella riga di ricamo prima di salvare");
-  const r=(o.righe||[]).find(x=>x && x.categoria==="Ricamo" && !String(x.codiceFilo||"").trim());
-  const el=r && document.getElementById("filo-"+r.id);
+  showToast("Scrivi il codice del filo (o \"bianco\") nella barra della descrizione prima di salvare");
+  const list=filoList(o); let k=list.findIndex(x=>!String(x).trim()); if(k<0) k=0;
+  const el=document.getElementById("filo-"+k);
   if(el){ el.scrollIntoView({behavior:"smooth",block:"center"}); el.focus(); el.style.borderColor="#C62828"; el.style.boxShadow="0 0 0 3px rgba(198,40,40,.18)"; }
 }
 function jobCardNeedsWorker(o){
