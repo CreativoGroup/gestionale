@@ -17309,6 +17309,13 @@ async function onSignedIn(session){
   currentUser = await fetchUserProfile(session.user.id, session.user.email);
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("app").style.display = "flex";
+  // All'apertura si parte sempre dalla Dashboard, anche mentre i dati si caricano.
+  try{
+    currentView = "dashboard";
+    document.querySelectorAll("section.view").forEach(x=>x.classList.remove("active"));
+    document.getElementById("view-dashboard").classList.add("active");
+    renderNav();
+  }catch(e){ console.error("Vista iniziale", e); }
   // Un errore in uno di questi passaggi non deve impedire l'ingresso nel gestionale.
   for(const step of [loadAllFromSupabase, expireStaleWaitingLeads, cleanupOldNoteComunicazioni]){
     try{ await step(); }catch(e){ console.error("Avvio:", step.name, e); }
@@ -17316,7 +17323,7 @@ async function onSignedIn(session){
   try{ subscribeRealtime(); }catch(e){ console.error("Realtime", e); }
   try{ startDataAutoRefresh(); }catch(e){ console.error("Auto refresh", e); }
   renderNav();
-  goTo("dashboard");
+  try{ goTo("dashboard"); }catch(e){ console.error("Dashboard", e); document.getElementById("view-dashboard")?.classList.add("active"); }
   if(!window._leadExpiryTimer){
     window._leadExpiryTimer=setInterval(expireStaleWaitingLeads,60*60*1000);
   }
