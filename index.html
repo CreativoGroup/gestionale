@@ -4446,7 +4446,7 @@ const NAV = [
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
-  {id:"lavoriCompletati", label:"Lavori completati", icon:"✓", subtitle:"Da consegnare e completati recenti", group:"Operativa", hidden:true},
+  {id:"lavoriCompletati", label:"Lavori completati e crediti aperti", icon:"✓", subtitle:"Da consegnare, completati recenti e crediti da incassare", group:"Operativa"},
 
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Archivio"},
   {id:"dropbox", label:"Dropbox", icon:"☁", subtitle:"Archivio file collegato al gestionale", group:"Archivio"},
@@ -8244,18 +8244,7 @@ function renderDashboard(){
     </div>
     ${ordiniImportanti.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">★ Ordini importanti</h3><table><tbody>${ordiniImportanti.map(o=>`<tr><td>${clientName(o.clientId)}</td><td>${orderCategorieLabel(o)}</td><td><span class="pill ${STATUS_CLASS[o.stato]}">${statusDot(o.stato)}${o.stato}</span></td><td><button class="btn btn-outline btn-sm" onclick="openJobCard('${o.id}')">Scheda</button></td></tr>`).join("")}</tbody></table></div>` : ""}
     ${scorteBasse.length ? `<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">Avvisi magazzino</h3><table><thead><tr><th>Codice</th><th>Colore</th><th>Taglia</th><th>Disponibili</th><th>Scorta minima</th></tr></thead><tbody>${scorteBasse.map(w=>`<tr><td style="font-weight:700;">${w.codice}</td><td>${w.colore}</td><td>${w.taglia}</td><td class="low-stock">${w.quantita} ${w.unita}</td><td>${w.scortaMinima} ${w.unita}</td></tr>`).join("")}</tbody></table></div>` : ""}
-    <div class="card dashboard-crediti-aperti" style="margin-top:16px;">
-      <h3 style="margin-top:0;">Crediti aperti (ultimi inseriti)</h3>
-      ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Ordini da saldare</th><th>Da saldare</th><th></th></tr></thead><tbody>${creditiApertiDash.map(g=>`
-        <tr class="credit-mobile-row">
-          <td class="credit-client-name">${clientName(g.clientId)}</td>
-          <td class="mobile-hide">${g.orders.length===1 ? orderCategorieLabel(g.orders[0].o) : `${g.orders.length} ordini — ${g.orders.map(x=>orderCategorieLabel(x.o)).join(", ")}`}</td>
-          <td class="credit-residuo"><button class="btn btn-outline btn-sm" style="color:var(--danger);font-weight:800;white-space:nowrap;border-color:#DDE3EA;" title="${g.orders.length===1?"Clic per registrare un pagamento":"Clic per scegliere l'ordine da pagare"}" onclick="${g.orders.length===1?`openCompletedOrderPayment('${g.orders[0].o.id}')`:`openCreditiCliente('${g.clientId}')`}">${fmtMoney(g.totaleSaldo)}</button></td>
-          <td class="credit-action" style="white-space:nowrap;">${g.orders.length===1
-            ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button>`
-            : `<button class="btn btn-outline btn-sm" onclick="openCreditiCliente('${g.clientId}')">Dettaglio</button>`}</td>
-        </tr>`).join("")}</tbody></table>` : `<p class="empty">Nessun credito aperto.</p>`}
-    </div>
+    ${creditiApertiCardHtml(creditiApertiDash,"Crediti aperti (ultimi inseriti)")}
   `;
 }
 function segnaAllestimentoCompletato(orderId){
@@ -8287,6 +8276,23 @@ function compareOrdersNewestFirst(a,b){
   if(A.numero!==B.numero) return B.numero-A.numero;
   if(A.date!==B.date) return B.date-A.date;
   return String(b?.id||"").localeCompare(String(a?.id||""));
+}
+function creditiApertiCardHtml(groups,title){
+  const creditiApertiDash=groups;
+  return `
+    <div class="card dashboard-crediti-aperti" style="margin-top:16px;">
+      <h3 style="margin-top:0;">${title}</h3>
+      ${creditiApertiDash.length ? `<table><thead><tr><th>Cliente</th><th>Ordini da saldare</th><th>Da saldare</th><th></th></tr></thead><tbody>${creditiApertiDash.map(g=>`
+        <tr class="credit-mobile-row">
+          <td class="credit-client-name">${clientName(g.clientId)}</td>
+          <td class="mobile-hide">${g.orders.length===1 ? orderCategorieLabel(g.orders[0].o) : `${g.orders.length} ordini — ${g.orders.map(x=>orderCategorieLabel(x.o)).join(", ")}`}</td>
+          <td class="credit-residuo"><button class="btn btn-outline btn-sm" style="color:var(--danger);font-weight:800;white-space:nowrap;border-color:#DDE3EA;" title="${g.orders.length===1?"Clic per registrare un pagamento":"Clic per scegliere l'ordine da pagare"}" onclick="${g.orders.length===1?`openCompletedOrderPayment('${g.orders[0].o.id}')`:`openCreditiCliente('${g.clientId}')`}">${fmtMoney(g.totaleSaldo)}</button></td>
+          <td class="credit-action" style="white-space:nowrap;">${g.orders.length===1
+            ? `<button class="btn btn-outline btn-sm" onclick="openJobCard('${g.orders[0].o.id}')">Scheda</button>`
+            : `<button class="btn btn-outline btn-sm" onclick="openCreditiCliente('${g.clientId}')">Dettaglio</button>`}</td>
+        </tr>`).join("")}</tbody></table>` : `<p class="empty">Nessun credito aperto.</p>`}
+    </div>
+  `;
 }
 function creditiApertiRaggruppati(){
   const map = new Map();
@@ -11849,6 +11855,7 @@ function renderLavoriCompletati(){
           </table>
         </div>` : `<p class="empty">Nessun lavoro consegnato negli ultimi 15 giorni.</p>`}
     </div>
+    <div style="margin-top:18px;">${creditiApertiCardHtml(creditiApertiRaggruppati(),"Crediti aperti")}</div>
   `;
 }
 
