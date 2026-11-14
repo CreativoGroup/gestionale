@@ -1741,6 +1741,9 @@
 .job-v2-admin-details{border:1px solid #e7ebf0;border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 5px 18px rgba(25,35,50,.045);}
 .job-v2-admin-details>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 19px;border-left:4px solid #ef5b4a;font-weight:900;}
 .job-v2-admin-details>summary::-webkit-details-marker{display:none;}
+.recenti-toggle>summary::-webkit-details-marker{display:none;}
+.recenti-toggle>summary .recenti-freccia{transition:.18s transform;}
+.recenti-toggle[open]>summary .recenti-freccia{transform:rotate(180deg);}
 .job-v2-admin-details>summary:after{content:"⌄";font-size:18px;color:var(--muted);transition:.18s transform;}
 .job-v2-admin-details[open]>summary:after{transform:rotate(180deg);}
 .job-v2-admin-body{padding:0 18px 18px;}
@@ -3175,6 +3178,9 @@ const SOTTOCATEGORIE = {
   "Allestimenti": ["SUMMA","MIMAKI"],
   "Gadget": ["MIMAKI 3042","SUBLIMATICA","LASER"]
 };
+/* Nomi mostrati: "Stampa" si chiama Personalizzazione, "Fornitori" si chiama Stampa (i dati salvati non cambiano). */
+const CATEGORY_LABELS = {"Stampa":"Personalizzazione","Fornitori":"Stampa"};
+function catLabel(c){ return CATEGORY_LABELS[c] || c; }
 function isExternalCat(c){ return c==="Fornitori" || c==="Altri fornitori" || c==="Lavorazioni Esterne"; }
 function sottocategorieDi(c){
   if(c==="Fornitori") return FORNITORI_PRINCIPALI;
@@ -4365,7 +4371,7 @@ function renderBozzaSection(o){
   return `<div class="modal-section"><h3>Gestione bozza</h3></div>`;
 }
 function orderCategorie(o){ return [...new Set((o.righe||[]).map(r=>r.categoria).filter(Boolean))]; }
-function orderCategorieLabel(o){ const c = orderCategorie(o); return c.length ? c.join(", ") : "—"; }
+function orderCategorieLabel(o){ const c = orderCategorie(o).map(catLabel); return c.length ? c.join(", ") : "—"; }
 function orderWorkersList(o){
   const raw=String(o?.worker||"").trim();
   if(!raw || raw==="Misto") return [];
@@ -4642,7 +4648,7 @@ function jobCardPrintHtml(o){
   const cli=(l,v)=>v?`<div class="kv"><span>${l}</span><b>${e(v)}</b></div>`:"";
   const rows=righe.map((r,i)=>{
     const q=Number(r.quantita)||0, pu=Number(r.prezzoUnitario)||0;
-    const titolo=[r.categoria,r.sottocategoria,r.prodotto].filter(Boolean).join(" — ");
+    const titolo=[catLabel(r.categoria),r.sottocategoria,r.prodotto].filter(Boolean).join(" — ");
     return `<tr>
       <td class="n">${i+1}</td>
       <td><b>${e(titolo||"—")}</b>${r.descrizione?`<div class="d">${e(r.descrizione).replace(/\n/g,"<br>")}</div>`:""}${r.fornitore?`<div class="d">Fornitore: ${e(r.fornitore)}</div>`:""}</td>
@@ -8265,13 +8271,13 @@ function segnaComeSpedito(orderId){
   renderDashboard();
   showToast("Ordine segnato come spedito e archiviato");
 }
-function orderInsertionSortValue(o){
+function orderNewestSortKey(o){
   const ts=o?.createdAt ? Date.parse(o.createdAt) : NaN;
   if(Number.isFinite(ts)) return {hasDate:1, date:ts, numero:Number(o?.numero)||0};
   return {hasDate:0, date:0, numero:Number(o?.numero)||0};
 }
 function compareOrdersNewestFirst(a,b){
-  const A=orderInsertionSortValue(a), B=orderInsertionSortValue(b);
+  const A=orderNewestSortKey(a), B=orderNewestSortKey(b);
   if(A.hasDate && B.hasDate && A.date!==B.date) return B.date-A.date;
   if(A.numero!==B.numero) return B.numero-A.numero;
   if(A.date!==B.date) return B.date-A.date;
@@ -8691,7 +8697,7 @@ function openDashboardList(type){
   } else if(cfg.isQuote){
     rows = cfg.items.map(q=>`
       <div class="list-row" onclick="openQuoteDetail('${q.id}')">
-        <div><div class="lr-main">${quoteRecipient(q).nome || clientName(q.clientId)}</div><div class="lr-sub">${q.categoria} — ${fmtMoney(quoteImponibile(q))}</div></div>
+        <div><div class="lr-main">${quoteRecipient(q).nome || clientName(q.clientId)}</div><div class="lr-sub">${catLabel(q.categoria)} — ${fmtMoney(quoteImponibile(q))}</div></div>
         <span class="pill ${QUOTE_CLASS[q.stato]}">${q.stato}</span>
       </div>`).join("");
   } else {
@@ -9410,7 +9416,7 @@ async function resolveClientId(selectId, newClientPrefix){
   if(val === "__new__") return await createClientFromPrefix(newClientPrefix);
   return val;
 }
-function categoryOptions(selected, includeBlank){ return (includeBlank?`<option value="">Seleziona categoria…</option>`:'') + CATEGORIES.map(c=>`<option value="${c}" ${c===selected?'selected':''}>${c}</option>`).join(""); }
+function categoryOptions(selected, includeBlank){ return (includeBlank?`<option value="">Seleziona categoria…</option>`:'') + CATEGORIES.map(c=>`<option value="${c}" ${c===selected?'selected':''}>${catLabel(c)}</option>`).join(""); }
 function prodottoOptions(categoria, selected){
   const opts = PRODOTTI_PER_CATEGORIA[categoria] || [];
   return `<option value="">Seleziona…</option>` + opts.map(p=>`<option value="${p}" ${p===selected?'selected':''}>${p}</option>`).join("");
@@ -10817,7 +10823,7 @@ async function transformQuoteToLead(quoteId){
   if(existing||(q.extra&&q.extra.leadId)){showToast('Questo preventivo è già collegato a un Lead');return;}
   const c=state.clients.find(x=>x.id===q.clientId);
   const righe=(q.righe||[]).map(r=>`${r.descrizione||r.prodotto||q.categoria}: ${r.quantita||0} x ${fmtMoney(r.prezzoUnitario||0)}`).join('\n');
-  const lead={id:uuid(),nome:c?.nome||'',azienda:c?.ragioneSociale||c?.azienda||'',email:c?.email||'',telefono:c?.telefono||'',oggettoRichiesta:`Preventivo - ${q.categoria||''}`.trim(),richiesta:`${q.descrizione||''}${q.descrizione&&righe?'\n':''}${righe}${righe?'\n':''}Totale: ${fmtMoney(quoteImponibile(q))}`.trim(),stato:'In attesa di conferma',fonte:`preventivo:${q.id}`,creatoIl:new Date().toISOString(),aggiornatoIl:new Date().toISOString()};
+  const lead={id:uuid(),nome:c?.nome||'',azienda:c?.ragioneSociale||c?.azienda||'',email:c?.email||'',telefono:c?.telefono||'',oggettoRichiesta:`Preventivo - ${catLabel(q.categoria||'')}`.trim(),richiesta:`${q.descrizione||''}${q.descrizione&&righe?'\n':''}${righe}${righe?'\n':''}Totale: ${fmtMoney(quoteImponibile(q))}`.trim(),stato:'In attesa di conferma',fonte:`preventivo:${q.id}`,creatoIl:new Date().toISOString(),aggiornatoIl:new Date().toISOString()};
   const ok=await upsertOne('leads',lead); if(!ok)return;
   if(!state.leads.some(x=>x.id===lead.id)) state.leads.unshift(lead);
   q.extra=Object.assign({},q.extra||{},{leadId:lead.id}); saveState('quotes');
@@ -11830,13 +11836,14 @@ function renderLavoriCompletati(){
       ${renderCompletedDeliveryRows(daConsegnare)}
     </div>
 
-    <div class="card">
-      <div class="section-header">
+    <details class="card recenti-toggle" ${window._recentiCompletatiOpen?'open':''} ontoggle="window._recentiCompletatiOpen=this.open">
+      <summary class="section-header" style="cursor:pointer;list-style:none;">
         <div>
-          <h3 style="margin:0;">Lavori completati negli ultimi 15 giorni</h3>
-          <p class="helptext" style="margin:5px 0 0;">Dopo 15 giorni spariscono automaticamente da questa sezione e restano archiviati definitivamente in Ordini → Archiviati.</p>
+          <h3 style="margin:0;">Lavori completati negli ultimi 15 giorni <span class="nota-foot" style="font-weight:600;">· ${recenti.length}</span></h3>
+          <p class="helptext" style="margin:5px 0 0;">Clicca per aprire o chiudere. Dopo 15 giorni spariscono automaticamente da questa sezione e restano archiviati definitivamente in Ordini → Archiviati.</p>
         </div>
-      </div>
+        <span class="recenti-freccia" style="font-size:20px;color:var(--muted);">⌄</span>
+      </summary>
       ${recenti.length ? `
         <div class="table-wrap" style="box-shadow:none;">
           <table>
@@ -11854,7 +11861,7 @@ function renderLavoriCompletati(){
             }).join("")}</tbody>
           </table>
         </div>` : `<p class="empty">Nessun lavoro consegnato negli ultimi 15 giorni.</p>`}
-    </div>
+    </details>
     <div style="margin-top:18px;">${creditiApertiCardHtml(creditiApertiRaggruppati(),"Crediti aperti")}</div>
   `;
 }
@@ -11941,7 +11948,7 @@ function renderOrdini(){
     <div class="section-header">
       <div class="filters">
         <input id="ordiniSearchInput" class="inline" style="min-width:200px;" placeholder="Cerca ordine…" value="${f.search}" oninput="orderFilters.search=this.value; rerenderKeepingFocus(renderOrdini);">
-        <select class="inline" onchange="orderFilters.categoria=this.value; renderOrdini();"><option value="">Tutte le categorie</option>${CATEGORIES.map(c=>`<option ${c===f.categoria?'selected':''}>${c}</option>`).join("")}</select>
+        <select class="inline" onchange="orderFilters.categoria=this.value; renderOrdini();"><option value="">Tutte le categorie</option>${CATEGORIES.map(c=>`<option value="${c}" ${c===f.categoria?'selected':''}>${catLabel(c)}</option>`).join("")}</select>
         <select class="inline" onchange="orderFilters.worker=this.value; renderOrdini();"><option value="">Tutti gli operatori</option>${WORKERS.map(w=>`<option ${w===f.worker?'selected':''}>${w}</option>`).join("")}</select>
       </div>
     </div>
@@ -13650,7 +13657,7 @@ function renderFasiGrouped(o){
   const groups = {};
   o.fasi.forEach((f,i)=>{ (groups[f.categoria] = groups[f.categoria] || []).push({f,i}); });
   return Object.keys(groups).map(cat => `
-    <p class="fasi-group-title">${cat}</p>
+    <p class="fasi-group-title">${catLabel(cat)}</p>
     <div class="steps" style="margin-bottom:10px;">
       ${groups[cat].map(({f,i})=>`<div class="step-row ${f.completata?'done':''}"><input type="checkbox" ${f.completata?'checked':''} onchange="toggleStep('${o.id}',${i})"><label>${f.nome}</label></div>`).join("")}
     </div>
@@ -15133,7 +15140,7 @@ function buildMonthlyRows(year){
 
 function openOrderValueDetails(monthKey,label){
   const orders = state.orders
-    .filter(o=>o.createdAt && o.createdAt.slice(0,7)===monthKey)
+    .filter(o=>o.createdAt && o.createdAt.slice(0,7)===monthKey && !orderFuoriConti(o))
     .sort((a,b)=>compareOrdersNewestFirst(a,b));
 
   const totale = orders.reduce((s,o)=>s+orderTotale(o),0);
@@ -15204,7 +15211,7 @@ function monthMovementRows(key, kind){
     default: return [...pay(nonFatt),...ent,...sp,...cf];
   }
 }
-const MONTH_MOVEMENT_TITLES={contanti:"Pagamenti in contanti",carta:"Pagamenti con carta",bonifico:"Pagamenti con bonifico",nonfatt:"Pagamenti non fatturati",fatt:"Pagamenti fatturati",entrate:"Entrate",spese:"Spese",costi:"Costi fissi",tutti:"Totale complessivo"};
+const MONTH_MOVEMENT_TITLES={contanti:"Pagamenti in contanti",carta:"Pagamenti con carta",bonifico:"Pagamenti con bonifico",nonfatt:"Pagamenti",fatt:"Pagamenti",entrate:"Entrate",spese:"Spese",costi:"Costi fissi",tutti:"Totale complessivo"};
 function monthCell(key,label,kind,amount,asCount){
   const v=Number(amount)||0;
   const txt=asCount ? String(v) : fmtMoney(v);
@@ -15364,21 +15371,20 @@ function renderIncassi(){
       <div class="card" style="margin-bottom:18px;"><canvas id="monthlyChart" height="90"></canvas></div>
       <div class="table-wrap" style="margin-bottom:20px;overflow-x:auto;">
         <table>
-          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta di Pagamento</th><th>Bonifico</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Totale pagamenti NON fatturati</th><th>Pagamenti fatturati (esclusi dal totale)</th><th>Totale complessivo</th></tr></thead>
+          <thead><tr><th>Mese</th><th>N. Ordini</th><th>Totale Ordini</th><th>N. Pagamenti</th><th>Contanti</th><th>Carta di Pagamento</th><th>Bonifico</th><th>Entrate</th><th>Spese</th><th>Costi fissi</th><th>Totale pagamenti</th><th>Totale complessivo</th></tr></thead>
           <tbody>
-            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini?`<button class="btn btn-outline btn-sm" title="Clic per vedere gli ordini" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${r.nOrdini}</button>`:"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${monthCell(r.monthKey,r.mese,"nonfatt",r.nPagamenti,true)}</td><td>${monthCell(r.monthKey,r.mese,"contanti",r.contanti)}</td><td>${monthCell(r.monthKey,r.mese,"carta",r.carta)}</td><td>${monthCell(r.monthKey,r.mese,"bonifico",r.bonifico)}</td><td>${monthCell(r.monthKey,r.mese,"entrate",r.entrate)}</td><td>${monthCell(r.monthKey,r.mese,"spese",r.spese)}</td><td>${monthCell(r.monthKey,r.mese,"costi",r.costiFissi)}</td><td style="font-weight:700;">${monthCell(r.monthKey,r.mese,"nonfatt",r.soldiIncassati)}</td><td style="font-weight:700;">${monthCell(r.monthKey,r.mese,"fatt",r.pagamentiFatturati)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${monthCell(r.monthKey,r.mese,"tutti",r.differenza)}</td></tr>`).join("")}
-            <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${monthCell(yKey,yLab,"nonfatt",tot.nPagamenti,true)}</td><td>${monthCell(yKey,yLab,"contanti",tot.contanti)}</td><td>${monthCell(yKey,yLab,"carta",tot.carta)}</td><td>${monthCell(yKey,yLab,"bonifico",tot.bonifico)}</td><td>${monthCell(yKey,yLab,"entrate",tot.entrate)}</td><td>${monthCell(yKey,yLab,"spese",tot.spese)}</td><td>${monthCell(yKey,yLab,"costi",tot.costiFissi)}</td><td>${monthCell(yKey,yLab,"nonfatt",tot.soldiIncassati)}</td><td>${monthCell(yKey,yLab,"fatt",tot.pagamentiFatturati)}</td><td>${monthCell(yKey,yLab,"tutti",tot.differenza)}</td></tr>
+            ${rows.map(r=>`<tr><td>${r.mese}</td><td>${r.nOrdini?`<button class="btn btn-outline btn-sm" title="Clic per vedere gli ordini" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${r.nOrdini}</button>`:"—"}</td><td><button class="btn btn-outline btn-sm" onclick="openOrderValueDetails(\'${r.monthKey}\',\'${r.mese}\')">${fmtMoney(r.totaleOrdini)}</button></td><td>${monthCell(r.monthKey,r.mese,"nonfatt",r.nPagamenti,true)}</td><td>${monthCell(r.monthKey,r.mese,"contanti",r.contanti)}</td><td>${monthCell(r.monthKey,r.mese,"carta",r.carta)}</td><td>${monthCell(r.monthKey,r.mese,"bonifico",r.bonifico)}</td><td>${monthCell(r.monthKey,r.mese,"entrate",r.entrate)}</td><td>${monthCell(r.monthKey,r.mese,"spese",r.spese)}</td><td>${monthCell(r.monthKey,r.mese,"costi",r.costiFissi)}</td><td style="font-weight:700;">${monthCell(r.monthKey,r.mese,"nonfatt",r.soldiIncassati)}</td><td style="font-weight:600;${r.differenza<0?'color:var(--danger)':''}">${monthCell(r.monthKey,r.mese,"tutti",r.differenza)}</td></tr>`).join("")}
+            <tr style="font-weight:800;background:var(--paper);"><td>TOTALE ANNO</td><td>${tot.nOrdini}</td><td>${fmtMoney(tot.totaleOrdini)}</td><td>${monthCell(yKey,yLab,"nonfatt",tot.nPagamenti,true)}</td><td>${monthCell(yKey,yLab,"contanti",tot.contanti)}</td><td>${monthCell(yKey,yLab,"carta",tot.carta)}</td><td>${monthCell(yKey,yLab,"bonifico",tot.bonifico)}</td><td>${monthCell(yKey,yLab,"entrate",tot.entrate)}</td><td>${monthCell(yKey,yLab,"spese",tot.spese)}</td><td>${monthCell(yKey,yLab,"costi",tot.costiFissi)}</td><td>${monthCell(yKey,yLab,"nonfatt",tot.soldiIncassati)}</td><td>${monthCell(yKey,yLab,"tutti",tot.differenza)}</td></tr>
           </tbody>
         </table>
       </div>
       <div class="card" style="margin-bottom:18px;">
         <p style="margin:0;font-size:13px;line-height:1.5;color:var(--muted);">
           <strong>Come leggere questi numeri:</strong><br>
-          <strong>Totale Ordini</strong> = valore delle schede create nel mese: righe (quantità × prezzo) + eventuale spedizione + eventuale IVA − sconto. Include quindi anche ordini non ancora pagati e ordini non ancora consegnati.<br>
-          <strong>Totale pagamenti NON fatturati</strong> = incassi registrati nel mese collegati a schede non fatturate.<br>
-          <strong>Pagamenti fatturati</strong> = incassi registrati nel mese collegati a schede già fatturate.<br>
+          <strong>Totale Ordini</strong> = valore delle schede create nel mese (escluse quelle fatturate o da fatturare): righe (quantità × prezzo) + eventuale spedizione + eventuale IVA − sconto. Include quindi anche ordini non ancora pagati e ordini non ancora consegnati.<br>
+          <strong>Totale pagamenti</strong> = incassi registrati nel mese. Le schede fatturate o da fatturare non entrano in nessun conto (sono gestite nel gestionale di fatturazione).<br>
           <strong>Entrate</strong> = entrate extra non collegate agli ordini.<br>
-          <strong>Totale complessivo</strong> = pagamenti non fatturati + pagamenti fatturati + entrate − spese − costi fissi.<br>
+          <strong>Totale complessivo</strong> = pagamenti + entrate − spese − costi fissi.<br>
           Clicca su un numero della tabella per vedere tutti i movimenti che lo compongono (ordini, pagamenti, entrate, spese).
         </p>
       </div>`;
@@ -15437,7 +15443,7 @@ function renderIncassi(){
       <h3 style="margin:0;">Storico pagamenti</h3>
       <div class="filters">
         <select class="inline" onchange="incassiFilters.metodo=this.value; renderIncassi();"><option value="">Tutte le modalità</option>${PAY_METHODS.map(m=>`<option ${m===f.metodo?'selected':''}>${m}</option>`).join("")}</select>
-        <select class="inline" onchange="incassiFilters.categoria=this.value; renderIncassi();"><option value="">Tutti i lavori</option>${CATEGORIES.map(c=>`<option ${c===f.categoria?'selected':''}>${c}</option>`).join("")}</select>
+        <select class="inline" onchange="incassiFilters.categoria=this.value; renderIncassi();"><option value="">Tutti i lavori</option>${CATEGORIES.map(c=>`<option value="${c}" ${c===f.categoria?'selected':''}>${catLabel(c)}</option>`).join("")}</select>
         <input class="inline" type="month" value="${f.mese}" onchange="incassiFilters.mese=this.value; renderIncassi();">
       </div>
     </div>
@@ -17392,7 +17398,7 @@ if("serviceWorker" in navigator){
 
 window.addEventListener("error",e=>{ try{ showToast("Errore: "+(e.message||"sconosciuto")); }catch(_){} });
 /* Etichetta versione (in basso a sinistra, piccola) per capire quale versione è aperta */
-(function(){ const d=document.createElement("div"); d.textContent="v. 21/10 18:45"; d.style.cssText="position:fixed;left:8px;bottom:4px;font:600 10px Inter,system-ui,sans-serif;color:#8a94a3;opacity:.75;z-index:50;pointer-events:none;"; window.addEventListener("load",()=>document.body.appendChild(d)); })();
+(function(){ const d=document.createElement("div"); d.textContent="v. 14/11 15:30"; d.style.cssText="position:fixed;left:8px;bottom:4px;font:600 10px Inter,system-ui,sans-serif;color:#8a94a3;opacity:.75;z-index:50;pointer-events:none;"; window.addEventListener("load",()=>document.body.appendChild(d)); })();
 
 /* Avviso "nuova versione disponibile": compare solo se la versione online cambia davvero (2 controlli di fila uguali) */
 (function(){
