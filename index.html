@@ -3175,7 +3175,7 @@ const CATEGORIES = ["Stampa","Ricamo","Allestimenti","Gadget","Stampante Xerox",
 /* Sottocategorie = macchinario usato. Per Fornitori / Altri fornitori la sottocategoria è il fornitore. */
 const SOTTOCATEGORIE = {
   "Stampa": ["DTF","EPSON F2000","INTAGLIO"],
-  "Ricamo": ["BROTHER","SWF"],
+  "Ricamo": ["BROTHER","SWF","SWF + BROTHER"],
   "Allestimenti": ["SUMMA","MIMAKI"],
   "Gadget": ["MIMAKI 3042","SUBLIMATICA","LASER"]
 };
@@ -4542,19 +4542,37 @@ async function deleteRicamo(id){
   closeModal();
 }
 function ricamiFind(id){ return ricamiState.find(x=>x.id===id); }
-/* Ogni ordine aperto di un cliente "Felpe per reparti" ha in automatico il suo lavoro ricamo.
+/* Ogni ordine aperto con una riga di ricamo ha in automatico il suo lavoro ricamo
+   (le Felpe per reparti con cuore, nomi e retro; gli altri con la macchina scelta nell'ordine).
    L'id è fisso (ord-<id ordine>), così due computer non creano doppioni e un lavoro già modificato non viene sovrascritto. */
+/* Macchine scelte nelle righe di ricamo dell'ordine (sottocategoria BROTHER, SWF o SWF + BROTHER) */
+function ricMacchineOrdine(o){
+  const t = (o&&o.righe||[]).filter(r=>r && r.categoria==="Ricamo").map(r=>String(r.sottocategoria||"").toUpperCase()).join(" ");
+  return {swf:/SWF/.test(t), brother:/BROTHER/.test(t)};
+}
+function ricRigheIniziali(o){
+  if(ricIsFelpeReparti(o)) return [ricNuovaRiga("Cuore","Logo ospedale","SWF"), ricNuovaRiga("Destra","Nomi","Brother"), ricNuovaRiga("Retro","Scritta reparto","SWF")];
+  const m = ricMacchineOrdine(o);
+  if(m.swf && m.brother) return [ricNuovaRiga("Altro","Ricamo","SWF"), ricNuovaRiga("Altro","Nomi","Brother")].map(r=>Object.assign(r,{base:false}));
+  return [Object.assign(ricNuovaRiga("Altro","Ricamo", m.brother?"Brother":"SWF"), {base:false})];
+}
+function ricIsReparto(l){ const o = l.orderId ? findItem("orders", l.orderId) : null; return !!o && ricIsFelpeReparti(o); }
+function ricMacchineLavoro(l){
+  const s = new Set((l.ricami||[]).map(r=>r.macchina==="Brother"?"Brother":"SWF"));
+  return s;
+}
+let ricamiMacchina = "";
 let ricamiAutoBusy = false;
 let ricPianoCorrente = null;
 let ricSimFelpe = 20;
 async function ricamiAutoSync(){
   if(ricamiAutoBusy || !ricamiLoaded) return 0;
   const nuovi = state.orders
-    .filter(o=>!["Completato","Consegnato"].includes(o.stato) && ricIsFelpeReparti(o))
+    .filter(o=>!["Completato","Consegnato"].includes(o.stato) && (ricIsFelpeReparti(o) || orderHasRicamo(o)))
     .filter(o=>!ricamiState.some(l=>l.orderId===o.id || l.id==="ord-"+o.id))
     .map(o=>({id:"ord-"+o.id, orderId:o.id, auto:true, titolo:"", numFelpe:"", operatore:WORKERS.includes(o.worker)?o.worker:"", stato:"Da fare",
       nomi:"", note:"", inizioPrevisto:"", creatoIl:o.createdAt||new Date().toISOString(), impostazioni:ricImpPredefinite(),
-      ricami:[ricNuovaRiga("Cuore","Logo ospedale","SWF"), ricNuovaRiga("Destra","Nomi","Brother"), ricNuovaRiga("Retro","Scritta reparto","SWF")]}));
+      ricami:ricRigheIniziali(o)}));
   if(!nuovi.length) return 0;
   ricamiAutoBusy = true;
   try{
@@ -4799,7 +4817,7 @@ function renderRicami(){
   const all = ricamiState.slice().sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
   const posto = l => (ricPianoCorrente.map[l.id]||{}).posto || 9999;
   all.sort((a,b)=>posto(a)-posto(b));
-  const list = all.filter(l=> ricamiFilter==="tutti" ? true : ricamiFilter==="finiti" ? l.stato==="Finito" : l.stato!=="Finito");
+  const list = all.filter(l=> !ricamiMacchina || ricMacchineLavoro(l).has(ricamiMacchina)).filter(l=> ricamiFilter==="tutti" ? true : ricamiFilter==="finiti" ? l.stato==="Finito" : l.stato!=="Finito");
   /* statistica sui lavori finiti: quanto ci si discosta in media dal previsto */
   const finiti = all.filter(l=>l.stato==="Finito").map(ricTotali).filter(t=>t.prevFatti>0 && t.realeFatti>0);
   const media = finiti.length ? finiti.reduce((s,t)=>s+(t.realeFatti-t.prevFatti)/t.prevFatti*100,0)/finiti.length : null;
@@ -4814,12 +4832,17 @@ function renderRicami(){
           const c = ricPianoCorrente.cursori, imp = ricImp();
           const libero = op => c[op] ? fmtRicData(new Date(c[op])) : "subito";
           return `<div><div style="font-size:12px;color:var(--muted);">Fine prevista dell'ultimo lavoro</div><div style="font-size:22px;font-weight:800;color:var(--accent);">${ultimo?fmtRicData(ultimo):"—"}</div>
-            <div style="font-size:11.5px;color:var(--muted);">Un nuovo lavoro entra in macchina: SWF (${escapeHtml(imp.swfOp)}) ${libero(imp.swfOp)} · nomi (${escapeHtml(imp.broOp)}) ${libero(imp.broOp)}</div></div>`; })()}
+            <div style="font-size:11.5px;color:var(--muted);max-width:340px;">Un nuovo lavoro entra in macchina: SWF (${escapeHtml(imp.swfOp)}) ${libero(imp.swfOp)} · nomi (${escapeHtml(imp.broOp)}) ${libero(imp.broOp)}</div></div>`; })()}
         <div><div style="font-size:12px;color:var(--muted);">Ricami in macchina ora</div><div style="font-size:22px;font-weight:800;">${inCorso}</div></div>
         <div><div style="font-size:12px;color:var(--muted);">Scostamento medio sui lavori finiti</div><div style="font-size:22px;font-weight:800;">${media===null?"—":`<span style="color:${media<=10?"var(--ok)":media<=25?"var(--warn)":"var(--danger)"}">${media>=0?"+":"−"}${Math.abs(Math.round(media))}%</span>`}</div>
           <div style="font-size:11.5px;color:var(--muted);">${finiti.length?`su ${finiti.length} lavor${finiti.length===1?"o":"i"} (+ = più lento del previsto)`:"compare quando chiudi il primo lavoro"}</div></div>
       </div>
-      <div style="display:flex;gap:6px;">${chip("attivi","Attivi")}${chip("finiti","Finiti")}${chip("tutti","Tutti")}</div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+        <div style="display:flex;gap:6px;">${chip("attivi","Attivi")}${chip("finiti","Finiti")}${chip("tutti","Tutti")}</div>
+        <div style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);">Ricamatrice:
+          ${[["","Tutte"],["SWF","SWF"],["Brother","Brother"]].map(([k,lab])=>`<button class="btn ${ricamiMacchina===k?"btn-primary":"btn-outline"} btn-sm" onclick="ricamiMacchina='${k}';renderRicami()">${lab}</button>`).join("")}</div>
+        <div style="font-size:11.5px;color:var(--muted);"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#EEE9FF;border:1px solid #CFC3FF;vertical-align:middle;"></span> altre lavorazioni di ricamo</div>
+      </div>
     </div>
     <div class="card" style="margin-bottom:16px;background:#FFF8F4;border:1px solid #F5D3C4;">
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:15px;">
@@ -4845,12 +4868,15 @@ function ricCardHtml(l){
   const o = l.orderId ? findItem("orders", l.orderId) : null;
   const running = (l.ricami||[]).filter(ricInCorso);
   const statoCol = l.stato==="Finito" ? "var(--ok)" : running.length ? "var(--accent)" : "var(--muted)";
-  return `<div class="card" style="cursor:pointer;margin:0;" onclick="openRicamo('${l.id}')">
+  const reparto = ricIsReparto(l);
+  const macch = [...ricMacchineLavoro(l)].join(" + ");
+  return `<div class="card" style="cursor:pointer;margin:0;${reparto?"":"background:#F5F2FF;border:1px solid #CFC3FF;"}" onclick="openRicamo('${l.id}')">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;color:${reparto?"var(--teal)":"#6B4FD8"};">${reparto?"Felpe per reparti":"Altra lavorazione"}${macch?` · ${escapeHtml(macch)}`:""}</div>
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
       <strong style="font-size:15px;">${escapeHtml(ricamoTitolo(l))}</strong>
       <span class="badge" style="color:${statoCol};border-color:${statoCol};white-space:nowrap;">${running.length?"● In macchina":escapeHtml(l.stato||"Da fare")}</span>
     </div>
-    <div style="font-size:12.5px;color:var(--muted);margin:4px 0 10px;">${ricFelpe(l)} felpe · ${t.tot} ricam${t.tot===1?"o":"i"}${l.operatore?` · ${escapeHtml(l.operatore)}`:""}${o&&o.dataConsegna?` · consegna ${fmtDate(o.dataConsegna)}`:""}</div>
+    <div style="font-size:12.5px;color:var(--muted);margin:4px 0 10px;">${ricFelpe(l)} ${ricIsReparto(l)?"felpe":"pezzi"} · ${t.tot} ricam${t.tot===1?"o":"i"}${l.operatore?` · ${escapeHtml(l.operatore)}`:""}${o&&o.dataConsegna?` · consegna ${fmtDate(o.dataConsegna)}`:""}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12.5px;">
       <div><div style="color:var(--muted);">Previsto</div><b>${fmtRicMin(t.previsto)}</b></div>
       <div><div style="color:var(--muted);">Reale</div><b data-ric-reale="${l.id}">${fmtRicMin(t.reale)}</b></div>
@@ -4882,7 +4908,7 @@ async function newRicamo(orderId){
   const o = orderId ? findItem("orders", orderId) : null;
   const l = {id:uuid(), orderId:o?o.id:"", titolo:"", numFelpe:"", operatore:o&&WORKERS.includes(o.worker)?o.worker:"", stato:"Da fare",
     nomi:"", note:"", inizioPrevisto:"", creatoIl:new Date().toISOString(), impostazioni:ricImpPredefinite(),
-    ricami:[ricNuovaRiga("Cuore","Logo ospedale","SWF"), ricNuovaRiga("Destra","Nomi","Brother"), ricNuovaRiga("Retro","Scritta reparto","SWF")]};
+    ricami:o?ricRigheIniziali(o):[ricNuovaRiga("Cuore","Logo ospedale","SWF"), ricNuovaRiga("Destra","Nomi","Brother"), ricNuovaRiga("Retro","Scritta reparto","SWF")]};
   ricamiState.push(l);
   await saveRicamo(l);
   openRicamo(l.id);
@@ -5112,7 +5138,7 @@ const NAV = [
   {id:"leadOrdine", label:"NUOVI CLIENTI CON ORDINE", icon:"◆", subtitle:"Ordini ricevuti da clienti non ancora presenti o da completare", group:"Operativa", hidden:true},
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
-  {id:"ricami", label:"Ricami felpe reparti", icon:"✣", subtitle:"Pianificazione ricami: tempo previsto e tempo reale", group:"Operativa"},
+  {id:"ricami", label:"Ricami", icon:"✣", subtitle:"Felpe per reparti e altri ricami: coda, tempo previsto e tempo reale", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
   {id:"lavoriCompletati", label:"LAVORI COMPLETATI E CREDITI APERTI", icon:"✓", subtitle:"Da consegnare, completati recenti e crediti da incassare", group:"Dashboard"},
 
