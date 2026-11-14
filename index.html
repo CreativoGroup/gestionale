@@ -3503,10 +3503,26 @@ function fromDbRow(collection, r){
 /* Lettura completa di una tabella. I messaggi WhatsApp si scaricano senza il testo grezzo di Meta (pesante)
    e solo i più recenti, per non consumare la quota di Supabase. */
 const WA_MSG_COLS = "id,whatsapp_message_id,wa_id,contact_name,from_number,phone_number_id,display_phone_number,direction,message_type,body,message_timestamp,status,created_at";
-function dbSelectAll(c){
-  if(c==="warehouse") return sb.from(TABLES[c]).select("*").gt("quantita",0);
-  if(c==="whatsappMessages") return sb.from(TABLES[c]).select(WA_MSG_COLS).order("message_timestamp",{ascending:false}).limit(1500);
-  return sb.from(TABLES[c]).select("*");
+/* Supabase restituisce al massimo 1000 righe per richiesta: si legge a pagine finché la tabella non è finita,
+   così nessun ordine, pagamento o cliente resta fuori quando si superano le 1000 righe. */
+async function dbSelectAll(c){
+  const PAGE=1000;
+  const max = c==="whatsappMessages" ? 1500 : Infinity;
+  const build=()=>{
+    if(c==="warehouse") return sb.from(TABLES[c]).select("*").gt("quantita",0).order("id",{ascending:true});
+    if(c==="whatsappMessages") return sb.from(TABLES[c]).select(WA_MSG_COLS).order("message_timestamp",{ascending:false}).order("id",{ascending:true});
+    return sb.from(TABLES[c]).select("*").order("id",{ascending:true});
+  };
+  let all=[];
+  for(let from=0; from<max; from+=PAGE){
+    const to=Math.min(from+PAGE,max)-1;
+    const {data,error}=await build().range(from,to);
+    if(error) return {data:null,error};
+    const rows=data||[];
+    all=all.concat(rows);
+    if(rows.length<to-from+1) break;
+  }
+  return {data:all,error:null};
 }
 async function loadAllFromSupabase(){
   const collections = Object.keys(TABLES);
@@ -3852,9 +3868,9 @@ function orderIva(o){ return o.ivaApplicata ? (orderImponibile(o) + orderSpedizi
 function orderTotale(o){ const base = orderImponibile(o) + orderSpedizioneCosto(o) + orderIva(o) - (Number(o.sconto)||0); return Math.max(0, base); }
 function orderIncassato(o){ return state.payments.filter(p=>p.orderId===o.id).reduce((s,p)=>s+Number(p.importo),0); }
 function orderSaldo(o){ return orderTotale(o) - orderIncassato(o); }
-function paymentsTotaleMese(mese){ return state.payments.filter(p=>p.data.slice(0,7)===mese && !paymentIsFatturato(p)).reduce((s,p)=>s+Number(p.importo),0); }
-function entrateTotaleMese(mese){ return (state.entrate||[]).filter(e=>e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
-function speseTotaleMese(mese){ return state.expenses.filter(e=>e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
+function paymentsTotaleMese(mese){ return state.payments.filter(p=>String(p.data||"").slice(0,7)===mese && !paymentIsFatturato(p)).reduce((s,p)=>s+Number(p.importo),0); }
+function entrateTotaleMese(mese){ return (state.entrate||[]).filter(e=>String(e.data||"").slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
+function speseTotaleMese(mese){ return state.expenses.filter(e=>String(e.data||"").slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
 function costiFissiTotaleMese(mese){ return (state.fixedCosts||[]).filter(e=>e.data && e.data.slice(0,7)===mese).reduce((s,e)=>s+Number(e.importo),0); }
 
 /* ============ SEED DEMO ============ */
@@ -6966,7 +6982,7 @@ async function completeWhatsappMetaSignup(){
     );
 
     try{
-      await loadWhatsappInbox();
+      await refreshWhatsappInbox(true);
     }catch(e){
       console.warn("Aggiornamento inbox WhatsApp dopo collegamento",e);
     }
@@ -9665,7 +9681,7 @@ async function createClientFromPrefixInner(prefix, existingId){
   else state.clients.push(saved);
   return id;
 }
-function clientFatturato(clientId){ return state.orders.filter(o=>o.clientId===clientId).reduce((s,o)=>s+orderTotale(o),0); }
+function clientFatturato(clientId){ return state.orders.filter(o=>o.clientId===clientId && !orderFuoriConti(o)).reduce((s,o)=>s+orderTotale(o),0); }
 let clientiFilters = {search:"", settore:"", tipo:"", fatturatoMin:""};
 
 function clientSpecLabel(c){
@@ -9799,7 +9815,7 @@ function renderClienti(){
 function openClientHistory(clientId){
   const c = state.clients.find(x=>x.id===clientId);
   const orders = state.orders.filter(o=>o.clientId===clientId).sort((a,b)=>(b.dataConsegna||"").localeCompare(a.dataConsegna||""));
-  const totale = orders.reduce((s,o)=>s+orderTotale(o),0);
+  const totale = orders.filter(o=>!orderFuoriConti(o)).reduce((s,o)=>s+orderTotale(o),0);
   const indirizzoCompleto = [c.indirizzo, [c.cap,c.citta].filter(Boolean).join(" "), c.provincia].filter(Boolean).join(", ");
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
@@ -13211,11 +13227,16 @@ function jobCardWorkerBlock(orderId){
 }
 async function cancelJobCard(orderId){
   { const cur=jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId ? jobCardEditSnapshot.order : findItem("orders",orderId);
-    if(jobCardMissingFilo(cur)){ jobCardFiloBlock(findItem("orders",orderId)||cur); return; } }
-  if(jobCardNeedsWorker(jobCardEditSnapshot && jobCardEditSnapshot.orderId===orderId ? jobCardEditSnapshot.order : findItem("orders",orderId))){
-    jobCardWorkerBlock(orderId);
-    return;
-  }
+    const live=findItem("orders",orderId);
+    // Annullando si tornerebbe a una scheda senza codice filo / operatore: se ora sono compilati basta salvare.
+    if(jobCardMissingFilo(cur)){
+      if(live && live!==cur && !jobCardMissingFilo(live)){ showToast("Hai già scritto il codice filo: premi SALVA per tenerlo (annullando si perderebbe)"); return; }
+      jobCardFiloBlock(live||cur); return;
+    }
+    if(jobCardNeedsWorker(cur)){
+      if(live && live!==cur && !jobCardNeedsWorker(live)){ showToast("Hai già scelto l'operatore: premi SALVA per tenerlo (annullando si perderebbe)"); return; }
+      jobCardWorkerBlock(orderId); return;
+    } }
   if(!jobCardEditSnapshot || jobCardEditSnapshot.orderId!==orderId){
     closeModal();
     return;
@@ -16002,7 +16023,7 @@ function renderIncassi(){
   const saldoOrdiniFatturati = ordiniFatturati.reduce((s,o)=>s+Math.max(0,orderSaldo(o)),0);
 
   const guadagno = (paymentsTotaleMese(f.mese) + entrateTotaleMese(f.mese)) - speseTotaleMese(f.mese) - costiFissiTotaleMese(f.mese);
-  const filtered = state.payments.filter(p => !paymentIsFatturato(p) && (!f.metodo||p.metodo===f.metodo) && paymentMatchesCategoria(p,f.categoria) && (!f.mese||p.data.slice(0,7)===f.mese));
+  const filtered = state.payments.filter(p => !paymentIsFatturato(p) && (!f.metodo||p.metodo===f.metodo) && paymentMatchesCategoria(p,f.categoria) && (!f.mese||String(p.data||"").slice(0,7)===f.mese));
 
   let reportHtml = "";
   if(f.view==="giorno"){
@@ -16140,7 +16161,7 @@ function renderIncassi(){
       <table>
         <thead><tr><th>Data</th><th>Cliente</th><th>Lavoro</th><th>Tipo</th><th>Importo</th><th>Metodo</th><th></th></tr></thead>
         <tbody>
-          ${filtered.length ? [...filtered].sort((a,b)=>b.data.localeCompare(a.data)).map(p=>`
+          ${filtered.length ? [...filtered].sort((a,b)=>String(b.data||"").localeCompare(String(a.data||""))).map(p=>`
             <tr>
               <td>${fmtDate(p.data)}</td><td>${clientName(p.clientId)}</td><td>${paymentCategorieLabel(p)}</td><td>${p.tipo||"—"}</td>
               <td>${fmtMoney(p.importo)}</td><td>${p.metodo}</td>
@@ -16229,7 +16250,7 @@ function renderSpese(){
       <table>
         <thead><tr><th>Data</th><th>Descrizione</th><th>Importo</th><th>Metodo</th><th></th></tr></thead>
         <tbody>
-          ${speseFiltrate.length ? [...speseFiltrate].sort((a,b)=>b.data.localeCompare(a.data)).map(e=>`
+          ${speseFiltrate.length ? [...speseFiltrate].sort((a,b)=>String(b.data||"").localeCompare(String(a.data||""))).map(e=>`
             <tr><td>${fmtDate(e.data)}</td><td>${e.descrizione}</td><td>${fmtMoney(e.importo)}</td><td>${e.metodo}</td>
             <td><button title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" class="btn btn-ghost btn-sm" onclick="deleteExpense('${e.id}')">🗑</button></td></tr>
           `).join("") : `<tr><td colspan="5" class="empty">${state.expenses.length?"Nessuna spesa con questi filtri.":"Nessuna spesa registrata."}</td></tr>`}
@@ -16525,7 +16546,7 @@ function renderEntrate(){
       <table>
         <thead><tr><th>Data</th><th>Descrizione</th><th>Importo</th><th>Metodo</th><th></th></tr></thead>
         <tbody>
-          ${entrateFiltrate.length ? [...entrateFiltrate].sort((a,b)=>b.data.localeCompare(a.data)).map(e=>`
+          ${entrateFiltrate.length ? [...entrateFiltrate].sort((a,b)=>String(b.data||"").localeCompare(String(a.data||""))).map(e=>`
             <tr><td>${fmtDate(e.data)}</td><td>${e.descrizione}</td><td style="color:var(--ok);font-weight:600;">+ ${fmtMoney(e.importo)}</td><td>${e.metodo}</td>
             <td><button title="Elimina" aria-label="Elimina" style="color:var(--danger);padding:6px 10px;font-size:15px;line-height:1;" class="btn btn-ghost btn-sm" onclick="deleteEntrata('${e.id}')">🗑</button></td></tr>
           `).join("") : `<tr><td colspan="5" class="empty">${(state.entrate||[]).length?"Nessuna entrata con questi filtri.":"Nessuna entrata registrata."}</td></tr>`}
@@ -18087,7 +18108,7 @@ if("serviceWorker" in navigator){
 
 window.addEventListener("error",e=>{ try{ showToast("Errore: "+(e.message||"sconosciuto")); }catch(_){} });
 /* Etichetta versione (in basso a sinistra, piccola) per capire quale versione è aperta */
-(function(){ const d=document.createElement("div"); d.textContent="v. 14/11 15:30"; d.style.cssText="position:fixed;left:8px;bottom:4px;font:600 10px Inter,system-ui,sans-serif;color:#8a94a3;opacity:.75;z-index:50;pointer-events:none;"; window.addEventListener("load",()=>document.body.appendChild(d)); })();
+(function(){ const d=document.createElement("div"); d.textContent="v. 14/11 18:10"; d.style.cssText="position:fixed;left:8px;bottom:4px;font:600 10px Inter,system-ui,sans-serif;color:#8a94a3;opacity:.75;z-index:50;pointer-events:none;"; window.addEventListener("load",()=>document.body.appendChild(d)); })();
 
 /* Avviso "nuova versione disponibile": compare solo se la versione online cambia davvero (2 controlli di fila uguali) */
 (function(){
