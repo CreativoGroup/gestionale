@@ -4542,6 +4542,31 @@ async function deleteRicamo(id){
   closeModal();
 }
 function ricamiFind(id){ return ricamiState.find(x=>x.id===id); }
+/* Ogni ordine aperto di un cliente "Felpe per reparti" ha in automatico il suo lavoro ricamo.
+   L'id è fisso (ord-<id ordine>), così due computer non creano doppioni e un lavoro già modificato non viene sovrascritto. */
+let ricamiAutoBusy = false;
+async function ricamiAutoSync(){
+  if(ricamiAutoBusy || !ricamiLoaded) return 0;
+  const nuovi = state.orders
+    .filter(o=>!["Completato","Consegnato"].includes(o.stato) && ricIsFelpeReparti(o))
+    .filter(o=>!ricamiState.some(l=>l.orderId===o.id || l.id==="ord-"+o.id))
+    .map(o=>({id:"ord-"+o.id, orderId:o.id, auto:true, titolo:"", numFelpe:ricFelpeDaOrdine(o)||"", operatore:WORKERS.includes(o.worker)?o.worker:"", stato:"Da fare",
+      nomi:"", note:"", inizioPrevisto:"", creatoIl:o.createdAt||new Date().toISOString(), impostazioni:ricImpPredefinite(),
+      ricami:[ricNuovaRiga("Cuore","Logo ospedale","SWF"), ricNuovaRiga("Destra","Nomi","Brother"), ricNuovaRiga("Retro","Scritta reparto","SWF")]}));
+  if(!nuovi.length) return 0;
+  ricamiAutoBusy = true;
+  try{
+    if(RICAMI_DB){
+      const {error} = await sb.from(RICAMI_TABLE).upsert(nuovi.map(ricamiToRow), {onConflict:"id", ignoreDuplicates:true});
+      if(error){ console.error("Errore creazione automatica ricami", error); return 0; }
+      const {data} = await sb.from(RICAMI_TABLE).select("*").in("id", nuovi.map(x=>x.id));
+      (data||[]).map(ricamiFromRow).forEach(l=>{ const i=ricamiState.findIndex(x=>x.id===l.id); if(i>=0) ricamiState[i]=l; else ricamiState.push(l); });
+    } else {
+      ricamiState.push(...nuovi); ricamiLocalWrite(ricamiState);
+    }
+    return nuovi.length;
+  } finally { ricamiAutoBusy = false; }
+}
 function copyRicamiSql(){
   const done = () => showToast("Script SQL copiato");
   try{ navigator.clipboard.writeText(RICAMI_SQL).then(done, () => prompt("Copia lo script SQL:", RICAMI_SQL)); }
@@ -4701,6 +4726,7 @@ function renderRicami(){
       <p style="margin:6px 0 10px;color:#6B5A2A;">Per ora i lavori di ricamo restano salvati <b>solo su questo computer</b>. Per vederli da tutti i dispositivi apri Supabase → <b>SQL Editor</b>, incolla lo script e premi <b>Run</b>, poi ricarica: i lavori già inseriti verranno spostati online da soli.</p>
       <button class="btn btn-outline btn-sm" onclick="copyRicamiSql()">COPIA SCRIPT SQL</button>
     </div>` : "";
+  ricamiAutoSync().then(n=>{ if(n && currentView==="ricami" && !ricamiOpenId) renderRicami(); });
   const all = ricamiState.slice().sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
   const list = all.filter(l=> ricamiFilter==="tutti" ? true : ricamiFilter==="finiti" ? l.stato==="Finito" : l.stato!=="Finito");
   /* statistica sui lavori finiti: quanto ci si discosta in media dal previsto */
