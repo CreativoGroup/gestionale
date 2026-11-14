@@ -4620,12 +4620,32 @@ function ricAvviato(l){ return (l.ricami||[]).some(r=>(r.sessioni||[]).some(x=>x
 function ricPrimoAvvio(l){ const t=(l.ricami||[]).flatMap(r=>(r.sessioni||[]).map(x=>Date.parse(x.inizio))).filter(Boolean); return t.length?Math.min(...t):0; }
 /* Ordine della coda: prima i lavori già avviati, poi gli altri nell'ordine in cui sono arrivati */
 function ricCoda(){
-  return ricamiState.filter(l=>l.stato!=="Finito").sort((a,b)=>{
+  const attivi = ricamiState.filter(l=>l.stato!=="Finito");
+  /* ordine automatico per i lavori senza numero scelto a mano */
+  const base = attivi.filter(l=>!(ricNum(l.posizioneCoda)>0)).sort((a,b)=>{
     const sa=ricAvviato(a), sb=ricAvviato(b);
     if(sa!==sb) return sa?-1:1;
     if(sa) return ricPrimoAvvio(a)-ricPrimoAvvio(b);
     return String(a.creatoIl||"").localeCompare(String(b.creatoIl||""));
   });
+  /* i lavori con il numero in coda scelto a mano vanno in quella posizione */
+  attivi.filter(l=>ricNum(l.posizioneCoda)>0).sort((a,b)=>ricNum(a.posizioneCoda)-ricNum(b.posizioneCoda))
+    .forEach(l=>base.splice(Math.min(Math.round(ricNum(l.posizioneCoda))-1, base.length), 0, l));
+  return base;
+}
+/* Sposta un lavoro al numero scelto e rinumera tutta la coda, così l'ordine resta quello deciso */
+async function ricSpostaInCoda(id, n){
+  const coda = ricCoda(), l = ricamiFind(id); if(!l) return;
+  n = Math.max(1, Math.min(coda.length, Math.round(ricNum(n, 1))));
+  const resto = coda.filter(x=>x.id!==id);
+  resto.splice(n-1, 0, l);
+  const cambiati = [];
+  resto.forEach((x,i)=>{ if(ricNum(x.posizioneCoda)!==i+1){ x.posizioneCoda = i+1; cambiati.push(x); } });
+  for(const x of cambiati) await saveRicamo(x);
+  if(ricamiOpenId===id) openRicamo(id); else renderRicami();
+}
+function ricPostoInput(l, posto){
+  return `<input type="number" min="1" value="${posto}" title="Cambia il numero per spostare il lavoro in coda" style="width:58px;padding:3px 6px;font-weight:700;display:inline-block;" onclick="event.stopPropagation()" onchange="ricSpostaInCoda('${l.id}',this.value)">`;
 }
 /* Mette un lavoro in coda sugli operatori: Daniele (SWF) e Francess (nomi) lavorano in contemporanea,
    ognuno con il proprio orario, e ogni lavoro parte quando l'operatore ha finito quelli prima. */
@@ -4788,7 +4808,13 @@ function renderRicami(){
   root.innerHTML = `${banner}
     <div class="card" style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;">
       <div style="display:flex;gap:22px;flex-wrap:wrap;">
-        <div><div style="font-size:12px;color:var(--muted);">Lavori attivi</div><div style="font-size:22px;font-weight:800;">${all.filter(l=>l.stato!=="Finito").length}</div></div>
+        <div><div style="font-size:12px;color:var(--muted);">Lavori attivi da fare</div><div style="font-size:22px;font-weight:800;">${all.filter(l=>l.stato!=="Finito").length}</div></div>
+        ${(()=>{ const fini = Object.values(ricPianoCorrente.map).map(x=>x.fine).filter(Boolean);
+          const ultimo = fini.length ? new Date(Math.max(...fini.map(d=>d.getTime()))) : null;
+          const c = ricPianoCorrente.cursori, imp = ricImp();
+          const libero = op => c[op] ? fmtRicData(new Date(c[op])) : "subito";
+          return `<div><div style="font-size:12px;color:var(--muted);">Fine prevista dell'ultimo lavoro</div><div style="font-size:22px;font-weight:800;color:var(--accent);">${ultimo?fmtRicData(ultimo):"—"}</div>
+            <div style="font-size:11.5px;color:var(--muted);">Un nuovo lavoro entra in macchina: SWF (${escapeHtml(imp.swfOp)}) ${libero(imp.swfOp)} · nomi (${escapeHtml(imp.broOp)}) ${libero(imp.broOp)}</div></div>`; })()}
         <div><div style="font-size:12px;color:var(--muted);">Ricami in macchina ora</div><div style="font-size:22px;font-weight:800;">${inCorso}</div></div>
         <div><div style="font-size:12px;color:var(--muted);">Scostamento medio sui lavori finiti</div><div style="font-size:22px;font-weight:800;">${media===null?"—":`<span style="color:${media<=10?"var(--ok)":media<=25?"var(--warn)":"var(--danger)"}">${media>=0?"+":"−"}${Math.abs(Math.round(media))}%</span>`}</div>
           <div style="font-size:11.5px;color:var(--muted);">${finiti.length?`su ${finiti.length} lavor${finiti.length===1?"o":"i"} (+ = più lento del previsto)`:"compare quando chiudi il primo lavoro"}</div></div>
@@ -4832,7 +4858,7 @@ function ricCardHtml(l){
     </div>
     ${(()=>{ const pl = l.stato!=="Finito" && ricPianoCorrente ? ricPianoCorrente.map[l.id] : null; if(!pl || !(t.previsto>0)) return "";
       return `<div style="margin-top:10px;padding:8px 10px;border-radius:10px;background:#EEF6F8;font-size:12.5px;line-height:1.5;">
-        <div>N. ${pl.posto} in coda${ricAvviato(l)?" · avviato":` · si parte ${fmtRicData(new Date(pl.inizio))}`}</div>
+        <div>N. ${ricPostoInput(l, pl.posto)} in coda${ricAvviato(l)?" · avviato":` · si parte ${fmtRicData(new Date(pl.inizio))}`}</div>
         <div>Fine prevista: <b style="font-size:13.5px;">${pl.fine?fmtRicData(pl.fine):"—"}</b></div>
         ${t.stima?`<div style="color:var(--muted);font-size:11.5px;">con i punti di partenza (stima)</div>`:""}
       </div>`; })()}
@@ -4988,7 +5014,7 @@ function ricRefreshCalc(id){
       const p = ricPiano(), d = p.map[l.id]; if(!d || !(t.previsto>0)) return "";
       const riga = (x, cosa) => x.minuti>0 ? `<div>• <b>${escapeHtml(cosa)}</b> con <b>${escapeHtml(x.op)}</b>: restano ${fmtRicMin(x.minuti)} · parte ${fmtRicData(new Date(x.inizio))} → finisce <b>${x.fine?fmtRicData(x.fine):"mai: nessun orario impostato"}</b></div>` : "";
       return `<div style="margin-top:10px;background:#EEF6F8;border:1px solid #CFE3E8;border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.7;">
-        <div>Questo lavoro è il <b>n. ${d.posto} in coda</b>. Le date si aggiornano da sole ogni minuto, in base a quello che resta da fare e agli orari dei ragazzi:</div>
+        <div>Questo lavoro è il <b>n. ${ricPostoInput(l, d.posto)} in coda</b> (cambia il numero per spostarlo). Le date si aggiornano da sole ogni minuto, in base a quello che resta da fare e agli orari dei ragazzi:</div>
         ${riga(d.swf, "SWF, ricami uguali")}
         ${riga(d.bro, d.swf.op===d.bro.op ? "Brother, nomi (dopo la SWF)" : "Brother, nomi")}
         ${!(d.rimanente>0)?`<div>Tutti i ricami sono stati chiusi con ■ Fine: puoi mettere lo stato su «Finito».</div>`:""}
