@@ -3127,6 +3127,7 @@
     <section class="view" id="view-ordini"></section>
     <section class="view" id="view-flusso"></section>
     <section class="view" id="view-magazzino"></section>
+    <section class="view" id="view-ricami"></section>
     <section class="view" id="view-lavoriCompletati"></section>
     <section class="view" id="view-dropbox"></section>
     <section class="view" id="view-incassi"></section>
@@ -4437,6 +4438,537 @@ function mkOrder(id, clientId, descrizione, worker, stato, dataConsegna, righe, 
   recalcFasi(order);
   return order;
 }
+/* ============ RICAMI FELPE PER REPARTI · PIANIFICAZIONE ============
+   Ogni "lavoro ricamo" ha: numero di felpe, i ricami (posizione, punti, macchina) e le sessioni reali (avvio/fine).
+   Tempo previsto: punti ÷ velocità (punti al minuto).
+   - SWF (ricami uguali): 4 teste → le felpe si fanno 4 alla volta (giri = felpe ÷ 4 arrotondato in su).
+   - Brother (nomi diversi): 3 macchine a testa singola che lavorano insieme.
+   I dati stanno nella tabella Supabase ricami_lavori; se la tabella non c'è ancora, restano salvati su questo computer. */
+const RICAMI_TABLE = "ricami_lavori";
+const RICAMI_LOCAL_KEY = "ricamiLavoriLocal";
+const RICAMI_SQL = `create table if not exists public.ricami_lavori (
+  id text primary key,
+  order_id text,
+  dati jsonb not null default '{}'::jsonb,
+  creato_il timestamptz default now(),
+  aggiornato_il timestamptz default now()
+);
+alter table public.ricami_lavori enable row level security;
+drop policy if exists "ricami_lavori_utenti" on public.ricami_lavori;
+create policy "ricami_lavori_utenti" on public.ricami_lavori for all to authenticated using (true) with check (true);
+grant select, insert, update, delete on public.ricami_lavori to authenticated;
+alter publication supabase_realtime add table public.ricami_lavori;`;
+const RICAMI_GIORNI = [[1,"Lunedì"],[2,"Martedì"],[3,"Mercoledì"],[4,"Giovedì"],[5,"Venerdì"],[6,"Sabato"]];
+const RICAMI_ORARI_BASE = {
+  Daniele:  {1:"9:30-13:30, 15:00-19:00", 2:"9:30-13:30, 15:00-19:00", 3:"9:30-13:30, 15:00-19:00", 4:"9:30-13:30, 15:00-19:00", 5:"9:30-13:30, 15:00-19:00", 6:""},
+  Francess: {1:"14:00-19:00", 2:"9:30-13:00, 14:00-19:00", 3:"14:00-19:00", 4:"14:00-19:00", 5:"9:30-13:00, 14:00-19:00", 6:""}
+};
+const RICAMI_ORARIO_GENERICO = {1:"9:00-13:00, 14:00-18:00", 2:"9:00-13:00, 14:00-18:00", 3:"9:00-13:00, 14:00-18:00", 4:"9:00-13:00, 14:00-18:00", 5:"9:00-13:00, 14:00-18:00", 6:""};
+const RICAMI_DEFAULTS = {swfVel:500, swfTeste:4, brotherVel:500, brotherNum:3, cambioMin:0, swfOp:"Daniele", broOp:"Francess", orari:RICAMI_ORARI_BASE};
+function ricImpPredefinite(){ try{ return Object.assign({}, RICAMI_DEFAULTS, JSON.parse(localStorage.getItem("ricamiImpDefault")||"{}")); }catch(e){ return Object.assign({}, RICAMI_DEFAULTS); } }
+function ricImpRicorda(imp){ try{ localStorage.setItem("ricamiImpDefault", JSON.stringify(imp)); }catch(e){} }
+const RICAMI_POSIZIONI = ["Cuore","Destra","Retro","Manica","Altro"];
+const RICAMI_STATI = ["Da fare","In corso","Finito"];
+let ricamiState = [];
+let RICAMI_DB = null;          /* null = non ancora controllato, true = tabella presente, false = manca */
+let ricamiLoaded = false;
+let ricamiRealtimeOn = false;
+let ricamiOpenId = null;
+let ricamiTick = null;
+let ricamiFilter = "attivi";
+
+function ricamiLocalRead(){ try{ const a=JSON.parse(localStorage.getItem(RICAMI_LOCAL_KEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function ricamiLocalWrite(list){ try{ localStorage.setItem(RICAMI_LOCAL_KEY, JSON.stringify(list)); }catch(e){} }
+function ricamiFromRow(r){ const d=(r&&r.dati)||{}; return Object.assign({}, d, {id:r.id, orderId:r.order_id||d.orderId||"", creatoIl:r.creato_il||d.creatoIl||""}); }
+function ricamiToRow(l){ const d=Object.assign({}, l); delete d.id; return {id:l.id, order_id:l.orderId||null, dati:d, aggiornato_il:new Date().toISOString()}; }
+
+async function loadRicami(){
+  try{
+    const {data, error} = await sb.from(RICAMI_TABLE).select("*");
+    if(error) throw error;
+    RICAMI_DB = true;
+    ricamiState = (data||[]).map(ricamiFromRow);
+    /* lavori creati quando la tabella non c'era: li porto su Supabase */
+    const locali = ricamiLocalRead().filter(l=>!ricamiState.some(x=>x.id===l.id));
+    if(locali.length){
+      const {error:e2} = await sb.from(RICAMI_TABLE).upsert(locali.map(ricamiToRow));
+      if(!e2){ ricamiState.push(...locali); ricamiLocalWrite([]); }
+    } else ricamiLocalWrite([]);
+    ricamiSubscribe();
+  }catch(e){
+    RICAMI_DB = false;
+    ricamiState = ricamiLocalRead();
+  }
+  ricamiLoaded = true;
+}
+function ricamiSubscribe(){
+  if(ricamiRealtimeOn || !RICAMI_DB) return;
+  ricamiRealtimeOn = true;
+  try{
+    sb.channel("ricami-changes")
+      .on("postgres_changes", {event:"*", schema:"public", table:RICAMI_TABLE}, payload=>{
+        if(payload.eventType==="DELETE") ricamiState = ricamiState.filter(x=>x.id!==payload.old.id);
+        else {
+          const l = ricamiFromRow(payload.new);
+          const i = ricamiState.findIndex(x=>x.id===l.id);
+          if(i>=0) ricamiState[i]=l; else ricamiState.push(l);
+        }
+        if(currentView==="ricami" && !ricamiOpenId) requestSafeCurrentViewRender();
+      })
+      .subscribe();
+  }catch(e){}
+}
+async function saveRicamo(l){
+  l.aggiornatoIl = new Date().toISOString();
+  const i = ricamiState.findIndex(x=>x.id===l.id);
+  if(i>=0) ricamiState[i]=l; else ricamiState.push(l);
+  if(RICAMI_DB){
+    const {error} = await sb.from(RICAMI_TABLE).upsert(ricamiToRow(l));
+    if(!error) return true;
+    console.error("Errore salvataggio ricamo", error);
+    showToast("Errore nel salvataggio del ricamo: riprova");
+    return false;
+  }
+  ricamiLocalWrite(ricamiState);
+  return true;
+}
+async function deleteRicamo(id){
+  const l = ricamiFind(id); if(!l) return;
+  if(!confirm(`Eliminare il lavoro ricamo «${ricamoTitolo(l)}»?`)) return;
+  ricamiState = ricamiState.filter(x=>x.id!==id);
+  if(RICAMI_DB){ const {error}=await sb.from(RICAMI_TABLE).delete().eq("id",id); if(error) showToast("Errore nell'eliminazione: riprova"); }
+  else ricamiLocalWrite(ricamiState);
+  ricamiOpenId = null;
+  closeModal();
+}
+function ricamiFind(id){ return ricamiState.find(x=>x.id===id); }
+function copyRicamiSql(){
+  const done = () => showToast("Script SQL copiato");
+  try{ navigator.clipboard.writeText(RICAMI_SQL).then(done, () => prompt("Copia lo script SQL:", RICAMI_SQL)); }
+  catch(e){ prompt("Copia lo script SQL:", RICAMI_SQL); }
+}
+
+/* ---- Calcoli ---- */
+function ricImp(l){ return Object.assign({}, l ? RICAMI_DEFAULTS : ricImpPredefinite(), (l&&l.impostazioni)||{}); }
+/* ---- Orari di lavoro: quanto dura davvero il lavoro e quando finisce ---- */
+function ricOrarioOp(imp, op){ return Object.assign({}, RICAMI_ORARI_BASE[op]||RICAMI_ORARIO_GENERICO, ((imp.orari||{})[op])||{}); }
+/* "9:30-13:30, 15:00-19:00" → [[570,810],[900,1140]] (minuti dalla mezzanotte) */
+function ricFasce(txt){
+  return String(txt||"").split(/[,;]+/).map(x=>{
+    const m = x.match(/(\d{1,2})(?:[:.](\d{2}))?\s*-\s*(\d{1,2})(?:[:.](\d{2}))?/);
+    if(!m) return null;
+    const a = Number(m[1])*60+Number(m[2]||0), b = Number(m[3])*60+Number(m[4]||0);
+    return b>a ? [a,b] : null;
+  }).filter(Boolean).sort((x,y)=>x[0]-y[0]);
+}
+function ricOreSettimana(orario){ return [1,2,3,4,5,6].reduce((s,g)=>s+ricFasce(orario[g]).reduce((t,f)=>t+f[1]-f[0],0),0); }
+/* minuti di lavoro di una persona → data e ora di fine secondo il suo orario settimanale */
+function ricFinePrevista(startMs, minuti, orario){
+  if(!(minuti>0)) return {fine:new Date(startMs), giorni:0};
+  if(!ricOreSettimana(orario)) return {fine:null, giorni:0};
+  let resto = minuti, giorni = 0;
+  const start = new Date(startMs);
+  for(let i=0;i<800;i++){
+    const day = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
+    const fasce = ricFasce(orario[day.getDay()]);
+    let usato = false;
+    for(const [a,b] of fasce){
+      const ini = Math.max(day.getTime()+a*60000, startMs), fin = day.getTime()+b*60000;
+      if(fin<=ini) continue;
+      const disp = (fin-ini)/60000;
+      usato = true;
+      if(resto<=disp) return {fine:new Date(ini+resto*60000), giorni:giorni+1};
+      resto -= disp;
+    }
+    if(usato) giorni++;
+  }
+  return {fine:null, giorni};
+}
+function ricDurata(l){
+  const imp = ricImp(l), t = ricTotali(l);
+  const run = (l.ricami||[]).flatMap(r=>(r.sessioni||[]).filter(x=>x.inizio)).map(x=>Date.parse(x.inizio)).filter(Boolean);
+  const startMs = l.inizioPrevisto ? Date.parse(l.inizioPrevisto) : (run.length ? Math.min(...run) : Date.now());
+  const swfOp = imp.swfOp||"Daniele", broOp = imp.broOp||"Francess";
+  let swf, bro;
+  if(swfOp===broOp){
+    /* stessa persona su entrambe: prima SWF poi Brother, una dopo l'altra */
+    const tot = ricFinePrevista(startMs, t.swf+t.bro, ricOrarioOp(imp, swfOp));
+    swf = {op:swfOp, minuti:t.swf, ...ricFinePrevista(startMs, t.swf, ricOrarioOp(imp, swfOp))};
+    bro = {op:broOp, minuti:t.bro, ...tot};
+  } else {
+    swf = {op:swfOp, minuti:t.swf, ...ricFinePrevista(startMs, t.swf, ricOrarioOp(imp, swfOp))};
+    bro = {op:broOp, minuti:t.bro, ...ricFinePrevista(startMs, t.bro, ricOrarioOp(imp, broOp))};
+  }
+  const parti = [swf, bro].filter(x=>x.minuti>0);
+  const manca = parti.some(x=>!x.fine);
+  const fine = (!parti.length || manca) ? null : new Date(Math.max(...parti.map(x=>x.fine.getTime())));
+  const giorni = parti.length ? Math.max(...parti.map(x=>x.giorni)) : 0;
+  return {minuti:t.previsto, startMs, swf, bro, fine, giorni, manca};
+}
+function fmtRicGiorni(g){ if(!(g>0)) return "—"; return `${g} giorn${g===1?"o":"i"} di lavoro`; }
+function fmtRicData(d){ if(!d) return "—"; const gg=["dom","lun","mar","mer","gio","ven","sab"][d.getDay()]; return `${gg} ${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")} alle ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
+function ricNum(v, d=0){ const n=Number(String(v??"").replace(",",".")); return Number.isFinite(n)&&n>=0 ? n : d; }
+function ricNomiList(l){ return String(l.nomi||"").split(/\n+/).map(s=>s.trim()).filter(Boolean); }
+function ricPezzi(l, r){
+  if(r.pezzi!=="" && r.pezzi!=null && ricNum(r.pezzi)>0) return Math.round(ricNum(r.pezzi));
+  if(r.macchina==="Brother"){ const n=ricNomiList(l).length; if(n) return n; }
+  return Math.round(ricNum(l.numFelpe));
+}
+function ricCalcRiga(l, r){
+  const imp = ricImp(l);
+  const punti = ricNum(r.punti), pezzi = ricPezzi(l, r), cambio = ricNum(imp.cambioMin);
+  if(r.macchina==="Brother"){
+    const vel = Math.max(1, ricNum(imp.brotherVel, 500)), macchine = Math.max(1, Math.round(ricNum(imp.brotherNum, 3)));
+    const perPezzo = punti/vel + cambio;
+    const turni = Math.ceil(pezzi/macchine);
+    return {pezzi, perPezzo, giri:turni, previsto: turni*perPezzo, minMacchina: pezzi*perPezzo,
+      spiega:`${fmtRicNum(punti)} punti ÷ ${fmtRicNum(vel)} = ${fmtRicMin(punti/vel)} a nome${cambio?` + ${fmtRicMin(cambio)} cambio`:""} · ${pezzi} nomi su ${macchine} Brother = ${turni} turni`};
+  }
+  const vel = Math.max(1, ricNum(imp.swfVel, 500)), teste = Math.max(1, Math.round(ricNum(imp.swfTeste, 4)));
+  const perGiro = punti/vel + cambio;
+  const giri = Math.ceil(pezzi/teste);
+  return {pezzi, perPezzo: perGiro, giri, previsto: giri*perGiro, minMacchina: giri*perGiro,
+    spiega:`${fmtRicNum(punti)} punti ÷ ${fmtRicNum(vel)} = ${fmtRicMin(punti/vel)} a giro${cambio?` + ${fmtRicMin(cambio)} cambio`:""} · ${pezzi} felpe ÷ ${teste} teste = ${giri} giri`};
+}
+function ricRealeRiga(r, now=Date.now()){
+  return (r.sessioni||[]).reduce((s,x)=>{
+    const a = Date.parse(x.inizio); if(!a) return s;
+    const b = x.fine ? Date.parse(x.fine) : now;
+    return s + Math.max(0, (b-a)/60000);
+  }, 0);
+}
+function ricInCorso(r){ return (r.sessioni||[]).find(x=>x.inizio && !x.fine); }
+function ricTotali(l){
+  let previsto=0, reale=0, swf=0, bro=0, fatto=0, prevFatti=0, realeFatti=0;
+  (l.ricami||[]).forEach(r=>{
+    const c = ricCalcRiga(l, r);
+    previsto += c.previsto; reale += ricRealeRiga(r);
+    if(r.macchina==="Brother") bro += c.previsto; else swf += c.previsto;
+    /* il confronto previsto/reale si fa solo sui ricami già chiusi con ■ Fine (e non ripartiti) */
+    if((r.sessioni||[]).some(x=>x.fine) && !ricInCorso(r)){ fatto++; prevFatti += c.previsto; realeFatti += ricRealeRiga(r); }
+  });
+  return {previsto, reale, swf, bro, insieme: Math.max(swf, bro), fatto, prevFatti, realeFatti, tot:(l.ricami||[]).length};
+}
+function fmtRicNum(n){ return (Math.round(Number(n)*10)/10).toLocaleString("it-IT"); }
+function fmtRicMin(m){
+  m = Number(m)||0;
+  if(m<1) return m>0 ? `${Math.round(m*60)} sec` : "0 min";
+  const tot = Math.round(m), h = Math.floor(tot/60), mm = tot%60;
+  return h ? `${h} h${mm?` ${mm} min`:""}` : `${mm} min`;
+}
+function ricScostHtml(previsto, reale){
+  if(!(reale>0) || !(previsto>0)) return `<span style="color:var(--muted);">—</span>`;
+  const diff = reale-previsto, pct = diff/previsto*100;
+  const col = pct<=10 ? "var(--ok)" : pct<=25 ? "var(--warn)" : "var(--danger)";
+  return `<span style="color:${col};font-weight:700;">${diff>=0?"+":"−"}${fmtRicMin(Math.abs(diff))} (${pct>=0?"+":"−"}${Math.abs(Math.round(pct))}%)</span>`;
+}
+function ricOra(iso){ if(!iso) return ""; const d=new Date(iso); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
+
+/* ---- Collegamento agli ordini ---- */
+function ricOrdineCliente(o){ return o ? findItem("clients", o.clientId) : null; }
+function ricIsFelpeReparti(o){ const c=ricOrdineCliente(o); return !!c && familyRichiestaBase(c)==="Felpe per reparti"; }
+function ricamoTitolo(l){
+  if(l.titolo) return l.titolo;
+  const o = l.orderId ? findItem("orders", l.orderId) : null;
+  if(o) return `${clientName(o.clientId)}${o.numero?` · ordine n. ${o.numero}`:""}`;
+  return "Lavoro ricamo";
+}
+function ricOrdiniSelezionabili(selId){
+  const list = state.orders.filter(o=>o.id===selId || (!["Completato","Consegnato"].includes(o.stato) && (orderHasRicamo(o) || ricIsFelpeReparti(o))));
+  list.sort((a,b)=>{
+    const fa=ricIsFelpeReparti(a), fb=ricIsFelpeReparti(b);
+    if(fa!==fb) return fa?-1:1;
+    return String(a.dataConsegna||"9999").localeCompare(String(b.dataConsegna||"9999"));
+  });
+  return list;
+}
+function ricFelpeDaOrdine(o){
+  if(!o) return 0;
+  const rr = (o.righe||[]).filter(r=>r && r.categoria==="Ricamo");
+  return rr.reduce((s,r)=>s+(Number(r.quantita)||0),0);
+}
+
+/* ---- Vista elenco ---- */
+function renderRicami(){
+  const root = document.getElementById("view-ricami"); if(!root) return;
+  if(!ricamiLoaded){
+    root.innerHTML = `<div class="card"><p class="helptext" style="margin:0;">Caricamento lavori di ricamo…</p></div>`;
+    loadRicami().then(()=>{ if(currentView==="ricami") renderRicami(); });
+    return;
+  }
+  const banner = RICAMI_DB===false ? `<div style="background:#FFF6E5;border:1px solid #F0D9A8;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <strong>Serve una modifica una tantum al database</strong>
+      <p style="margin:6px 0 10px;color:#6B5A2A;">Per ora i lavori di ricamo restano salvati <b>solo su questo computer</b>. Per vederli da tutti i dispositivi apri Supabase → <b>SQL Editor</b>, incolla lo script e premi <b>Run</b>, poi ricarica: i lavori già inseriti verranno spostati online da soli.</p>
+      <button class="btn btn-outline btn-sm" onclick="copyRicamiSql()">COPIA SCRIPT SQL</button>
+    </div>` : "";
+  const all = ricamiState.slice().sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
+  const list = all.filter(l=> ricamiFilter==="tutti" ? true : ricamiFilter==="finiti" ? l.stato==="Finito" : l.stato!=="Finito");
+  /* statistica sui lavori finiti: quanto ci si discosta in media dal previsto */
+  const finiti = all.filter(l=>l.stato==="Finito").map(ricTotali).filter(t=>t.prevFatti>0 && t.realeFatti>0);
+  const media = finiti.length ? finiti.reduce((s,t)=>s+(t.realeFatti-t.prevFatti)/t.prevFatti*100,0)/finiti.length : null;
+  const inCorso = all.filter(l=>(l.ricami||[]).some(ricInCorso)).length;
+  const chip = (k,lab)=>`<button class="btn ${ricamiFilter===k?"btn-primary":"btn-outline"} btn-sm" onclick="ricamiFilter='${k}';renderRicami()">${lab}</button>`;
+  root.innerHTML = `${banner}
+    <div class="card" style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;">
+      <div style="display:flex;gap:22px;flex-wrap:wrap;">
+        <div><div style="font-size:12px;color:var(--muted);">Lavori attivi</div><div style="font-size:22px;font-weight:800;">${all.filter(l=>l.stato!=="Finito").length}</div></div>
+        <div><div style="font-size:12px;color:var(--muted);">Ricami in macchina ora</div><div style="font-size:22px;font-weight:800;">${inCorso}</div></div>
+        <div><div style="font-size:12px;color:var(--muted);">Scostamento medio sui lavori finiti</div><div style="font-size:22px;font-weight:800;">${media===null?"—":`<span style="color:${media<=10?"var(--ok)":media<=25?"var(--warn)":"var(--danger)"}">${media>=0?"+":"−"}${Math.abs(Math.round(media))}%</span>`}</div>
+          <div style="font-size:11.5px;color:var(--muted);">${finiti.length?`su ${finiti.length} lavor${finiti.length===1?"o":"i"} (+ = più lento del previsto)`:"compare quando chiudi il primo lavoro"}</div></div>
+      </div>
+      <div style="display:flex;gap:6px;">${chip("attivi","Attivi")}${chip("finiti","Finiti")}${chip("tutti","Tutti")}</div>
+    </div>
+    ${list.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">${list.map(ricCardHtml).join("")}</div>`
+      : `<div class="card"><p class="empty">${ricamiFilter==="finiti"?"Nessun lavoro finito.":"Nessun lavoro di ricamo in programma. Premi «+ Nuovo lavoro ricamo»."}</p></div>`}
+    <p class="helptext" style="margin-top:16px;">Come si calcola il previsto: punti ÷ velocità della macchina (punti al minuto). SWF a ${ricImp().swfTeste} teste per i ricami uguali (felpe fatte ${ricImp().swfTeste} alla volta), ${ricImp().brotherNum} Brother a testa singola per i nomi, che lavorano insieme. Le velocità si cambiano dentro ogni lavoro.</p>`;
+  ricStartTick();
+}
+function ricCardHtml(l){
+  const t = ricTotali(l);
+  const o = l.orderId ? findItem("orders", l.orderId) : null;
+  const running = (l.ricami||[]).filter(ricInCorso);
+  const statoCol = l.stato==="Finito" ? "var(--ok)" : running.length ? "var(--accent)" : "var(--muted)";
+  return `<div class="card" style="cursor:pointer;margin:0;" onclick="openRicamo('${l.id}')">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
+      <strong style="font-size:15px;">${escapeHtml(ricamoTitolo(l))}</strong>
+      <span class="badge" style="color:${statoCol};border-color:${statoCol};white-space:nowrap;">${running.length?"● In macchina":escapeHtml(l.stato||"Da fare")}</span>
+    </div>
+    <div style="font-size:12.5px;color:var(--muted);margin:4px 0 10px;">${Math.round(ricNum(l.numFelpe))} felpe · ${t.tot} ricam${t.tot===1?"o":"i"}${l.operatore?` · ${escapeHtml(l.operatore)}`:""}${o&&o.dataConsegna?` · consegna ${fmtDate(o.dataConsegna)}`:""}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12.5px;">
+      <div><div style="color:var(--muted);">Previsto</div><b>${fmtRicMin(t.previsto)}</b></div>
+      <div><div style="color:var(--muted);">Reale</div><b data-ric-reale="${l.id}">${fmtRicMin(t.reale)}</b></div>
+      <div><div style="color:var(--muted);">Differenza</div>${ricScostHtml(t.prevFatti, t.realeFatti)}</div>
+    </div>
+    ${l.stato!=="Finito"&&t.previsto>0?`<div style="margin-top:8px;font-size:12px;">Fine prevista: <b>${fmtRicData(ricDurata(l).fine)}</b></div>`:""}
+    ${running.length?`<div style="margin-top:8px;font-size:12px;color:var(--accent);">In macchina: ${running.map(r=>escapeHtml(r.posizione||"")).join(", ")}</div>`:""}
+  </div>`;
+}
+function ricStartTick(){
+  if(ricamiTick) return;
+  ricamiTick = setInterval(()=>{
+    if(currentView!=="ricami"){ clearInterval(ricamiTick); ricamiTick=null; return; }
+    const anyRunning = ricamiState.some(l=>(l.ricami||[]).some(ricInCorso));
+    if(!anyRunning) return;
+    if(ricamiOpenId){ ricRefreshCalc(ricamiOpenId); return; }
+    document.querySelectorAll("[data-ric-reale]").forEach(el=>{ const l=ricamiFind(el.dataset.ricReale); if(l) el.textContent=fmtRicMin(ricTotali(l).reale); });
+  }, 20000);
+}
+
+/* ---- Nuovo lavoro ---- */
+function ricNuovaRiga(posizione, descrizione, macchina){ return {id:uid(), posizione, descrizione, punti:"", macchina, pezzi:"", sessioni:[]}; }
+async function newRicamo(orderId){
+  if(currentView!=="ricami") goTo("ricami");
+  const o = orderId ? findItem("orders", orderId) : null;
+  const l = {id:uuid(), orderId:o?o.id:"", titolo:"", numFelpe:o?(ricFelpeDaOrdine(o)||""):"", operatore:o&&WORKERS.includes(o.worker)?o.worker:"", stato:"Da fare",
+    nomi:"", note:"", inizioPrevisto:"", creatoIl:new Date().toISOString(), impostazioni:ricImpPredefinite(),
+    ricami:[ricNuovaRiga("Cuore","Logo ospedale","SWF"), ricNuovaRiga("Destra","Nomi","Brother"), ricNuovaRiga("Retro","Scritta reparto","SWF")]};
+  ricamiState.push(l);
+  await saveRicamo(l);
+  openRicamo(l.id);
+}
+
+/* ---- Scheda del lavoro (popup) ---- */
+function openRicamo(id){
+  const l = ricamiFind(id); if(!l) return;
+  ricamiOpenId = id;
+  const imp = ricImp(l);
+  const ordini = ricOrdiniSelezionabili(l.orderId);
+  const o = l.orderId ? findItem("orders", l.orderId) : null;
+  const nomi = ricNomiList(l);
+  const inp = (val, onch, extra="") => `<input value="${escapeHtml(val??"")}" ${extra} onchange="${onch}">`;
+  const righe = (l.ricami||[]).map((r,i)=>{
+    const run = ricInCorso(r);
+    const sess = (r.sessioni||[]).filter(x=>x.inizio);
+    return `<tr>
+      <td><select onchange="ricSetRiga('${l.id}','${r.id}','posizione',this.value)">${RICAMI_POSIZIONI.map(p=>`<option ${p===r.posizione?"selected":""}>${p}</option>`).join("")}</select></td>
+      <td><input style="min-width:180px;" value="${escapeHtml(r.descrizione||"")}" placeholder="Es. logo, scritta reparto, disegno" onchange="ricSetRiga('${l.id}','${r.id}','descrizione',this.value)"></td>
+      <td><input type="number" min="0" step="100" style="width:100px;" value="${escapeHtml(r.punti??"")}" placeholder="${r.macchina==="Brother"?"media a nome":"punti"}" oninput="ricSetRiga('${l.id}','${r.id}','punti',this.value,true)" onchange="ricSetRiga('${l.id}','${r.id}','punti',this.value)"></td>
+      <td><select onchange="ricSetRiga('${l.id}','${r.id}','macchina',this.value,false,true)"><option value="SWF" ${r.macchina!=="Brother"?"selected":""}>SWF (uguali)</option><option value="Brother" ${r.macchina==="Brother"?"selected":""}>Brother (nomi)</option></select></td>
+      <td><input type="number" min="0" style="width:70px;" value="${escapeHtml(r.pezzi??"")}" placeholder="${ricPezzi(l,Object.assign({},r,{pezzi:""}))}" title="Lascia vuoto per usare il numero di felpe (o dei nomi)" oninput="ricSetRiga('${l.id}','${r.id}','pezzi',this.value,true)" onchange="ricSetRiga('${l.id}','${r.id}','pezzi',this.value)"></td>
+      <td style="white-space:nowrap;"><b id="ric-prev-${r.id}"></b><div id="ric-spiega-${r.id}" style="font-size:11px;color:var(--muted);white-space:normal;min-width:160px;"></div></td>
+      <td style="white-space:nowrap;"><b id="ric-reale-${r.id}"></b><div id="ric-diff-${r.id}" style="font-size:11.5px;"></div></td>
+      <td style="white-space:nowrap;">
+        ${run ? `<button class="btn btn-primary btn-sm" style="background:var(--danger);border-color:var(--danger);" onclick="ricStop('${l.id}','${r.id}')">■ Fine</button>
+                 <div style="font-size:11px;color:var(--accent);margin-top:3px;">dalle ${ricOra(run.inizio).slice(6)}${run.operatore?` · ${escapeHtml(run.operatore)}`:""}</div>`
+              : `<button class="btn btn-outline btn-sm" onclick="ricStart('${l.id}','${r.id}')">▶ Avvia</button>`}
+        ${sess.length?`<div style="font-size:11px;color:var(--muted);margin-top:4px;">${sess.map((x,k)=>`<div>${ricOra(x.inizio)}${x.fine?` → ${ricOra(x.fine).slice(6)}`:" → …"}${x.operatore?` · ${escapeHtml(x.operatore)}`:""} <a href="#" title="Togli questa sessione" style="color:var(--danger);text-decoration:none;" onclick="event.preventDefault();ricDelSessione('${l.id}','${r.id}',${k})">×</a></div>`).join("")}</div>`:""}
+      </td>
+      <td><button class="btn btn-ghost btn-sm" title="Togli questo ricamo" onclick="ricDelRiga('${l.id}','${r.id}')">🗑</button></td>
+    </tr>`;
+  }).join("");
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="closeRicamo()">×</button>
+    <h2 style="margin-bottom:4px;">✣ ${escapeHtml(ricamoTitolo(l))}</h2>
+    <p class="helptext" style="margin:0 0 14px;">Pianificazione ricamo: tempo previsto calcolato dai punti, tempo reale con ▶ Avvia / ■ Fine.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+      <div class="field" style="grid-column:span 2;"><label>Ordine collegato</label>
+        <select onchange="ricSet('${l.id}','orderId',this.value,true)">
+          <option value="">— nessun ordine —</option>
+          ${ordini.map(x=>`<option value="${x.id}" ${x.id===l.orderId?"selected":""}>${escapeHtml(clientName(x.clientId))}${x.numero?` · n. ${x.numero}`:""}${x.dataConsegna?` · consegna ${fmtDate(x.dataConsegna)}`:""}</option>`).join("")}
+        </select>
+        ${o?`<a href="#" style="font-size:12px;" onclick="event.preventDefault();ricamiOpenId=null;openJobCard('${o.id}')">Apri la scheda dell'ordine →</a>`:""}</div>
+      <div class="field"><label>Nome del lavoro (facoltativo)</label>${inp(l.titolo, `ricSet('${l.id}','titolo',this.value.trim(),true)`, `placeholder="${escapeHtml(o?clientName(o.clientId):"Es. Cardiologia San Raffaele")}"`)}</div>
+      <div class="field"><label>Numero di felpe</label><input type="number" min="0" value="${escapeHtml(l.numFelpe??"")}" oninput="ricSet('${l.id}','numFelpe',this.value,false,true)" onchange="ricSet('${l.id}','numFelpe',this.value,true)"></div>
+      <div class="field"><label>Operatore</label><select onchange="ricSet('${l.id}','operatore',this.value)"><option value="">— scegli —</option>${WORKERS.map(w=>`<option ${w===l.operatore?"selected":""}>${w}</option>`).join("")}</select></div>
+      <div class="field"><label>Inizio previsto</label><input type="datetime-local" value="${escapeHtml(l.inizioPrevisto||"")}" onchange="ricSet('${l.id}','inizioPrevisto',this.value)"></div>
+      <div class="field"><label>Stato</label><select onchange="ricSet('${l.id}','stato',this.value)">${RICAMI_STATI.map(s=>`<option ${s===(l.stato||"Da fare")?"selected":""}>${s}</option>`).join("")}</select></div>
+    </div>
+
+    <h3 style="margin:18px 0 8px;font-size:15px;">Ricami</h3>
+    <div style="overflow-x:auto;">
+      <table class="lines-table" style="min-width:980px;">
+        <thead><tr><th>Posizione</th><th>Cosa</th><th>Punti</th><th>Macchina</th><th>Pezzi</th><th>Previsto</th><th>Reale</th><th>Tempo reale</th><th></th></tr></thead>
+        <tbody>${righe || `<tr><td colspan="9" class="empty">Nessun ricamo: aggiungine uno.</td></tr>`}</tbody>
+      </table>
+    </div>
+    <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="ricAddRiga('${l.id}')">+ Aggiungi ricamo (es. disegno)</button>
+
+    <div id="ric-calc" style="margin-top:16px;"></div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:16px;">
+      <div class="field"><label>Nomi da ricamare (uno per riga) · ${nomi.length} nomi</label>
+        <textarea rows="5" placeholder="Mario Rossi&#10;Dott.ssa Bianchi&#10;…" onchange="ricSet('${l.id}','nomi',this.value,true)">${escapeHtml(l.nomi||"")}</textarea>
+        <div style="font-size:11.5px;color:var(--muted);">Se li scrivi, le righe Brother usano il numero dei nomi al posto del numero di felpe.</div></div>
+      <div class="field"><label>Note per i ragazzi</label><textarea rows="5" onchange="ricSet('${l.id}','note',this.value)">${escapeHtml(l.note||"")}</textarea></div>
+    </div>
+
+    <details style="margin-top:14px;">
+      <summary style="cursor:pointer;font-weight:700;">Chi lavora, orari dei ragazzi e velocità delle macchine (modificabili)</summary>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px;">
+        <div class="field"><label>Chi usa la SWF</label><select onchange="ricSetImp('${l.id}','swfOp',this.value,false,true)">${WORKERS.map(w=>`<option ${w===imp.swfOp?"selected":""}>${w}</option>`).join("")}</select></div>
+        <div class="field"><label>Chi fa i nomi (Brother)</label><select onchange="ricSetImp('${l.id}','broOp',this.value,false,true)">${WORKERS.map(w=>`<option ${w===imp.broOp?"selected":""}>${w}</option>`).join("")}</select></div>
+      </div>
+      <div style="overflow-x:auto;margin-top:6px;"><table class="lines-table" style="min-width:520px;">
+        <thead><tr><th>Orari</th>${[...new Set([imp.swfOp, imp.broOp])].map(op=>`<th>${escapeHtml(op)}</th>`).join("")}</tr></thead>
+        <tbody>${RICAMI_GIORNI.map(([g,nome])=>`<tr><td>${nome}</td>${[...new Set([imp.swfOp, imp.broOp])].map(op=>`<td><input value="${escapeHtml(ricOrarioOp(imp,op)[g]||"")}" placeholder="riposo" onchange="ricSetOrario('${l.id}','${escapeHtml(op)}',${g},this.value)"></td>`).join("")}</tr>`).join("")}</tbody>
+      </table></div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Scrivi le fasce così: <b>9:30-13:30, 15:00-19:00</b>. Lascia vuoto il giorno di riposo.</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Le impostazioni che cambi qui diventano quelle di partenza per i prossimi lavori.</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px;">
+        <div class="field"><label>SWF · punti al minuto</label><input type="number" min="1" value="${imp.swfVel}" oninput="ricSetImp('${l.id}','swfVel',this.value,true)" onchange="ricSetImp('${l.id}','swfVel',this.value)"></div>
+        <div class="field"><label>SWF · teste</label><input type="number" min="1" value="${imp.swfTeste}" oninput="ricSetImp('${l.id}','swfTeste',this.value,true)" onchange="ricSetImp('${l.id}','swfTeste',this.value)"></div>
+        <div class="field"><label>Brother · punti al minuto</label><input type="number" min="1" value="${imp.brotherVel}" oninput="ricSetImp('${l.id}','brotherVel',this.value,true)" onchange="ricSetImp('${l.id}','brotherVel',this.value)"></div>
+        <div class="field"><label>Brother · quante macchine</label><input type="number" min="1" value="${imp.brotherNum}" oninput="ricSetImp('${l.id}','brotherNum',this.value,true)" onchange="ricSetImp('${l.id}','brotherNum',this.value)"></div>
+        <div class="field"><label>Minuti extra a giro (cambio telaio)</label><input type="number" min="0" step="0.5" value="${imp.cambioMin}" oninput="ricSetImp('${l.id}','cambioMin',this.value,true)" onchange="ricSetImp('${l.id}','cambioMin',this.value)"></div>
+      </div>
+    </details>
+
+    <div class="form-actions" style="margin-top:18px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="closeRicamo()">Fatto</button>
+      <button class="btn btn-outline" style="color:var(--danger);" onclick="deleteRicamo('${l.id}')">Elimina lavoro</button>
+    </div>`;
+  document.getElementById("modalBackdrop").classList.add("open");
+  ricRefreshCalc(id);
+  ricStartTick();
+}
+function closeRicamo(){ ricamiOpenId = null; closeModal(); }
+function ricRefreshCalc(id){
+  const l = ricamiFind(id); if(!l) return;
+  const now = Date.now();
+  (l.ricami||[]).forEach(r=>{
+    const c = ricCalcRiga(l, r), re = ricRealeRiga(r, now);
+    const set = (k,h)=>{ const el=document.getElementById(`ric-${k}-${r.id}`); if(el) el.innerHTML=h; };
+    set("prev", ricNum(r.punti)>0 ? fmtRicMin(c.previsto) : `<span style="color:var(--muted);">mancano i punti</span>`);
+    set("spiega", ricNum(r.punti)>0 ? escapeHtml(c.spiega) : "");
+    set("reale", re>0 ? fmtRicMin(re) : `<span style="color:var(--muted);">—</span>`);
+    set("diff", (r.sessioni||[]).some(x=>x.fine) && !ricInCorso(r) ? ricScostHtml(c.previsto, re) : "");
+  });
+  const t = ricTotali(l);
+  const box = document.getElementById("ric-calc");
+  if(box) box.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;background:#F6F8F9;border:1px solid var(--border);border-radius:12px;padding:12px 14px;">
+      <div><div style="font-size:12px;color:var(--muted);">Previsto SWF (ricami uguali)</div><b style="font-size:17px;">${fmtRicMin(t.swf)}</b></div>
+      <div><div style="font-size:12px;color:var(--muted);">Previsto Brother (nomi)</div><b style="font-size:17px;">${fmtRicMin(t.bro)}</b></div>
+      <div><div style="font-size:12px;color:var(--muted);">Totale previsto</div><b style="font-size:17px;">${fmtRicMin(t.previsto)}</b>
+        <div style="font-size:11px;color:var(--muted);">${t.swf>0&&t.bro>0?`${fmtRicMin(t.insieme)} se SWF e Brother lavorano insieme`:"una macchina dopo l'altra"}</div></div>
+      <div><div style="font-size:12px;color:var(--muted);">Reale finora</div><b style="font-size:17px;">${fmtRicMin(t.reale)}</b></div>
+      <div><div style="font-size:12px;color:var(--muted);">Differenza</div><div style="font-size:15px;">${ricScostHtml(t.prevFatti, t.realeFatti)}</div>
+        <div style="font-size:11px;color:var(--muted);">sui ricami finiti: ${t.fatto}/${t.tot}</div></div>
+    </div>
+    ${(()=>{ const d=ricDurata(l); if(!(d.minuti>0)) return "";
+      const riga = (x, cosa) => x.minuti>0 ? `<div>• <b>${escapeHtml(cosa)}</b> con <b>${escapeHtml(x.op)}</b>: ${fmtRicMin(x.minuti)} → finisce <b>${x.fine?fmtRicData(x.fine):"mai: nessun orario impostato"}</b>${x.fine?` (${fmtRicGiorni(x.giorni)})`:""}</div>` : "";
+      return `<div style="margin-top:10px;background:#EEF6F8;border:1px solid #CFE3E8;border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.7;">
+        <div>Partendo ${l.inizioPrevisto?"":"(se non scegli l'inizio, da adesso o dal primo ▶ Avvia) "}<b>${fmtRicData(new Date(d.startMs))}</b>, secondo gli orari dei ragazzi:</div>
+        ${riga(d.swf, "SWF, ricami uguali")}
+        ${riga(d.bro, d.swf.op===d.bro.op ? "Brother, nomi (dopo la SWF)" : "Brother, nomi")}
+        <div style="margin-top:4px;font-size:15px;">Lavoro finito: <b>${d.fine?fmtRicData(d.fine):"—"}</b></div>
+      </div>`; })()}`;
+}
+function ricSet(id, campo, val, rerender=false, soloCalcolo=false){
+  const l = ricamiFind(id); if(!l) return;
+  l[campo] = val;
+  if(campo==="orderId" && val){
+    const o = findItem("orders", val);
+    if(o && !ricNum(l.numFelpe)) l.numFelpe = ricFelpeDaOrdine(o) || l.numFelpe;
+    if(o && !l.operatore && WORKERS.includes(o.worker)) l.operatore = o.worker;
+  }
+  if(soloCalcolo){ ricRefreshCalc(id); return; }
+  saveRicamo(l);
+  if(rerender) openRicamo(id); else ricRefreshCalc(id);
+}
+function ricSetImp(id, campo, val, soloCalcolo=false, rerender=false){
+  const l = ricamiFind(id); if(!l) return;
+  const v = (campo==="swfOp"||campo==="broOp") ? String(val) : ricNum(val, RICAMI_DEFAULTS[campo]);
+  l.impostazioni = Object.assign({}, ricImp(l), {[campo]: v});
+  if(soloCalcolo){ ricRefreshCalc(id); return; }
+  ricImpRicorda(l.impostazioni); saveRicamo(l);
+  if(rerender) openRicamo(id); else ricRefreshCalc(id);
+}
+function ricSetOrario(id, op, giorno, val){
+  const l = ricamiFind(id); if(!l) return;
+  const imp = ricImp(l);
+  const orari = JSON.parse(JSON.stringify(imp.orari||{}));
+  orari[op] = Object.assign({}, ricOrarioOp(imp, op), {[giorno]: String(val||"").trim()});
+  l.impostazioni = Object.assign({}, imp, {orari});
+  ricImpRicorda(l.impostazioni); saveRicamo(l); ricRefreshCalc(id);
+}
+function ricSetRiga(id, rid, campo, val, soloCalcolo=false, rerender=false){
+  const l = ricamiFind(id); if(!l) return;
+  const r = (l.ricami||[]).find(x=>x.id===rid); if(!r) return;
+  r[campo] = val;
+  if(soloCalcolo){ ricRefreshCalc(id); return; }
+  saveRicamo(l);
+  if(rerender) openRicamo(id); else ricRefreshCalc(id);
+}
+function ricAddRiga(id){
+  const l = ricamiFind(id); if(!l) return;
+  l.ricami = l.ricami || [];
+  l.ricami.push(ricNuovaRiga("Retro","Disegno","SWF"));
+  saveRicamo(l); openRicamo(id);
+}
+function ricDelRiga(id, rid){
+  const l = ricamiFind(id); if(!l) return;
+  const r = (l.ricami||[]).find(x=>x.id===rid);
+  if(r && (r.sessioni||[]).length && !confirm("Questo ricamo ha già dei tempi registrati. Toglierlo lo stesso?")) return;
+  l.ricami = (l.ricami||[]).filter(x=>x.id!==rid);
+  saveRicamo(l); openRicamo(id);
+}
+function ricStart(id, rid){
+  const l = ricamiFind(id); if(!l) return;
+  const r = (l.ricami||[]).find(x=>x.id===rid); if(!r) return;
+  if(!l.operatore){ showToast("Scegli prima l'operatore del lavoro"); return; }
+  if(ricInCorso(r)) return;
+  r.sessioni = r.sessioni || [];
+  r.sessioni.push({inizio:new Date().toISOString(), fine:"", operatore:l.operatore});
+  if((l.stato||"Da fare")==="Da fare") l.stato = "In corso";
+  saveRicamo(l); openRicamo(id);
+}
+function ricStop(id, rid){
+  const l = ricamiFind(id); if(!l) return;
+  const r = (l.ricami||[]).find(x=>x.id===rid); if(!r) return;
+  const s = ricInCorso(r); if(!s) return;
+  s.fine = new Date().toISOString();
+  saveRicamo(l); openRicamo(id);
+}
+function ricDelSessione(id, rid, k){
+  const l = ricamiFind(id); if(!l) return;
+  const r = (l.ricami||[]).find(x=>x.id===rid); if(!r) return;
+  const sess = (r.sessioni||[]).filter(x=>x.inizio);
+  const s = sess[k]; if(!s) return;
+  if(!confirm(`Togliere la sessione del ${ricOra(s.inizio)}?`)) return;
+  r.sessioni = (r.sessioni||[]).filter(x=>x!==s);
+  saveRicamo(l); openRicamo(id);
+}
+
 /* ============ NAVIGAZIONE ============ */
 const NAV = [
   {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard", hidden:true},
@@ -4451,6 +4983,7 @@ const NAV = [
   {id:"leadOrdine", label:"NUOVI CLIENTI CON ORDINE", icon:"◆", subtitle:"Ordini ricevuti da clienti non ancora presenti o da completare", group:"Operativa", hidden:true},
   {id:"ordini", label:"Ordini", icon:"▣", subtitle:"Tutti gli ordini attivi e conclusi", group:"Operativa"},
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
+  {id:"ricami", label:"Ricami felpe reparti", icon:"✣", subtitle:"Pianificazione ricami: tempo previsto e tempo reale", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
   {id:"lavoriCompletati", label:"LAVORI COMPLETATI E CREDITI APERTI", icon:"✓", subtitle:"Da consegnare, completati recenti e crediti da incassare", group:"Dashboard"},
 
@@ -4821,6 +5354,7 @@ function renderTopbarActions(){
     clienti: `<button class="btn btn-primary" onclick="toggleForm('clientForm')">+ Nuovo cliente</button>`,
     ordini: `<button class="btn btn-primary" onclick="pendingLeadOrderConversion=null;pendingOrderDescription='';toggleForm('orderForm')">+ Nuovo ordine</button>`,
     magazzino: ``,
+    ricami: `<button class="btn btn-primary" onclick="newRicamo()">+ Nuovo lavoro ricamo</button>`,
     lavoriCompletati: ``,
     dropbox: `<button class="btn btn-outline" onclick="dropboxRefresh()">↻ Aggiorna</button>`,
     incassi: `<button class="btn btn-primary" onclick="toggleForm('paymentForm')">+ Registra incasso</button>`,
@@ -4840,7 +5374,7 @@ function renderTopbarActions(){
 function renderCurrentView(){
   ({dashboard:renderDashboard, note:renderNote, clienti:renderClienti,
     ordini:renderOrdini, flusso:renderFlusso,
-    magazzino:renderMagazzino, lavoriCompletati:renderLavoriCompletati, dropbox:renderDropbox, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate, entrateUscite:renderEntrateUscite,
+    magazzino:renderMagazzino, ricami:renderRicami, lavoriCompletati:renderLavoriCompletati, dropbox:renderDropbox, incassi:renderIncassi, spese:renderSpese, costiFissi:renderCostiFissi, entrate:renderEntrate, entrateUscite:renderEntrateUscite,
     posta:renderPosta, whatsapp:renderWhatsapp, instagram:renderInstagram, leads:renderLeads, leadOrdine:renderLeadOrdine})[currentView]();
 }
 let clientFormOpen = false;
@@ -13652,7 +14186,7 @@ function deletePaymentFromEdit(paymentId, orderId){
     else { closeModal(); renderIncassi(); }
   });
 }
-function closeModal(){ document.getElementById("modalBackdrop").classList.remove("open"); renderCurrentView(); }
+function closeModal(){ ricamiOpenId = null; document.getElementById("modalBackdrop").classList.remove("open"); renderCurrentView(); }
 function renderFasiGrouped(o){
   const groups = {};
   o.fasi.forEach((f,i)=>{ (groups[f.categoria] = groups[f.categoria] || []).push({f,i}); });
