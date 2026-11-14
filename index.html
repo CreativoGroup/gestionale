@@ -4464,7 +4464,7 @@ const RICAMI_ORARI_BASE = {
   Francess: {1:"14:00-19:00", 2:"9:30-13:00, 14:00-19:00", 3:"14:00-19:00", 4:"14:00-19:00", 5:"9:30-13:00, 14:00-19:00", 6:""}
 };
 const RICAMI_ORARIO_GENERICO = {1:"9:00-13:00, 14:00-18:00", 2:"9:00-13:00, 14:00-18:00", 3:"9:00-13:00, 14:00-18:00", 4:"9:00-13:00, 14:00-18:00", 5:"9:00-13:00, 14:00-18:00", 6:""};
-const RICAMI_DEFAULTS = {swfVel:500, swfTeste:4, brotherVel:500, brotherNum:3, cambioMin:0, swfOp:"Daniele", broOp:"Francess", orari:RICAMI_ORARI_BASE};
+const RICAMI_DEFAULTS = {swfVel:500, swfTeste:4, brotherVel:500, brotherNum:3, cambioMin:0, swfOp:"Daniele", broOp:"Francess", orari:RICAMI_ORARI_BASE, puntiCuore:10000, puntiDestra:8000, puntiRetro:20000};
 function ricImpPredefinite(){ try{ return Object.assign({}, RICAMI_DEFAULTS, JSON.parse(localStorage.getItem("ricamiImpDefault")||"{}")); }catch(e){ return Object.assign({}, RICAMI_DEFAULTS); } }
 function ricImpRicorda(imp){ try{ localStorage.setItem("ricamiImpDefault", JSON.stringify(imp)); }catch(e){} }
 const RICAMI_POSIZIONI = ["Cuore","Destra","Retro","Manica","Altro"];
@@ -4545,12 +4545,14 @@ function ricamiFind(id){ return ricamiState.find(x=>x.id===id); }
 /* Ogni ordine aperto di un cliente "Felpe per reparti" ha in automatico il suo lavoro ricamo.
    L'id è fisso (ord-<id ordine>), così due computer non creano doppioni e un lavoro già modificato non viene sovrascritto. */
 let ricamiAutoBusy = false;
+let ricPianoCorrente = null;
+let ricSimFelpe = 20;
 async function ricamiAutoSync(){
   if(ricamiAutoBusy || !ricamiLoaded) return 0;
   const nuovi = state.orders
     .filter(o=>!["Completato","Consegnato"].includes(o.stato) && ricIsFelpeReparti(o))
     .filter(o=>!ricamiState.some(l=>l.orderId===o.id || l.id==="ord-"+o.id))
-    .map(o=>({id:"ord-"+o.id, orderId:o.id, auto:true, titolo:"", numFelpe:ricFelpeDaOrdine(o)||"", operatore:WORKERS.includes(o.worker)?o.worker:"", stato:"Da fare",
+    .map(o=>({id:"ord-"+o.id, orderId:o.id, auto:true, titolo:"", numFelpe:"", operatore:WORKERS.includes(o.worker)?o.worker:"", stato:"Da fare",
       nomi:"", note:"", inizioPrevisto:"", creatoIl:o.createdAt||new Date().toISOString(), impostazioni:ricImpPredefinite(),
       ricami:[ricNuovaRiga("Cuore","Logo ospedale","SWF"), ricNuovaRiga("Destra","Nomi","Brother"), ricNuovaRiga("Retro","Scritta reparto","SWF")]}));
   if(!nuovi.length) return 0;
@@ -4609,39 +4611,81 @@ function ricFinePrevista(startMs, minuti, orario){
   }
   return {fine:null, giorni};
 }
-function ricDurata(l){
-  const imp = ricImp(l), t = ricTotali(l);
-  const run = (l.ricami||[]).flatMap(r=>(r.sessioni||[]).filter(x=>x.inizio)).map(x=>Date.parse(x.inizio)).filter(Boolean);
-  const startMs = l.inizioPrevisto ? Date.parse(l.inizioPrevisto) : (run.length ? Math.min(...run) : Date.now());
+/* Minuti che restano su un ricamo: 0 se è già chiuso con ■ Fine, altrimenti previsto meno il tempo già fatto */
+function ricRimanente(l, r){
+  if((r.sessioni||[]).some(x=>x.fine) && !ricInCorso(r)) return 0;
+  return Math.max(0, ricCalcRiga(l, r).previsto - ricRealeRiga(r));
+}
+function ricAvviato(l){ return (l.ricami||[]).some(r=>(r.sessioni||[]).some(x=>x.inizio)); }
+function ricPrimoAvvio(l){ const t=(l.ricami||[]).flatMap(r=>(r.sessioni||[]).map(x=>Date.parse(x.inizio))).filter(Boolean); return t.length?Math.min(...t):0; }
+/* Ordine della coda: prima i lavori già avviati, poi gli altri nell'ordine in cui sono arrivati */
+function ricCoda(){
+  return ricamiState.filter(l=>l.stato!=="Finito").sort((a,b)=>{
+    const sa=ricAvviato(a), sb=ricAvviato(b);
+    if(sa!==sb) return sa?-1:1;
+    if(sa) return ricPrimoAvvio(a)-ricPrimoAvvio(b);
+    return String(a.creatoIl||"").localeCompare(String(b.creatoIl||""));
+  });
+}
+/* Mette un lavoro in coda sugli operatori: Daniele (SWF) e Francess (nomi) lavorano in contemporanea,
+   ognuno con il proprio orario, e ogni lavoro parte quando l'operatore ha finito quelli prima. */
+function ricPianificaLavoro(l, cursori, now){
+  const imp = ricImp(l);
   const swfOp = imp.swfOp||"Daniele", broOp = imp.broOp||"Francess";
-  let swf, bro;
-  if(swfOp===broOp){
-    /* stessa persona su entrambe: prima SWF poi Brother, una dopo l'altra */
-    const tot = ricFinePrevista(startMs, t.swf+t.bro, ricOrarioOp(imp, swfOp));
-    swf = {op:swfOp, minuti:t.swf, ...ricFinePrevista(startMs, t.swf, ricOrarioOp(imp, swfOp))};
-    bro = {op:broOp, minuti:t.bro, ...tot};
-  } else {
-    swf = {op:swfOp, minuti:t.swf, ...ricFinePrevista(startMs, t.swf, ricOrarioOp(imp, swfOp))};
-    bro = {op:broOp, minuti:t.bro, ...ricFinePrevista(startMs, t.bro, ricOrarioOp(imp, broOp))};
-  }
+  let swfMin=0, broMin=0;
+  (l.ricami||[]).forEach(r=>{ const m=ricRimanente(l, r); if(r.macchina==="Brother") broMin+=m; else swfMin+=m; });
+  const minStart = (l.inizioPrevisto && Date.parse(l.inizioPrevisto)>now) ? Date.parse(l.inizioPrevisto) : now;
+  const parte = (op, minuti) => {
+    const inizio = Math.max(cursori[op]||now, minStart);
+    if(!(minuti>0)) return {op, minuti:0, inizio, fine:null, giorni:0};
+    const r = ricFinePrevista(inizio, minuti, ricOrarioOp(imp, op));
+    if(r.fine) cursori[op] = r.fine.getTime();
+    return {op, minuti, inizio, fine:r.fine, giorni:r.giorni, senzaOrario:!r.fine};
+  };
+  const swf = parte(swfOp, swfMin), bro = parte(broOp, broMin);
   const parti = [swf, bro].filter(x=>x.minuti>0);
   const manca = parti.some(x=>!x.fine);
-  const fine = (!parti.length || manca) ? null : new Date(Math.max(...parti.map(x=>x.fine.getTime())));
-  const giorni = parti.length ? Math.max(...parti.map(x=>x.giorni)) : 0;
-  return {minuti:t.previsto, startMs, swf, bro, fine, giorni, manca};
+  const fine = !parti.length ? (ricAvviato(l)?new Date(now):null) : manca ? null : new Date(Math.max(...parti.map(x=>x.fine.getTime())));
+  return {swf, bro, fine, manca, rimanente: swfMin+broMin, inizio: parti.length?Math.min(...parti.map(x=>x.inizio)):now};
 }
+function ricPiano(){
+  const now = Math.ceil(Date.now()/60000)*60000, cursori = {}, map = {};
+  ricCoda().forEach((l,i)=>{ map[l.id] = Object.assign(ricPianificaLavoro(l, cursori, now), {posto:i+1}); });
+  return {map, cursori, now};
+}
+/* Se oggi arrivasse un nuovo reparto con N felpe (punti di partenza), quando sarebbe pronto? */
+function ricSimulaNuovo(felpe){
+  const p = ricPiano();
+  const finto = {id:"sim", numFelpe:felpe, numFelpeManuale:true, nomi:"", impostazioni:ricImpPredefinite(),
+    ricami:[ricNuovaRiga("Cuore","Logo ospedale","SWF"), ricNuovaRiga("Destra","Nomi","Brother"), ricNuovaRiga("Retro","Scritta reparto","SWF")]};
+  return ricPianificaLavoro(finto, Object.assign({}, p.cursori), p.now);
+}
+function ricDataBreve(d){ if(!d) return "—"; const gg=["domenica","lunedì","martedì","mercoledì","giovedì","venerdì","sabato"][d.getDay()]; return `${gg} ${d.getDate()}/${d.getMonth()+1}`; }
 function fmtRicGiorni(g){ if(!(g>0)) return "—"; return `${g} giorn${g===1?"o":"i"} di lavoro`; }
 function fmtRicData(d){ if(!d) return "—"; const gg=["dom","lun","mar","mer","gio","ven","sab"][d.getDay()]; return `${gg} ${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")} alle ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
 function ricNum(v, d=0){ const n=Number(String(v??"").replace(",",".")); return Number.isFinite(n)&&n>=0 ? n : d; }
 function ricNomiList(l){ return String(l.nomi||"").split(/\n+/).map(s=>s.trim()).filter(Boolean); }
+/* Numero di felpe: preso dall'ordine collegato (si aggiorna da solo) finché non lo scrivi a mano nel lavoro */
+function ricFelpe(l){
+  if(!l.numFelpeManuale && l.orderId){ const o=findItem("orders", l.orderId); const n=ricFelpeDaOrdine(o); if(n) return n; }
+  return Math.round(ricNum(l.numFelpe));
+}
 function ricPezzi(l, r){
   if(r.pezzi!=="" && r.pezzi!=null && ricNum(r.pezzi)>0) return Math.round(ricNum(r.pezzi));
   if(r.macchina==="Brother"){ const n=ricNomiList(l).length; if(n) return n; }
-  return Math.round(ricNum(l.numFelpe));
+  return ricFelpe(l);
 }
+/* Punti: quelli scritti, altrimenti i punti di partenza per cuore, destra e retro */
+const RICAMI_BASE_DESC = ["Logo ospedale","Nomi","Scritta reparto"];
+function ricPuntiDefault(l, r){
+  if(!(r.base || RICAMI_BASE_DESC.includes(String(r.descrizione||"").trim()))) return 0;
+  const imp = ricImp(l);
+  return r.posizione==="Cuore" ? ricNum(imp.puntiCuore,10000) : r.posizione==="Destra" ? ricNum(imp.puntiDestra,8000) : r.posizione==="Retro" ? ricNum(imp.puntiRetro,20000) : 0;
+}
+function ricPunti(l, r){ const p=ricNum(r.punti); return p>0 ? {punti:p, stima:false} : {punti:ricPuntiDefault(l, r), stima:true}; }
 function ricCalcRiga(l, r){
   const imp = ricImp(l);
-  const punti = ricNum(r.punti), pezzi = ricPezzi(l, r), cambio = ricNum(imp.cambioMin);
+  const pp = ricPunti(l, r), punti = pp.punti, pezzi = ricPezzi(l, r), cambio = ricNum(imp.cambioMin);
   if(r.macchina==="Brother"){
     const vel = Math.max(1, ricNum(imp.brotherVel, 500)), macchine = Math.max(1, Math.round(ricNum(imp.brotherNum, 3)));
     const perPezzo = punti/vel + cambio;
@@ -4664,15 +4708,16 @@ function ricRealeRiga(r, now=Date.now()){
 }
 function ricInCorso(r){ return (r.sessioni||[]).find(x=>x.inizio && !x.fine); }
 function ricTotali(l){
-  let previsto=0, reale=0, swf=0, bro=0, fatto=0, prevFatti=0, realeFatti=0;
+  let previsto=0, reale=0, swf=0, bro=0, fatto=0, prevFatti=0, realeFatti=0, stima=false;
   (l.ricami||[]).forEach(r=>{
     const c = ricCalcRiga(l, r);
+    if(ricPunti(l, r).stima && ricPunti(l, r).punti>0) stima=true;
     previsto += c.previsto; reale += ricRealeRiga(r);
     if(r.macchina==="Brother") bro += c.previsto; else swf += c.previsto;
     /* il confronto previsto/reale si fa solo sui ricami già chiusi con ■ Fine (e non ripartiti) */
     if((r.sessioni||[]).some(x=>x.fine) && !ricInCorso(r)){ fatto++; prevFatti += c.previsto; realeFatti += ricRealeRiga(r); }
   });
-  return {previsto, reale, swf, bro, insieme: Math.max(swf, bro), fatto, prevFatti, realeFatti, tot:(l.ricami||[]).length};
+  return {previsto, reale, swf, bro, insieme: Math.max(swf, bro), fatto, prevFatti, realeFatti, stima, tot:(l.ricami||[]).length};
 }
 function fmtRicNum(n){ return (Math.round(Number(n)*10)/10).toLocaleString("it-IT"); }
 function fmtRicMin(m){
@@ -4710,7 +4755,10 @@ function ricOrdiniSelezionabili(selId){
 function ricFelpeDaOrdine(o){
   if(!o) return 0;
   const rr = (o.righe||[]).filter(r=>r && r.categoria==="Ricamo");
-  return rr.reduce((s,r)=>s+(Number(r.quantita)||0),0);
+  /* se ci sono righe "Felpa" conto quelle; altrimenti la quantità più alta (spesso c'è una riga per posizione) */
+  const felpe = rr.filter(r=>/felp/i.test([r.prodotto,r.descrizione,r.sottocategoria].join(" ")));
+  if(felpe.length) return felpe.reduce((s,r)=>s+(Number(r.quantita)||0),0);
+  return rr.reduce((m,r)=>Math.max(m, Number(r.quantita)||0),0);
 }
 
 /* ---- Vista elenco ---- */
@@ -4727,7 +4775,10 @@ function renderRicami(){
       <button class="btn btn-outline btn-sm" onclick="copyRicamiSql()">COPIA SCRIPT SQL</button>
     </div>` : "";
   ricamiAutoSync().then(n=>{ if(n && currentView==="ricami" && !ricamiOpenId) renderRicami(); });
+  ricPianoCorrente = ricPiano();
   const all = ricamiState.slice().sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
+  const posto = l => (ricPianoCorrente.map[l.id]||{}).posto || 9999;
+  all.sort((a,b)=>posto(a)-posto(b));
   const list = all.filter(l=> ricamiFilter==="tutti" ? true : ricamiFilter==="finiti" ? l.stato==="Finito" : l.stato!=="Finito");
   /* statistica sui lavori finiti: quanto ci si discosta in media dal previsto */
   const finiti = all.filter(l=>l.stato==="Finito").map(ricTotali).filter(t=>t.prevFatti>0 && t.realeFatti>0);
@@ -4744,10 +4795,24 @@ function renderRicami(){
       </div>
       <div style="display:flex;gap:6px;">${chip("attivi","Attivi")}${chip("finiti","Finiti")}${chip("tutti","Tutti")}</div>
     </div>
+    <div class="card" style="margin-bottom:16px;background:#FFF8F4;border:1px solid #F5D3C4;">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:15px;">
+        <b>Se oggi arriva un nuovo reparto</b> con
+        <input type="number" min="1" value="${ricSimFelpe}" style="width:80px;" oninput="ricSimFelpe=Math.max(1,Math.round(ricNum(this.value,20)));ricAggiornaSim()"> felpe
+        (cuore, nomi e retro) → <span id="ric-sim"></span>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:6px;">Tiene conto dei lavori già in coda, degli orari di Daniele e Francess e dei punti di partenza (cuore ${fmtRicNum(ricImp().puntiCuore)}, nomi ${fmtRicNum(ricImp().puntiDestra)}, retro ${fmtRicNum(ricImp().puntiRetro)}). Aggiungi qualche giorno di margine per pulizia e imprevisti.</div>
+    </div>
     ${list.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">${list.map(ricCardHtml).join("")}</div>`
       : `<div class="card"><p class="empty">${ricamiFilter==="finiti"?"Nessun lavoro finito.":"Nessun lavoro di ricamo in programma. Premi «+ Nuovo lavoro ricamo»."}</p></div>`}
     <p class="helptext" style="margin-top:16px;">Come si calcola il previsto: punti ÷ velocità della macchina (punti al minuto). SWF a ${ricImp().swfTeste} teste per i ricami uguali (felpe fatte ${ricImp().swfTeste} alla volta), ${ricImp().brotherNum} Brother a testa singola per i nomi, che lavorano insieme. Le velocità si cambiano dentro ogni lavoro.</p>`;
+  ricAggiornaSim();
   ricStartTick();
+}
+function ricAggiornaSim(){
+  const el = document.getElementById("ric-sim"); if(!el) return;
+  const r = ricSimulaNuovo(ricSimFelpe);
+  el.innerHTML = r.fine ? `pronto indicativamente <b style="color:var(--accent);">${ricDataBreve(r.fine)}</b> <span style="color:var(--muted);font-size:13px;">(${fmtRicMin(r.rimanente)} di macchina)</span>` : "—";
 }
 function ricCardHtml(l){
   const t = ricTotali(l);
@@ -4759,33 +4824,37 @@ function ricCardHtml(l){
       <strong style="font-size:15px;">${escapeHtml(ricamoTitolo(l))}</strong>
       <span class="badge" style="color:${statoCol};border-color:${statoCol};white-space:nowrap;">${running.length?"● In macchina":escapeHtml(l.stato||"Da fare")}</span>
     </div>
-    <div style="font-size:12.5px;color:var(--muted);margin:4px 0 10px;">${Math.round(ricNum(l.numFelpe))} felpe · ${t.tot} ricam${t.tot===1?"o":"i"}${l.operatore?` · ${escapeHtml(l.operatore)}`:""}${o&&o.dataConsegna?` · consegna ${fmtDate(o.dataConsegna)}`:""}</div>
+    <div style="font-size:12.5px;color:var(--muted);margin:4px 0 10px;">${ricFelpe(l)} felpe · ${t.tot} ricam${t.tot===1?"o":"i"}${l.operatore?` · ${escapeHtml(l.operatore)}`:""}${o&&o.dataConsegna?` · consegna ${fmtDate(o.dataConsegna)}`:""}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12.5px;">
       <div><div style="color:var(--muted);">Previsto</div><b>${fmtRicMin(t.previsto)}</b></div>
       <div><div style="color:var(--muted);">Reale</div><b data-ric-reale="${l.id}">${fmtRicMin(t.reale)}</b></div>
       <div><div style="color:var(--muted);">Differenza</div>${ricScostHtml(t.prevFatti, t.realeFatti)}</div>
     </div>
-    ${l.stato!=="Finito"&&t.previsto>0?`<div style="margin-top:8px;font-size:12px;">Fine prevista: <b>${fmtRicData(ricDurata(l).fine)}</b></div>`:""}
+    ${(()=>{ const pl = l.stato!=="Finito" && ricPianoCorrente ? ricPianoCorrente.map[l.id] : null; if(!pl || !(t.previsto>0)) return "";
+      return `<div style="margin-top:10px;padding:8px 10px;border-radius:10px;background:#EEF6F8;font-size:12.5px;line-height:1.5;">
+        <div>N. ${pl.posto} in coda${ricAvviato(l)?" · avviato":` · si parte ${fmtRicData(new Date(pl.inizio))}`}</div>
+        <div>Fine prevista: <b style="font-size:13.5px;">${pl.fine?fmtRicData(pl.fine):"—"}</b></div>
+        ${t.stima?`<div style="color:var(--muted);font-size:11.5px;">con i punti di partenza (stima)</div>`:""}
+      </div>`; })()}
     ${running.length?`<div style="margin-top:8px;font-size:12px;color:var(--accent);">In macchina: ${running.map(r=>escapeHtml(r.posizione||"")).join(", ")}</div>`:""}
   </div>`;
 }
+/* Ogni minuto le date previste si ricalcolano da sole (avanzamento reale + orari) */
 function ricStartTick(){
   if(ricamiTick) return;
   ricamiTick = setInterval(()=>{
     if(currentView!=="ricami"){ clearInterval(ricamiTick); ricamiTick=null; return; }
-    const anyRunning = ricamiState.some(l=>(l.ricami||[]).some(ricInCorso));
-    if(!anyRunning) return;
-    if(ricamiOpenId){ ricRefreshCalc(ricamiOpenId); return; }
-    document.querySelectorAll("[data-ric-reale]").forEach(el=>{ const l=ricamiFind(el.dataset.ricReale); if(l) el.textContent=fmtRicMin(ricTotali(l).reale); });
-  }, 20000);
+    if(ricamiOpenId){ if(!userIsEditingAnyField()) ricRefreshCalc(ricamiOpenId); return; }
+    if(!userIsEditingAnyField() && !document.getElementById("modalBackdrop")?.classList.contains("open")) renderRicami();
+  }, 60000);
 }
 
 /* ---- Nuovo lavoro ---- */
-function ricNuovaRiga(posizione, descrizione, macchina){ return {id:uid(), posizione, descrizione, punti:"", macchina, pezzi:"", sessioni:[]}; }
+function ricNuovaRiga(posizione, descrizione, macchina){ return {id:uid(), posizione, descrizione, punti:"", macchina, pezzi:"", sessioni:[], base:RICAMI_BASE_DESC.includes(descrizione)}; }
 async function newRicamo(orderId){
   if(currentView!=="ricami") goTo("ricami");
   const o = orderId ? findItem("orders", orderId) : null;
-  const l = {id:uuid(), orderId:o?o.id:"", titolo:"", numFelpe:o?(ricFelpeDaOrdine(o)||""):"", operatore:o&&WORKERS.includes(o.worker)?o.worker:"", stato:"Da fare",
+  const l = {id:uuid(), orderId:o?o.id:"", titolo:"", numFelpe:"", operatore:o&&WORKERS.includes(o.worker)?o.worker:"", stato:"Da fare",
     nomi:"", note:"", inizioPrevisto:"", creatoIl:new Date().toISOString(), impostazioni:ricImpPredefinite(),
     ricami:[ricNuovaRiga("Cuore","Logo ospedale","SWF"), ricNuovaRiga("Destra","Nomi","Brother"), ricNuovaRiga("Retro","Scritta reparto","SWF")]};
   ricamiState.push(l);
@@ -4808,9 +4877,9 @@ function openRicamo(id){
     return `<tr>
       <td><select onchange="ricSetRiga('${l.id}','${r.id}','posizione',this.value)">${RICAMI_POSIZIONI.map(p=>`<option ${p===r.posizione?"selected":""}>${p}</option>`).join("")}</select></td>
       <td><input style="min-width:180px;" value="${escapeHtml(r.descrizione||"")}" placeholder="Es. logo, scritta reparto, disegno" onchange="ricSetRiga('${l.id}','${r.id}','descrizione',this.value)"></td>
-      <td><input type="number" min="0" step="100" style="width:100px;" value="${escapeHtml(r.punti??"")}" placeholder="${r.macchina==="Brother"?"media a nome":"punti"}" oninput="ricSetRiga('${l.id}','${r.id}','punti',this.value,true)" onchange="ricSetRiga('${l.id}','${r.id}','punti',this.value)"></td>
+      <td><input type="number" min="0" step="100" style="width:130px;" value="${escapeHtml(r.punti??"")}" placeholder="${ricPuntiDefault(l,r)?fmtRicNum(ricPuntiDefault(l,r))+" (stima)":(r.macchina==="Brother"?"media a nome":"punti")}" title="Lascia vuoto per usare i punti di partenza" oninput="ricSetRiga('${l.id}','${r.id}','punti',this.value,true)" onchange="ricSetRiga('${l.id}','${r.id}','punti',this.value)"></td>
       <td><select onchange="ricSetRiga('${l.id}','${r.id}','macchina',this.value,false,true)"><option value="SWF" ${r.macchina!=="Brother"?"selected":""}>SWF (uguali)</option><option value="Brother" ${r.macchina==="Brother"?"selected":""}>Brother (nomi)</option></select></td>
-      <td><input type="number" min="0" style="width:70px;" value="${escapeHtml(r.pezzi??"")}" placeholder="${ricPezzi(l,Object.assign({},r,{pezzi:""}))}" title="Lascia vuoto per usare il numero di felpe (o dei nomi)" oninput="ricSetRiga('${l.id}','${r.id}','pezzi',this.value,true)" onchange="ricSetRiga('${l.id}','${r.id}','pezzi',this.value)"></td>
+      <td><input type="number" min="0" style="width:70px;" value="${escapeHtml(ricNum(r.pezzi)>0?r.pezzi:ricPezzi(l,r))}" title="Uguale al numero di felpe: cambialo solo se in questa posizione ne servono meno" oninput="ricSetRiga('${l.id}','${r.id}','pezzi',this.value,true)" onchange="ricSetRiga('${l.id}','${r.id}','pezzi',this.value)"></td>
       <td style="white-space:nowrap;"><b id="ric-prev-${r.id}"></b><div id="ric-spiega-${r.id}" style="font-size:11px;color:var(--muted);white-space:normal;min-width:160px;"></div></td>
       <td style="white-space:nowrap;"><b id="ric-reale-${r.id}"></b><div id="ric-diff-${r.id}" style="font-size:11.5px;"></div></td>
       <td style="white-space:nowrap;">
@@ -4834,7 +4903,8 @@ function openRicamo(id){
         </select>
         ${o?`<a href="#" style="font-size:12px;" onclick="event.preventDefault();ricamiOpenId=null;openJobCard('${o.id}')">Apri la scheda dell'ordine →</a>`:""}</div>
       <div class="field"><label>Nome del lavoro (facoltativo)</label>${inp(l.titolo, `ricSet('${l.id}','titolo',this.value.trim(),true)`, `placeholder="${escapeHtml(o?clientName(o.clientId):"Es. Cardiologia San Raffaele")}"`)}</div>
-      <div class="field"><label>Numero di felpe</label><input type="number" min="0" value="${escapeHtml(l.numFelpe??"")}" oninput="ricSet('${l.id}','numFelpe',this.value,false,true)" onchange="ricSet('${l.id}','numFelpe',this.value,true)"></div>
+      <div class="field"><label>Numero di felpe</label><input type="number" min="0" value="${ricFelpe(l)||""}" oninput="ricSet('${l.id}','numFelpe',this.value,false,true)" onchange="ricSet('${l.id}','numFelpe',this.value,true)">
+        ${l.orderId&&!l.numFelpeManuale?`<div style="font-size:11px;color:var(--muted);">preso dall'ordine</div>`:l.orderId?`<a href="#" style="font-size:11px;" onclick="event.preventDefault();ricSet('${l.id}','numFelpeManuale',false,true)">riprendi dall'ordine</a>`:""}</div>
       <div class="field"><label>Operatore</label><select onchange="ricSet('${l.id}','operatore',this.value)"><option value="">— scegli —</option>${WORKERS.map(w=>`<option ${w===l.operatore?"selected":""}>${w}</option>`).join("")}</select></div>
       <div class="field"><label>Inizio previsto</label><input type="datetime-local" value="${escapeHtml(l.inizioPrevisto||"")}" onchange="ricSet('${l.id}','inizioPrevisto',this.value)"></div>
       <div class="field"><label>Stato</label><select onchange="ricSet('${l.id}','stato',this.value)">${RICAMI_STATI.map(s=>`<option ${s===(l.stato||"Da fare")?"selected":""}>${s}</option>`).join("")}</select></div>
@@ -4875,6 +4945,9 @@ function openRicamo(id){
         <div class="field"><label>SWF · teste</label><input type="number" min="1" value="${imp.swfTeste}" oninput="ricSetImp('${l.id}','swfTeste',this.value,true)" onchange="ricSetImp('${l.id}','swfTeste',this.value)"></div>
         <div class="field"><label>Brother · punti al minuto</label><input type="number" min="1" value="${imp.brotherVel}" oninput="ricSetImp('${l.id}','brotherVel',this.value,true)" onchange="ricSetImp('${l.id}','brotherVel',this.value)"></div>
         <div class="field"><label>Brother · quante macchine</label><input type="number" min="1" value="${imp.brotherNum}" oninput="ricSetImp('${l.id}','brotherNum',this.value,true)" onchange="ricSetImp('${l.id}','brotherNum',this.value)"></div>
+        <div class="field"><label>Punti di partenza · cuore</label><input type="number" min="0" step="500" value="${imp.puntiCuore}" oninput="ricSetImp('${l.id}','puntiCuore',this.value,true)" onchange="ricSetImp('${l.id}','puntiCuore',this.value)"></div>
+        <div class="field"><label>Punti di partenza · nomi (destra)</label><input type="number" min="0" step="500" value="${imp.puntiDestra}" oninput="ricSetImp('${l.id}','puntiDestra',this.value,true)" onchange="ricSetImp('${l.id}','puntiDestra',this.value)"></div>
+        <div class="field"><label>Punti di partenza · retro</label><input type="number" min="0" step="500" value="${imp.puntiRetro}" oninput="ricSetImp('${l.id}','puntiRetro',this.value,true)" onchange="ricSetImp('${l.id}','puntiRetro',this.value)"></div>
         <div class="field"><label>Minuti extra a giro (cambio telaio)</label><input type="number" min="0" step="0.5" value="${imp.cambioMin}" oninput="ricSetImp('${l.id}','cambioMin',this.value,true)" onchange="ricSetImp('${l.id}','cambioMin',this.value)"></div>
       </div>
     </details>
@@ -4894,8 +4967,9 @@ function ricRefreshCalc(id){
   (l.ricami||[]).forEach(r=>{
     const c = ricCalcRiga(l, r), re = ricRealeRiga(r, now);
     const set = (k,h)=>{ const el=document.getElementById(`ric-${k}-${r.id}`); if(el) el.innerHTML=h; };
-    set("prev", ricNum(r.punti)>0 ? fmtRicMin(c.previsto) : `<span style="color:var(--muted);">mancano i punti</span>`);
-    set("spiega", ricNum(r.punti)>0 ? escapeHtml(c.spiega) : "");
+    const pp = ricPunti(l, r);
+    set("prev", pp.punti>0 ? fmtRicMin(c.previsto)+(pp.stima?` <span style="font-weight:400;color:var(--muted);font-size:11px;">stima</span>`:"") : `<span style="color:var(--muted);">mancano i punti</span>`);
+    set("spiega", pp.punti>0 ? escapeHtml(c.spiega) : "");
     set("reale", re>0 ? fmtRicMin(re) : `<span style="color:var(--muted);">—</span>`);
     set("diff", (r.sessioni||[]).some(x=>x.fine) && !ricInCorso(r) ? ricScostHtml(c.previsto, re) : "");
   });
@@ -4910,21 +4984,23 @@ function ricRefreshCalc(id){
       <div><div style="font-size:12px;color:var(--muted);">Differenza</div><div style="font-size:15px;">${ricScostHtml(t.prevFatti, t.realeFatti)}</div>
         <div style="font-size:11px;color:var(--muted);">sui ricami finiti: ${t.fatto}/${t.tot}</div></div>
     </div>
-    ${(()=>{ const d=ricDurata(l); if(!(d.minuti>0)) return "";
-      const riga = (x, cosa) => x.minuti>0 ? `<div>• <b>${escapeHtml(cosa)}</b> con <b>${escapeHtml(x.op)}</b>: ${fmtRicMin(x.minuti)} → finisce <b>${x.fine?fmtRicData(x.fine):"mai: nessun orario impostato"}</b>${x.fine?` (${fmtRicGiorni(x.giorni)})`:""}</div>` : "";
+    ${(()=>{ if(l.stato==="Finito") return "";
+      const p = ricPiano(), d = p.map[l.id]; if(!d || !(t.previsto>0)) return "";
+      const riga = (x, cosa) => x.minuti>0 ? `<div>• <b>${escapeHtml(cosa)}</b> con <b>${escapeHtml(x.op)}</b>: restano ${fmtRicMin(x.minuti)} · parte ${fmtRicData(new Date(x.inizio))} → finisce <b>${x.fine?fmtRicData(x.fine):"mai: nessun orario impostato"}</b></div>` : "";
       return `<div style="margin-top:10px;background:#EEF6F8;border:1px solid #CFE3E8;border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.7;">
-        <div>Partendo ${l.inizioPrevisto?"":"(se non scegli l'inizio, da adesso o dal primo ▶ Avvia) "}<b>${fmtRicData(new Date(d.startMs))}</b>, secondo gli orari dei ragazzi:</div>
+        <div>Questo lavoro è il <b>n. ${d.posto} in coda</b>. Le date si aggiornano da sole ogni minuto, in base a quello che resta da fare e agli orari dei ragazzi:</div>
         ${riga(d.swf, "SWF, ricami uguali")}
         ${riga(d.bro, d.swf.op===d.bro.op ? "Brother, nomi (dopo la SWF)" : "Brother, nomi")}
-        <div style="margin-top:4px;font-size:15px;">Lavoro finito: <b>${d.fine?fmtRicData(d.fine):"—"}</b></div>
+        ${!(d.rimanente>0)?`<div>Tutti i ricami sono stati chiusi con ■ Fine: puoi mettere lo stato su «Finito».</div>`:""}
+        <div style="margin-top:4px;font-size:15px;">Lavoro finito: <b>${d.fine?fmtRicData(d.fine):"—"}</b>${t.stima?` <span style="font-size:12px;color:var(--muted);">(con i punti di partenza)</span>`:""}</div>
       </div>`; })()}`;
 }
 function ricSet(id, campo, val, rerender=false, soloCalcolo=false){
   const l = ricamiFind(id); if(!l) return;
   l[campo] = val;
+  if(campo==="numFelpe") l.numFelpeManuale = String(val).trim()!=="";
   if(campo==="orderId" && val){
     const o = findItem("orders", val);
-    if(o && !ricNum(l.numFelpe)) l.numFelpe = ricFelpeDaOrdine(o) || l.numFelpe;
     if(o && !l.operatore && WORKERS.includes(o.worker)) l.operatore = o.worker;
   }
   if(soloCalcolo){ ricRefreshCalc(id); return; }
@@ -4950,6 +5026,7 @@ function ricSetOrario(id, op, giorno, val){
 function ricSetRiga(id, rid, campo, val, soloCalcolo=false, rerender=false){
   const l = ricamiFind(id); if(!l) return;
   const r = (l.ricami||[]).find(x=>x.id===rid); if(!r) return;
+  if(campo==="pezzi" && Math.round(ricNum(val))===ricPezzi(l, Object.assign({}, r, {pezzi:""}))) val = "";
   r[campo] = val;
   if(soloCalcolo){ ricRefreshCalc(id); return; }
   saveRicamo(l);
@@ -4958,7 +5035,7 @@ function ricSetRiga(id, rid, campo, val, soloCalcolo=false, rerender=false){
 function ricAddRiga(id){
   const l = ricamiFind(id); if(!l) return;
   l.ricami = l.ricami || [];
-  l.ricami.push(ricNuovaRiga("Retro","Disegno","SWF"));
+  l.ricami.push(Object.assign(ricNuovaRiga("Retro","Disegno","SWF"), {base:false}));
   saveRicamo(l); openRicamo(id);
 }
 function ricDelRiga(id, rid){
