@@ -4723,6 +4723,24 @@ async function ricSpostaInCoda(id, n){
 function ricPostoInput(l, posto){
   return `<input type="number" min="1" value="${posto}" title="Cambia il numero per spostare il lavoro in coda" style="width:58px;padding:3px 6px;font-weight:700;display:inline-block;" onclick="event.stopPropagation()" onchange="ricSpostaInCoda('${l.id}',this.value)">`;
 }
+/* Inizio lavoro: se il lavoro è collegato a un ordine è la data "inizio lavoro" della scheda di lavoro
+   (quella scelta a mano o quella calcolata dal gestionale); altrimenti quella scritta nel lavoro */
+function ricInizioOrdine(l){ const o = l && l.orderId ? findItem("orders", l.orderId) : null; return o ? String(effectiveWorkStartDate(o)||"") : ""; }
+function ricInizioMs(l){
+  const d = ricInizioOrdine(l);
+  if(d){ const [y,m,g] = d.split("-").map(Number); if(y&&m&&g) return new Date(y, m-1, g).getTime(); }
+  return l && l.inizioPrevisto ? (Date.parse(l.inizioPrevisto)||0) : 0;
+}
+function ricSetInizioOrdine(id, date){
+  const l = ricamiFind(id); if(!l || !l.orderId) return;
+  const o = findItem("orders", l.orderId); if(!o) return;
+  const keep = (o.fasi||[]).filter(f=>!(f && f.key==="__inizio_lavoro__"));
+  const v = String(date||"").trim();
+  o.fasi = v ? [{key:"__inizio_lavoro__", date:v}, ...keep] : keep;
+  saveState("orders");
+  showToast(v ? "Data di inizio aggiornata anche nella scheda di lavoro" : "Data di inizio tornata al calcolo automatico");
+  openRicamo(id);
+}
 /* Mette un lavoro in coda sugli operatori: Daniele (SWF) e Francess (nomi) lavorano in contemporanea,
    ognuno con il proprio orario, e ogni lavoro parte quando l'operatore ha finito quelli prima. */
 function ricPianificaLavoro(l, cursori, now){
@@ -4730,13 +4748,16 @@ function ricPianificaLavoro(l, cursori, now){
   const swfOp = imp.swfOp||"Daniele", broOp = imp.broOp||"Francess";
   let swfMin=0, broMin=0;
   (l.ricami||[]).forEach(r=>{ const m=ricRimanente(l, r); if(r.macchina==="Brother") broMin+=m; else swfMin+=m; });
-  const minStart = (l.inizioPrevisto && Date.parse(l.inizioPrevisto)>now) ? Date.parse(l.inizioPrevisto) : now;
+  const ini = ricInizioMs(l);
+  const minStart = (ini && ini>now) ? ini : now;
   const parte = (op, minuti) => {
     const inizio = Math.max(cursori[op]||now, minStart);
     if(!(minuti>0)) return {op, minuti:0, inizio, fine:null, giorni:0};
     const r = ricFinePrevista(inizio, minuti, ricOrarioOp(imp, op));
     if(r.fine) cursori[op] = r.fine.getTime();
-    return {op, minuti, inizio, fine:r.fine, giorni:r.giorni, senzaOrario:!r.fine};
+    /* momento reale di partenza: il primo orario di lavoro utile di chi usa la macchina */
+    const primo = ricFinePrevista(inizio, 0.001, ricOrarioOp(imp, op)).fine;
+    return {op, minuti, inizio: primo ? primo.getTime() : inizio, fine:r.fine, giorni:r.giorni, senzaOrario:!r.fine};
   };
   const swf = parte(swfOp, swfMin), bro = parte(broOp, broMin);
   const parti = [swf, bro].filter(x=>x.minuti>0);
@@ -5023,7 +5044,9 @@ function openRicamo(id){
       <div class="field"><label>Numero di felpe</label><input type="number" min="0" value="${ricFelpe(l)||""}" oninput="ricSet('${l.id}','numFelpe',this.value,false,true)" onchange="ricSet('${l.id}','numFelpe',this.value,true)">
         ${l.orderId&&!l.numFelpeManuale?`<div style="font-size:11px;color:var(--muted);">preso dall'ordine</div>`:l.orderId?`<a href="#" style="font-size:11px;" onclick="event.preventDefault();ricSet('${l.id}','numFelpeManuale',false,true)">riprendi dall'ordine</a>`:""}</div>
       <div class="field"><label>Operatore</label><select onchange="ricSet('${l.id}','operatore',this.value)"><option value="">— scegli —</option>${WORKERS.map(w=>`<option ${w===l.operatore?"selected":""}>${w}</option>`).join("")}</select></div>
-      <div class="field"><label>Inizio previsto</label><input type="datetime-local" value="${escapeHtml(l.inizioPrevisto||"")}" onchange="ricSet('${l.id}','inizioPrevisto',this.value)"></div>
+      ${o ? `<div class="field"><label>Inizio lavoro</label><input type="date" value="${escapeHtml(ricInizioOrdine(l))}" onchange="ricSetInizioOrdine('${l.id}',this.value)">
+          <div style="font-size:11px;color:var(--muted);">${getWorkStartMeta(o)?.date ? "uguale alla scheda di lavoro (cambia anche lì)" : "calcolata dalla scheda di lavoro (cambia anche lì)"}</div></div>`
+        : `<div class="field"><label>Inizio previsto</label><input type="datetime-local" value="${escapeHtml(l.inizioPrevisto||"")}" onchange="ricSet('${l.id}','inizioPrevisto',this.value)"></div>`}
       <div class="field"><label>Stato</label><select onchange="ricSet('${l.id}','stato',this.value)">${RICAMI_STATI.map(s=>`<option ${s===(l.stato||"Da fare")?"selected":""}>${s}</option>`).join("")}</select></div>
     </div>
 
