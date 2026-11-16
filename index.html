@@ -4668,7 +4668,10 @@ function ricFatti(l, r, now=Date.now()){
   const base = man ? Number(man.n) : 0;
   const dopo = Math.max(0, reale - (man ? Number(man.reale)||0 : 0));
   const stimati = c.perPezzo>0 ? Math.floor(dopo / c.perPezzo) * c.pezziGiro : 0;
-  return {fatti: Math.max(0, Math.min(tot, base + stimati)), tot, manuale:!!man};
+  const fatti = Math.max(0, Math.min(tot, base + stimati));
+  /* tra quanti minuti di lavoro si aggiungono i prossimi pezzi (un giro SWF = 4 felpe, un turno Brother = 3 nomi) */
+  const prossimi = (ricInCorso(r) && c.perPezzo>0 && fatti<tot) ? Math.max(1, Math.ceil(c.perPezzo - (dopo % c.perPezzo))) : 0;
+  return {fatti, tot, manuale:!!man, prossimi, pezziGiro:Math.min(c.pezziGiro, tot-fatti)};
 }
 function ricSetFatti(id, rid, val){
   const l = ricamiFind(id); if(!l) return;
@@ -4820,8 +4823,8 @@ function ricRealeRiga(r, now=Date.now(), l=null){
   return (r.sessioni||[]).reduce((s,x)=>{
     const a = Date.parse(x.inizio); if(!a) return s;
     if(!x.fine && l){
-      /* ricamo ancora in macchina: conto solo le ore di lavoro di chi usa quella macchina */
-      const imp = ricImp(l), op = r.macchina==="Brother" ? imp.broOp : imp.swfOp;
+      /* ricamo ancora in macchina: conto solo le ore di lavoro di chi l'ha avviato (o di chi usa quella macchina) */
+      const imp = ricImp(l), op = x.operatore || (r.macchina==="Brother" ? imp.broOp : imp.swfOp);
       return s + ricMinutiInOrario(a, now, ricOrarioOp(imp, op));
     }
     const b = x.fine ? Date.parse(x.fine) : now;
@@ -5110,7 +5113,7 @@ function ricRefreshCalc(id){
     const fin = document.getElementById(`ric-fatti-${r.id}`);
     if(fin && document.activeElement!==fin) fin.value = f.fatti;
     const fl = document.getElementById(`ric-fattilab-${r.id}`);
-    if(fl) fl.textContent = f.chiuso ? "finito" : f.manuale ? "corretto a mano + stima" : "stima";
+    if(fl) fl.textContent = (f.chiuso ? "finito" : f.manuale ? "corretto a mano + stima" : "stima") + (f.prossimi ? ` · +${f.pezziGiro} tra ${f.prossimi} min` : "");
     const set = (k,h)=>{ const el=document.getElementById(`ric-${k}-${r.id}`); if(el) el.innerHTML=h; };
     const pp = ricPunti(l, r);
     set("prev", pp.punti>0 ? fmtRicMin(c.previsto)+(pp.stima?` <span style="font-weight:400;color:var(--muted);font-size:11px;">stima</span>`:"") : `<span style="color:var(--muted);">mancano i punti</span>`);
