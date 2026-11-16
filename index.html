@@ -4651,9 +4651,46 @@ function ricFinePrevista(startMs, minuti, orario){
   return {fine:null, giorni};
 }
 /* Minuti che restano su un ricamo: 0 se è già chiuso con ■ Fine, altrimenti previsto meno il tempo già fatto */
+function ricChiuso(r){ return (r.sessioni||[]).some(x=>x.fine) && !ricInCorso(r); }
 function ricRimanente(l, r){
-  if((r.sessioni||[]).some(x=>x.fine) && !ricInCorso(r)) return 0;
-  return Math.max(0, ricCalcRiga(l, r).previsto - ricRealeRiga(r));
+  const f = ricFatti(l, r);
+  if(ricChiuso(r) && !f.manuale) return 0;
+  const c = ricCalcRiga(l, r), mancano = Math.max(0, c.pezzi - f.fatti);
+  return Math.ceil(mancano / c.pezziGiro) * c.perPezzo;
+}
+/* Pezzi fatti per questo ricamo: stima dal tempo lavorato (giri × teste per la SWF, turni × macchine per le Brother),
+   oppure il numero corretto a mano, da cui la stima riparte */
+function ricFatti(l, r, now=Date.now()){
+  const c = ricCalcRiga(l, r), tot = c.pezzi;
+  const man = r.fattiManuale && Number.isFinite(Number(r.fattiManuale.n)) ? r.fattiManuale : null;
+  const reale = ricRealeRiga(r, now, l);
+  if(ricChiuso(r) && (!man || Date.parse(man.il) < Math.max(...(r.sessioni||[]).map(x=>Date.parse(x.fine)||0)))) return {fatti:tot, tot, manuale:false, chiuso:true};
+  const base = man ? Number(man.n) : 0;
+  const dopo = Math.max(0, reale - (man ? Number(man.reale)||0 : 0));
+  const stimati = c.perPezzo>0 ? Math.floor(dopo / c.perPezzo) * c.pezziGiro : 0;
+  return {fatti: Math.max(0, Math.min(tot, base + stimati)), tot, manuale:!!man};
+}
+function ricSetFatti(id, rid, val){
+  const l = ricamiFind(id); if(!l) return;
+  const r = (l.ricami||[]).find(x=>x.id===rid); if(!r) return;
+  if(String(val).trim()===""){ delete r.fattiManuale; }
+  else r.fattiManuale = {n: Math.round(ricNum(val)), il: new Date().toISOString(), reale: ricRealeRiga(r, Date.now(), l)};
+  saveRicamo(l); ricRefreshCalc(id);
+  showToast("Pezzi fatti aggiornati: la stima riparte da qui");
+}
+/* Minuti dentro l'orario di lavoro tra due momenti (serve se una macchina resta "avviata" di sera o nel weekend) */
+function ricMinutiInOrario(a, b, orario){
+  let tot = 0;
+  const d0 = new Date(a);
+  for(let i=0;i<400;i++){
+    const day = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate()+i);
+    if(day.getTime() > b) break;
+    for(const [x,y] of ricFasce(orario[day.getDay()])){
+      const ini = Math.max(day.getTime()+x*60000, a), fin = Math.min(day.getTime()+y*60000, b);
+      if(fin>ini) tot += (fin-ini)/60000;
+    }
+  }
+  return tot;
 }
 function ricAvviato(l){ return (l.ricami||[]).some(r=>(r.sessioni||[]).some(x=>x.inizio)); }
 function ricPrimoAvvio(l){ const t=(l.ricami||[]).flatMap(r=>(r.sessioni||[]).map(x=>Date.parse(x.inizio))).filter(Boolean); return t.length?Math.min(...t):0; }
@@ -4749,18 +4786,23 @@ function ricCalcRiga(l, r){
     const vel = Math.max(1, ricNum(imp.brotherVel, 500)), macchine = Math.max(1, Math.round(ricNum(imp.brotherNum, 3)));
     const perPezzo = punti/vel + cambio;
     const turni = Math.ceil(pezzi/macchine);
-    return {pezzi, perPezzo, giri:turni, previsto: turni*perPezzo, minMacchina: pezzi*perPezzo,
+    return {pezzi, perPezzo, pezziGiro:macchine, giri:turni, previsto: turni*perPezzo, minMacchina: pezzi*perPezzo,
       spiega:`${fmtRicNum(punti)} punti ÷ ${fmtRicNum(vel)} = ${fmtRicMin(punti/vel)} a nome${cambio?` + ${fmtRicMin(cambio)} cambio`:""} · ${pezzi} nomi su ${macchine} Brother = ${turni} turni`};
   }
   const vel = Math.max(1, ricNum(imp.swfVel, 500)), teste = Math.max(1, Math.round(ricNum(imp.swfTeste, 4)));
   const perGiro = punti/vel + cambio;
   const giri = Math.ceil(pezzi/teste);
-  return {pezzi, perPezzo: perGiro, giri, previsto: giri*perGiro, minMacchina: giri*perGiro,
+  return {pezzi, perPezzo: perGiro, pezziGiro:teste, giri, previsto: giri*perGiro, minMacchina: giri*perGiro,
     spiega:`${fmtRicNum(punti)} punti ÷ ${fmtRicNum(vel)} = ${fmtRicMin(punti/vel)} a giro${cambio?` + ${fmtRicMin(cambio)} cambio`:""} · ${pezzi} felpe ÷ ${teste} teste = ${giri} giri`};
 }
-function ricRealeRiga(r, now=Date.now()){
+function ricRealeRiga(r, now=Date.now(), l=null){
   return (r.sessioni||[]).reduce((s,x)=>{
     const a = Date.parse(x.inizio); if(!a) return s;
+    if(!x.fine && l){
+      /* ricamo ancora in macchina: conto solo le ore di lavoro di chi usa quella macchina */
+      const imp = ricImp(l), op = r.macchina==="Brother" ? imp.broOp : imp.swfOp;
+      return s + ricMinutiInOrario(a, now, ricOrarioOp(imp, op));
+    }
     const b = x.fine ? Date.parse(x.fine) : now;
     return s + Math.max(0, (b-a)/60000);
   }, 0);
@@ -4771,17 +4813,17 @@ function ricTotali(l){
   (l.ricami||[]).forEach(r=>{
     const c = ricCalcRiga(l, r);
     if(ricPunti(l, r).stima && ricPunti(l, r).punti>0) stima=true;
-    previsto += c.previsto; reale += ricRealeRiga(r);
+    previsto += c.previsto; reale += ricRealeRiga(r, Date.now(), l);
     if(r.macchina==="Brother") bro += c.previsto; else swf += c.previsto;
     /* il confronto previsto/reale si fa solo sui ricami già chiusi con ■ Fine (e non ripartiti) */
-    if((r.sessioni||[]).some(x=>x.fine) && !ricInCorso(r)){ fatto++; prevFatti += c.previsto; realeFatti += ricRealeRiga(r); }
+    if((r.sessioni||[]).some(x=>x.fine) && !ricInCorso(r)){ fatto++; prevFatti += c.previsto; realeFatti += ricRealeRiga(r, Date.now(), l); }
   });
   return {previsto, reale, swf, bro, insieme: Math.max(swf, bro), fatto, prevFatti, realeFatti, stima, tot:(l.ricami||[]).length};
 }
 function fmtRicNum(n){ return (Math.round(Number(n)*10)/10).toLocaleString("it-IT"); }
 function fmtRicMin(m){
   m = Number(m)||0;
-  if(m<1) return m>0 ? `${Math.round(m*60)} sec` : "0 min";
+  if(m<1) return m>0 ? "meno di 1 min" : "0 min";
   const tot = Math.round(m), h = Math.floor(tot/60), mm = tot%60;
   return h ? `${h} h${mm?` ${mm} min`:""}` : `${mm} min`;
 }
@@ -4909,7 +4951,7 @@ function ricCardHtml(l){
         <div>Fine prevista: <b style="font-size:13.5px;">${pl.fine?fmtRicData(pl.fine):"—"}</b></div>
         ${t.stima?`<div style="color:var(--muted);font-size:11.5px;">con i punti di partenza (stima)</div>`:""}
       </div>`; })()}
-    ${running.length?`<div style="margin-top:8px;font-size:12px;color:var(--accent);">In macchina: ${running.map(r=>escapeHtml(r.posizione||"")).join(", ")}</div>`:""}
+    ${ricAvviato(l)?`<div style="margin-top:8px;font-size:12px;"><span style="color:var(--muted);">Fatti (stima):</span> ${(l.ricami||[]).map(r=>{ const f=ricFatti(l,r); return `${escapeHtml(r.posizione||"")} <b>${f.fatti}/${f.tot}</b>${ricInCorso(r)?` <span style="color:var(--accent);">●</span>`:""}`; }).join(" · ")}</div>`:""}
   </div>`;
 }
 /* Ogni minuto le date previste si ricalcolano da sole (avanzamento reale + orari) */
@@ -4954,7 +4996,9 @@ function openRicamo(id){
       <td><select onchange="ricSetRiga('${l.id}','${r.id}','macchina',this.value,false,true)"><option value="SWF" ${r.macchina!=="Brother"?"selected":""}>SWF (uguali)</option><option value="Brother" ${r.macchina==="Brother"?"selected":""}>Brother (nomi)</option></select></td>
       <td><input type="number" min="0" style="width:70px;" value="${escapeHtml(ricNum(r.pezzi)>0?r.pezzi:ricPezzi(l,r))}" title="Uguale al numero di felpe: cambialo solo se in questa posizione ne servono meno" oninput="ricSetRiga('${l.id}','${r.id}','pezzi',this.value,true)" onchange="ricSetRiga('${l.id}','${r.id}','pezzi',this.value)"></td>
       <td style="white-space:nowrap;"><b id="ric-prev-${r.id}"></b><div id="ric-spiega-${r.id}" style="font-size:11px;color:var(--muted);white-space:normal;min-width:160px;"></div></td>
-      <td style="white-space:nowrap;"><b id="ric-reale-${r.id}"></b><div id="ric-diff-${r.id}" style="font-size:11.5px;"></div></td>
+      <td style="white-space:nowrap;"><b id="ric-reale-${r.id}"></b><div id="ric-diff-${r.id}" style="font-size:11.5px;"></div>
+        <div style="margin-top:4px;font-size:11.5px;">Fatti <input id="ric-fatti-${r.id}" type="number" min="0" style="width:62px;padding:2px 5px;display:inline-block;" title="Scrivi quanti ne avete ricamati davvero: la stima riparte da qui" onchange="ricSetFatti('${l.id}','${r.id}',this.value)"> / ${ricPezzi(l,r)}
+          <div id="ric-fattilab-${r.id}" style="color:var(--muted);font-size:10.5px;"></div></div></td>
       <td style="white-space:nowrap;">
         ${run ? `<button class="btn btn-primary btn-sm" style="background:var(--danger);border-color:var(--danger);" onclick="ricStop('${l.id}','${r.id}')">■ Fine</button>
                  <div style="font-size:11px;color:var(--accent);margin-top:3px;">dalle ${ricOra(run.inizio).slice(6)}${run.operatore?` · ${escapeHtml(run.operatore)}`:""}</div>`
@@ -5038,7 +5082,12 @@ function ricRefreshCalc(id){
   const l = ricamiFind(id); if(!l) return;
   const now = Date.now();
   (l.ricami||[]).forEach(r=>{
-    const c = ricCalcRiga(l, r), re = ricRealeRiga(r, now);
+    const c = ricCalcRiga(l, r), re = ricRealeRiga(r, now, l);
+    const f = ricFatti(l, r, now);
+    const fin = document.getElementById(`ric-fatti-${r.id}`);
+    if(fin && document.activeElement!==fin) fin.value = f.fatti;
+    const fl = document.getElementById(`ric-fattilab-${r.id}`);
+    if(fl) fl.textContent = f.chiuso ? "finito" : f.manuale ? "corretto a mano + stima" : "stima";
     const set = (k,h)=>{ const el=document.getElementById(`ric-${k}-${r.id}`); if(el) el.innerHTML=h; };
     const pp = ricPunti(l, r);
     set("prev", pp.punti>0 ? fmtRicMin(c.previsto)+(pp.stima?` <span style="font-weight:400;color:var(--muted);font-size:11px;">stima</span>`:"") : `<span style="color:var(--muted);">mancano i punti</span>`);
