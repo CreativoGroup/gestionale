@@ -9962,7 +9962,7 @@ function newOrderForClient(clientId, leadId=null){
     const _t=_ld ? String(leadReqParse(_ld.richiesta).text||"").trim() : "";
     if(_ld && _t && /^gmail/.test(String(_ld.fonte||""))){
       const _s=String(_ld.oggettoRichiesta||"").trim();
-      pendingOrderDescription=(_s?`Richiesta ricevuta via Gmail: ${_s}\n\n`:"")+_t;
+      pendingOrderDescription=(_s?`Richiesta ricevuta via Gmail: ${_s}\n\n`:"")+gmailLatestMessageText(_t);
     }
   }
 
@@ -17932,6 +17932,38 @@ async function sendGmailReply(){
 }
 
 
+// Tiene solo l'ultimo messaggio di una mail: toglie le mail precedenti citate sotto
+// (righe con ">", "Il giorno ... ha scritto:", "On ... wrote:", "Messaggio originale", intestazioni Da:/From: ecc.).
+// Se la pulizia svuota il testo, restituisce il testo intero (la descrizione non deve mai restare vuota).
+function gmailLatestMessageText(raw){
+  const full=String(raw||"").replace(/\r\n?/g,"\n");
+  const lines=full.split("\n");
+  const isHeaderLine=l=>/^\s*\*?(Da|From|Inviato|Sent|Data|Date|A|To|Cc|Oggetto|Subject)\s*:\*?/i.test(l);
+  let cut=-1;
+  for(let i=0;i<lines.length && cut<0;i++){
+    const l=lines[i], t=l.trim();
+    if(!t) continue;
+    if(/^>/.test(t)){ cut=i; break; }
+    if(/^-{2,}\s*(Messaggio originale|Original Message|Messaggio di risposta)\s*-{2,}/i.test(t)){ cut=i; break; }
+    if(/^_{8,}\s*$/.test(t)){
+      const nx=lines.slice(i+1,i+4).find(x=>x.trim());
+      if(nx && isHeaderLine(nx)){ cut=i; break; }
+    }
+    // "Il giorno ... ha scritto:" / "On ... wrote:" (anche spezzati su 2-3 righe)
+    if(/^(Il giorno|In data|Il\s+\w{3}\s+\d|On\s)/i.test(t) || /(ha scritto|wrote)\s*:\s*$/i.test(t)){
+      const joined=lines.slice(i,i+3).join(" ");
+      if(/(ha scritto|wrote)\s*:/i.test(joined) && /^(Il giorno|In data|Il\s|On\s|.*<[^>]+@[^>]+>|.*\d{1,2}[:.]\d{2})/i.test(t)){ cut=i; break; }
+    }
+    // Intestazione stile Outlook: "Da: ..." seguita da "Inviato:/Data:/A:/Oggetto:"
+    if(/^\*?(Da|From)\s*:/i.test(t)){
+      const next=lines.slice(i+1,i+5).filter(x=>x.trim());
+      if(next.some(isHeaderLine)){ cut=i; break; }
+    }
+  }
+  if(cut<0) return full.trim();
+  const out=lines.slice(0,cut).join("\n").trim();
+  return out || full.trim();
+}
 function gmailExtractAddress(value){
   const raw=String(value||"").trim();
   const m=raw.match(/<([^>]+)>/);
@@ -18197,7 +18229,7 @@ function createOrderFromGmail(){
   const email=gmailExtractAddress(m.from||"");
   const existing=findClientByEmail(email);
   {
-    const _body=String(m.bodyText||m.snippet||"").trim().slice(0,6000);
+    const _body=gmailLatestMessageText(m.bodyText||m.snippet||"").slice(0,6000);
     const _subj=String(m.subject||"").trim();
     pendingOrderDescription=_body ? ((_subj?`Richiesta ricevuta via Gmail: ${_subj}\n\n`:"")+_body) : "";
   }
