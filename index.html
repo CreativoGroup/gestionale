@@ -16669,7 +16669,8 @@ function renderDomini(){
   const daFatt = dominiDaFatturare();
   const totDaFatt = daFatt.reduce((s,x)=>s+(Number(x.daFatturareImporto ?? x.prezzo)||0),0);
   const costoAnno = attivi.reduce((s,x)=>s+(Number(x.costo)||0),0);
-  const prezzoAnno = attivi.reduce((s,x)=>s+(Number(x.prezzo)||0),0);
+  const prezzoAnno = attivi.filter(x=>!x.interno).reduce((s,x)=>s+(Number(x.prezzo)||0),0);
+  const senzaPrezzo = attivi.filter(x=>!x.interno && (x.prezzo===undefined || x.prezzo==="")).length;
   const q = dominiSearch.trim().toLowerCase();
   const list = dominiState.filter(x=>{
     const k = dominiStato(x).k;
@@ -16686,7 +16687,7 @@ function renderDomini(){
       <div class="card stat clickable" onclick="dominiFilter='scadenza';renderDomini()"><p class="stat-label">In scadenza (entro ${DOMINI_GIORNI_AVVISO} gg) o scaduti</p><p class="stat-value" style="${inScad.length?'color:var(--danger)':''}">${inScad.length}</p><p class="stat-sub">da rinnovare su SiteGround</p></div>
       <div class="card stat clickable" onclick="dominiFilter='fatturare';renderDomini()"><p class="stat-label">Rinnovati da fatturare</p><p class="stat-value" style="${daFatt.length?'color:var(--accent)':''}">${daFatt.length}</p><p class="stat-sub">${fmtMoney(totDaFatt)} · promemoria, non entra negli incassi</p></div>
       <div class="card stat"><p class="stat-label">Domini attivi</p><p class="stat-value">${attivi.length}</p><p class="stat-sub">su ${dominiState.length} totali</p></div>
-      <div class="card stat"><p class="stat-label">Costo annuo SiteGround</p><p class="stat-value">${fmtMoney(costoAnno)}</p><p class="stat-sub">ai clienti ${fmtMoney(prezzoAnno)} · margine ${fmtMoney(prezzoAnno-costoAnno)}</p></div>
+      <div class="card stat"><p class="stat-label">Costo annuo SiteGround</p><p class="stat-value">${fmtMoney(costoAnno)}</p><p class="stat-sub">ai clienti ${fmtMoney(prezzoAnno)}${senzaPrezzo?` · <span style="color:var(--warn);">${senzaPrezzo} senza prezzo</span>`:""}</p></div>
     </div>
     <div class="card" style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;">
       <div style="display:flex;gap:6px;flex-wrap:wrap;">${chip("attivi","Attivi")}${chip("scadenza","In scadenza")}${chip("fatturare","Da fatturare")}${chip("dismessi","Non si rinnovano")}${chip("tutti","Tutti")}</div>
@@ -16701,14 +16702,14 @@ function renderDomini(){
             const cl = x.clientId ? (state.clients||[]).find(c=>c.id===x.clientId) : null;
             return `<tr>
               <td><a href="#" onclick="event.preventDefault();openDominioForm('${x.id}')" style="font-weight:700;">${escapeHtml(x.dominio)}</a><div class="lr-sub">${escapeHtml(x.tipo||"Dominio")}${x.rinnovoAuto?" · rinnovo automatico":""}</div></td>
-              <td>${cl ? `<a href="#" onclick="event.preventDefault();openClientHistory('${cl.id}')">${escapeHtml(clientDisplayName(cl))}</a>` : `<span style="color:var(--muted);">${escapeHtml(x.clienteTesto||"—")}</span>`}</td>
+              <td>${x.interno ? `<span style="color:var(--muted);font-weight:600;">Uso interno</span>` : cl ? `<a href="#" onclick="event.preventDefault();openClientHistory('${cl.id}')">${escapeHtml(clientDisplayName(cl))}</a>` : `<span style="color:var(--warn);">da collegare</span>`}</td>
               <td>${fmtDate(x.scadenza)}</td>
               <td><span style="font-weight:700;color:${st.color};">${st.label}</span>${x.daFatturare?`<div style="font-weight:700;color:var(--accent);font-size:12px;">● Da fatturare ${fmtMoney(x.daFatturareImporto ?? x.prezzo)}</div>`:""}</td>
               <td>${x.costo!==undefined && x.costo!=="" ? fmtMoney(x.costo) : "—"}</td>
-              <td>${x.prezzo!==undefined && x.prezzo!=="" ? fmtMoney(x.prezzo) : "—"}</td>
+              <td>${x.interno ? "—" : x.prezzo!==undefined && x.prezzo!=="" ? fmtMoney(x.prezzo) : `<a href="#" onclick="event.preventDefault();openDominioForm('${x.id}')" style="color:var(--warn);">da inserire</a>`}</td>
               <td style="white-space:nowrap;">${dominiAzioniHTML(x)}</td>
             </tr>`;
-          }).join("") : `<tr><td colspan="7" class="empty">${dominiState.length?"Nessun dominio con questo filtro.":"Nessun dominio inserito. Usa «Importa da SiteGround» per incollare l'elenco, oppure «+ Nuovo dominio»."}</td></tr>`}
+          }).join("") : `<tr><td colspan="7" class="empty">${dominiState.length?"Nessun dominio con questo filtro.":`Nessun dominio inserito.<div style="margin-top:12px;"><button class="btn btn-primary" onclick="dominiCaricaElencoSiteGround()">Carica i 32 domini + piano hosting dall'elenco SiteGround del 16/11</button></div>`}</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -16769,6 +16770,7 @@ function openDominioForm(id){
       <div class="field"><label>Costo SiteGround all'anno (€)</label><input id="dm-costo" type="number" min="0" step="0.01" value="${x&&x.costo!==undefined?escapeHtml(String(x.costo)):""}"></div>
       <div class="field"><label>Prezzo al cliente all'anno (€)</label><input id="dm-prezzo" type="number" min="0" step="0.01" value="${x&&x.prezzo!==undefined?escapeHtml(String(x.prezzo)):""}"></div>
       <div class="field" style="grid-column:1/-1;"><label>Note</label><textarea id="dm-note" rows="2" placeholder="es. include 2 caselle email">${escapeHtml(x?x.note||"":"")}</textarea></div>
+      <div class="field" style="grid-column:1/-1;"><label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="dm-interno" ${x&&x.interno?"checked":""} style="width:auto;"> Uso interno: è un dominio/servizio nostro, non si rifattura</label></div>
       <div class="field" style="grid-column:1/-1;"><label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="dm-dismesso" ${x&&x.dismesso?"checked":""} style="width:auto;"> Non si rinnova più (il cliente non lo vuole, o è stato trasferito)</label></div>
       ${x ? `<div class="field" style="grid-column:1/-1;"><label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="dm-dafatt" ${x.daFatturare?"checked":""} style="width:auto;"> Da fatturare al cliente</label></div>` : ""}
     </div>
@@ -16790,7 +16792,8 @@ function dominioSuggerisciCliente(){
   sel.onchange = ()=>{ sel.dataset.touched = "1"; };
 }
 async function salvaDominioForm(id){
-  const dominio = dominiNorm(document.getElementById("dm-dominio").value);
+  const grezzo = document.getElementById("dm-dominio").value.trim();
+  const dominio = /\s/.test(grezzo) ? grezzo : dominiNorm(grezzo);
   if(!dominio){ showToast("Inserisci il nome del dominio"); return; }
   const dup = dominiState.find(d=>d.dominio===dominio && d.id!==id);
   if(dup){ showToast("Questo dominio è già presente"); return; }
@@ -16806,7 +16809,8 @@ async function salvaDominioForm(id){
     costo: num(document.getElementById("dm-costo").value),
     prezzo: num(document.getElementById("dm-prezzo").value),
     note: document.getElementById("dm-note").value.trim(),
-    dismesso: document.getElementById("dm-dismesso").checked
+    dismesso: document.getElementById("dm-dismesso").checked,
+    interno: document.getElementById("dm-interno").checked
   });
   const df = document.getElementById("dm-dafatt");
   if(df){ x.daFatturare = df.checked; if(!df.checked) delete x.daFatturareImporto; }
@@ -16831,12 +16835,12 @@ function openDominioRinnovo(id){
   document.getElementById("modalBody").innerHTML = `
     <button class="close-x" onclick="closeModal()">×</button>
     <h2 style="margin-bottom:6px;">Rinnovato: ${escapeHtml(x.dominio)}</h2>
-    <p style="color:var(--muted);margin:0 0 14px;">Cliente: <b>${escapeHtml(x.clientId?clientName(x.clientId):(x.clienteTesto||"nessuno"))}</b> · scadenza attuale ${fmtDate(x.scadenza)}</p>
+    <p style="color:var(--muted);margin:0 0 14px;">Cliente: <b>${x.interno?"uso interno":escapeHtml(x.clientId?clientName(x.clientId):"nessuno")}</b> · scadenza attuale ${fmtDate(x.scadenza)}</p>
     <div class="form-grid">
       <div class="field"><label>Nuova scadenza</label><input id="dr-scadenza" type="date" value="${nuova}"></div>
       <div class="field"><label>Pagato a SiteGround (€)</label><input id="dr-costo" type="number" min="0" step="0.01" value="${x.costo!==undefined?escapeHtml(String(x.costo)):""}"></div>
       <div class="field"><label>Da fatturare al cliente (€)</label><input id="dr-prezzo" type="number" min="0" step="0.01" value="${x.prezzo!==undefined?escapeHtml(String(x.prezzo)):""}"></div>
-      <div class="field"><label>Da fatturare?</label><select id="dr-fatt"><option value="1">Sì, va fatturato</option><option value="0">No (già fatturato / gratis)</option></select></div>
+      <div class="field"><label>Da fatturare?</label><select id="dr-fatt"><option value="1" ${x.interno?"":"selected"}>Sì, va fatturato</option><option value="0" ${x.interno?"selected":""}>No (uso interno / già fatturato / gratis)</option></select></div>
     </div>
     <p class="helptext" style="margin-top:10px;">L'importo resta solo come promemoria «da fatturare»: non entra negli incassi.</p>
     <div class="form-actions" style="margin-top:14px;">
@@ -16890,31 +16894,86 @@ function dominiParseData(s){
 function dominiParseTesto(txt){
   const out = []; const visti = new Set();
   const righe = String(txt||"").split(/\r?\n/);
-  /* SiteGround a volte mette dominio e data su righe diverse: se una riga ha solo il dominio, la data può arrivare nelle righe dopo */
-  let attesa = null;
+  /* Copiando da SiteGround dominio, «Scade …» e prezzo stanno su righe diverse:
+     le righe senza dominio completano l'ultimo dominio letto (data e prezzo annuo, non quello al mese). */
+  let ultimo = null;
+  const isInterno = d => /creativo/i.test(d);
   for(const raw of righe){
     const r = raw.trim(); if(!r) continue;
     const senzaMail = r.replace(/\S+@\S+/g," ");
     const dm = senzaMail.match(/\b((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,24}))\b/i);
-    const dominio = dm ? dominiNorm(dm[1]) : "";
-    const valido = dominio && !/\.(png|jpe?g|pdf|csv|html?|php|js)$/i.test(dominio) && !/^\d+(\.\d+)+$/.test(dominio) && !/siteground\./i.test(dominio);
-    const data = dominiParseData(senzaMail.replace(dm?dm[0]:"",""));
-    const senzaDate = senzaMail.replace(dm?dm[0]:"","").replace(/\b20\d{2}[-\/.]\d{1,2}[-\/.]\d{1,2}\b|\b\d{1,2}[-\/.]\d{1,2}[-\/.]20\d{2}\b|\b20\d{2}\b/g," ");
-    const soldi = senzaDate.match(/(?:€|eur|usd|\$)\s*(\d+(?:[.,]\d{1,2})?)/i) || senzaDate.match(/(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/i);
+    let dominio = dm ? dominiNorm(dm[1]) : "";
+    const valido = dominio && !/\.(png|jpe?g|pdf|csv|html?|php|js)$/i.test(dominio) && !/^\d+([.,]\d+)+$/.test(dominio) && !/siteground\./i.test(dominio) && /[a-z]/i.test(dominio.split(".")[0]);
+    const resto = senzaMail.replace(valido&&dm?dm[0]:"","");
+    const data = dominiParseData(resto);
+    const senzaDate = resto.replace(/\b20\d{2}[-\/.]\d{1,2}[-\/.]\d{1,2}\b|\b\d{1,2}[-\/.]\d{1,2}[-\/.]20\d{2}\b|\b20\d{2}\b/g," ");
+    const mensile = /\/\s*mes|\/\s*mo|al mese|per month/i.test(senzaDate);
+    const soldi = mensile ? null : (senzaDate.match(/(?:€|eur|usd|\$)\s*(\d+(?:[.,]\d{1,2})?)/i) || senzaDate.match(/(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)/i));
     const costo = soldi ? Number(String(soldi[1]).replace(",",".")) : "";
+    const auto = /auto[- ]?renew|rinnovo automatico/i.test(r) && !/\boff\b|disattiv/i.test(r);
+    if(!valido && /piano hosting|hosting plan/i.test(r)){
+      const piano = (r.match(/\b(GoGeek|GrowBig|StartUp|Cloud)\b/i)||[])[1] || "";
+      dominio = "Piano hosting SiteGround" + (piano?" "+piano:"");
+      if(visti.has(dominio.toLowerCase())){ ultimo = null; continue; }
+      visti.add(dominio.toLowerCase());
+      ultimo = {dominio, tipo:"Hosting", interno:true, scadenza:data, costo, auto};
+      out.push(ultimo);
+      continue;
+    }
     if(valido){
-      if(visti.has(dominio)){ attesa = null; continue; }
+      if(visti.has(dominio)){ ultimo = null; continue; }
       visti.add(dominio);
-      const row = {dominio, scadenza:data, costo, auto:/auto[- ]?renew|rinnovo automatico/i.test(r) && !/\boff\b|disattiv/i.test(r)};
-      out.push(row);
-      attesa = data ? null : row;
-    } else if(attesa && data){
-      attesa.scadenza = data;
-      if(costo!=="" && attesa.costo==="") attesa.costo = costo;
-      attesa = null;
+      ultimo = {dominio, tipo:"Dominio", interno:isInterno(dominio), scadenza:data, costo, auto};
+      out.push(ultimo);
+    } else if(ultimo){
+      if(ultimo.tipo==="Hosting" && /\b(GoGeek|GrowBig|StartUp|Cloud)\b/i.test(r) && !/ \S+$/.test(ultimo.dominio.replace("Piano hosting SiteGround",""))){
+        ultimo.dominio = "Piano hosting SiteGround " + r.match(/\b(GoGeek|GrowBig|StartUp|Cloud)\b/i)[1];
+      }
+      if(data && !ultimo.scadenza) ultimo.scadenza = data;
+      if(costo!=="" && ultimo.costo==="") ultimo.costo = costo;
+      if(auto) ultimo.auto = true;
     }
   }
   return out;
+}
+/* Elenco rinnovi SiteGround ricevuto il 16/11/2026 (dagli screenshot del pannello): si carica con un clic */
+const DOMINI_ELENCO_SITEGROUND = `Piano hosting GoGeek 19/07/2027 479,88€
+creativogroup.it 28/12/2026 12,99€
+ginevrasciarretta.it 07/01/2027 12,99€
+lapegolosa.it 20/01/2027 12,99€
+aciromadellavittoria.it 30/01/2027 12,99€
+carlocastagnoli.it 13/02/2027 12,99€
+lateranensis.it 14/02/2027 12,99€
+joelledanna.it 16/02/2027 12,99€
+ariannaquelladelfilo.it 23/02/2027 12,99€
+borgodeicipressilaurora.it 11/04/2027 12,99€
+gotshirt.it 12/04/2027 12,99€
+marcoeilariasposi.com 27/04/2027 20,99€
+antiquafineart.it 03/05/2027 12,99€
+gmgdistribuzione.com 22/09/2027 20,99€
+danielejoellesposi.it 23/09/2027 12,99€
+premove.it 24/09/2027 12,99€
+fondazionesanpietroapostoloets.it 09/11/2027 12,99€
+bikersinasce.it 07/01/2027 12,99€
+impiantitservice.it 07/01/2027 12,99€
+ritaerobertosposi.it 23/01/2027 12,99€
+puntemezzepunte.it 24/01/2027 12,99€
+basiliroma.it 23/02/2027 12,99€
+youcaf.it 02/03/2027 12,99€
+creativostudiografico.it 16/03/2027 12,99€
+antoniosperanza.com 22/03/2027 20,99€
+centrorevisionibalzano.com 08/05/2027 20,99€
+luigimariafarina.it 03/07/2027 12,99€
+aurorasalvucci.it 22/07/2027 12,99€
+stampadtfroma.it 03/09/2027 12,99€
+andreaciardulli.com 14/10/2027 20,99€
+silviadonfrancesco.it 21/10/2027 12,99€
+casadioagenzia.it 23/10/2027 12,99€
+gmtdistribuzione.com 14/11/2027 20,99€`;
+function dominiCaricaElencoSiteGround(){
+  openDominiImport();
+  document.getElementById("dimp-testo").value = DOMINI_ELENCO_SITEGROUND;
+  dominiImportLeggi();
 }
 function openDominiImport(){
   dominiImportRows = [];
@@ -16940,7 +16999,7 @@ function dominiImportLeggi(){
   const rows = dominiParseTesto(document.getElementById("dimp-testo").value);
   dominiImportRows = rows.map(r=>{
     const ex = dominiState.find(d=>d.dominio===r.dominio);
-    return Object.assign(r, {esiste:!!ex, clientId: ex ? (ex.clientId||"") : dominiIndovinaCliente(r.dominio), sel:true});
+    return Object.assign(r, {esiste:!!ex, clientId: ex ? (ex.clientId||"") : (r.interno ? "" : dominiIndovinaCliente(r.dominio)), sel:true});
   });
   const box = document.getElementById("dimp-anteprima");
   if(!dominiImportRows.length){ box.innerHTML = `<p class="empty">Non ho trovato domini nel testo. Controlla di aver copiato anche i nomi dei domini.</p>`; return; }
@@ -16949,13 +17008,14 @@ function dominiImportLeggi(){
   box.innerHTML = `
     <p style="margin:0 0 8px;"><b>${dominiImportRows.length}</b> domini trovati${senzaData?` · <span style="color:var(--warn);">${senzaData} senza data (potrai inserirla dopo)</span>`:""}. Controlla i clienti collegati, poi importa. I domini già presenti vengono solo aggiornati nella scadenza.</p>
     <div class="table-wrap" style="max-height:340px;overflow:auto;"><table>
-      <thead><tr><th></th><th>Dominio</th><th>Scadenza</th><th>Costo</th><th>Cliente</th></tr></thead>
+      <thead><tr><th></th><th>Dominio</th><th>Scadenza</th><th>Costo</th><th>Cliente</th><th title="Dominio o servizio tuo: non si rifattura">Uso interno</th></tr></thead>
       <tbody>${dominiImportRows.map((r,i)=>`<tr>
         <td><input type="checkbox" ${r.sel?"checked":""} onchange="dominiImportRows[${i}].sel=this.checked" style="width:auto;"></td>
         <td><b>${escapeHtml(r.dominio)}</b>${r.esiste?`<div class="lr-sub">già presente</div>`:""}</td>
         <td><input type="date" value="${r.scadenza}" onchange="dominiImportRows[${i}].scadenza=this.value" style="min-width:140px;"></td>
         <td><input type="number" min="0" step="0.01" value="${r.costo}" onchange="dominiImportRows[${i}].costo=this.value===''?'':Number(this.value)" style="width:90px;"></td>
         <td><select onchange="dominiImportRows[${i}].clientId=this.value" style="min-width:180px;">${r.clientId?opts.replace(`value="${escapeHtml(r.clientId)}"`,`value="${escapeHtml(r.clientId)}" selected`):opts}</select></td>
+        <td style="text-align:center;"><input type="checkbox" ${r.interno?"checked":""} onchange="dominiImportRows[${i}].interno=this.checked" style="width:auto;"></td>
       </tr>`).join("")}</tbody>
     </table></div>
     <div class="form-actions" style="margin-top:14px;">
@@ -16976,10 +17036,11 @@ async function dominiImportConferma(){
       if(r.scadenza) u.scadenza = r.scadenza;
       if(r.costo!=="" && r.costo!==undefined) u.costo = r.costo;
       if(r.clientId) u.clientId = r.clientId;
+      u.interno = !!r.interno;
       return u;
     }
     nuovi++;
-    return {id:uid(), dominio:r.dominio, tipo:"Dominio", clientId:r.clientId||"", scadenza:r.scadenza||"", costo:r.costo, prezzo:"", rinnovoAuto:!!r.auto, note:"", dismesso:false, daFatturare:false, storico:[], creatoIl:now};
+    return {id:uid(), dominio:r.dominio, tipo:r.tipo||"Dominio", interno:!!r.interno, clientId:r.clientId||"", scadenza:r.scadenza||"", costo:r.costo, prezzo:"", rinnovoAuto:!!r.auto, note:"", dismesso:false, daFatturare:false, storico:[], creatoIl:now};
   });
   if(await saveDominiMany(list)){
     closeModal(); renderNav();
@@ -16997,7 +17058,7 @@ function dominiDashboardCard(){
   const riga = x => {
     const st = dominiStato(x);
     return `<div class="list-row" style="cursor:default;align-items:center;">
-      <div style="min-width:0;"><div class="lr-main">${escapeHtml(x.dominio)}</div><div class="lr-sub">${escapeHtml(x.clientId?clientName(x.clientId):"cliente non collegato")} · scadenza ${fmtDate(x.scadenza)}</div></div>
+      <div style="min-width:0;"><div class="lr-main">${escapeHtml(x.dominio)}</div><div class="lr-sub">${x.interno?"uso interno":escapeHtml(x.clientId?clientName(x.clientId):"cliente non collegato")} · scadenza ${fmtDate(x.scadenza)}</div></div>
       <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
         <span style="font-weight:700;color:${x.daFatturare&&st.k==="attivo"?"var(--accent)":st.color};font-size:13px;">${x.daFatturare&&st.k==="attivo"?`Da fatturare ${fmtMoney(x.daFatturareImporto ?? x.prezzo)}`:st.label}</span>
         ${dominiAzioniHTML(x, true)}
