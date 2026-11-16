@@ -4572,6 +4572,10 @@ function ricRigheIniziali(o){
   if(m.swf && m.brother) return [ricNuovaRiga("Altro","Ricamo","SWF"), ricNuovaRiga("Altro","Nomi","Brother")].map(r=>Object.assign(r,{base:false}));
   return [Object.assign(ricNuovaRiga("Altro","Ricamo", m.brother?"Brother":"SWF"), {base:false})];
 }
+/* Nella sezione Ricami entrano solo gli ordini con almeno una riga la cui categoria o sottocategoria è Ricamo */
+function ricOrdineHaRicamo(o){ return (o && o.righe||[]).some(r=>r && /ricam/i.test(String(r.categoria||"")+" "+String(r.sottocategoria||""))); }
+/* Un lavoro collegato a un ordine senza righe di ricamo resta salvato ma non si vede (riappare se l'ordine torna ad avere il ricamo) */
+function ricInSezione(l){ if(!l || !l.orderId) return true; const o = findItem("orders", l.orderId); return !o || ricOrdineHaRicamo(o); }
 function ricIsReparto(l){ const o = l.orderId ? findItem("orders", l.orderId) : null; return !!o && ricIsFelpeReparti(o); }
 function ricMacchineLavoro(l){
   const s = new Set((l.ricami||[]).map(r=>r.macchina==="Brother"?"Brother":"SWF"));
@@ -4584,7 +4588,7 @@ let ricSimFelpe = 20;
 async function ricamiAutoSync(){
   if(ricamiAutoBusy || !ricamiLoaded) return 0;
   const nuovi = state.orders
-    .filter(o=>!["Completato","Consegnato"].includes(o.stato) && (ricIsFelpeReparti(o) || orderHasRicamo(o)))
+    .filter(o=>!["Completato","Consegnato"].includes(o.stato) && ricOrdineHaRicamo(o))
     .filter(o=>!ricamiState.some(l=>l.orderId===o.id || l.id==="ord-"+o.id))
     .map(o=>({id:"ord-"+o.id, orderId:o.id, auto:true, titolo:"", numFelpe:"", operatore:WORKERS.includes(o.worker)?o.worker:"", stato:"Da fare",
       nomi:"", note:"", inizioPrevisto:"", creatoIl:o.createdAt||new Date().toISOString(), impostazioni:ricImpPredefinite(),
@@ -4654,7 +4658,7 @@ function ricAvviato(l){ return (l.ricami||[]).some(r=>(r.sessioni||[]).some(x=>x
 function ricPrimoAvvio(l){ const t=(l.ricami||[]).flatMap(r=>(r.sessioni||[]).map(x=>Date.parse(x.inizio))).filter(Boolean); return t.length?Math.min(...t):0; }
 /* Ordine della coda: prima i lavori già avviati, poi gli altri nell'ordine in cui sono arrivati */
 function ricCoda(){
-  const attivi = ricamiState.filter(l=>l.stato!=="Finito");
+  const attivi = ricamiState.filter(l=>l.stato!=="Finito" && ricInSezione(l));
   /* ordine automatico per i lavori senza numero scelto a mano */
   const base = attivi.filter(l=>!(ricNum(l.posizioneCoda)>0)).sort((a,b)=>{
     const sa=ricAvviato(a), sb=ricAvviato(b);
@@ -4798,7 +4802,7 @@ function ricamoTitolo(l){
   return "Lavoro ricamo";
 }
 function ricOrdiniSelezionabili(selId){
-  const list = state.orders.filter(o=>o.id===selId || (!["Completato","Consegnato"].includes(o.stato) && (orderHasRicamo(o) || ricIsFelpeReparti(o))));
+  const list = state.orders.filter(o=>o.id===selId || (!["Completato","Consegnato"].includes(o.stato) && ricOrdineHaRicamo(o)));
   list.sort((a,b)=>{
     const fa=ricIsFelpeReparti(a), fb=ricIsFelpeReparti(b);
     if(fa!==fb) return fa?-1:1;
@@ -4830,7 +4834,7 @@ function renderRicami(){
     </div>` : "";
   ricamiAutoSync().then(n=>{ if(n && currentView==="ricami" && !ricamiOpenId) renderRicami(); });
   ricPianoCorrente = ricPiano();
-  const all = ricamiState.slice().sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
+  const all = ricamiState.filter(ricInSezione).sort((a,b)=>String(b.creatoIl||"").localeCompare(String(a.creatoIl||"")));
   const posto = l => (ricPianoCorrente.map[l.id]||{}).posto || 9999;
   all.sort((a,b)=>posto(a)-posto(b));
   const list = all.filter(l=> !ricamiMacchina || ricMacchineLavoro(l).has(ricamiMacchina)).filter(l=> ricamiFilter==="tutti" ? true : ricamiFilter==="finiti" ? l.stato==="Finito" : l.stato!=="Finito");
