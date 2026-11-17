@@ -4181,6 +4181,7 @@ function openBozzaMail(orderId){
 
     <div class="form-actions">
       <button id="bozza-mail-send" class="btn btn-primary" onclick="sendBozzaMail('${o.id}')">INVIA BOZZA</button>
+      <button class="btn btn-outline" onclick="markWaStageSent('${o.id}','bozza')">SEGNA COME INVIATO</button>
       <button class="btn btn-outline" onclick="openJobCard('${o.id}')">Indietro</button>
     </div>
   `;
