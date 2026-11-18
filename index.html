@@ -9919,6 +9919,7 @@ function openClientHistory(clientId){
       <button class="btn btn-primary btn-sm" onclick="newOrderForClient('${c.id}')">+ NUOVO ORDINE</button>
       <button class="btn btn-outline btn-sm" onclick="newQuoteForClient('${c.id}')">+ PREVENTIVO</button>
       <button class="btn btn-outline btn-sm" onclick="openEditClient('${c.id}')">Modifica anagrafica</button>
+      <button class="btn btn-outline btn-sm" onclick="openMergeClientPicker('${c.id}')" title="Unisci con un cliente doppione">UNISCI DOPPIONE</button>
       ${waMePhone(c.telefono)?`<button class="btn btn-outline btn-sm" onclick="openClientWhatsapp('${c.id}')">WHATSAPP</button>`:""}
       ${c.dropboxFolderUrl
         ? `<button class="btn btn-outline btn-sm" onclick="openClientDropbox('${c.id}')">APRI DROPBOX</button><button class="btn btn-outline btn-sm" onclick="setClientDropboxFolder('${c.id}')">Modifica Dropbox</button>`
@@ -10074,6 +10075,209 @@ function deleteClient(id){
     if(pagamentiCollegati.length) saveState('payments');
     renderClienti();
   });
+}
+
+/* ============ UNISCI CLIENTI DUPLICATI ============
+   Si sceglie il cliente da tenere: ordini, preventivi, pagamenti, richieste/lead, appuntamenti,
+   note, domini e collegamenti Instagram del duplicato passano a lui; i dati mancanti vengono
+   completati con quelli del duplicato; poi il duplicato viene eliminato. */
+const MERGE_CLIENT_FIELDS = ["ragioneSociale","nomeCommerciale","refNome","refCognome","nome","cognome","telefono","settore","richiesta","carattere","indirizzo","citta","cap","provincia","partitaIva","codiceFiscale","pec","codiceSDI","dropboxFolderUrl"];
+const MERGE_FIELD_LABELS = {ragioneSociale:"Ragione sociale", nomeCommerciale:"Nome commerciale", refNome:"Nome referente", refCognome:"Cognome referente", nome:"Nome", cognome:"Cognome", telefono:"Telefono", email:"Email", settore:"Settore", richiesta:"Richiesta", carattere:"Carattere", indirizzo:"Indirizzo", citta:"Città", cap:"CAP", provincia:"Provincia", partitaIva:"Partita IVA", codiceFiscale:"Codice fiscale", pec:"PEC", codiceSDI:"Codice SDI", dropboxFolderUrl:"Cartella Dropbox"};
+let mergePickSearch = "";
+
+function mergeNormName(s){ return String(s||"").toLowerCase().replace(/\b(s\.?r\.?l\.?s?|s\.?p\.?a\.?|s\.?n\.?c\.?|s\.?a\.?s\.?|snc|sas|srl|spa|di|e|&)\b/g," ").replace(/[^a-z0-9àèéìòù]+/g," ").trim(); }
+function mergeNormPhone(s){ const d=String(s||"").replace(/\D/g,""); return d.replace(/^0039/,"").replace(/^39(?=3\d{8,9}$)/,""); }
+function mergeSimilarity(a,b){
+  if(!a||!b||a.id===b.id) return 0;
+  let score=0;
+  const ea=splitEmails(a.email).map(x=>x.toLowerCase()), eb=splitEmails(b.email).map(x=>x.toLowerCase());
+  if(ea.some(x=>eb.includes(x))) score+=3;
+  const pa=mergeNormPhone(a.telefono), pb=mergeNormPhone(b.telefono);
+  if(pa && pa.length>=6 && pa===pb) score+=3;
+  const piva=String(a.partitaIva||"").replace(/\s/g,"").toUpperCase();
+  if(piva && piva===String(b.partitaIva||"").replace(/\s/g,"").toUpperCase()) score+=3;
+  const na=mergeNormName(clientDisplayNameBase(a)), nb=mergeNormName(clientDisplayNameBase(b));
+  if(na && nb){
+    if(na===nb) score+=2;
+    else if(na.length>=4 && nb.length>=4 && (na.includes(nb)||nb.includes(na))) score+=1;
+  }
+  return score;
+}
+function mergeClientCounts(id){
+  const n = arr => (arr||[]).length;
+  return {
+    ordini: n((state.orders||[]).filter(o=>o.clientId===id)),
+    preventivi: n((state.quotes||[]).filter(q=>q.clientId===id)),
+    pagamenti: n((state.payments||[]).filter(p=>p.clientId===id)),
+    richieste: n((state.leads||[]).filter(l=>l.clientId===id)),
+    appuntamenti: n((state.appuntamenti||[]).filter(a=>a.clientId===id)),
+    note: n((state.noteComunicazioni||[]).filter(x=>x && x.extra && x.extra.clientId===id)),
+    domini: n((typeof dominiState!=="undefined" ? dominiState : []).filter(d=>d.clientId===id))
+  };
+}
+function mergeCountsLabel(c){
+  const parts=[];
+  if(c.ordini) parts.push(`${c.ordini} ${c.ordini===1?"ordine":"ordini"}`);
+  if(c.preventivi) parts.push(`${c.preventivi} ${c.preventivi===1?"preventivo":"preventivi"}`);
+  if(c.pagamenti) parts.push(`${c.pagamenti} ${c.pagamenti===1?"pagamento":"pagamenti"}`);
+  if(c.richieste) parts.push(`${c.richieste} ${c.richieste===1?"richiesta":"richieste"}`);
+  if(c.appuntamenti) parts.push(`${c.appuntamenti} ${c.appuntamenti===1?"appuntamento":"appuntamenti"}`);
+  if(c.note) parts.push(`${c.note} ${c.note===1?"nota":"note"}`);
+  if(c.domini) parts.push(`${c.domini} ${c.domini===1?"dominio":"domini"}`);
+  return parts.length ? parts.join(", ") : "nessun ordine o altro collegato";
+}
+function mergeClientSub(c){
+  return [c.numero?("#"+c.numero):"", c.telefono||"", splitEmails(c.email).join(", "), c.citta||""].filter(Boolean).map(escapeHtml).join(" · ");
+}
+
+function openMergeClientPicker(clientId, q){
+  const c=findItem("clients",clientId);
+  if(!c) return;
+  if(q!==undefined) mergePickSearch=q; else mergePickSearch="";
+  const others=(state.clients||[]).filter(x=>x.id!==clientId);
+  const simili=others.map(x=>({x,s:mergeSimilarity(c,x)})).filter(r=>r.s>=2).sort((a,b)=>b.s-a.s).slice(0,8).map(r=>r.x);
+  const qq=mergePickSearch.trim().toLowerCase();
+  const trovati=qq ? others.filter(x=>(clientDisplayName(x)+" "+(x.email||"")+" "+(x.telefono||"")+" "+(x.citta||"")+" "+(x.partitaIva||"")).toLowerCase().includes(qq)).slice(0,30) : [];
+  const row=x=>`<div class="list-row" onclick="openMergeClientConfirm('${clientId}','${x.id}')">
+      <div><div class="lr-main">${escapeHtml(clientDisplayName(x))}</div><div class="lr-sub">${mergeClientSub(x)||"—"}</div></div>
+      <div class="lr-sub" style="white-space:nowrap;">${escapeHtml(mergeCountsLabel(mergeClientCounts(x.id)))}</div>
+    </div>`;
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="openClientHistory('${clientId}')">×</button>
+    <h2>Unisci clienti</h2>
+    <p style="color:var(--muted);margin-top:0;">Scegli il cliente doppione di <strong>${escapeHtml(clientDisplayName(c))}</strong>. Nel passaggio successivo decidi quale scheda tenere.</p>
+    ${simili.length ? `<h3 style="margin-bottom:6px;">Possibili doppioni</h3>${simili.map(row).join("")}` : `<p class="helptext">Non ho trovato doppioni evidenti (stessa mail, telefono, P.IVA o nome): cercalo qui sotto.</p>`}
+    <h3 style="margin:16px 0 6px;">Cerca un altro cliente</h3>
+    <input id="mergePickQ" class="inline" placeholder="Nome, mail, telefono, città…" value="${escapeHtml(mergePickSearch)}" oninput="openMergeClientPicker('${clientId}',this.value)" style="width:100%;">
+    <div style="margin-top:8px;">${qq ? (trovati.length ? trovati.map(row).join("") : `<p class="empty">Nessun cliente trovato.</p>`) : ""}</div>
+    <div class="form-actions"><button class="btn btn-outline" onclick="openClientHistory('${clientId}')">Annulla</button></div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+  if(q!==undefined){ const i=document.getElementById("mergePickQ"); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } }
+}
+
+/* Campi vuoti della scheda tenuta da completare con il doppione. Il nome mostrato della scheda tenuta
+   non cambia: un campo che lo modificherebbe (es. nome commerciale) non viene copiato. */
+function mergeFillFields(keep, dup){
+  const nomeKeep=clientDisplayNameBase(keep), tmp=Object.assign({}, keep), out=[];
+  MERGE_CLIENT_FIELDS.forEach(f=>{
+    if(String(tmp[f]||"").trim() || !String(dup[f]||"").trim()) return;
+    const prova=Object.assign({}, tmp, {[f]:dup[f]});
+    if(nomeKeep && nomeKeep!=="—" && clientDisplayNameBase(prova)!==nomeKeep) return;
+    tmp[f]=dup[f]; out.push(f);
+  });
+  return out;
+}
+function mergePreviewFill(keep, dup){
+  const filled=mergeFillFields(keep, dup);
+  const ek=splitEmails(keep.email), lower=ek.map(x=>x.toLowerCase());
+  const nuove=splitEmails(dup.email).filter(x=>!lower.includes(x.toLowerCase()));
+  if(nuove.length) filled.push("email");
+  return filled;
+}
+
+function openMergeClientConfirm(keepId, dupId){
+  const keep=findItem("clients",keepId), dup=findItem("clients",dupId);
+  if(!keep||!dup) return;
+  const filled=mergePreviewFill(keep,dup);
+  const card=(c,label,color)=>`<div style="flex:1;min-width:220px;border:1px solid var(--border);border-radius:12px;padding:12px 14px;${color?`border-color:${color};`:""}">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.04em;color:${color||"var(--muted)"};">${label}</div>
+      <div style="font-weight:700;margin:4px 0;">${escapeHtml(clientDisplayName(c))}</div>
+      <div class="lr-sub">${mergeClientSub(c)||"—"}</div>
+      <div class="lr-sub" style="margin-top:4px;">${escapeHtml(mergeCountsLabel(mergeClientCounts(c.id)))}</div>
+    </div>`;
+  document.getElementById("modalBody").innerHTML = `
+    <button class="close-x" onclick="openClientHistory('${keepId}')">×</button>
+    <h2>Unisci clienti</h2>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin:10px 0;">
+      ${card(keep,"DA TENERE","#1F8A4C")}
+      ${card(dup,"DA ELIMINARE DOPO L'UNIONE","var(--danger)")}
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="openMergeClientConfirm('${dupId}','${keepId}')">⇄ Tieni l'altro</button>
+    <div style="margin:14px 0;padding:10px 14px;border-radius:12px;background:#F4F7FA;font-size:13.5px;line-height:1.5;">
+      Tutto quello che è collegato a <strong>${escapeHtml(clientDisplayName(dup))}</strong> passa a <strong>${escapeHtml(clientDisplayName(keep))}</strong>.<br>
+      ${filled.length ? `Dati che verranno aggiunti alla scheda tenuta: <strong>${filled.map(f=>escapeHtml(MERGE_FIELD_LABELS[f]||f)).join(", ")}</strong>.` : "La scheda tenuta ha già tutti i dati: non viene aggiunto niente."}<br>
+      Poi la scheda <strong>${escapeHtml(clientDisplayName(dup))}</strong> viene eliminata. L'operazione non si può annullare.
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="mergeGoBtn" onclick="doMergeClients('${keepId}','${dupId}')">Sì, unisci</button>
+      <button class="btn btn-outline" onclick="openMergeClientPicker('${keepId}')">Indietro</button>
+    </div>
+  `;
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function doMergeClients(keepId, dupId){
+  const keep=findItem("clients",keepId), dup=findItem("clients",dupId);
+  if(!keep||!dup||keepId===dupId) return;
+  const btn=document.getElementById("mergeGoBtn");
+  if(btn){ btn.disabled=true; btn.textContent="Unione in corso…"; }
+  const fail=msg=>{ showToast(msg); if(btn){ btn.disabled=false; btn.textContent="Sì, unisci"; } };
+
+  /* 1. Completa i dati mancanti della scheda da tenere */
+  const merged=Object.assign({}, keep);
+  mergeFillFields(keep, dup).forEach(f=>{ merged[f]=dup[f]; });
+  const ek=splitEmails(keep.email), lower=ek.map(x=>x.toLowerCase());
+  const emails=ek.concat(splitEmails(dup.email).filter(x=>!lower.includes(x.toLowerCase())));
+  merged.email=emails.join(", ");
+  const savedKeep=await upsertOneReturning("clients", merged);
+  if(!savedKeep) return fail("Non sono riuscito a salvare la scheda: unione annullata");
+  const ki=state.clients.findIndex(x=>x.id===keepId);
+  if(ki>=0) state.clients[ki]=savedKeep;
+
+  /* 2. Sposta tutto quello che è collegato al doppione */
+  activeDbWrites++;
+  try{
+    for(const name of ["orders","quotes","payments","leads","appuntamenti"]){
+      const {error}=await sb.from(TABLES[name]).update({client_id:keepId}).eq("client_id",dupId);
+      if(error){ console.error("Errore unione clienti", name, error); return fail("Errore nello spostamento ("+name+"): il doppione NON è stato eliminato, riprova"); }
+      (state[name]||[]).forEach(x=>{ if(x.clientId===dupId){ x.clientId=keepId; if(!syncSnapshots[name]) syncSnapshots[name]=new Map(); syncSnapshots[name].set(x.id,rowFingerprint(name,x)); } });
+    }
+  } finally { activeDbWrites=Math.max(0,activeDbWrites-1); }
+
+  /* Note e appunti (il cliente è salvato dentro "extra") */
+  for(const n of (state.noteComunicazioni||[])){
+    if(n && n.extra && n.extra.clientId===dupId){
+      n.extra=Object.assign({}, n.extra, {clientId:keepId});
+      const ok=await upsertOne("noteComunicazioni", n);
+      if(!ok) return fail("Errore nello spostamento delle note: il doppione NON è stato eliminato, riprova");
+    }
+  }
+
+  /* Domini e rinnovi */
+  try{
+    if(typeof dominiState!=="undefined"){
+      const mine=dominiState.filter(d=>d.clientId===dupId);
+      mine.forEach(d=>{ d.clientId=keepId; });
+      if(DOMINI_DB!==false){
+        const {error}=await sb.from(DOMINI_TABLE).update({client_id:keepId}).eq("client_id",dupId);
+        if(error) console.warn("Domini non aggiornati", error);
+        if(mine.length){ const {error:e2}=await sb.from(DOMINI_TABLE).upsert(mine.map(dominiToRow)); if(e2) console.warn("Domini non aggiornati", e2); }
+      } else if(mine.length){
+        const loc=dominiLocalRead().map(d=>d.clientId===dupId?Object.assign({},d,{clientId:keepId}):d);
+        dominiLocalWrite(loc);
+      }
+    }
+  }catch(e){ console.warn("Domini non aggiornati", e); }
+
+  /* Collegamenti Instagram salvati su questo dispositivo */
+  try{
+    const l=igLinks(); let ch=false;
+    Object.keys(l).forEach(k=>{ if(l[k]===dupId){ l[k]=keepId; ch=true; } });
+    if(ch) localStorage.setItem("igClientLinks",JSON.stringify(l));
+  }catch(e){}
+
+  /* 3. Elimina il doppione */
+  activeDbWrites++;
+  try{
+    const {error}=await sb.from(TABLES.clients).delete().eq("id",dupId);
+    if(error){ console.error("Errore eliminazione doppione", error); return fail("Dati spostati, ma il doppione non è stato eliminato: eliminalo a mano"); }
+    syncSnapshots.clients?.delete(dupId);
+  } finally { activeDbWrites=Math.max(0,activeDbWrites-1); }
+  state.clients=state.clients.filter(c=>c.id!==dupId);
+
+  showToast("Clienti uniti in "+clientDisplayName(savedKeep));
+  openClientHistory(keepId);
 }
 
 /* ============ IMPORT CSV CLIENTI ============ */
@@ -18786,7 +18990,7 @@ if("serviceWorker" in navigator){
 
 window.addEventListener("error",e=>{ try{ showToast("Errore: "+(e.message||"sconosciuto")); }catch(_){} });
 /* Etichetta versione (in basso a sinistra, piccola) per capire quale versione è aperta */
-(function(){ const d=document.createElement("div"); d.textContent="v. 14/11 18:10"; d.style.cssText="position:fixed;left:8px;bottom:4px;font:600 10px Inter,system-ui,sans-serif;color:#8a94a3;opacity:.75;z-index:50;pointer-events:none;"; window.addEventListener("load",()=>document.body.appendChild(d)); })();
+(function(){ const d=document.createElement("div"); d.textContent="v. 18/11 11:00"; d.style.cssText="position:fixed;left:8px;bottom:4px;font:600 10px Inter,system-ui,sans-serif;color:#8a94a3;opacity:.75;z-index:50;pointer-events:none;"; window.addEventListener("load",()=>document.body.appendChild(d)); })();
 
 /* Avviso "nuova versione disponibile": compare solo se la versione online cambia davvero (2 controlli di fila uguali) */
 (function(){
