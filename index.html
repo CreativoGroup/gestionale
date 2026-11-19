@@ -6780,11 +6780,12 @@ async function finishLinkLeadToClient(id, inserisciOrdine=false){
 
 async function expireStaleWaitingLeads(){
   const now=Date.now();
-  const sevenDays=7*24*60*60*1000;
+  // Un lead in attesa passa in archivio (Perso) solo dopo almeno 3 settimane senza novità
+  const threeWeeks=21*24*60*60*1000;
   const stale=(state.leads||[]).filter(l=>{
     if(l.stato!=="In attesa di conferma") return false;
     const ts=new Date(l.aggiornatoIl||l.creatoIl||0).getTime();
-    return ts && (now-ts)>=sevenDays;
+    return ts && (now-ts)>=threeWeeks;
   });
 
   if(!stale.length) return;
