@@ -4587,15 +4587,24 @@ let ricamiMacchina = "";
 let ricamiAutoBusy = false;
 let ricPianoCorrente = null;
 let ricSimFelpe = 20;
+/* Il lavoro di ricamo è chiuso se è "Finito" oppure se l'ordine collegato è già completato o consegnato */
+function ricOrdineChiuso(l){ const o = l && l.orderId ? findItem("orders", l.orderId) : null; return !!(o && ["Completato","Consegnato"].includes(o.stato)); }
 async function ricamiAutoSync(){
   if(ricamiAutoBusy || !ricamiLoaded) return 0;
+  /* gli ordini completati o consegnati chiudono da soli il loro lavoro di ricamo (così escono dalla coda) */
+  const daChiudere = ricamiState.filter(l=>l.stato!=="Finito" && ricOrdineChiuso(l));
+  if(daChiudere.length){
+    ricamiAutoBusy = true;
+    try{ for(const l of daChiudere){ l.stato = "Finito"; await saveRicamo(l); } }
+    finally{ ricamiAutoBusy = false; }
+  }
   const nuovi = state.orders
     .filter(o=>!["Completato","Consegnato"].includes(o.stato) && ricOrdineHaRicamo(o))
     .filter(o=>!ricamiState.some(l=>l.orderId===o.id || l.id==="ord-"+o.id))
     .map(o=>({id:"ord-"+o.id, orderId:o.id, auto:true, titolo:"", numFelpe:"", operatore:WORKERS.includes(o.worker)?o.worker:"", stato:"Da fare",
       nomi:"", note:"", inizioPrevisto:"", creatoIl:o.createdAt||new Date().toISOString(), impostazioni:ricImpPredefinite(),
       ricami:ricRigheIniziali(o)}));
-  if(!nuovi.length) return 0;
+  if(!nuovi.length) return daChiudere.length;
   ricamiAutoBusy = true;
   try{
     if(RICAMI_DB){
@@ -4606,7 +4615,7 @@ async function ricamiAutoSync(){
     } else {
       ricamiState.push(...nuovi); ricamiLocalWrite(ricamiState);
     }
-    return nuovi.length;
+    return nuovi.length + daChiudere.length;
   } finally { ricamiAutoBusy = false; }
 }
 function copyRicamiSql(){
@@ -4700,7 +4709,7 @@ function ricAvviato(l){ return (l.ricami||[]).some(r=>(r.sessioni||[]).some(x=>x
 function ricPrimoAvvio(l){ const t=(l.ricami||[]).flatMap(r=>(r.sessioni||[]).map(x=>Date.parse(x.inizio))).filter(Boolean); return t.length?Math.min(...t):0; }
 /* Ordine della coda: prima i lavori già avviati, poi gli altri nell'ordine in cui sono arrivati */
 function ricCoda(){
-  const attivi = ricamiState.filter(l=>l.stato!=="Finito" && ricInSezione(l));
+  const attivi = ricamiState.filter(l=>l.stato!=="Finito" && !ricOrdineChiuso(l) && ricInSezione(l));
   /* ordine automatico per i lavori senza numero scelto a mano */
   const base = attivi.filter(l=>!(ricNum(l.posizioneCoda)>0)).sort((a,b)=>{
     const sa=ricAvviato(a), sb=ricAvviato(b);
