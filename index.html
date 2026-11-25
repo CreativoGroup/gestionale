@@ -5246,6 +5246,7 @@ const NAV = [
   {id:"flusso", label:"Flusso di lavoro", icon:"⇶", subtitle:"Stato dei lavori per fase", group:"Operativa"},
   {id:"ricami", label:"Ricami", icon:"✣", subtitle:"Felpe per reparti e altri ricami: coda, tempo previsto e tempo reale", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
+  {id:"lavoriCompletatiMenu", label:"Lavori completati", icon:"✓", subtitle:"Da consegnare, completati recenti e crediti da incassare", group:"Operativa", goto:"lavoriCompletati"},
   {id:"lavoriCompletati", label:"LAVORI COMPLETATI E CREDITI APERTI", icon:"✓", subtitle:"Da consegnare, completati recenti e crediti da incassare", group:"Dashboard"},
 
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Archivio"},
@@ -5336,7 +5337,7 @@ function renderNav(){
     return `
       <div class="nav-group nav-group-${group.toLowerCase().replace(/\s+/g,"-")}">
         ${group==="Dashboard" ? "" : `<div class="nav-group-title">${group}</div>`}
-        ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}${navBadgeHTML(n)}${n.id==="ordini"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo ordine" onclick="event.stopPropagation();navNuovoOrdine()">+ NUOVO</span>`:""}${n.id==="note"?`<span class="nav-mini-btn" role="button" title="Scrivi un appunto veloce" onclick="event.stopPropagation();navNuovoAppunto()">+ APPUNTI</span>`:""}${n.id==="leads"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo preventivo" onclick="event.stopPropagation();openNuovoPreventivo()">+ NUOVO</span>`:""}</button>`).join("")}
+        ${groupItems.map(n=>`<button class="${(n.id===currentView||n.goto===currentView)?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span>${typeof n.label==="function"?n.label():n.label}${navBadgeHTML(n)}${n.id==="ordini"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo ordine" onclick="event.stopPropagation();navNuovoOrdine()">+ NUOVO</span>`:""}${n.id==="note"?`<span class="nav-mini-btn" role="button" title="Scrivi un appunto veloce" onclick="event.stopPropagation();navNuovoAppunto()">+ APPUNTI</span>`:""}${n.id==="leads"?`<span class="nav-mini-btn" role="button" title="Crea un nuovo preventivo" onclick="event.stopPropagation();openNuovoPreventivo()">+ NUOVO</span>`:""}</button>`).join("")}
       </div>
     `;
   }).join("");
@@ -5346,7 +5347,7 @@ function renderNav(){
     if(!groupItems.length) return "";
     return `
       ${group==="Dashboard" ? "" : `<div class="mobile-nav-group-title mobile-nav-group-${group.toLowerCase().replace(/\s+/g,"-")}">${group}</div>`}
-      ${groupItems.map(n=>`<button class="${n.id===currentView?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span><span>${typeof n.label==="function"?n.label():n.label}</span>${navBadgeHTML(n)}</button>`).join("")}
+      ${groupItems.map(n=>`<button class="${(n.id===currentView||n.goto===currentView)?'active':''}" onclick="goTo('${n.id}')"><span class="icon">${n.icon}</span><span>${typeof n.label==="function"?n.label():n.label}</span>${navBadgeHTML(n)}</button>`).join("")}
     `;
   }).join("");
 
@@ -5600,7 +5601,8 @@ function renderViewHeading(){
 }
 function goTo(id){
   if(id==="leadOrdine") id="ordini";
-  const navItem = NAV.find(n=>n.id===id);
+  let navItem = NAV.find(n=>n.id===id);
+  if(navItem && navItem.goto){ id = navItem.goto; navItem = NAV.find(n=>n.id===id); }
   if(navItem && navItem.action==="waMode"){ toggleWaOpenMode(); return; }
   if(navItem && navItem.externalUrl){ openWaWindow(""); return; }
   currentView = id;
