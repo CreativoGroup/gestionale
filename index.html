@@ -5508,7 +5508,7 @@ td.n{color:#6B7280;width:24px;}
 <table><thead><tr><th>#</th><th>Lavorazione</th><th class="r">Q.tà</th><th class="r">Prezzo unit.</th><th class="r">Totale</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="grid" style="align-items:start;">
   <div>
-    <div class="box"><h3>Descrizione del lavoro</h3><div class="note">${o.descrizioneHtml?rtSanitize(o.descrizioneHtml):e(o.descrizione||"—")}</div></div>
+    <div class="box"><h3>Descrizione del lavoro</h3><div class="note">${Q?"":latiPrintHtml(o)}${o.descrizioneHtml?rtSanitize(o.descrizioneHtml):e(o.descrizione||"—")}</div></div>
     ${pagamenti.length?`<div class="box pag"><h3>Pagamenti registrati</h3>${pagamenti.map(x=>`<div class="kv"><span>${fmtDate(x.data)}</span><b>${fmtMoney(x.importo)} · ${e(x.tipo||"")}${x.metodo?" · "+e(x.metodo):""}</b></div>`).join("")}</div>`:""}
   </div>
   <div class="tots">
@@ -11100,7 +11100,10 @@ function addRiga(collection, id){
 }
 function removeRiga(collection, id, rigaId){
   const item = findItem(collection, id);
+  const tolta = item.righe.find(r=>r.id===rigaId);
   item.righe = item.righe.filter(r=>r.id!==rigaId);
+  /* le caselle Lato cuore / destro / retro restano: passano alla prima riga rimasta */
+  if(tolta && tolta.latiReparto && item.righe.length && !item.righe.some(r=>r&&r.latiReparto)) item.righe[0].latiReparto = tolta.latiReparto;
   if(collection==='orders') recalcFasi(item);
   saveState(collection);
   if(collection==='orders') openJobCard(id); else openQuoteDetail(id);
@@ -11955,6 +11958,33 @@ function filoRemove(orderId,i){
   const o=findItem("orders",orderId); if(!o) return;
   const list=filoList(o); list.splice(i,1); if(!list.length) list.push("");
   filoSave(o,list); filoRefresh(o);
+}
+/* ===== Felpe per reparti: caselle LATO CUORE / LATO DESTRO / RETRO SCHIENA sopra la descrizione (non obbligatorie).
+   Si salvano nella prima riga dell'ordine (campo latiReparto), così non serve una nuova colonna nel database. ===== */
+const LATI_REPARTO=[["cuore","Lato cuore"],["destro","Lato destro"],["retro","Retro schiena"]];
+function latiRiga(o){ const rr=(o&&o.righe)||[]; return rr.find(r=>r&&r.latiReparto) || rr.find(r=>r) || null; }
+function latiGet(o){ const r=latiRiga(o); return (r&&r.latiReparto)||{}; }
+function latiHasValue(o){ const l=latiGet(o); return LATI_REPARTO.some(([k])=>String(l[k]||"").trim()); }
+function latiSet(orderId,key,val){
+  const o=findItem("orders",orderId); if(!o) return;
+  const r=latiRiga(o); if(!r) return;
+  const l=Object.assign({}, r.latiReparto||{}); l[key]=String(val||"");
+  (o.righe||[]).forEach(x=>{ if(x&&x!==r) delete x.latiReparto; });
+  r.latiReparto=l; saveState("orders");
+}
+function latiRepartoHtml(o){
+  if(!ricIsFelpeReparti(o)) return "";
+  if(!(o.righe||[]).length) return `<div class="helptext" style="margin-bottom:8px;">Aggiungi una lavorazione per compilare Lato cuore, Lato destro e Retro schiena.</div>`;
+  const l=latiGet(o);
+  return `<div class="lati-reparto" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:10px;">
+    ${LATI_REPARTO.map(([k,lab])=>`<div class="field" style="margin:0;"><label style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;">${lab}</label>
+      <input type="text" value="${escapeHtml(l[k]||"")}" placeholder="${lab}…" autocomplete="off" oninput="latiSet('${o.id}','${k}',this.value)"></div>`).join("")}
+  </div>`;
+}
+function latiPrintHtml(o){
+  if(!o || !latiHasValue(o)) return "";
+  const l=latiGet(o);
+  return LATI_REPARTO.filter(([k])=>String(l[k]||"").trim()).map(([k,lab])=>`<div><b>${escapeHtml(lab.toUpperCase())}:</b> ${escapeHtml(l[k])}</div>`).join("")+`<div style="height:8px"></div>`;
 }
 function rtEditorHtml(coll,item){
   const id=`rt-${coll}-${item.id}`;
@@ -14292,6 +14322,7 @@ function openJobCard(orderId){
         ${orderLinesWithWarehouse(o)}
         <div class="job-v2-desc-block">
           <label class="job-v2-desc-label">Descrizione del lavoro</label>
+          ${latiRepartoHtml(o)}
           ${rtEditorHtml('orders',o)}
         </div>
         <div class="job-v2-desc-block">
