@@ -4810,10 +4810,15 @@ function ricPezzi(l, r){
 }
 /* Punti: quelli scritti, altrimenti i punti di partenza per cuore, destra e retro */
 const RICAMI_BASE_DESC = ["Logo ospedale","Nomi","Scritta reparto"];
+/* Vale anche per le altre lavorazioni: se i punti non sono scritti si usa una stima (Manica/Altro: come il cuore
+   sulla SWF, come un nome sulla Brother), così ogni lavoro ha un tempo previsto e può entrare in coda */
 function ricPuntiDefault(l, r){
-  if(!(r.base || RICAMI_BASE_DESC.includes(String(r.descrizione||"").trim()))) return 0;
   const imp = ricImp(l);
-  return r.posizione==="Cuore" ? ricNum(imp.puntiCuore,10000) : r.posizione==="Destra" ? ricNum(imp.puntiDestra,8000) : r.posizione==="Retro" ? ricNum(imp.puntiRetro,20000) : 0;
+  const cuore = ricNum(imp.puntiCuore,10000), destra = ricNum(imp.puntiDestra,8000), retro = ricNum(imp.puntiRetro,20000);
+  if(r.posizione==="Cuore") return cuore;
+  if(r.posizione==="Destra") return destra;
+  if(r.posizione==="Retro") return retro;
+  return r.macchina==="Brother" ? destra : cuore;
 }
 function ricPunti(l, r){ const p=ricNum(r.punti); return p>0 ? {punti:p, stima:false} : {punti:ricPuntiDefault(l, r), stima:true}; }
 function ricCalcRiga(l, r){
@@ -4982,7 +4987,7 @@ function ricCardHtml(l){
       <div><div style="color:var(--muted);">Reale</div><b data-ric-reale="${l.id}">${fmtRicMin(t.reale)}</b></div>
       <div><div style="color:var(--muted);">Differenza</div>${ricScostHtml(t.prevFatti, t.realeFatti)}</div>
     </div>
-    ${(()=>{ const pl = l.stato!=="Finito" && ricPianoCorrente ? ricPianoCorrente.map[l.id] : null; if(!pl || !(t.previsto>0)) return "";
+    ${(()=>{ const pl = l.stato!=="Finito" && ricPianoCorrente ? ricPianoCorrente.map[l.id] : null; if(!pl) return "";
       return `<div style="margin-top:10px;padding:8px 10px;border-radius:10px;background:#EEF6F8;font-size:12.5px;line-height:1.5;">
         <div>N. ${ricPostoInput(l, pl.posto)} in coda${ricAvviato(l)?" · avviato":` · si parte ${fmtRicData(new Date(pl.inizio))}`}</div>
         <div>Fine prevista: <b style="font-size:13.5px;">${pl.fine?fmtRicData(pl.fine):"—"}</b></div>
