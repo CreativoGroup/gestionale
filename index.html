@@ -4981,7 +4981,10 @@ function ricCardHtml(l){
       <strong style="font-size:15px;">${escapeHtml(ricamoTitolo(l))}</strong>
       <span class="badge" style="color:${statoCol};border-color:${statoCol};white-space:nowrap;">${running.length?"● In macchina":escapeHtml(l.stato||"Da fare")}</span>
     </div>
-    <div style="font-size:12.5px;color:var(--muted);margin:4px 0 10px;">${ricFelpe(l)} ${ricIsReparto(l)?"felpe":"pezzi"} · ${t.tot} ricam${t.tot===1?"o":"i"}${l.operatore?` · ${escapeHtml(l.operatore)}`:""}${o&&o.dataConsegna?` · consegna ${fmtDate(o.dataConsegna)}`:""}</div>
+    <div style="display:flex;align-items:center;gap:10px;margin:8px 0 10px;flex-wrap:wrap;">
+      <span style="display:inline-flex;align-items:baseline;gap:5px;padding:4px 12px;border-radius:10px;background:${reparto?"var(--teal)":"#6B4FD8"};color:#fff;line-height:1.1;"><b style="font-size:24px;font-weight:800;">${ricFelpe(l)}</b><span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;">${reparto?"felpe":"pezzi"}</span></span>
+      <span style="font-size:12.5px;color:var(--muted);">${t.tot} ricam${t.tot===1?"o":"i"}${l.operatore?` · ${escapeHtml(l.operatore)}`:""}${o&&o.dataConsegna?` · consegna ${fmtDate(o.dataConsegna)}`:""}</span>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12.5px;">
       <div><div style="color:var(--muted);">Previsto</div><b>${fmtRicMin(t.previsto)}</b></div>
       <div><div style="color:var(--muted);">Reale</div><b data-ric-reale="${l.id}">${fmtRicMin(t.reale)}</b></div>
