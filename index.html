@@ -5545,6 +5545,106 @@ function printJobCard(orderId){
   const o=findItem('orders',orderId); if(!o) return;
   printHtmlDoc(jobCardPrintHtml(o));
 }
+/* ============ RESOCONTO CLIENTE (ordini da incassare) ============ */
+function clientStatementData(clientId){
+  const c=state.clients.find(x=>x.id===clientId);
+  const ordini=state.orders.filter(o=>o.clientId===clientId && !orderFuoriConti(o) && orderSaldo(o)>0.005)
+    .map(o=>{
+      const data=o.createdAt?String(o.createdAt).slice(0,10):(o.dataConsegna||"");
+      const pagamenti=state.payments.filter(p=>p.orderId===o.id).sort((a,b)=>String(a.data||"").localeCompare(String(b.data||"")));
+      const voci=(o.righe||[]).map(r=>{const t=[catLabel(r.categoria),r.sottocategoria,r.prodotto].filter(Boolean).join(" — "); const q=Number(r.quantita)||0; return t?(q>1?`${t} (x${q.toLocaleString("it-IT")})`:t):"";}).filter(Boolean);
+      return {o, data, voci, pagamenti, totale:orderTotale(o), incassato:orderIncassato(o), saldo:orderSaldo(o)};
+    })
+    .sort((a,b)=>String(a.data||"").localeCompare(String(b.data||"")));
+  const tot=ordini.reduce((t,x)=>t+x.totale,0), inc=ordini.reduce((t,x)=>t+x.incassato,0), res=ordini.reduce((t,x)=>t+x.saldo,0);
+  return {c, ordini, tot, inc, res};
+}
+function printClientStatement(clientId){
+  const {c, ordini, tot, inc, res}=clientStatementData(clientId);
+  if(!c) return;
+  if(!ordini.length){ showToast("Non ci sono ordini da incassare per questo cliente"); return; }
+  const e=escapeHtml, oggi=new Date().toLocaleDateString("it-IT");
+  const nome=clientDisplayName(c);
+  const indirizzo=[c.indirizzo,[c.cap,c.citta].filter(Boolean).join(" "),c.provincia?`(${c.provincia})`:""].filter(Boolean).join(" · ");
+  const kv=(l,v)=>v?`<div class="kv"><span>${l}</span><b>${e(v)}</b></div>`:"";
+  const P=QUOTE_PAY_DEFAULT, CO=QUOTE_COMPANY;
+  const rows=ordini.map(x=>`<tr>
+    <td>${x.data?fmtDate(x.data):"—"}${x.o.numero?`<div class="d">n. ${e(x.o.numero)}</div>`:""}</td>
+    <td><b>${e(orderCategorieLabel(x.o))}</b>${x.voci.length?`<div class="d">${x.voci.map(e).join("<br>")}</div>`:""}
+      ${x.pagamenti.length?`<div class="pg">${x.pagamenti.map(p=>`Pagato il ${p.data?fmtDate(p.data):"—"}: ${fmtMoney(p.importo)}${p.tipo?" · "+e(p.tipo):""}${p.metodo?" · "+e(p.metodo):""}`).join("<br>")}</div>`:""}</td>
+    <td class="r">${fmtMoney(x.totale)}</td>
+    <td class="r">${x.incassato>0.005?"− "+fmtMoney(x.incassato):"—"}</td>
+    <td class="r"><b>${fmtMoney(x.saldo)}</b></td></tr>`).join("");
+  const html=`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Resoconto ${e(nome)} ${oggi.replace(/\//g,"-")}</title>
+<style>
+@page{size:A4;margin:12mm;}
+*{box-sizing:border-box;}
+body{font-family:Helvetica,Arial,sans-serif;color:#1c2430;font-size:11.5px;line-height:1.4;margin:0;}
+.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #14213D;padding-bottom:10px;margin-bottom:12px;}
+.top img{height:46px;}
+.ttl{text-align:right;}.ttl h1{margin:0;font-size:20px;color:#14213D;}.ttl div{color:#555;margin-top:2px;}
+.box{border:1px solid #cfd5da;border-radius:6px;padding:9px 11px;margin-bottom:12px;page-break-inside:avoid;}
+.box h3{margin:0 0 6px;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#6B7280;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.kv{display:flex;gap:8px;padding:1.5px 0;}.kv span{flex:0 0 92px;color:#6B7280;}.kv b{font-weight:600;}
+.cli-name{font-size:15px;font-weight:700;margin-bottom:4px;}
+table{width:100%;border-collapse:collapse;margin-bottom:10px;}
+th{background:#14213D;color:#fff;text-align:left;font-size:10.5px;padding:6px 7px;}
+th.r,td.r{text-align:right;white-space:nowrap;}
+td{border-bottom:1px solid #dde2e5;padding:7px;vertical-align:top;}
+tr{page-break-inside:avoid;}
+.d{color:#555;font-size:10.5px;margin-top:2px;}
+.pg{color:#256a41;font-size:10.5px;margin-top:4px;}
+.tots{margin-left:auto;width:300px;page-break-inside:avoid;}
+.t{display:flex;justify-content:space-between;padding:3px 0;}
+.t.saldo{background:#fdeceb;border-radius:4px;padding:7px 9px;margin-top:6px;font-size:15px;color:#a02a1f;border-top:2px solid #14213D;}
+.foot{margin-top:14px;color:#888;font-size:9.5px;text-align:center;}
+</style></head><body>
+<div class="top">
+  <img src="${QUOTE_LOGO_DATAURL}" alt="Creativò">
+  <div class="ttl"><h1>Resoconto ordini da saldare</h1><div>Aggiornato al ${oggi}</div></div>
+</div>
+<div class="grid">
+  <div class="box"><h3>Cliente</h3>
+    <div class="cli-name">${e(nome)}</div>
+    ${c.tipo==="Business"&&c.ragioneSociale&&c.ragioneSociale!==nome?kv("Ragione sociale",c.ragioneSociale):""}
+    ${kv("Indirizzo",indirizzo)}${kv("Telefono",c.telefono)}${kv("Email",c.email)}${kv("P. IVA",c.partitaIva)}${kv("Cod. fiscale",c.codiceFiscale)}
+  </div>
+  <div class="box"><h3>Come pagare</h3>
+    ${kv("Intestatario",CO.ragione)}${kv("Banca",P.banca)}${kv("IBAN",P.iban)}${kv("BIC",P.bic)}
+  </div>
+</div>
+<table><thead><tr><th>Data</th><th>Ordine e pagamenti ricevuti</th><th class="r">Importo</th><th class="r">Già pagato</th><th class="r">Da pagare</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="tots">
+  <div class="t"><span>Totale ordini</span><b>${fmtMoney(tot)}</b></div>
+  <div class="t"><span>Già pagato</span><b>${inc>0.005?"− "+fmtMoney(inc):fmtMoney(0)}</b></div>
+  <div class="t saldo"><span>TOTALE DA PAGARE</span><b>${fmtMoney(res)}</b></div>
+</div>
+<div class="foot">${e(CO.ragione)} · ${e(CO.indirizzo)} · Tel. ${e(CO.telefono)} · ${e(CO.email)} · P.IVA ${e(CO.piva)}</div>
+</body></html>`;
+  printHtmlDoc(html);
+  showToast("Nella finestra di stampa scegli “Salva come PDF” per mandarlo al cliente");
+}
+function clientStatementText(clientId){
+  const {c, ordini, res}=clientStatementData(clientId);
+  if(!c || !ordini.length) return "";
+  const righe=ordini.map(x=>{
+    let t=`• ${x.data?fmtDate(x.data):"—"} – ${orderCategorieLabel(x.o)}: ${fmtMoney(x.totale)}`;
+    x.pagamenti.forEach(p=>{ t+=`\n   pagato il ${p.data?fmtDate(p.data):"—"}: ${fmtMoney(p.importo)}`; });
+    if(x.incassato>0.005) t+=`\n   resta da pagare: ${fmtMoney(x.saldo)}`;
+    return t;
+  }).join("\n");
+  const nome=c.tipo==="Business"?"":(" "+String(c.nome||"").trim());
+  return `Ciao${nome.trim()?nome:""}, ti mandiamo il riepilogo degli ordini ancora da saldare:\n\n${righe}\n\nTOTALE DA PAGARE: ${fmtMoney(res)}\n\nPer il bonifico: ${QUOTE_COMPANY.ragione}\nIBAN ${QUOTE_PAY_DEFAULT.iban}\n\nGrazie!\nCreativò Group`;
+}
+function sendClientStatementWhatsapp(clientId){
+  const c=state.clients.find(x=>x.id===clientId); if(!c) return;
+  const testo=clientStatementText(clientId);
+  if(!testo){ showToast("Non ci sono ordini da incassare per questo cliente"); return; }
+  const url=waMeUrl(c.telefono,testo);
+  if(!url){ showToast("Il cliente non ha un numero WhatsApp valido"); return; }
+  openWaWindow(url);
+}
 function printHtmlDoc(html){
   let fr=document.getElementById("printFrame");
   if(fr) fr.remove();
@@ -9949,7 +10049,7 @@ function openClientHistory(clientId){
         ? `<button class="btn btn-outline btn-sm" onclick="openClientDropbox('${c.id}')">APRI DROPBOX</button><button class="btn btn-outline btn-sm" onclick="setClientDropboxFolder('${c.id}')">Modifica Dropbox</button>`
         : `<button class="btn btn-outline btn-sm" onclick="setClientDropboxFolder('${c.id}')">COLLEGA DROPBOX</button>`}
     </div>
-    ${(()=>{const dovuto=orders.filter(o=>!o.daFatturare && !o.fatturato).reduce((t,o)=>t+Math.max(0,orderSaldo(o)),0); return dovuto>0.005 ? `<div style="margin:0 0 14px;padding:10px 14px;border-radius:12px;background:#FFF1EE;color:var(--danger);font-weight:800;">Da incassare in totale: ${fmtMoney(dovuto)}</div>` : "";})()}
+    ${(()=>{const dovuto=orders.filter(o=>!o.daFatturare && !o.fatturato).reduce((t,o)=>t+Math.max(0,orderSaldo(o)),0); return dovuto>0.005 ? `<div style="margin:0 0 14px;padding:10px 14px;border-radius:12px;background:#FFF1EE;color:var(--danger);font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><span>Da incassare in totale: ${fmtMoney(dovuto)}</span><span style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="printClientStatement('${c.id}')" title="Resoconto da stampare o salvare in PDF">CREA RESOCONTO</button>${waMePhone(c.telefono)?`<button class="btn btn-outline btn-sm" onclick="sendClientStatementWhatsapp('${c.id}')" title="Manda il riepilogo come messaggio WhatsApp">RESOCONTO SU WHATSAPP</button>`:""}</span></div>` : "";})()}
     <h3>Storico ordini</h3>
     ${orders.length ? orders.map(o=>`
       <div class="list-row" onclick="openJobCard('${o.id}')">
