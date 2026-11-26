@@ -3854,9 +3854,12 @@ async function prepareCatalogDatalistForOrder(orderId){
 /* ============ HELPER CLIENTI ============ */
 const FAMILY_OSP_SEP=" @ ";
 function familyRichiestaBase(c){ return String((c&&c.richiesta)||"").split(FAMILY_OSP_SEP)[0].trim(); }
-function familyOspedale(c){ const p=String((c&&c.richiesta)||"").split(FAMILY_OSP_SEP); return p.length>1?p.slice(1).join(FAMILY_OSP_SEP).trim():""; }
+const FAMILY_REP_SEP=" ## ";
+function familyOspTail(c){ const p=String((c&&c.richiesta)||"").split(FAMILY_OSP_SEP); return p.length>1?p.slice(1).join(FAMILY_OSP_SEP):""; }
+function familyOspedale(c){ return familyOspTail(c).split(FAMILY_REP_SEP)[0].trim(); }
+function familyReparto(c){ const p=familyOspTail(c).split(FAMILY_REP_SEP); return p.length>1?p.slice(1).join(" ").trim():""; }
 function clientDisplayNameBase(c){ if(!c) return "—"; return c.tipo==="Business" ? (String(c.nomeCommerciale||"").trim() || String(c.ragioneSociale||"").trim() || "—") : `${c.nome||""} ${c.cognome||""}`.trim(); }
-function clientDisplayName(c){ const b=clientDisplayNameBase(c); if(c&&c.tipo==="Family"){ const o=familyOspedale(c); if(o) return `${b} (${o})`; } return b; }
+function clientDisplayName(c){ const b=clientDisplayNameBase(c); if(c&&c.tipo==="Family"){ const o=familyOspedale(c); const r=familyReparto(c); if(o||r) return `${b} (${[o,r].filter(Boolean).join(" – ")})`; } return b; }
 function clientDisplayName_old(c){ if(!c) return "—"; return c.tipo==="Business" ? (String(c.nomeCommerciale||"").trim() || String(c.ragioneSociale||"").trim() || "—") : `${c.nome||""} ${c.cognome||""}`.trim(); }
 function clientName(id){ const c = state.clients.find(x=>x.id===id); return clientDisplayName(c); }
 
@@ -9567,7 +9570,7 @@ function clientFieldsHTML(prefix, existing){
       <div class="field">${emailListFieldHtml(prefix, e.email)}</div>
       <div class="field" id="${prefix}-settore-wrap"><label>Settore merceologico <span id="${prefix}-settore-req">*</span></label><select id="${prefix}-settore">${settoreOptions(e.settore)}</select></div>
       <div class="field" id="${prefix}-richiesta-wrap" style="display:none;"><label>RICHIESTA</label><select id="${prefix}-richiesta" onchange="toggleOspedaleField('${prefix}')">${familyRichiestaOptions(familyRichiestaBase(e))}</select></div>
-      <div class="field" id="${prefix}-ospedale-wrap" style="display:none;"><label>NOME OSPEDALE / STRUTTURA <span style="color:var(--danger);">*</span></label><input id="${prefix}-ospedale" placeholder="Es. San Raffaele" value="${escapeHtml(familyOspedale(e))}" autocomplete="off"></div>
+      <div id="${prefix}-ospedale-wrap" style="display:none;gap:12px;flex-wrap:wrap;grid-column:1/-1;"><div class="field" style="flex:1 1 200px;"><label>NOME OSPEDALE / STRUTTURA <span style="color:var(--danger);">*</span></label><input id="${prefix}-ospedale" placeholder="Es. San Raffaele" value="${escapeHtml(familyOspedale(e))}" autocomplete="off"></div><div class="field" style="flex:1 1 200px;"><label>REPARTO</label><input id="${prefix}-reparto" placeholder="Es. Radiodiagnostica" value="${escapeHtml(familyReparto(e))}" autocomplete="off"></div></div>
     </div>
     <p class="helptext" style="margin-top:10px;margin-bottom:18px;">Compila almeno telefono o email. Business: settore obbligatorio. Family: seleziona la richiesta prima di archiviare la scheda tra i clienti completati.</p>
 
@@ -9671,7 +9674,7 @@ function toggleOspedaleField(prefix){
   const w=document.getElementById(`${prefix}-ospedale-wrap`); if(!w) return;
   const tipo=document.getElementById(`${prefix}-tipo`)?.value;
   const r=document.getElementById(`${prefix}-richiesta`)?.value;
-  w.style.display = (tipo==="Family" && r==="Felpe per reparti") ? "block" : "none";
+  w.style.display = (tipo==="Family" && r==="Felpe per reparti") ? "flex" : "none";
 }
 function toggleClientTypeFields(prefix){
   const tipo = document.getElementById(`${prefix}-tipo`).value;
@@ -9738,7 +9741,8 @@ async function createClientFromPrefixInner(prefix, existingId){
     if(richiesta==="Felpe per reparti"){
       const osp = (document.getElementById(`${prefix}-ospedale`)?.value||"").trim();
       if(!osp){ showToast("Per «Felpe per reparti» scrivi il nome dell'ospedale"); document.getElementById(`${prefix}-ospedale`)?.focus(); return null; }
-      richiesta = richiesta+FAMILY_OSP_SEP+osp;
+      const rep = (document.getElementById(`${prefix}-reparto`)?.value||"").trim().replace(/\s*##\s*/g," ");
+      richiesta = richiesta+FAMILY_OSP_SEP+osp+(rep?FAMILY_REP_SEP+rep:"");
     }
     payload = {
       tipo, nome,
