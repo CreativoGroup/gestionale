@@ -5232,7 +5232,7 @@ function ricDelSessione(id, rid, k){
 
 /* ============ NAVIGAZIONE ============ */
 const NAV = [
-  {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard", hidden:true},
+  {id:"dashboard", label:"Dashboard", icon:"◆", subtitle:"Panoramica generale dell'attività", group:"Dashboard"},
 
   {id:"whatsappWeb", label:"WhatsApp Web", icon:"◉", subtitle:"Apre WhatsApp Web", group:"Traffico", externalUrl:"https://web.whatsapp.com/", hidden:true},
   {id:"whatsapp", label:"WhatsApp", icon:"◉", subtitle:"Messaggi WhatsApp Business", group:"Traffico"},
@@ -5247,7 +5247,7 @@ const NAV = [
   {id:"ricami", label:"Ricami", icon:"✣", subtitle:"Felpe per reparti e altri ricami: coda, tempo previsto e tempo reale", group:"Operativa"},
   {id:"magazzino", label:"Magazzino", icon:"▥", subtitle:"Solo giacenze reali disponibili", group:"Operativa"},
   {id:"lavoriCompletatiMenu", label:"Lavori completati", icon:"✓", subtitle:"Da consegnare, completati recenti e crediti da incassare", group:"Operativa", goto:"lavoriCompletati"},
-  {id:"lavoriCompletati", label:"LAVORI COMPLETATI E CREDITI APERTI", icon:"✓", subtitle:"Da consegnare, completati recenti e crediti da incassare", group:"Dashboard"},
+  {id:"lavoriCompletati", label:"LAVORI COMPLETATI E CREDITI APERTI", icon:"✓", subtitle:"Da consegnare, completati recenti e crediti da incassare", group:"Dashboard", hidden:true},
 
   {id:"clienti", label:"Clienti", icon:"●", subtitle:"Anagrafica clienti Business e Family", group:"Archivio"},
   {id:"dropbox", label:"Dropbox", icon:"☁", subtitle:"Archivio file collegato al gestionale", group:"Archivio"},
