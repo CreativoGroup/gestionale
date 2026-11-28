@@ -6863,25 +6863,65 @@ function discardLead(id){
 async function linkLeadToExistingClient(id){
   const l=(state.leads||[]).find(x=>x.id===id);
   if(!l) return;
-  const matches=(state.clients||[]).filter(c=>{
-    const email=String(c.email||"").toLowerCase();
-    const term=String(l.email||"").toLowerCase();
-    return term && email===term;
-  });
-
-  const options=(state.clients||[]).map(c=>`<option value="${c.id}" ${matches.some(m=>m.id===c.id)?"selected":""}>${escapeHtml(clientDisplayName(c))}${c.email?` — ${escapeHtml(c.email)}`:""}</option>`).join("");
-
   document.getElementById("modalBody").innerHTML=`
     <button class="close-x" onclick="closeModal()">×</button>
     <h2>${isOrderLeadSource(l.fonte) ? "Usa cliente esistente" : "Collega Lead a cliente"}</h2>
-    <p style="color:var(--muted);">${isOrderLeadSource(l.fonte) ? "Scegli il cliente esistente e apri subito il nuovo ordine." : "Scegli il cliente esistente. Il Lead verrà segnato come Accettato e si aprirà subito un nuovo ordine con il cliente già selezionato."}</p>
-    <div class="field"><label>Cliente</label><select id="lead-client-link"><option value="">Seleziona cliente…</option>${options}</select></div>
+    <p style="color:var(--muted);">${isOrderLeadSource(l.fonte) ? "Cerca il cliente esistente (nome, email o telefono), cliccalo e apri subito il nuovo ordine." : "Cerca il cliente esistente e cliccalo. Il Lead verrà segnato come Accettato e si aprirà subito un nuovo ordine con il cliente già selezionato."}</p>
+    <input type="hidden" id="lead-client-link" value="">
+    <div class="field"><label>Cerca cliente</label><input id="lead-client-link-q" placeholder="Scrivi il nome del cliente, l'email o il telefono…" oninput="leadLinkSearch('${id}')"></div>
+    <div id="lead-client-link-chosen" style="margin:-4px 0 10px;font-weight:700;color:var(--accent);"></div>
+    <div id="lead-client-link-results" style="max-height:330px;overflow:auto;"></div>
     <div class="form-actions">
       <button class="btn btn-primary" onclick="finishLinkLeadToClient('${id}', true)">Collega cliente ed effettua ordine</button>
       <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
     </div>
   `;
   document.getElementById("modalBackdrop").classList.add("open");
+  leadLinkSearch(id);
+  setTimeout(()=>{ const q=document.getElementById("lead-client-link-q"); if(q) q.focus(); },60);
+}
+/* Clienti suggeriti per una richiesta: stessa email/telefono, oppure nome del cliente scritto nell'oggetto o nel testo della mail */
+function leadLinkSuggestions(l){
+  const mails=splitEmails(l.email||"").map(x=>x.toLowerCase());
+  const tel=String(l.telefono||"").replace(/\D/g,"").slice(-9);
+  const text=" "+clientSearchNorm([l.azienda,l.oggettoRichiesta,leadReqParse(l.richiesta).text,l.nome].filter(Boolean).join(" ")).replace(/[^a-z0-9]+/g," ")+" ";
+  const out=[];
+  (state.clients||[]).forEach(c=>{
+    let score=0;
+    if(mails.length && splitEmails(c.email||"").some(x=>mails.includes(x.toLowerCase()))) score=3;
+    else if(tel.length>=6 && String(c.telefono||"").replace(/\D/g,"").endsWith(tel)) score=3;
+    else {
+      [clientDisplayName(c),c.ragioneSociale,c.nomeCommerciale].filter(Boolean).forEach(nm=>{
+        const k=clientSearchNorm(nm).replace(/[^a-z0-9]+/g," ").trim();
+        if(k.length>=4 && text.includes(" "+k+" ")) score=Math.max(score,2);
+      });
+    }
+    if(score) out.push({c,score});
+  });
+  return out.sort((a,b)=>b.score-a.score).map(x=>x.c);
+}
+function leadLinkSearch(id){
+  const l=(state.leads||[]).find(x=>x.id===id)||{};
+  const box=document.getElementById("lead-client-link-results"); if(!box) return;
+  const n=clientSearchNorm(document.getElementById("lead-client-link-q")?.value||"");
+  let list, title="";
+  if(n){
+    list=(state.clients||[]).filter(c=>{
+      const hay=clientSearchNorm([clientDisplayName(c),c.ragioneSociale,c.nomeCommerciale,c.refNome,c.refCognome,c.nome,c.cognome,c.telefono,c.email].join(" "));
+      return n.split(/\s+/).every(t=>hay.includes(t));
+    }).sort((a,b)=>clientDisplayName(a).localeCompare(clientDisplayName(b),"it")).slice(0,30);
+  }else{
+    list=leadLinkSuggestions(l).slice(0,8);
+    title=list.length?`<div class="helptext" style="margin-bottom:6px;">Clienti suggeriti per questa richiesta:</div>`:`<div class="helptext">Scrivi qui sopra per cercare il cliente.</div>`;
+  }
+  const sel=document.getElementById("lead-client-link")?.value||"";
+  box.innerHTML=title+(list.length ? list.map(c=>`<div class="list-row" style="${c.id===sel?"border-color:var(--accent);":""}" onclick="leadLinkPick('${id}','${c.id}')"><div><div class="lr-main">${escapeHtml(clientDisplayName(c))}</div><div class="lr-sub">${escapeHtml([c.telefono,splitEmails(c.email||"").join(", ")].filter(Boolean).join(" · "))}</div></div>${c.id===sel?"<b>✓</b>":""}</div>`).join("") : (n?`<p class="empty">Nessun cliente trovato.</p>`:""));
+}
+function leadLinkPick(id,clientId){
+  const c=(state.clients||[]).find(x=>x.id===clientId); if(!c) return;
+  const h=document.getElementById("lead-client-link"); if(h) h.value=clientId;
+  const ch=document.getElementById("lead-client-link-chosen"); if(ch) ch.textContent="Cliente scelto: "+clientDisplayName(c);
+  leadLinkSearch(id);
 }
 
 async function finishLinkLeadToClient(id, inserisciOrdine=false){
